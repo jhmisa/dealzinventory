@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Pencil, Trash2, Zap } from 'lucide-react'
+import { Plus, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -10,7 +10,6 @@ import { AiConfigFormDialog, AiConfigTest, AiPromptList } from '@/components/set
 import {
   useAiConfigurations,
   useDeleteAiConfiguration,
-  useSetActiveAiConfiguration,
 } from '@/hooks/use-ai-configurations'
 import { formatDateTime } from '@/lib/utils'
 import type { AiConfiguration } from '@/lib/types'
@@ -23,7 +22,6 @@ export default function AiSettingsPage() {
 
   const { data: configs, isLoading } = useAiConfigurations()
   const deleteMutation = useDeleteAiConfiguration()
-  const setActiveMutation = useSetActiveAiConfiguration()
 
   function handleEdit(config: AiConfiguration) {
     setEditConfig(config)
@@ -41,21 +39,16 @@ export default function AiSettingsPage() {
     })
   }
 
-  function handleSetActive(config: AiConfiguration) {
-    if (!config.last_test_at) {
-      toast.error('Test the configuration first before setting it active')
-      return
-    }
-    setActiveMutation.mutate(config.id, {
-      onSuccess: () => toast.success(`${config.service_name} is now active`),
-      onError: (err) => toast.error(`Failed: ${err.message}`),
-    })
+  const PURPOSE_LABELS: Record<string, string> = {
+    invoice_parsing: 'Invoice Parsing',
+    image_enhancement: 'Image Enhancement',
+    general: 'General',
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <PageHeader title="AI Configuration" description="Configure AI services for invoice parsing." />
+        <PageHeader title="AI Configuration" description="Configure AI services. Each service is matched by its purpose automatically." />
         <Button onClick={() => { setEditConfig(null); setFormOpen(true) }}>
           <Plus className="h-4 w-4 mr-2" />
           Add AI Service
@@ -84,22 +77,11 @@ export default function AiSettingsPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <CardTitle className="text-base">{config.service_name}</CardTitle>
-                    {config.is_active && (
-                      <Badge className="bg-green-100 text-green-800 border-green-300">Active</Badge>
-                    )}
+                    <Badge variant="outline">
+                      {PURPOSE_LABELS[(config as Record<string, unknown>).purpose as string] ?? 'General'}
+                    </Badge>
                   </div>
                   <div className="flex items-center gap-2">
-                    {!config.is_active && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleSetActive(config)}
-                        disabled={setActiveMutation.isPending}
-                      >
-                        <Zap className="h-3 w-3 mr-1" />
-                        Set Active
-                      </Button>
-                    )}
                     <Button variant="outline" size="sm" onClick={() => setTestConfig(testConfig?.id === config.id ? null : config)}>
                       Test
                     </Button>
