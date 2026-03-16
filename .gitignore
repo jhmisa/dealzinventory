@@ -29,3 +29,4 @@ dist-ssr
 .agent/
 .agents/
 .cursor/
+.vercel
