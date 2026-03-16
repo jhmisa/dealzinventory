@@ -242,11 +242,11 @@ export function PhotoSection({ productId, existingMedia, className }: PhotoSecti
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-3">
+          <div className="flex gap-2">
             {/* Drag & Drop area */}
             <div
               className={cn(
-                'flex-1 border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors',
+                'flex-1 border-2 border-dashed rounded-lg px-4 py-3 text-center cursor-pointer transition-colors flex items-center gap-3',
                 isDragging
                   ? 'border-primary bg-primary/5'
                   : 'border-muted-foreground/25 hover:border-primary/50',
@@ -256,13 +256,15 @@ export function PhotoSection({ productId, existingMedia, className }: PhotoSecti
               onDrop={handleDrop}
               onClick={() => inputRef.current?.click()}
             >
-              <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground">
-                Drag & drop images here, or click to browse
-              </p>
-              <p className="text-xs text-muted-foreground/70 mt-1">
-                Images are automatically processed into 3 sizes (2048, 1080, 256px)
-              </p>
+              <Upload className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+              <div className="text-left">
+                <p className="text-sm text-muted-foreground">
+                  Drop images or click to browse
+                </p>
+                <p className="text-xs text-muted-foreground/60">
+                  Auto-processed to 3 sizes
+                </p>
+              </div>
               <input
                 ref={inputRef}
                 type="file"
@@ -278,11 +280,11 @@ export function PhotoSection({ productId, existingMedia, className }: PhotoSecti
 
             {/* Take Photo button */}
             <div
-              className="border-2 border-dashed rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer transition-colors border-muted-foreground/25 hover:border-primary/50 hover:bg-primary/5 min-w-[120px]"
+              className="border-2 border-dashed rounded-lg px-4 py-3 flex items-center gap-2 cursor-pointer transition-colors border-muted-foreground/25 hover:border-primary/50 hover:bg-primary/5"
               onClick={handleCameraClick}
             >
-              <Camera className="h-8 w-8 text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground font-medium">Take Photo</p>
+              <Camera className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+              <p className="text-sm text-muted-foreground font-medium whitespace-nowrap">Take Photo</p>
             </div>
 
             {/* Hidden camera input for mobile */}

@@ -297,13 +297,13 @@ export function VideoSection({ productId, existingMedia, className }: VideoSecti
 
           {!selectedFile ? (
             <div className="space-y-4">
-              <div className="flex gap-3">
+              <div className="flex gap-2">
                 {/* File upload area */}
                 <div
-                  className="flex-1 border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors border-muted-foreground/25 hover:border-primary/50"
+                  className="flex-1 border-2 border-dashed rounded-lg px-4 py-3 cursor-pointer transition-colors border-muted-foreground/25 hover:border-primary/50 flex items-center gap-3"
                   onClick={() => inputRef.current?.click()}
                 >
-                  <Video className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                  <Video className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                   <p className="text-sm text-muted-foreground">
                     Click to select a video file
                   </p>
@@ -321,11 +321,11 @@ export function VideoSection({ productId, existingMedia, className }: VideoSecti
 
                 {/* Record Video button */}
                 <div
-                  className="border-2 border-dashed rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer transition-colors border-muted-foreground/25 hover:border-primary/50 hover:bg-primary/5 min-w-[120px]"
+                  className="border-2 border-dashed rounded-lg px-4 py-3 flex items-center gap-2 cursor-pointer transition-colors border-muted-foreground/25 hover:border-primary/50 hover:bg-primary/5"
                   onClick={handleCameraClick}
                 >
-                  <Camera className="h-8 w-8 text-muted-foreground mb-2" />
-                  <p className="text-sm text-muted-foreground font-medium">Record Video</p>
+                  <Camera className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                  <p className="text-sm text-muted-foreground font-medium whitespace-nowrap">Record Video</p>
                 </div>
 
                 {/* Hidden camera input for mobile */}
