@@ -358,7 +358,7 @@ export function PhotoSection({ productId, existingMedia, className }: PhotoSecti
           <CardContent>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
               {photos.map((photo) => (
-                <div key={photo.id} className="group relative">
+                <div key={photo.id} className="group space-y-2">
                   <div className="aspect-square rounded-lg overflow-hidden border bg-muted">
                     <img
                       src={photo.file_url}
@@ -366,24 +366,28 @@ export function PhotoSection({ productId, existingMedia, className }: PhotoSecti
                       className="w-full h-full object-cover"
                     />
                   </div>
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 rounded-lg transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                  {/* Action buttons below photo — always visible on mobile, hover on desktop */}
+                  <div className="flex items-center gap-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                     <Button
-                      variant="secondary"
-                      size="icon"
-                      className="h-8 w-8"
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 h-8 text-xs"
                       onClick={() => handleEnhance(photo.file_url)}
-                      title="Enhance with AI"
                     >
-                      <Sparkles className="h-4 w-4" />
+                      <Sparkles className="h-3.5 w-3.5 mr-1" />
+                      Enhance
                     </Button>
                     <Button
-                      variant="destructive"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => handleDelete(photo.id)}
-                      title="Delete photo"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => {
+                        if (window.confirm('Delete this photo?')) {
+                          handleDelete(photo.id)
+                        }
+                      }}
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                 </div>
