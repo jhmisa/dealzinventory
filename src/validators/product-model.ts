@@ -1,0 +1,34 @@
+import { z } from 'zod'
+
+export const productModelSchema = z.object({
+  brand: z.string().min(1, 'Brand is required'),
+  model_name: z.string().min(1, 'Model name is required'),
+  color: z.string().min(1, 'Color is required'),
+  category_id: z.string().min(1, 'Category is required'),
+  chipset: z.string().optional().or(z.literal('')),
+  screen_size: z.coerce.number().positive().optional().or(z.literal(0).transform(() => undefined)),
+  ports: z.string().optional().or(z.literal('')),
+  year: z.coerce.number().int().positive().optional().or(z.literal(0).transform(() => undefined)),
+  other_features: z.string().optional().or(z.literal('')),
+  model_notes: z.string().optional().or(z.literal('')),
+  device_category: z.enum(['IPHONE', 'ANDROID', 'COMPUTER', 'TABLET', 'OTHER']).default('COMPUTER'),
+  cpu: z.string().optional().or(z.literal('')),
+  ram_gb: z.coerce.number().int().positive().optional().or(z.literal(0).transform(() => undefined)),
+  storage_gb: z.coerce.number().int().positive().optional().or(z.literal(0).transform(() => undefined)),
+  os_family: z.string().optional().or(z.literal('')),
+  gpu: z.string().optional().or(z.literal('')),
+  carrier: z.string().optional().or(z.literal('')),
+  is_unlocked: z.boolean().default(true),
+  keyboard_layout: z.string().optional().or(z.literal('')),
+  has_touchscreen: z.boolean().default(false),
+  has_thunderbolt: z.boolean().default(false),
+  supports_stylus: z.boolean().default(false),
+  has_cellular: z.boolean().default(false),
+  imei_slot_count: z.coerce.number().int().nonnegative().optional().or(z.literal(0).transform(() => undefined)),
+  match_pattern: z.string().optional().or(z.literal('')),
+  match_priority: z.coerce.number().int().default(0),
+  status: z.enum(['DRAFT', 'ACTIVE']).default('DRAFT'),
+  short_description: z.string().optional().or(z.literal('')),
+})
+
+export type ProductModelFormValues = z.infer<typeof productModelSchema>

@@ -1,0 +1,149 @@
+import { supabase } from '@/lib/supabase'
+import type { Customer, CustomerUpdate } from '@/lib/types'
+
+interface CustomerFilters {
+  search?: string
+}
+
+export async function getCustomers(filters: CustomerFilters = {}) {
+  let query = supabase
+    .from('customers')
+    .select('*')
+    .order('created_at', { ascending: false })
+
+  if (filters.search) {
+    query = query.or(
+      `last_name.ilike.%${filters.search}%,first_name.ilike.%${filters.search}%,email.ilike.%${filters.search}%,customer_code.ilike.%${filters.search}%`
+    )
+  }
+
+  const { data, error } = await query
+  if (error) throw error
+  return data ?? []
+}
+
+export async function getCustomer(id: string) {
+  const { data, error } = await supabase
+    .from('customers')
+    .select('*')
+    .eq('id', id)
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export async function getCustomerWithDetails(id: string) {
+  const { data, error } = await supabase
+    .from('customers')
+    .select(`
+      *,
+      orders(id, order_code, order_status, total_price, created_at),
+      kaitori_requests(id, kaitori_code, request_status, auto_quote_price, final_price, created_at)
+    `)
+    .eq('id', id)
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export async function updateCustomer(id: string, updates: CustomerUpdate) {
+  const { data, error } = await supabase
+    .from('customers')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data as Customer
+}
+
+export async function generateCustomerCode(): Promise<string> {
+  const { data, error } = await supabase.rpc('generate_code', {
+    prefix: 'CUST',
+    seq_name: 'cust_code_seq',
+  })
+
+  if (error) throw error
+  return data as string
+}
+
+export async function verifyCustomerId(id: string) {
+  return updateCustomer(id, {
+    id_verified: true,
+    id_verified_at: new Date().toISOString(),
+  })
+}
+
+export async function getCustomerOrders(customerId: string) {
+  const { data, error } = await supabase
+    .from('orders')
+    .select(`
+      *,
+      sell_groups(sell_group_code, product_models(brand, model_name, cpu, ram_gb, storage_gb))
+    `)
+    .eq('customer_id', customerId)
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+  return data ?? []
+}
+
+export async function getCustomerKaitoriRequests(customerId: string) {
+  const { data, error } = await supabase
+    .from('kaitori_requests')
+    .select(`
+      *,
+      product_models(brand, model_name, cpu, ram_gb, storage_gb)
+    `)
+    .eq('customer_id', customerId)
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+  return data ?? []
+}
+
+// --- Customer Auth (calls Edge Function) ---
+// In production, these call the customer-auth Edge Function.
+// For MVP, we implement a simplified client-side version.
+
+export async function customerLogin(lastNam: string, emailOrPhone: string, pin: string) {
+  // Call edge function for auth
+  const { data, error } = await supabase.functions.invoke('customer-auth', {
+    body: { action: 'login', last_name: lastNam, email_or_phone: emailOrPhone, pin },
+  })
+
+  if (error) throw error
+  if (data?.error) throw new Error(data.error)
+  return data as { customer: Customer; token: string }
+}
+
+export async function customerRegister(params: {
+  last_name: string
+  first_name?: string
+  email?: string
+  phone?: string
+  pin: string
+  shipping_address?: string
+}) {
+  const code = await generateCustomerCode()
+  const { data, error } = await supabase.functions.invoke('customer-auth', {
+    body: { action: 'register', ...params, customer_code: code },
+  })
+
+  if (error) throw error
+  if (data?.error) throw new Error(data.error)
+  return data as { customer: Customer; token: string }
+}
+
+export async function customerChangePin(customerId: string, currentPin: string, newPin: string) {
+  const { data, error } = await supabase.functions.invoke('customer-auth', {
+    body: { action: 'change_pin', customer_id: customerId, current_pin: currentPin, new_pin: newPin },
+  })
+
+  if (error) throw error
+  if (data?.error) throw new Error(data.error)
+  return data
+}

@@ -1,0 +1,146 @@
+import { lazy, Suspense, type ComponentType } from 'react'
+import { createBrowserRouter, Navigate } from 'react-router-dom'
+import { AdminLayout } from '@/components/layout/admin-layout'
+import { ShopLayout } from '@/components/layout/shop-layout'
+import { CustomerLayout } from '@/components/layout/customer-layout'
+import { ProtectedRoute } from '@/components/layout/protected-route'
+import { RouteLoading } from '@/components/layout/route-loading'
+
+// Lazy-loaded page components
+const LoginPage = lazy(() => import('@/pages/admin/login'))
+const DashboardPage = lazy(() => import('@/pages/admin/dashboard'))
+const ItemListPage = lazy(() => import('@/pages/admin/items'))
+const BulkIntakePage = lazy(() => import('@/pages/admin/bulk-intake'))
+const ItemDetailPage = lazy(() => import('@/pages/admin/item-detail'))
+const QRScannerPage = lazy(() => import('@/pages/admin/qr-scanner'))
+const InspectionQueuePage = lazy(() => import('@/pages/admin/inspection-queue'))
+const InspectItemPage = lazy(() => import('@/pages/admin/inspect-item'))
+const ProductListPage = lazy(() => import('@/pages/admin/products'))
+const ProductDetailPage = lazy(() => import('@/pages/admin/product-detail'))
+const SupplierListPage = lazy(() => import('@/pages/admin/suppliers'))
+const KaitoriListPage = lazy(() => import('@/pages/admin/kaitori'))
+const KaitoriDetailPage = lazy(() => import('@/pages/admin/kaitori-detail'))
+const KaitoriPriceListPage = lazy(() => import('@/pages/admin/kaitori-price-list'))
+const SellGroupListPage = lazy(() => import('@/pages/admin/sell-groups'))
+const SellGroupDetailPage = lazy(() => import('@/pages/admin/sell-group-detail'))
+const OrderListPage = lazy(() => import('@/pages/admin/orders'))
+const OrderDetailPage = lazy(() => import('@/pages/admin/order-detail'))
+const PackingStationPage = lazy(() => import('@/pages/admin/packing-station'))
+const CustomerListPage = lazy(() => import('@/pages/admin/customers'))
+const CustomerDetailPage = lazy(() => import('@/pages/admin/customer-detail'))
+const ReportsPage = lazy(() => import('@/pages/admin/reports'))
+const ReceivingReportsPage = lazy(() => import('@/pages/admin/receiving-reports'))
+const ReceivingReportDetailPage = lazy(() => import('@/pages/admin/receiving-report-detail'))
+const CategoriesPage = lazy(() => import('@/pages/admin/categories'))
+const AiSettingsPage = lazy(() => import('@/pages/admin/ai-settings'))
+const MediaStudioPage = lazy(() => import('@/pages/admin/media-studio'))
+const ShopBrowsePage = lazy(() => import('@/pages/shop/browse'))
+const ShopProductDetailPage = lazy(() => import('@/pages/shop/product-detail'))
+const CheckoutPage = lazy(() => import('@/pages/shop/checkout'))
+const KaitoriLandingPage = lazy(() => import('@/pages/kaitori/landing'))
+const KaitoriAssessPage = lazy(() => import('@/pages/kaitori/assess'))
+const KaitoriStatusPage = lazy(() => import('@/pages/kaitori/status'))
+const CustomerLoginPage = lazy(() => import('@/pages/customer/login'))
+const CustomerRegisterPage = lazy(() => import('@/pages/customer/register'))
+const CustomerDashboardPage = lazy(() => import('@/pages/customer/dashboard'))
+const CustomerOrdersPage = lazy(() => import('@/pages/customer/orders'))
+const CustomerOrderDetailPage = lazy(() => import('@/pages/customer/order-detail'))
+const CustomerKaitoriPage = lazy(() => import('@/pages/customer/kaitori'))
+const CustomerSettingsPage = lazy(() => import('@/pages/customer/settings'))
+const CustomerVerifyIdPage = lazy(() => import('@/pages/customer/verify-id'))
+
+function lazyElement(Component: React.LazyExoticComponent<ComponentType>) {
+  return (
+    <Suspense fallback={<RouteLoading />}>
+      <Component />
+    </Suspense>
+  )
+}
+
+export const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <Navigate to="/admin/dashboard" replace />,
+  },
+  {
+    path: '/admin/login',
+    element: lazyElement(LoginPage),
+  },
+  {
+    element: <ProtectedRoute />,
+    children: [
+      {
+        path: '/admin',
+        element: <AdminLayout />,
+        children: [
+          { index: true, element: <Navigate to="/admin/dashboard" replace /> },
+          { path: 'dashboard', element: lazyElement(DashboardPage) },
+          { path: 'items', element: lazyElement(ItemListPage) },
+          { path: 'items/intake', element: lazyElement(BulkIntakePage) },
+          { path: 'items/scan', element: lazyElement(QRScannerPage) },
+          { path: 'items/:id', element: lazyElement(ItemDetailPage) },
+          { path: 'inspection', element: lazyElement(InspectionQueuePage) },
+          { path: 'inspection/:id', element: lazyElement(InspectItemPage) },
+          { path: 'products', element: lazyElement(ProductListPage) },
+          { path: 'products/:id', element: lazyElement(ProductDetailPage) },
+          { path: 'products/:id/media-studio', element: lazyElement(MediaStudioPage) },
+          { path: 'categories', element: lazyElement(CategoriesPage) },
+          { path: 'sell-groups', element: lazyElement(SellGroupListPage) },
+          { path: 'sell-groups/:id', element: lazyElement(SellGroupDetailPage) },
+          { path: 'orders', element: lazyElement(OrderListPage) },
+          { path: 'orders/:id', element: lazyElement(OrderDetailPage) },
+          { path: 'packing', element: lazyElement(PackingStationPage) },
+          { path: 'kaitori', element: lazyElement(KaitoriListPage) },
+          { path: 'kaitori/:id', element: lazyElement(KaitoriDetailPage) },
+          { path: 'kaitori-prices', element: lazyElement(KaitoriPriceListPage) },
+          { path: 'customers', element: lazyElement(CustomerListPage) },
+          { path: 'customers/:id', element: lazyElement(CustomerDetailPage) },
+          { path: 'receiving-reports', element: lazyElement(ReceivingReportsPage) },
+          { path: 'receiving-reports/:id', element: lazyElement(ReceivingReportDetailPage) },
+          { path: 'reports', element: lazyElement(ReportsPage) },
+          { path: 'suppliers', element: lazyElement(SupplierListPage) },
+          { path: 'settings/ai', element: lazyElement(AiSettingsPage) },
+        ],
+      },
+    ],
+  },
+  {
+    path: '/shop',
+    element: <ShopLayout />,
+    children: [
+      { index: true, element: lazyElement(ShopBrowsePage) },
+      { path: 'product/:id', element: lazyElement(ShopProductDetailPage) },
+      { path: 'checkout/:sellGroupId', element: lazyElement(CheckoutPage) },
+    ],
+  },
+  {
+    path: '/order/:sellGroupCode',
+    element: <ShopLayout />,
+    children: [
+      { index: true, element: lazyElement(CheckoutPage) },
+    ],
+  },
+  {
+    path: '/sell',
+    element: <ShopLayout />,
+    children: [
+      { index: true, element: lazyElement(KaitoriLandingPage) },
+      { path: 'assess', element: lazyElement(KaitoriAssessPage) },
+      { path: 'status', element: lazyElement(KaitoriStatusPage) },
+    ],
+  },
+  {
+    path: '/account',
+    element: <CustomerLayout />,
+    children: [
+      { index: true, element: lazyElement(CustomerDashboardPage) },
+      { path: 'login', element: lazyElement(CustomerLoginPage) },
+      { path: 'register', element: lazyElement(CustomerRegisterPage) },
+      { path: 'orders', element: lazyElement(CustomerOrdersPage) },
+      { path: 'orders/:id', element: lazyElement(CustomerOrderDetailPage) },
+      { path: 'kaitori', element: lazyElement(CustomerKaitoriPage) },
+      { path: 'settings', element: lazyElement(CustomerSettingsPage) },
+      { path: 'verify-id', element: lazyElement(CustomerVerifyIdPage) },
+    ],
+  },
+])

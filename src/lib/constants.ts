@@ -1,0 +1,290 @@
+import type { ConditionGrade, ItemStatus, SourceType, SupplierType, ProductStatus, AcAdapterStatus, OrderStatus, OrderSource, KaitoriStatus, KaitoriDeliveryMethod, KaitoriPaymentMethod, BatteryCondition, ScreenCondition, BodyCondition, KaitoriMediaRole, IntakeAdjustmentType } from './types'
+
+// --- Device Category Groupings ---
+
+export type DeviceCategory = 'IPHONE' | 'ANDROID' | 'COMPUTER' | 'TABLET' | 'OTHER'
+
+const ALL_CATEGORIES: DeviceCategory[] = ['IPHONE', 'ANDROID', 'COMPUTER', 'TABLET', 'OTHER']
+const PHONES: DeviceCategory[] = ['IPHONE', 'ANDROID']
+const COMPUTERS: DeviceCategory[] = ['COMPUTER']
+const NON_PHONE: DeviceCategory[] = ['COMPUTER', 'TABLET', 'OTHER']
+
+// --- Inspection Checklist Constants ---
+
+export interface DefectCheckEntry {
+  key: string
+  label: string
+  categories: DeviceCategory[]
+}
+
+export interface FunctionalityCheckEntry {
+  key: string
+  label: string
+  categories: DeviceCategory[]
+}
+
+export interface SpecCheckFieldEntry {
+  key: string
+  label: string
+  type: 'text' | 'number' | 'boolean'
+  categories: DeviceCategory[]
+}
+
+export const BODY_DEFECTS: DefectCheckEntry[] = [
+  { key: 'body_scratches', label: 'Scratches', categories: ALL_CATEGORIES },
+  { key: 'body_dents', label: 'Dents', categories: ALL_CATEGORIES },
+  { key: 'body_cracks', label: 'Cracks', categories: ALL_CATEGORIES },
+  { key: 'body_discoloration', label: 'Discoloration', categories: ALL_CATEGORIES },
+  { key: 'body_missing_parts', label: 'Missing Parts', categories: ALL_CATEGORIES },
+]
+
+export const SCREEN_DEFECTS: DefectCheckEntry[] = [
+  { key: 'screen_scratches', label: 'Scratches', categories: ALL_CATEGORIES },
+  { key: 'screen_dead_pixels', label: 'Dead Pixels', categories: ALL_CATEGORIES },
+  { key: 'screen_mura', label: 'Mura (Uneven Backlight)', categories: NON_PHONE },
+  { key: 'screen_white_spots', label: 'White Spots', categories: NON_PHONE },
+  { key: 'screen_backlight_bleed', label: 'Backlight Bleed', categories: NON_PHONE },
+]
+
+export const FUNCTIONALITY_CHECKS: FunctionalityCheckEntry[] = [
+  { key: 'func_keyboard', label: 'Keyboard', categories: ['COMPUTER', 'TABLET'] },
+  { key: 'func_trackpad', label: 'Trackpad', categories: COMPUTERS },
+  { key: 'func_ports', label: 'Ports (USB, HDMI, etc.)', categories: ['COMPUTER', 'TABLET'] },
+  { key: 'func_mic_earpiece', label: 'Microphone / Earpiece', categories: PHONES },
+  { key: 'func_buttons', label: 'Buttons (Volume, Power, Mute)', categories: PHONES },
+  { key: 'func_sim', label: 'SIM Tray / eSIM / Carrier', categories: PHONES },
+  { key: 'func_touchscreen', label: 'Touchscreen', categories: ['IPHONE', 'ANDROID', 'TABLET'] },
+  { key: 'func_camera', label: 'Camera', categories: ALL_CATEGORIES },
+  { key: 'func_speakers', label: 'Speakers / Sound', categories: ALL_CATEGORIES },
+  { key: 'func_wifi', label: 'Wi-Fi', categories: ALL_CATEGORIES },
+  { key: 'func_bluetooth', label: 'Bluetooth', categories: ALL_CATEGORIES },
+]
+
+export const SPEC_CHECK_FIELDS: SpecCheckFieldEntry[] = [
+  { key: 'cpu', label: 'CPU', type: 'text', categories: NON_PHONE },
+  { key: 'ram_gb', label: 'RAM (GB)', type: 'number', categories: NON_PHONE },
+  { key: 'storage_gb', label: 'Storage (GB)', type: 'number', categories: ALL_CATEGORIES },
+  { key: 'os_family', label: 'OS Family', type: 'text', categories: NON_PHONE },
+  { key: 'screen_size', label: 'Screen Size', type: 'number', categories: NON_PHONE },
+  { key: 'keyboard_layout', label: 'Keyboard', type: 'text', categories: COMPUTERS },
+  { key: 'gpu', label: 'GPU', type: 'text', categories: COMPUTERS },
+  { key: 'color', label: 'Color', type: 'text', categories: ALL_CATEGORIES },
+  { key: 'carrier', label: 'Carrier', type: 'text', categories: PHONES },
+  { key: 'is_unlocked', label: 'Unlocked', type: 'boolean', categories: PHONES },
+  { key: 'imei', label: 'IMEI', type: 'text', categories: PHONES },
+]
+
+export const CONDITION_GRADES: { value: ConditionGrade; label: string; color: string }[] = [
+  { value: 'S', label: 'S — Brand New', color: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
+  { value: 'A', label: 'A — Very Good', color: 'bg-blue-100 text-blue-800 border-blue-300' },
+  { value: 'B', label: 'B — Good', color: 'bg-sky-100 text-sky-800 border-sky-300' },
+  { value: 'C', label: 'C — Fair', color: 'bg-amber-100 text-amber-800 border-amber-300' },
+  { value: 'D', label: 'D — As-Is', color: 'bg-orange-100 text-orange-800 border-orange-300' },
+  { value: 'J', label: 'J — Junk', color: 'bg-red-100 text-red-800 border-red-300' },
+]
+
+export const ITEM_STATUSES: { value: ItemStatus; label: string; color: string }[] = [
+  { value: 'INTAKE', label: 'Intake', color: 'bg-gray-100 text-gray-800 border-gray-300' },
+  { value: 'AVAILABLE', label: 'Available', color: 'bg-green-100 text-green-800 border-green-300' },
+  { value: 'REPAIR', label: 'Repair', color: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
+  { value: 'MISSING', label: 'Missing', color: 'bg-red-100 text-red-800 border-red-300' },
+]
+
+export const SOURCE_TYPES: { value: SourceType; label: string }[] = [
+  { value: 'AUCTION', label: 'Auction' },
+  { value: 'WHOLESALE', label: 'Wholesale' },
+  { value: 'KAITORI', label: 'Kaitori' },
+]
+
+export const SUPPLIER_TYPES: { value: SupplierType; label: string }[] = [
+  { value: 'auction', label: 'Auction House' },
+  { value: 'wholesaler', label: 'Wholesaler' },
+  { value: 'individual_kaitori', label: 'Individual (Kaitori)' },
+]
+
+export const PRODUCT_STATUSES: { value: ProductStatus; label: string; color: string }[] = [
+  { value: 'DRAFT', label: 'Draft', color: 'bg-gray-100 text-gray-800 border-gray-300' },
+  { value: 'ACTIVE', label: 'Active', color: 'bg-green-100 text-green-800 border-green-300' },
+]
+
+export const AC_ADAPTER_STATUSES: { value: AcAdapterStatus; label: string }[] = [
+  { value: 'CORRECT', label: 'Correct' },
+  { value: 'INCORRECT', label: 'Incorrect' },
+  { value: 'MISSING', label: 'Missing' },
+]
+
+export const ORDER_STATUSES: { value: OrderStatus; label: string; color: string }[] = [
+  { value: 'PENDING', label: 'Pending', color: 'bg-gray-100 text-gray-800 border-gray-300' },
+  { value: 'CONFIRMED', label: 'Confirmed', color: 'bg-blue-100 text-blue-800 border-blue-300' },
+  { value: 'PACKED', label: 'Packed', color: 'bg-indigo-100 text-indigo-800 border-indigo-300' },
+  { value: 'SHIPPED', label: 'Shipped', color: 'bg-purple-100 text-purple-800 border-purple-300' },
+  { value: 'DELIVERED', label: 'Delivered', color: 'bg-green-100 text-green-800 border-green-300' },
+  { value: 'CANCELLED', label: 'Cancelled', color: 'bg-red-100 text-red-800 border-red-300' },
+]
+
+export const ORDER_SOURCES: { value: OrderSource; label: string }[] = [
+  { value: 'SHOP', label: 'Shop' },
+  { value: 'LIVE_SELLING', label: 'Live Selling' },
+]
+
+export function getOrderStatusConfig(status: OrderStatus) {
+  return ORDER_STATUSES.find(s => s.value === status) ?? { value: status, label: status, color: 'bg-gray-100 text-gray-800 border-gray-300' }
+}
+
+export function getGradeConfig(grade: ConditionGrade | null | undefined) {
+  return CONDITION_GRADES.find(g => g.value === grade) ?? { value: grade, label: grade ?? '—', color: 'bg-gray-100 text-gray-800 border-gray-300' }
+}
+
+export function getStatusConfig(status: ItemStatus) {
+  return ITEM_STATUSES.find(s => s.value === status) ?? { value: status, label: status, color: 'bg-gray-100 text-gray-800 border-gray-300' }
+}
+
+// --- Kaitori ---
+
+export const KAITORI_STATUSES: { value: KaitoriStatus; label: string; color: string }[] = [
+  { value: 'QUOTED', label: 'Quoted', color: 'bg-gray-100 text-gray-800 border-gray-300' },
+  { value: 'ACCEPTED', label: 'Accepted', color: 'bg-blue-100 text-blue-800 border-blue-300' },
+  { value: 'SHIPPED', label: 'Shipped', color: 'bg-cyan-100 text-cyan-800 border-cyan-300' },
+  { value: 'RECEIVED', label: 'Received', color: 'bg-indigo-100 text-indigo-800 border-indigo-300' },
+  { value: 'INSPECTING', label: 'Inspecting', color: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
+  { value: 'PRICE_REVISED', label: 'Price Revised', color: 'bg-orange-100 text-orange-800 border-orange-300' },
+  { value: 'APPROVED', label: 'Approved', color: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
+  { value: 'PAID', label: 'Paid', color: 'bg-green-100 text-green-800 border-green-300' },
+  { value: 'REJECTED', label: 'Rejected', color: 'bg-red-100 text-red-800 border-red-300' },
+  { value: 'CANCELLED', label: 'Cancelled', color: 'bg-red-100 text-red-800 border-red-300' },
+]
+
+export function getKaitoriStatusConfig(status: KaitoriStatus) {
+  return KAITORI_STATUSES.find(s => s.value === status) ?? { value: status, label: status, color: 'bg-gray-100 text-gray-800 border-gray-300' }
+}
+
+export const KAITORI_DELIVERY_METHODS: { value: KaitoriDeliveryMethod; label: string }[] = [
+  { value: 'SHIP', label: 'Ship (送付)' },
+  { value: 'WALK_IN', label: 'Walk-in (持込)' },
+]
+
+export const KAITORI_PAYMENT_METHODS: { value: KaitoriPaymentMethod; label: string }[] = [
+  { value: 'CASH', label: 'Cash (現金)' },
+  { value: 'BANK_TRANSFER', label: 'Bank Transfer (振込)' },
+]
+
+export const BATTERY_CONDITIONS: { value: BatteryCondition; label: string; description: string }[] = [
+  { value: 'GOOD', label: 'Good', description: '80%+ capacity, holds charge well' },
+  { value: 'FAIR', label: 'Fair', description: '50-80% capacity, drains faster' },
+  { value: 'POOR', label: 'Poor', description: 'Below 50%, needs replacement' },
+]
+
+export const SCREEN_CONDITIONS: { value: ScreenCondition; label: string; description: string }[] = [
+  { value: 'GOOD', label: 'Good', description: 'No scratches or dead pixels' },
+  { value: 'FAIR', label: 'Fair', description: 'Minor scratches, all pixels work' },
+  { value: 'POOR', label: 'Poor', description: 'Noticeable scratches or dead pixels' },
+  { value: 'CRACKED', label: 'Cracked', description: 'Screen is cracked or shattered' },
+]
+
+export const BODY_CONDITIONS: { value: BodyCondition; label: string; description: string }[] = [
+  { value: 'GOOD', label: 'Good', description: 'No dents, scratches, or scuffs' },
+  { value: 'FAIR', label: 'Fair', description: 'Light scratches or minor scuffs' },
+  { value: 'POOR', label: 'Poor', description: 'Visible dents or deep scratches' },
+  { value: 'DAMAGED', label: 'Damaged', description: 'Broken parts, missing keys/buttons' },
+]
+
+export const KAITORI_MEDIA_ROLES: { value: KaitoriMediaRole; label: string }[] = [
+  { value: 'front', label: 'Front' },
+  { value: 'back', label: 'Back' },
+  { value: 'screen', label: 'Screen' },
+  { value: 'battery_info', label: 'Battery Info' },
+  { value: 'damage', label: 'Damage' },
+  { value: 'other', label: 'Other' },
+]
+
+// --- Category Spec Fields ---
+
+export const AVAILABLE_SPEC_FIELDS: { key: string; label: string }[] = [
+  { key: 'brand', label: 'Brand' },
+  { key: 'model_name', label: 'Model Name' },
+  { key: 'color', label: 'Color' },
+  { key: 'cpu', label: 'CPU' },
+  { key: 'ram_gb', label: 'RAM (GB)' },
+  { key: 'storage_gb', label: 'Storage (GB)' },
+  { key: 'os_family', label: 'OS Family' },
+  { key: 'gpu', label: 'GPU' },
+  { key: 'carrier', label: 'Carrier' },
+  { key: 'is_unlocked', label: 'Unlocked' },
+  { key: 'keyboard_layout', label: 'Keyboard Layout' },
+  { key: 'screen_size', label: 'Screen Size' },
+  { key: 'has_touchscreen', label: 'Touchscreen' },
+  { key: 'has_thunderbolt', label: 'Thunderbolt' },
+  { key: 'supports_stylus', label: 'Stylus Support' },
+  { key: 'has_cellular', label: 'Cellular' },
+  { key: 'imei_slot_count', label: 'IMEI Slot Count' },
+  { key: 'chipset', label: 'Chipset' },
+  { key: 'ports', label: 'Ports' },
+  { key: 'year', label: 'Year' },
+  { key: 'other_features', label: 'Other Features' },
+]
+
+// Fields always shown in the description (available even if not in form_fields)
+export const ALWAYS_DESCRIPTION_FIELDS = ['brand', 'model_name', 'color']
+
+export function getSpecFieldLabel(key: string): string {
+  return AVAILABLE_SPEC_FIELDS.find(f => f.key === key)?.label ?? key
+}
+
+// --- Intake Adjustments ---
+
+export const INTAKE_ADJUSTMENT_TYPES: { value: IntakeAdjustmentType; label: string; color: string }[] = [
+  { value: 'VOIDED', label: 'Voided', color: 'bg-gray-100 text-gray-800 border-gray-300' },
+  { value: 'RETURNED', label: 'Returned', color: 'bg-orange-100 text-orange-800 border-orange-300' },
+  { value: 'REFUNDED', label: 'Refunded', color: 'bg-blue-100 text-blue-800 border-blue-300' },
+  { value: 'MISSING', label: 'Missing', color: 'bg-red-100 text-red-800 border-red-300' },
+]
+
+export function getAdjustmentTypeConfig(type: IntakeAdjustmentType) {
+  return INTAKE_ADJUSTMENT_TYPES.find(t => t.value === type) ?? { value: type, label: type, color: 'bg-gray-100 text-gray-800 border-gray-300' }
+}
+
+// --- Audit Log Field Labels ---
+
+export const AUDIT_FIELD_LABELS: Record<string, string> = {
+  item_status: 'Status',
+  condition_grade: 'Grade',
+  product_id: 'Product',
+  category_id: 'Category',
+  supplier_id: 'Supplier',
+  source_type: 'Source Type',
+  brand: 'Brand',
+  model_name: 'Model',
+  color: 'Color',
+  short_description: 'Short Description',
+  cpu: 'CPU',
+  ram_gb: 'RAM (GB)',
+  storage_gb: 'Storage (GB)',
+  screen_size: 'Screen Size',
+  os_family: 'OS',
+  chipset: 'Chipset',
+  ports: 'Ports',
+  gpu: 'GPU',
+  year: 'Year',
+  other_features: 'Other Features',
+  keyboard_layout: 'Keyboard',
+  has_touchscreen: 'Touchscreen',
+  has_thunderbolt: 'Thunderbolt',
+  serial_number: 'Serial Number',
+  purchase_price: 'Purchase Price',
+  selling_price: 'Selling Price',
+  supplier_description: 'Supplier Description',
+  ac_adapter_status: 'AC Adapter',
+  notes: 'Notes',
+  inspected_by: 'Inspected By',
+  inspected_at: 'Inspected At',
+  intake_receipt_id: 'Intake Receipt',
+  device_category: 'Device Category',
+  battery_health_pct: 'Battery Health',
+  condition_notes: 'Condition Notes',
+  specs_notes: 'Specs Notes',
+  carrier: 'Carrier',
+  is_unlocked: 'Unlocked',
+  imei: 'IMEI',
+  imei2: 'IMEI 2',
+  kaitori_request_id: 'Kaitori Request',
+}

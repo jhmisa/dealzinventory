@@ -1,0 +1,24 @@
+import { Outlet } from 'react-router-dom'
+import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
+import { AppSidebar } from './sidebar'
+import { TopHeader } from './top-header'
+import { BreadcrumbNav } from './breadcrumb-nav'
+
+export function AdminLayout() {
+  return (
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        <TopHeader />
+        <div className="flex-1 overflow-auto">
+          <div className="px-4 py-2 md:px-6 lg:px-8">
+            <BreadcrumbNav />
+          </div>
+          <div className="px-4 pb-8 md:px-6 lg:px-8 max-w-screen-2xl">
+            <Outlet />
+          </div>
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
+  )
+}
