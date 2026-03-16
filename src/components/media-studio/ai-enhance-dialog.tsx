@@ -24,10 +24,27 @@ interface AiEnhanceDialogProps {
 }
 
 /**
- * Extract an image URL from a generic AI API response.
- * Different providers return the URL in different fields.
+ * Extract an image URL (or data URI) from a generic AI API response.
+ * Supports Gemini (base64 in candidates), OpenAI, and generic providers.
  */
-function extractImageUrl(data: Record<string, unknown>): string | null {
+function extractImageResult(data: Record<string, unknown>): string | null {
+  // --- Gemini format: candidates[0].content.parts[].inlineData ---
+  if (Array.isArray(data.candidates) && data.candidates.length > 0) {
+    const candidate = data.candidates[0] as Record<string, unknown>
+    const content = candidate.content as Record<string, unknown> | undefined
+    if (content && Array.isArray(content.parts)) {
+      for (const part of content.parts) {
+        const p = part as Record<string, unknown>
+        if (p.inlineData && typeof p.inlineData === 'object') {
+          const inline = p.inlineData as Record<string, unknown>
+          if (typeof inline.data === 'string' && typeof inline.mimeType === 'string') {
+            return `data:${inline.mimeType};base64,${inline.data}`
+          }
+        }
+      }
+    }
+  }
+
   // Direct image_url field
   if (typeof data.image_url === 'string') return data.image_url
 
@@ -47,6 +64,28 @@ function extractImageUrl(data: Record<string, unknown>): string | null {
   }
 
   return null
+}
+
+/**
+ * Fetch an image URL and return its base64 data + mime type.
+ */
+async function imageUrlToBase64(imageUrl: string): Promise<{ base64: string; mimeType: string }> {
+  const response = await fetch(imageUrl)
+  if (!response.ok) throw new Error('Failed to fetch original image for AI processing')
+  const blob = await response.blob()
+  const mimeType = blob.type || 'image/jpeg'
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const dataUrl = reader.result as string
+      // Strip the data:mime;base64, prefix
+      const base64 = dataUrl.split(',')[1]
+      resolve({ base64, mimeType })
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
 }
 
 const BUCKET = 'photo-group-media'
@@ -113,15 +152,19 @@ export function AiEnhanceDialog({
       // Build request body — adapt to provider format
       let body: string
       if (isGemini) {
+        // Fetch the original image and convert to base64 for Gemini
+        const { base64, mimeType } = await imageUrlToBase64(originalImageUrl)
+
         body = JSON.stringify({
           contents: [{
             parts: [
               { text: promptText },
-              { inline_data: { mime_type: 'image/jpeg', data: '' } },
+              { inlineData: { mimeType, data: base64 } },
             ],
           }],
-          // For Imagen via Gemini
-          ...(url.includes('imagen') ? { prompt: promptText, image: { imageUri: originalImageUrl } } : {}),
+          generationConfig: {
+            responseModalities: ['TEXT', 'IMAGE'],
+          },
         })
       } else {
         body = JSON.stringify({
@@ -137,11 +180,12 @@ export function AiEnhanceDialog({
       })
 
       if (!response.ok) {
-        throw new Error(`AI API returned ${response.status}: ${response.statusText}`)
+        const errorText = await response.text().catch(() => response.statusText)
+        throw new Error(`AI API returned ${response.status}: ${errorText}`)
       }
 
       const data = (await response.json()) as Record<string, unknown>
-      const resultUrl = extractImageUrl(data)
+      const resultUrl = extractImageResult(data)
 
       if (!resultUrl) {
         throw new Error('Could not find image URL in API response')
