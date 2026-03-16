@@ -216,7 +216,7 @@ export default function BulkIntakePage() {
   // Data hooks
   const { data: suppliers } = useSuppliers()
   const { data: products } = useProductModelsWithHeroImage()
-  const { data: activeAiConfig } = useActiveAiConfiguration()
+  const { data: activeAiConfig } = useActiveAiConfiguration('invoice_parsing')
 
   // Mutation hooks
   const uploadMutation = useUploadInvoiceFile()

@@ -15,13 +15,17 @@ export async function getActiveAiConfiguration(purpose?: string) {
   let query = supabase
     .from('ai_configurations')
     .select('*')
-    .eq('is_active', true)
 
   if (purpose) {
+    // Look up by purpose — no need for is_active toggle
     query = query.eq('purpose', purpose)
+  } else {
+    // Fallback: get any active one (legacy behavior)
+    query = query.eq('is_active', true)
   }
 
-  const { data, error } = await query.maybeSingle()
+  // If multiple configs for same purpose, pick the most recently created
+  const { data, error } = await query.order('created_at', { ascending: false }).limit(1).maybeSingle()
 
   if (error) throw error
   return data as AiConfiguration | null
