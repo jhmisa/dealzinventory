@@ -10,10 +10,10 @@ export function useAiConfigurations() {
   })
 }
 
-export function useActiveAiConfiguration() {
+export function useActiveAiConfiguration(purpose?: string) {
   return useQuery({
-    queryKey: queryKeys.aiConfigurations.active(),
-    queryFn: () => aiConfigService.getActiveAiConfiguration(),
+    queryKey: [...queryKeys.aiConfigurations.active(), purpose],
+    queryFn: () => aiConfigService.getActiveAiConfiguration(purpose),
   })
 }
 

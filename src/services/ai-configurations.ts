@@ -11,12 +11,17 @@ export async function getAiConfigurations() {
   return data as AiConfiguration[]
 }
 
-export async function getActiveAiConfiguration() {
-  const { data, error } = await supabase
+export async function getActiveAiConfiguration(purpose?: string) {
+  let query = supabase
     .from('ai_configurations')
     .select('*')
     .eq('is_active', true)
-    .maybeSingle()
+
+  if (purpose) {
+    query = query.eq('purpose', purpose)
+  }
+
+  const { data, error } = await query.maybeSingle()
 
   if (error) throw error
   return data as AiConfiguration | null

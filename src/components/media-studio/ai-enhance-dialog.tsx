@@ -63,7 +63,7 @@ export function AiEnhanceDialog({
   const [saving, setSaving] = useState(false)
 
   const { data: prompts, isLoading: promptsLoading } = useActiveAiPrompts('image')
-  const { data: aiConfig, isLoading: configLoading } = useActiveAiConfiguration()
+  const { data: aiConfig, isLoading: configLoading } = useActiveAiConfiguration('image_enhancement')
   const addMediaMutation = useAddProductMedia()
 
   function handleClose() {
@@ -86,16 +86,54 @@ export function AiEnhanceDialog({
         .replace(/\{image_url\}/g, originalImageUrl)
         .replace(/\{original_url\}/g, originalImageUrl)
 
-      const response = await fetch(aiConfig.api_endpoint_url, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${aiConfig.api_key_encrypted}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const apiKey = aiConfig.api_key_encrypted
+      let url = aiConfig.api_endpoint_url
+
+      // Build headers based on provider
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      }
+
+      // Detect provider from URL to set correct auth
+      const isGemini = url.includes('generativelanguage.googleapis.com') || url.includes('google')
+      const isOpenAI = url.includes('openai.com')
+
+      if (isGemini) {
+        // Gemini uses ?key= query parameter
+        const separator = url.includes('?') ? '&' : '?'
+        url = `${url}${separator}key=${apiKey}`
+      } else if (isOpenAI) {
+        headers['Authorization'] = `Bearer ${apiKey}`
+      } else {
+        // Generic: try both common auth patterns
+        headers['Authorization'] = `Bearer ${apiKey}`
+        headers['x-api-key'] = apiKey
+      }
+
+      // Build request body — adapt to provider format
+      let body: string
+      if (isGemini) {
+        body = JSON.stringify({
+          contents: [{
+            parts: [
+              { text: promptText },
+              { inline_data: { mime_type: 'image/jpeg', data: '' } },
+            ],
+          }],
+          // For Imagen via Gemini
+          ...(url.includes('imagen') ? { prompt: promptText, image: { imageUri: originalImageUrl } } : {}),
+        })
+      } else {
+        body = JSON.stringify({
           prompt: promptText,
           image_url: originalImageUrl,
-        }),
+        })
+      }
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body,
       })
 
       if (!response.ok) {
