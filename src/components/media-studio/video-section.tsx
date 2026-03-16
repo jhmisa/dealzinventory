@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react'
-import { Video, Upload, Trash2, Loader2 } from 'lucide-react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { Video, Upload, Trash2, Loader2, Camera, X, CircleDot, Square } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -27,6 +27,13 @@ interface VideoSectionProps {
 
 const BUCKET = 'photo-group-media'
 
+/** Create a synthetic FileList from a single File (needed to reuse handleFileSelect) */
+function createFileList(file: File): FileList {
+  const dt = new DataTransfer()
+  dt.items.add(file)
+  return dt.files
+}
+
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
@@ -42,6 +49,17 @@ export function VideoSection({ productId, existingMedia, className }: VideoSecti
   const [processedPreviewUrl, setProcessedPreviewUrl] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+
+  // Camera recording state
+  const [cameraOpen, setCameraOpen] = useState(false)
+  const [recording, setRecording] = useState(false)
+  const [recordingTime, setRecordingTime] = useState(0)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const addMediaMutation = useAddProductMedia()
   const deleteMediaMutation = useDeleteProductMedia()
@@ -145,6 +163,119 @@ export function VideoSection({ productId, existingMedia, className }: VideoSecti
     setProcessProgress(0)
   }
 
+  // Check if this is a mobile device
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+
+  function handleCameraClick() {
+    if (isMobile) {
+      cameraInputRef.current?.click()
+    } else {
+      openCamera()
+    }
+  }
+
+  async function openCamera() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1080 }, height: { ideal: 1080 } },
+        audio: false, // No audio needed — we strip it anyway
+      })
+      streamRef.current = stream
+      setCameraOpen(true)
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+        }
+      }, 50)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not access camera'
+      toast.error(`Camera error: ${message}`)
+    }
+  }
+
+  function closeCamera() {
+    stopRecording()
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop())
+      streamRef.current = null
+    }
+    setCameraOpen(false)
+    setRecordingTime(0)
+  }
+
+  function startRecording() {
+    if (!streamRef.current) return
+
+    chunksRef.current = []
+
+    // Pick a supported mime type
+    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+      ? 'video/webm;codecs=vp9'
+      : MediaRecorder.isTypeSupported('video/webm')
+        ? 'video/webm'
+        : 'video/mp4'
+
+    const recorder = new MediaRecorder(streamRef.current, { mimeType })
+
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) chunksRef.current.push(e.data)
+    }
+
+    recorder.onstop = () => {
+      const blob = new Blob(chunksRef.current, { type: mimeType })
+      const file = new File([blob], `recording_${Date.now()}.webm`, { type: mimeType })
+      handleFileSelect(createFileList(file))
+      closeCamera()
+      toast.success('Video recorded! Process it to optimize.')
+    }
+
+    recorder.start(1000) // collect data every second
+    recorderRef.current = recorder
+    setRecording(true)
+    setRecordingTime(0)
+
+    // Start timer
+    timerRef.current = setInterval(() => {
+      setRecordingTime((prev) => {
+        const next = prev + 1
+        if (next >= VIDEO_SPECS.maxDurationSec) {
+          stopRecording()
+        }
+        return next
+      })
+    }, 1000)
+  }
+
+  const stopRecording = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
+    if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+      recorderRef.current.stop()
+    }
+    recorderRef.current = null
+    setRecording(false)
+  }, [])
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop())
+      }
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+      }
+    }
+  }, [])
+
+  function formatTime(seconds: number): string {
+    const m = Math.floor(seconds / 60)
+    const s = seconds % 60
+    return `${m}:${String(s).padStart(2, '0')}`
+  }
+
   return (
     <div className={cn('space-y-6', className)}>
       {/* Upload & Process Area */}
@@ -165,24 +296,107 @@ export function VideoSection({ productId, existingMedia, className }: VideoSecti
           </div>
 
           {!selectedFile ? (
-            <div
-              className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors border-muted-foreground/25 hover:border-primary/50"
-              onClick={() => inputRef.current?.click()}
-            >
-              <Video className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground">
-                Click to select a video file
-              </p>
-              <input
-                ref={inputRef}
-                type="file"
-                accept="video/*"
-                className="hidden"
-                onChange={(e) => {
-                  handleFileSelect(e.target.files)
-                  e.target.value = ''
-                }}
-              />
+            <div className="space-y-4">
+              <div className="flex gap-3">
+                {/* File upload area */}
+                <div
+                  className="flex-1 border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors border-muted-foreground/25 hover:border-primary/50"
+                  onClick={() => inputRef.current?.click()}
+                >
+                  <Video className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                  <p className="text-sm text-muted-foreground">
+                    Click to select a video file
+                  </p>
+                  <input
+                    ref={inputRef}
+                    type="file"
+                    accept="video/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      handleFileSelect(e.target.files)
+                      e.target.value = ''
+                    }}
+                  />
+                </div>
+
+                {/* Record Video button */}
+                <div
+                  className="border-2 border-dashed rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer transition-colors border-muted-foreground/25 hover:border-primary/50 hover:bg-primary/5 min-w-[120px]"
+                  onClick={handleCameraClick}
+                >
+                  <Camera className="h-8 w-8 text-muted-foreground mb-2" />
+                  <p className="text-sm text-muted-foreground font-medium">Record Video</p>
+                </div>
+
+                {/* Hidden camera input for mobile */}
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="video/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => {
+                    handleFileSelect(e.target.files)
+                    e.target.value = ''
+                  }}
+                />
+              </div>
+
+              {/* Live Camera Viewfinder (desktop) */}
+              {cameraOpen && (
+                <div className="rounded-lg overflow-hidden border bg-black relative">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full max-h-[500px] object-contain"
+                  />
+
+                  {/* Recording indicator */}
+                  {recording && (
+                    <div className="absolute top-4 left-4 flex items-center gap-2 bg-black/60 rounded-full px-3 py-1.5">
+                      <div className="h-3 w-3 rounded-full bg-red-500 animate-pulse" />
+                      <span className="text-white text-sm font-mono">
+                        {formatTime(recordingTime)} / {formatTime(VIDEO_SPECS.maxDurationSec)}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-3">
+                    {!recording ? (
+                      <Button
+                        size="lg"
+                        variant="destructive"
+                        className="rounded-full h-14 w-14 shadow-lg"
+                        onClick={startRecording}
+                        title="Start recording"
+                      >
+                        <CircleDot className="h-6 w-6" />
+                      </Button>
+                    ) : (
+                      <Button
+                        size="lg"
+                        variant="destructive"
+                        className="rounded-full h-14 w-14 shadow-lg"
+                        onClick={stopRecording}
+                        title="Stop recording"
+                      >
+                        <Square className="h-5 w-5" />
+                      </Button>
+                    )}
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="rounded-full h-10 w-10 shadow-lg self-center"
+                      onClick={closeCamera}
+                      title="Close camera"
+                    >
+                      <X className="h-5 w-5" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="space-y-4">
