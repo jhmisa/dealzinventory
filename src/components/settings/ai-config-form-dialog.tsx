@@ -12,6 +12,13 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Form,
   FormControl,
   FormField,
@@ -20,7 +27,7 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { useCreateAiConfiguration, useUpdateAiConfiguration } from '@/hooks/use-ai-configurations'
-import { aiConfigurationSchema, type AiConfigurationFormValues } from '@/validators/ai-configuration'
+import { aiConfigurationSchema, AI_PURPOSES, type AiConfigurationFormValues } from '@/validators/ai-configuration'
 import type { AiConfiguration } from '@/lib/types'
 
 interface AiConfigFormDialogProps {
@@ -40,6 +47,7 @@ export function AiConfigFormDialog({ open, onOpenChange, editConfig }: AiConfigF
       service_name: '',
       api_endpoint_url: '',
       api_key_encrypted: '',
+      purpose: 'general',
     },
   })
 
@@ -49,6 +57,7 @@ export function AiConfigFormDialog({ open, onOpenChange, editConfig }: AiConfigF
         service_name: editConfig?.service_name ?? '',
         api_endpoint_url: editConfig?.api_endpoint_url ?? '',
         api_key_encrypted: editConfig ? '••••••••' : '',
+        purpose: (editConfig as Record<string, unknown>)?.purpose as string ?? 'general',
       })
       setShowKey(false)
     }
@@ -59,6 +68,7 @@ export function AiConfigFormDialog({ open, onOpenChange, editConfig }: AiConfigF
       const updates: Record<string, string> = {
         service_name: values.service_name,
         api_endpoint_url: values.api_endpoint_url,
+        purpose: values.purpose,
       }
       if (values.api_key_encrypted !== '••••••••') {
         updates.api_key_encrypted = values.api_key_encrypted
@@ -108,6 +118,30 @@ export function AiConfigFormDialog({ open, onOpenChange, editConfig }: AiConfigF
                   <FormControl>
                     <Input placeholder='e.g. "Claude API", "OpenAI"' {...field} />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="purpose"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Purpose</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select purpose" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {AI_PURPOSES.map((p) => (
+                        <SelectItem key={p.value} value={p.value}>
+                          {p.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
