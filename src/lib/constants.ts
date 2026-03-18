@@ -125,7 +125,17 @@ export const ORDER_STATUSES: { value: OrderStatus; label: string; color: string 
 export const ORDER_SOURCES: { value: OrderSource; label: string }[] = [
   { value: 'SHOP', label: 'Shop' },
   { value: 'LIVE_SELLING', label: 'Live Selling' },
+  { value: 'WALK_IN', label: 'Walk-in' },
+  { value: 'FB', label: 'Facebook' },
+  { value: 'YOUTUBE', label: 'YouTube' },
 ]
+
+export const YAMATO_TIME_SLOTS = [
+  { code: '01', label: '午前中 (9:00–12:00)', label_en: 'Morning (9AM–12PM)' },
+  { code: '14', label: '14:00–16:00', label_en: '2PM–4PM' },
+  { code: '16', label: '16:00–18:00', label_en: '4PM–6PM' },
+  { code: '04', label: '18:00–20:00', label_en: '6PM–8PM' },
+] as const
 
 export function getOrderStatusConfig(status: OrderStatus) {
   return ORDER_STATUSES.find(s => s.value === status) ?? { value: status, label: status, color: 'bg-gray-100 text-gray-800 border-gray-300' }
@@ -242,6 +252,40 @@ export const INTAKE_ADJUSTMENT_TYPES: { value: IntakeAdjustmentType; label: stri
 export function getAdjustmentTypeConfig(type: IntakeAdjustmentType) {
   return INTAKE_ADJUSTMENT_TYPES.find(t => t.value === type) ?? { value: type, label: type, color: 'bg-gray-100 text-gray-800 border-gray-300' }
 }
+
+// --- Defect Types (for inspection defect-based condition tracking) ---
+
+export const DEFECT_TYPES = {
+  body: [
+    { value: 'scratch', label: 'Scratch' },
+    { value: 'dent', label: 'Dent' },
+    { value: 'crack', label: 'Crack' },
+    { value: 'discoloration', label: 'Discoloration' },
+    { value: 'missing_part', label: 'Missing Part' },
+    { value: 'sticker_residue', label: 'Sticker Residue' },
+    { value: 'other', label: 'Other' },
+  ],
+  screen: [
+    { value: 'scratch', label: 'Scratch' },
+    { value: 'dead_pixel', label: 'Dead Pixel' },
+    { value: 'crack', label: 'Crack' },
+    { value: 'mura', label: 'Mura (Uneven Backlight)' },
+    { value: 'white_spot', label: 'White Spot' },
+    { value: 'backlight_bleed', label: 'Backlight Bleed' },
+    { value: 'burn_in', label: 'Burn-in' },
+    { value: 'other', label: 'Other' },
+  ],
+  keyboard: [
+    { value: 'sticky_key', label: 'Sticky Key' },
+    { value: 'missing_key', label: 'Missing Key' },
+    { value: 'non_functional_key', label: 'Non-functional Key' },
+    { value: 'worn_keycap', label: 'Worn Keycap' },
+    { value: 'other', label: 'Other' },
+  ],
+} as const
+
+// 'other' area uses free-text input instead of dropdown
+export type DefectArea = keyof typeof DEFECT_TYPES | 'other'
 
 // --- Audit Log Field Labels ---
 
