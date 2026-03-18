@@ -1,7 +1,9 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
+import { Plus } from 'lucide-react'
 import { PageHeader, SearchBar, DataTable, StatusBadge, GradeBadge, CodeDisplay, PriceDisplay, TableSkeleton } from '@/components/shared'
+import { Button } from '@/components/ui/button'
 import {
   Select,
   SelectContent,
@@ -104,6 +106,14 @@ export default function OrderListPage() {
       <PageHeader
         title="Orders"
         description="Manage customer orders."
+        actions={
+          <Button asChild>
+            <Link to="/admin/orders/new">
+              <Plus className="h-4 w-4 mr-1" />
+              Create Order
+            </Link>
+          </Button>
+        }
       />
 
       <div className="flex items-center gap-4 flex-wrap">

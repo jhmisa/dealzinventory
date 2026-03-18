@@ -25,6 +25,7 @@ const SellGroupListPage = lazy(() => import('@/pages/admin/sell-groups'))
 const SellGroupDetailPage = lazy(() => import('@/pages/admin/sell-group-detail'))
 const OrderListPage = lazy(() => import('@/pages/admin/orders'))
 const OrderDetailPage = lazy(() => import('@/pages/admin/order-detail'))
+const CreateOrderPage = lazy(() => import('@/pages/admin/create-order'))
 const PackingStationPage = lazy(() => import('@/pages/admin/packing-station'))
 const CustomerListPage = lazy(() => import('@/pages/admin/customers'))
 const CustomerDetailPage = lazy(() => import('@/pages/admin/customer-detail'))
@@ -33,6 +34,7 @@ const ReceivingReportsPage = lazy(() => import('@/pages/admin/receiving-reports'
 const ReceivingReportDetailPage = lazy(() => import('@/pages/admin/receiving-report-detail'))
 const CategoriesPage = lazy(() => import('@/pages/admin/categories'))
 const AiSettingsPage = lazy(() => import('@/pages/admin/ai-settings'))
+const PostalCodesPage = lazy(() => import('@/pages/admin/postal-codes'))
 const MediaStudioPage = lazy(() => import('@/pages/admin/media-studio'))
 const ShopBrowsePage = lazy(() => import('@/pages/shop/browse'))
 const ShopProductDetailPage = lazy(() => import('@/pages/shop/product-detail'))
@@ -88,6 +90,7 @@ export const router = createBrowserRouter([
           { path: 'sell-groups', element: lazyElement(SellGroupListPage) },
           { path: 'sell-groups/:id', element: lazyElement(SellGroupDetailPage) },
           { path: 'orders', element: lazyElement(OrderListPage) },
+          { path: 'orders/new', element: lazyElement(CreateOrderPage) },
           { path: 'orders/:id', element: lazyElement(OrderDetailPage) },
           { path: 'packing', element: lazyElement(PackingStationPage) },
           { path: 'kaitori', element: lazyElement(KaitoriListPage) },
@@ -100,6 +103,7 @@ export const router = createBrowserRouter([
           { path: 'reports', element: lazyElement(ReportsPage) },
           { path: 'suppliers', element: lazyElement(SupplierListPage) },
           { path: 'settings/ai', element: lazyElement(AiSettingsPage) },
+          { path: 'settings/postal-codes', element: lazyElement(PostalCodesPage) },
         ],
       },
     ],
