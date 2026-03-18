@@ -110,6 +110,103 @@ export async function packOrderItem(orderItemId: string, packedBy: string) {
   return data
 }
 
+// --- Available Items for Manual Order ---
+
+interface AvailableItemFilters {
+  search?: string
+  grade?: string
+  page?: number
+  pageSize?: number
+}
+
+export async function getAvailableItems(filters: AvailableItemFilters = {}) {
+  const page = filters.page ?? 0
+  const pageSize = filters.pageSize ?? 20
+  const from = page * pageSize
+  const to = from + pageSize - 1
+
+  let query = supabase
+    .from('items')
+    .select(`
+      id, item_code, condition_grade, selling_price, item_status,
+      product_models(id, brand, model_name, color,
+        product_media(file_url, role, sort_order)
+      )
+    `, { count: 'exact' })
+    .eq('item_status', 'AVAILABLE')
+    .order('created_at', { ascending: false })
+    .range(from, to)
+
+  if (filters.search) {
+    query = query.ilike('item_code', `%${filters.search}%`)
+  }
+  if (filters.grade) {
+    query = query.eq('condition_grade', filters.grade)
+  }
+
+  const { data, error, count } = await query
+  if (error) throw error
+  return { items: data ?? [], total: count ?? 0 }
+}
+
+// --- Manual Order Creation ---
+
+interface ManualOrderInput {
+  customer_id: string
+  order_source: string
+  shipping_address: string
+  delivery_date?: string | null
+  delivery_time_code?: string | null
+  notes?: string | null
+  items: { item_id: string; unit_price: number }[]
+}
+
+export async function createManualOrder(input: ManualOrderInput) {
+  const orderCode = await generateOrderCode()
+
+  const quantity = input.items.length
+  const totalPrice = input.items.reduce((sum, item) => sum + item.unit_price, 0)
+
+  const { data: order, error: orderError } = await supabase
+    .from('orders')
+    .insert({
+      order_code: orderCode,
+      customer_id: input.customer_id,
+      order_source: input.order_source as Order['order_source'],
+      shipping_address: input.shipping_address,
+      quantity,
+      total_price: totalPrice,
+      delivery_date: input.delivery_date ?? null,
+      delivery_time_code: input.delivery_time_code ?? null,
+      notes: input.notes ?? null,
+      sell_group_id: null,
+    })
+    .select()
+    .single()
+
+  if (orderError) throw orderError
+
+  const orderItems = input.items.map((item) => ({
+    order_id: (order as Order).id,
+    item_id: item.item_id,
+    unit_price: item.unit_price,
+  }))
+
+  const { error: itemsError } = await supabase
+    .from('order_items')
+    .insert(orderItems)
+
+  if (itemsError) {
+    await supabase.from('orders').delete().eq('id', (order as Order).id)
+    if (itemsError.message.includes('unique') || itemsError.message.includes('duplicate')) {
+      throw new Error('One or more items are no longer available. Please refresh and try again.')
+    }
+    throw itemsError
+  }
+
+  return order as Order
+}
+
 // Get orders ready for packing (CONFIRMED status)
 export async function getPackableOrders() {
   const { data, error } = await supabase
