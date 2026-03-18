@@ -66,3 +66,27 @@ export function usePackOrderItem() {
     },
   })
 }
+
+interface AvailableItemFilters {
+  search?: string
+  grade?: string
+  page?: number
+}
+
+export function useAvailableItems(filters: AvailableItemFilters = {}) {
+  return useQuery({
+    queryKey: queryKeys.orders.list({ _type: 'available-items', ...filters }),
+    queryFn: () => ordersService.getAvailableItems(filters),
+  })
+}
+
+export function useCreateManualOrder() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ordersService.createManualOrder,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.items.all })
+    },
+  })
+}
