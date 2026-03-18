@@ -1,6 +1,7 @@
 import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, ShieldCheck, ShieldX } from 'lucide-react'
 import { toast } from 'sonner'
+import type { ShippingAddress } from '@/lib/address-types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -13,6 +14,7 @@ import {
   FormSkeleton,
   TableSkeleton,
   EmptyState,
+  AddressDisplay,
 } from '@/components/shared'
 import {
   useCustomerWithDetails,
@@ -68,7 +70,13 @@ export default function CustomerDetailPage() {
           <CardContent className="space-y-3">
             <InfoRow label="Email" value={customer.email ?? '-'} />
             <InfoRow label="Phone" value={customer.phone ?? '-'} />
-            <InfoRow label="Shipping Address" value={customer.shipping_address ?? '-'} />
+            <div className="space-y-1">
+              <span className="text-sm text-muted-foreground">Shipping Address</span>
+              <AddressDisplay
+                address={customer.shipping_address as ShippingAddress | null}
+                format="auto"
+              />
+            </div>
             <InfoRow label="Registered" value={formatDateTime(customer.created_at)} />
           </CardContent>
         </Card>
