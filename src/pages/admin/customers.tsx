@@ -1,12 +1,18 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
-import { useCustomers } from '@/hooks/use-customers'
+import { Plus } from 'lucide-react'
+import { toast } from 'sonner'
+import { useCustomers, useCreateCustomer } from '@/hooks/use-customers'
 import { DataTable, SearchBar, PageHeader, CodeDisplay, TableSkeleton, EmptyState } from '@/components/shared'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { ShieldCheck } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
+import { CustomerFormDialog } from '@/components/customers/customer-form-dialog'
 import type { Customer } from '@/lib/types'
+import type { AdminCreateCustomerFormValues } from '@/validators/customer'
+import type { ShippingAddress } from '@/lib/address-types'
 
 const columns: ColumnDef<Customer>[] = [
   {
@@ -68,11 +74,44 @@ const columns: ColumnDef<Customer>[] = [
 
 export default function CustomerListPage() {
   const [search, setSearch] = useState('')
+  const [dialogOpen, setDialogOpen] = useState(false)
   const { data: customers, isLoading } = useCustomers(search || undefined)
+  const createMutation = useCreateCustomer()
+
+  function handleCreate(values: AdminCreateCustomerFormValues, address: ShippingAddress | null) {
+    createMutation.mutate(
+      {
+        last_name: values.last_name,
+        first_name: values.first_name || undefined,
+        email: values.email || undefined,
+        phone: values.phone || undefined,
+        pin: values.pin,
+        shipping_address: address,
+        is_seller: values.is_seller,
+        bank_name: values.bank_name || undefined,
+        bank_branch: values.bank_branch || undefined,
+        bank_account_number: values.bank_account_number || undefined,
+        bank_account_holder: values.bank_account_holder || undefined,
+      },
+      {
+        onSuccess: () => {
+          toast.success('Customer created')
+          setDialogOpen(false)
+        },
+        onError: (err) => toast.error(`Failed to create customer: ${err.message}`),
+      },
+    )
+  }
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Customers" />
+      <div className="flex items-center justify-between">
+        <PageHeader title="Customers" />
+        <Button onClick={() => setDialogOpen(true)} size="sm">
+          <Plus className="h-4 w-4 mr-1" />
+          Add Customer
+        </Button>
+      </div>
 
       <SearchBar
         value={search}
@@ -90,6 +129,13 @@ export default function CustomerListPage() {
       ) : (
         <DataTable columns={columns} data={customers} />
       )}
+
+      <CustomerFormDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        loading={createMutation.isPending}
+        onSubmit={handleCreate}
+      />
     </div>
   )
 }
