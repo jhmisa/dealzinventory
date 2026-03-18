@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { shippingAddressSchema } from './address'
 
 export const customerLoginSchema = z.object({
   last_name: z.string().min(1, 'Last name is required'),
@@ -15,7 +16,7 @@ export const customerRegisterSchema = z.object({
   phone: z.string().optional().or(z.literal('')),
   pin: z.string().length(6, 'PIN must be 6 digits').regex(/^\d{6}$/, 'PIN must be 6 digits'),
   pin_confirm: z.string().length(6, 'PIN must be 6 digits'),
-  shipping_address: z.string().optional().or(z.literal('')),
+  shipping_address: shippingAddressSchema.nullable().optional(),
 }).refine((data) => data.pin === data.pin_confirm, {
   message: 'PINs do not match',
   path: ['pin_confirm'],
@@ -31,7 +32,7 @@ export const customerProfileSchema = z.object({
   first_name: z.string().optional().or(z.literal('')),
   email: z.string().email('Valid email required').optional().or(z.literal('')),
   phone: z.string().optional().or(z.literal('')),
-  shipping_address: z.string().optional().or(z.literal('')),
+  shipping_address: shippingAddressSchema.nullable().optional(),
   is_seller: z.boolean().default(false),
   bank_name: z.string().optional().or(z.literal('')),
   bank_branch: z.string().optional().or(z.literal('')),
@@ -51,3 +52,23 @@ export const changePinSchema = z.object({
 })
 
 export type ChangePinFormValues = z.infer<typeof changePinSchema>
+
+// Admin-side customer creation (staff sets initial PIN for the customer)
+export const adminCreateCustomerSchema = z.object({
+  last_name: z.string().min(1, 'Last name is required'),
+  first_name: z.string().optional().or(z.literal('')),
+  email: z.string().email('Valid email required').optional().or(z.literal('')),
+  phone: z.string().optional().or(z.literal('')),
+  pin: z.string().length(6, 'PIN must be 6 digits').regex(/^\d{6}$/, 'PIN must be 6 digits'),
+  shipping_address: shippingAddressSchema.nullable().optional(),
+  is_seller: z.boolean().default(false),
+  bank_name: z.string().optional().or(z.literal('')),
+  bank_branch: z.string().optional().or(z.literal('')),
+  bank_account_number: z.string().optional().or(z.literal('')),
+  bank_account_holder: z.string().optional().or(z.literal('')),
+}).refine((data) => data.email || data.phone, {
+  message: 'Email or phone is required',
+  path: ['email'],
+})
+
+export type AdminCreateCustomerFormValues = z.infer<typeof adminCreateCustomerSchema>
