@@ -23,6 +23,8 @@ The manual order creation flow uses a photo-grid item browser that doesn't match
 |--------|--------|--------|
 | `item_id` | Becomes **nullable** | NULL for ad-hoc/custom line items |
 
+The existing `UNIQUE` constraint on `item_id` must be dropped and replaced with a partial unique index (`WHERE item_id IS NOT NULL`) so that inventory items remain unique per order while multiple ad-hoc rows (NULL `item_id`) are allowed.
+
 ### `orders` table — new columns
 
 | Column | Type | Default | Purpose |
@@ -36,6 +38,7 @@ The manual order creation flow uses a photo-grid item browser that doesn't match
 - **Total discount** = sum of all per-line `discount` values (informational only in summary)
 - **Total** = Order subtotal + `shipping_cost`
 - The existing `total_price` column on `orders` stores the final total, recalculated on submit
+- The existing `quantity` column on `orders` stores the sum of all `order_items.quantity` values (not the count of line items)
 
 ## UI Design
 
@@ -57,7 +60,9 @@ The create order page simplifies from 4 steps to 3 sections on one scrollable pa
 - Debounced input (300ms) querying the `items` table by `item_code` or product model name
 - Results appear in a dropdown showing: P-code, product name, grade, selling price
 - Clicking a result adds it as a line item with qty=1, price pre-filled from `selling_price`
+- Already-added P-code items are disabled/hidden in the dropdown to prevent duplicates
 - Only AVAILABLE items with grade != J are searchable
+- Shows a loading spinner during search, "No items found" for empty results
 
 ### "Add custom item" button
 
@@ -153,17 +158,25 @@ interface ManualOrderInput {
 
 Total calculation: `sum((qty × price) - discount) + shipping_cost`
 
+Note: `care_of` is already embedded in the `shipping_address` JSON string passed to this function — no separate field needed.
+
 ### `getAvailableItems` in `src/services/orders.ts`
 
-Keep as-is but used for search dropdown instead of paginated grid.
+Update to support searching by product model name in addition to `item_code`. Since PostgREST `.or()` doesn't support filtering on joined table columns directly, use two separate queries: first search by `item_code`, then search by product model fields, and merge results client-side. Used for search dropdown instead of paginated grid.
+
+Note: The existing `unit_price` column on `order_items` is `numeric`. New monetary columns (`discount`, `shipping_cost`) use `integer` for simplicity since all values are whole yen. This is acceptable — no conversion needed as yen has no decimal subdivision.
 
 ## Migration
 
+Depends on prior migration `20260319100000_manual_order_support.sql` which already made `orders.sell_group_id` nullable and added `delivery_date`, `delivery_time_code`, `notes`, and `unit_price` columns.
+
 Single SQL migration adding:
-- `description text` to `order_items`
+- `description text` to `order_items` (nullable — existing rows get NULL, handled in UI)
 - `quantity integer NOT NULL DEFAULT 1` to `order_items`
 - `discount integer NOT NULL DEFAULT 0` to `order_items`
 - `ALTER TABLE order_items ALTER COLUMN item_id DROP NOT NULL`
+- Drop existing `UNIQUE` constraint on `order_items.item_id`
+- Create partial unique index: `CREATE UNIQUE INDEX idx_order_items_item_unique ON order_items (item_id) WHERE item_id IS NOT NULL`
 - `shipping_cost integer NOT NULL DEFAULT 0` to `orders`
 - `CHECK (quantity > 0)` constraint
 - `CHECK (discount >= 0)` constraint
@@ -180,7 +193,7 @@ Update `manualOrderItemSchema` to match new `OrderLineItem` type with nullable `
 - `src/services/orders.ts` — update `createManualOrder`, keep `getAvailableItems`
 - `src/hooks/use-orders.ts` — update mutation hook
 - `src/components/orders/order-line-items.tsx` — new component
-- `src/components/orders/index.ts` — update barrel export
+- `src/components/orders/index.ts` — update barrel export: remove `ItemBrowser`, `OrderReview`; add `OrderLineItems`
 - `src/pages/admin/create-order.tsx` — simplify to 3 sections
 - `src/components/orders/item-browser.tsx` — delete
 - `src/components/orders/order-review.tsx` — delete
