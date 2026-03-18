@@ -7,7 +7,6 @@ import { ArrowLeft, Check, ShoppingBag } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -18,6 +17,9 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
+import { AddressForm } from '@/components/shared'
+import type { ShippingAddress } from '@/lib/address-types'
+import { serializeAddress } from '@/lib/address-types'
 import { useSellGroup } from '@/hooks/use-sell-groups'
 import { useSellGroupByCode } from '@/hooks/use-shop'
 import { useCreateOrder } from '@/hooks/use-orders'
@@ -30,7 +32,6 @@ const checkoutSchema = z.object({
   first_name: z.string().optional().or(z.literal('')),
   email: z.string().email('Valid email required'),
   phone: z.string().optional().or(z.literal('')),
-  shipping_address: z.string().min(1, 'Shipping address is required'),
   quantity: z.coerce.number().int().min(1, 'At least 1'),
 })
 
@@ -48,6 +49,7 @@ export default function CheckoutPage() {
 
   const createOrderMutation = useCreateOrder()
   const [orderCreated, setOrderCreated] = useState<{ orderCode: string } | null>(null)
+  const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(null)
 
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutSchema),
@@ -56,7 +58,6 @@ export default function CheckoutPage() {
       first_name: '',
       email: '',
       phone: '',
-      shipping_address: '',
       quantity: 1,
     },
   })
@@ -111,6 +112,10 @@ export default function CheckoutPage() {
   }
 
   async function handleSubmit(values: CheckoutFormValues) {
+    if (!shippingAddress) {
+      toast.error('Shipping address is required')
+      return
+    }
     // For this MVP, we create the order directly without a separate customer auth flow.
     // In production, the customer-auth Edge Function would handle login/registration.
     // Here we create a placeholder order that admin can process.
@@ -119,7 +124,7 @@ export default function CheckoutPage() {
         customer_id: '00000000-0000-0000-0000-000000000000', // Placeholder — real flow uses customer-auth
         sell_group_id: sg!.id,
         order_source: sellGroupCode ? 'LIVE_SELLING' : 'SHOP',
-        shipping_address: `${values.last_name} ${values.first_name ?? ''}\n${values.email}${values.phone ? `\n${values.phone}` : ''}\n${values.shipping_address}`,
+        shipping_address: `${values.last_name.toUpperCase()} ${(values.first_name ?? '').toUpperCase()}\n${values.email}${values.phone ? `\n${values.phone}` : ''}\n${serializeAddress(shippingAddress)}`,
         quantity: values.quantity,
         total_price: Number(sg!.base_price) * values.quantity,
       },
@@ -235,23 +240,7 @@ export default function CheckoutPage() {
                 />
               </div>
 
-              <FormField
-                control={form.control}
-                name="shipping_address"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Shipping Address *</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="〒123-4567 Tokyo-to, Shibuya-ku..."
-                        rows={3}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <AddressForm value={shippingAddress} onChange={setShippingAddress} required />
 
               <FormField
                 control={form.control}
