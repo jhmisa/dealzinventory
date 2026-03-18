@@ -6,15 +6,17 @@ import { customerRegisterSchema, type CustomerRegisterFormValues } from '@/valid
 import { useCustomerAuth } from '@/hooks/use-customer-auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { ShoppingBag } from 'lucide-react'
+import { AddressForm } from '@/components/shared'
+import type { ShippingAddress } from '@/lib/address-types'
 
 export default function CustomerRegisterPage() {
   const navigate = useNavigate()
   const { register: registerCustomer } = useCustomerAuth()
   const [error, setError] = useState<string | null>(null)
+  const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(null)
 
   const form = useForm<CustomerRegisterFormValues>({
     resolver: zodResolver(customerRegisterSchema),
@@ -25,7 +27,6 @@ export default function CustomerRegisterPage() {
       phone: '',
       pin: '',
       pin_confirm: '',
-      shipping_address: '',
     },
   })
 
@@ -38,7 +39,7 @@ export default function CustomerRegisterPage() {
         email: values.email || undefined,
         phone: values.phone || undefined,
         pin: values.pin,
-        shipping_address: values.shipping_address || undefined,
+        shipping_address: shippingAddress ?? undefined,
       })
       navigate('/account', { replace: true })
     } catch (err) {
@@ -126,23 +127,7 @@ export default function CustomerRegisterPage() {
                 Email or phone is required for login.
               </p>
 
-              <FormField
-                control={form.control}
-                name="shipping_address"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Shipping Address</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Shipping address (optional)"
-                        rows={2}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <AddressForm value={shippingAddress} onChange={setShippingAddress} />
 
               <div className="grid grid-cols-2 gap-4">
                 <FormField

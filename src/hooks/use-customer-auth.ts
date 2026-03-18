@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback } from 'react'
 import type { Customer } from '@/lib/types'
 import * as customersService from '@/services/customers'
+import type { ShippingAddress } from '@/lib/address-types'
 
 interface CustomerAuthState {
   customer: Customer | null
@@ -9,7 +10,7 @@ interface CustomerAuthState {
   isLoading: boolean
   login: (lastName: string, emailOrPhone: string, pin: string) => Promise<void>
   register: (params: {
-    last_name: string; first_name?: string; email?: string; phone?: string; pin: string; shipping_address?: string
+    last_name: string; first_name?: string; email?: string; phone?: string; pin: string; shipping_address?: ShippingAddress | null
   }) => Promise<void>
   logout: () => void
   refreshCustomer: () => Promise<void>
@@ -57,7 +58,7 @@ export function useCustomerAuthProvider(): CustomerAuthState {
   }, [])
 
   const register = useCallback(async (params: {
-    last_name: string; first_name?: string; email?: string; phone?: string; pin: string; shipping_address?: string
+    last_name: string; first_name?: string; email?: string; phone?: string; pin: string; shipping_address?: ShippingAddress | null
   }) => {
     setIsLoading(true)
     try {
