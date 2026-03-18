@@ -7,14 +7,13 @@ import { ShippingStep } from '@/components/orders/shipping-step'
 import { ItemBrowser } from '@/components/orders/item-browser'
 import { OrderReview } from '@/components/orders/order-review'
 import { useCreateManualOrder } from '@/hooks/use-orders'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 import type { Customer } from '@/lib/types'
 import type { ShippingAddress } from '@/lib/address-types'
 import type { ManualOrderItemValues } from '@/validators/manual-order'
 
 export default function CreateOrderPage() {
   const navigate = useNavigate()
-  const { toast } = useToast()
   const createOrder = useCreateManualOrder()
 
   // Step 1: Customer
@@ -75,18 +74,11 @@ export default function CreateOrderPage() {
         })),
       })
 
-      toast({
-        title: 'Order created',
-        description: `Order ${order.order_code} has been created.`,
-      })
+      toast.success(`Order ${order.order_code} created`)
 
       navigate(`/admin/orders/${order.id}`)
     } catch (error) {
-      toast({
-        title: 'Failed to create order',
-        description: error instanceof Error ? error.message : 'An unexpected error occurred',
-        variant: 'destructive',
-      })
+      toast.error(error instanceof Error ? error.message : 'Failed to create order')
     }
   }
 
