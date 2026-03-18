@@ -38,6 +38,10 @@ export type OrderUpdate = Tables['orders']['Update']
 
 export type OrderItem = Tables['order_items']['Row']
 
+export type CustomerAddress = Tables['customer_addresses']['Row']
+export type CustomerAddressInsert = Tables['customer_addresses']['Insert']
+export type CustomerAddressUpdate = Tables['customer_addresses']['Update']
+
 export type KaitoriPriceEntry = Tables['kaitori_price_list']['Row']
 export type KaitoriPriceEntryInsert = Tables['kaitori_price_list']['Insert']
 export type KaitoriPriceEntryUpdate = Tables['kaitori_price_list']['Update']

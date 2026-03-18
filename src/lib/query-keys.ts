@@ -50,6 +50,11 @@ export const queryKeys = {
     details: () => [...queryKeys.customers.all, 'detail'] as const,
     detail: (id: string) => [...queryKeys.customers.details(), id] as const,
   },
+  customerAddresses: {
+    all: ['customer-addresses'] as const,
+    lists: () => [...queryKeys.customerAddresses.all, 'list'] as const,
+    list: (customerId: string) => [...queryKeys.customerAddresses.lists(), customerId] as const,
+  },
   shop: {
     all: ['shop'] as const,
     products: (filters: Record<string, unknown>) => [...queryKeys.shop.all, 'products', filters] as const,
@@ -100,5 +105,7 @@ export const queryKeys = {
   postalCodes: {
     all: ['postal-codes'] as const,
     lookup: (code: string) => ['postal-codes', 'lookup', code] as const,
+    reverse: (prefectureJa: string, cityJa: string, townJa: string) =>
+      ['postal-codes', 'reverse', prefectureJa, cityJa, townJa] as const,
   },
 }
