@@ -12,8 +12,9 @@ import {
 import * as customersService from '@/services/customers'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
+import { AddressForm } from '@/components/shared'
+import type { ShippingAddress } from '@/lib/address-types'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form'
 import { Separator } from '@/components/ui/separator'
@@ -42,6 +43,9 @@ export default function CustomerSettingsPage() {
 function ProfileSection() {
   const { customer, refreshCustomer } = useCustomerAuth()
   const [saving, setSaving] = useState(false)
+  const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(
+    (customer?.shipping_address as ShippingAddress | null) ?? null
+  )
 
   const form = useForm<CustomerProfileFormValues>({
     resolver: zodResolver(customerProfileSchema),
@@ -50,7 +54,6 @@ function ProfileSection() {
       first_name: customer?.first_name ?? '',
       email: customer?.email ?? '',
       phone: customer?.phone ?? '',
-      shipping_address: customer?.shipping_address ?? '',
       is_seller: customer?.is_seller ?? false,
       bank_name: customer?.bank_name ?? '',
       bank_branch: customer?.bank_branch ?? '',
@@ -68,7 +71,7 @@ function ProfileSection() {
         first_name: values.first_name || null,
         email: values.email || null,
         phone: values.phone || null,
-        shipping_address: values.shipping_address || null,
+        shipping_address: shippingAddress as unknown as string, // JSONB stored as-is by Supabase
         is_seller: values.is_seller,
       })
       await refreshCustomer()
@@ -146,19 +149,7 @@ function ProfileSection() {
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="shipping_address"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Shipping Address</FormLabel>
-                  <FormControl>
-                    <Textarea rows={2} {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <AddressForm value={shippingAddress} onChange={setShippingAddress} />
 
             <FormField
               control={form.control}
