@@ -97,4 +97,8 @@ export const queryKeys = {
     list: (filters: Record<string, unknown>) => [...queryKeys.aiPrompts.lists(), filters] as const,
     active: (mediaType?: string) => [...queryKeys.aiPrompts.all, 'active', mediaType] as const,
   },
+  postalCodes: {
+    all: ['postal-codes'] as const,
+    lookup: (code: string) => ['postal-codes', 'lookup', code] as const,
+  },
 }
