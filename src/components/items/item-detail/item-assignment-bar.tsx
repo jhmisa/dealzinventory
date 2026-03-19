@@ -76,13 +76,8 @@ export function ItemAssignmentBar({ item }: ItemAssignmentBarProps) {
       updates.category_id = selectedProduct.category_id
     }
 
-    // Auto-populate year and other_features from product when item fields are empty
-    if (selectedProduct && 'year' in selectedProduct && selectedProduct.year != null && item.year == null) {
-      updates.year = selectedProduct.year as number
-    }
-    if (selectedProduct && 'other_features' in selectedProduct && selectedProduct.other_features && !item.other_features) {
-      updates.other_features = selectedProduct.other_features as string
-    }
+    // Let the DB trigger handle auto-populating specs from the product.
+    // We only set product_id and category_id here — the trigger fills blank fields.
 
     updateItem.mutate(
       { id: item.id, updates },
