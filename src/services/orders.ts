@@ -49,7 +49,7 @@ export async function getOrder(id: string) {
         product_models(brand, model_name, color, cpu, ram_gb, storage_gb)
       ),
       order_items(
-        id, packed_at, packed_by,
+        id, item_id, description, quantity, unit_price, discount, packed_at, packed_by,
         items(id, item_code, condition_grade, item_status)
       )
     `)

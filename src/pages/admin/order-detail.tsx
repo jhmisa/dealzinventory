@@ -12,10 +12,12 @@ import {
   ConfirmDialog,
   FormSkeleton,
 } from '@/components/shared'
+import { AddressDisplay } from '@/components/shared/address-display'
 import { useOrder, useUpdateOrderStatus } from '@/hooks/use-orders'
-import { ORDER_STATUSES, ORDER_SOURCES } from '@/lib/constants'
-import { formatDateTime, cn } from '@/lib/utils'
+import { ORDER_STATUSES, ORDER_SOURCES, YAMATO_TIME_SLOTS } from '@/lib/constants'
+import { formatDateTime, formatPrice, cn } from '@/lib/utils'
 import { useState } from 'react'
+import type { ShippingAddress } from '@/lib/address-types'
 
 const STATUS_FLOW = ['PENDING', 'CONFIRMED', 'PACKED', 'SHIPPED', 'DELIVERED'] as const
 
@@ -28,6 +30,27 @@ function getNextStatus(current: string): string | null {
 function getNextStatusLabel(status: string | null): string {
   if (!status) return ''
   return ORDER_STATUSES.find(s => s.value === status)?.label ?? status
+}
+
+function parseShippingAddress(raw: string | null): ShippingAddress | null {
+  if (!raw) return null
+  try {
+    return JSON.parse(raw) as ShippingAddress
+  } catch {
+    return null
+  }
+}
+
+interface OrderItemRow {
+  id: string
+  item_id: string | null
+  description: string | null
+  quantity: number
+  unit_price: number
+  discount: number
+  packed_at: string | null
+  packed_by: string | null
+  items: { id: string; item_code: string; condition_grade: string; item_status: string } | null
 }
 
 export default function OrderDetailPage() {
@@ -49,12 +72,22 @@ export default function OrderDetailPage() {
     base_price: number
     product_models: { brand: string; model_name: string; color: string } | null
   } | null
-  const pm = sg?.product_models
-  const orderItems = (order.order_items ?? []) as { id: string; packed_at: string | null; packed_by: string | null; items: { id: string; item_code: string; condition_grade: string; item_status: string } | null }[]
+  const orderItems = (order.order_items ?? []) as OrderItemRow[]
   const statusCfg = ORDER_STATUSES.find(s => s.value === order.order_status)
   const sourceCfg = ORDER_SOURCES.find(s => s.value === order.order_source)
   const nextStatus = getNextStatus(order.order_status)
   const canCancel = order.order_status !== 'SHIPPED' && order.order_status !== 'DELIVERED' && order.order_status !== 'CANCELLED'
+
+  const shippingAddr = parseShippingAddress(order.shipping_address as string | null)
+  const deliveryDate = (order as Record<string, unknown>).delivery_date as string | null
+  const deliveryTimeCode = (order as Record<string, unknown>).delivery_time_code as string | null
+  const orderNotes = (order as Record<string, unknown>).notes as string | null
+  const shippingCost = ((order as Record<string, unknown>).shipping_cost as number) ?? 0
+  const timeSlot = YAMATO_TIME_SLOTS.find(s => s.code === deliveryTimeCode)
+
+  // Compute totals from line items
+  const subtotal = orderItems.reduce((sum, oi) => sum + (oi.unit_price * oi.quantity), 0)
+  const totalDiscount = orderItems.reduce((sum, oi) => sum + oi.discount, 0)
 
   function handleAdvance() {
     if (!nextStatus) return
@@ -85,7 +118,6 @@ export default function OrderDetailPage() {
         </Button>
         <PageHeader
           title={order.order_code}
-          description={pm ? `${pm.brand} ${pm.model_name}` : undefined}
           actions={
             <div className="flex gap-2">
               {nextStatus && order.order_status !== 'CANCELLED' && (
@@ -171,6 +203,12 @@ export default function OrderDetailPage() {
             <div className="flex justify-between"><span className="text-muted-foreground">Quantity</span><span>{order.quantity}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Total</span><PriceDisplay amount={order.total_price} /></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Created</span><span>{formatDateTime(order.created_at)}</span></div>
+            {orderNotes && (
+              <div className="pt-2 border-t">
+                <p className="text-muted-foreground text-xs mb-1">Notes</p>
+                <p className="whitespace-pre-wrap">{orderNotes}</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -192,32 +230,52 @@ export default function OrderDetailPage() {
             )}
             <div className="pt-2 border-t">
               <p className="text-muted-foreground text-xs mb-1">Shipping Address</p>
-              <p className="whitespace-pre-wrap">{order.shipping_address}</p>
+              {shippingAddr ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-0.5">Japanese</p>
+                    <AddressDisplay address={shippingAddr} format="jp" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-0.5">English</p>
+                    <AddressDisplay address={shippingAddr} format="en" />
+                  </div>
+                </div>
+              ) : (
+                <p className="text-muted-foreground">—</p>
+              )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Product Info */}
+        {/* Delivery Info */}
         <Card>
           <CardHeader>
-            <CardTitle>Product</CardTitle>
+            <CardTitle>Delivery</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
-            {sg ? (
-              <>
-                <div className="flex justify-between"><span className="text-muted-foreground">Sell Group</span><CodeDisplay code={sg.sell_group_code} /></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Model</span><span>{pm ? `${pm.brand} ${pm.model_name}` : '—'}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Grade</span><GradeBadge grade={sg.condition_grade} /></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Unit Price</span><PriceDisplay amount={sg.base_price} /></div>
-              </>
-            ) : (
-              <p className="text-muted-foreground">—</p>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Date</span>
+              <span>{deliveryDate ?? '—'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Time Slot</span>
+              <span>{timeSlot ? `${timeSlot.label_en}` : '—'}</span>
+            </div>
+            {sg && (
+              <div className="pt-2 border-t">
+                <p className="text-muted-foreground text-xs mb-1">Sell Group</p>
+                <div className="flex justify-between"><span className="text-muted-foreground">Code</span><CodeDisplay code={sg.sell_group_code} /></div>
+                {sg.product_models && (
+                  <div className="flex justify-between mt-1"><span className="text-muted-foreground">Model</span><span>{sg.product_models.brand} {sg.product_models.model_name}</span></div>
+                )}
+              </div>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Order Items */}
+      {/* Order Items — Line Items Table */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -227,46 +285,86 @@ export default function OrderDetailPage() {
         </CardHeader>
         <CardContent>
           {orderItems.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">No items assigned to this order yet.</p>
+            <p className="text-sm text-muted-foreground text-center py-4">No items in this order.</p>
           ) : (
-            <div className="space-y-1">
-              <div className="grid grid-cols-4 gap-4 px-3 py-2 text-xs font-medium text-muted-foreground uppercase">
-                <span>P-Code</span>
-                <span>Grade</span>
-                <span>Packed</span>
-                <span>Packed At</span>
+            <div>
+              {/* Table Header */}
+              <div className="grid grid-cols-[2rem_1fr_4rem_6rem_6rem_6rem_5rem] gap-2 px-3 py-2 text-xs font-medium text-muted-foreground uppercase border-b">
+                <span>#</span>
+                <span>Description</span>
+                <span className="text-right">Qty</span>
+                <span className="text-right">Unit Price</span>
+                <span className="text-right">Discount</span>
+                <span className="text-right">Subtotal</span>
+                <span className="text-center">Packed</span>
               </div>
-              {orderItems.map((oi) => {
+
+              {/* Table Rows */}
+              {orderItems.map((oi, idx) => {
                 const item = oi.items
+                const lineSubtotal = oi.unit_price * oi.quantity - oi.discount
+
                 return (
                   <div
                     key={oi.id}
                     className={cn(
-                      'grid grid-cols-4 gap-4 items-center px-3 py-2 border-b last:border-0 rounded',
+                      'grid grid-cols-[2rem_1fr_4rem_6rem_6rem_6rem_5rem] gap-2 items-center px-3 py-2.5 border-b last:border-0',
                       oi.packed_at ? 'bg-green-50' : '',
                     )}
                   >
+                    <span className="text-sm text-muted-foreground">{idx + 1}</span>
                     <div>
                       {item ? (
-                        <CodeDisplay code={item.item_code} />
+                        <div className="flex items-center gap-2">
+                          <CodeDisplay code={item.item_code} />
+                          <GradeBadge grade={item.condition_grade} />
+                          {oi.description && (
+                            <span className="text-sm text-muted-foreground truncate">{oi.description}</span>
+                          )}
+                        </div>
                       ) : (
-                        <span className="text-muted-foreground">—</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm">{oi.description ?? 'Custom item'}</span>
+                          <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">(custom)</span>
+                        </div>
                       )}
                     </div>
-                    <div>{item ? <GradeBadge grade={item.condition_grade} /> : '—'}</div>
-                    <div>
+                    <span className="text-sm text-right">{oi.quantity}</span>
+                    <span className="text-sm text-right">{formatPrice(oi.unit_price)}</span>
+                    <span className="text-sm text-right">{oi.discount > 0 ? `-${formatPrice(oi.discount)}` : '—'}</span>
+                    <span className="text-sm font-medium text-right">{formatPrice(lineSubtotal)}</span>
+                    <div className="text-center">
                       {oi.packed_at ? (
                         <StatusBadge label="Packed" color="bg-green-100 text-green-800 border-green-300" />
                       ) : (
                         <StatusBadge label="Unpacked" color="bg-gray-100 text-gray-800 border-gray-300" />
                       )}
                     </div>
-                    <span className="text-xs text-muted-foreground">
-                      {oi.packed_at ? formatDateTime(oi.packed_at) : '—'}
-                    </span>
                   </div>
                 )
               })}
+
+              {/* Summary */}
+              <div className="border-t mt-2 pt-3 space-y-1.5 px-3">
+                <div className="flex justify-end gap-8 text-sm">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="w-24 text-right font-medium">{formatPrice(subtotal)}</span>
+                </div>
+                <div className="flex justify-end gap-8 text-sm">
+                  <span className="text-muted-foreground">Delivery Fee</span>
+                  <span className="w-24 text-right">{formatPrice(shippingCost)}</span>
+                </div>
+                {totalDiscount > 0 && (
+                  <div className="flex justify-end gap-8 text-sm">
+                    <span className="text-muted-foreground">Discount</span>
+                    <span className="w-24 text-right text-muted-foreground">({formatPrice(totalDiscount)})</span>
+                  </div>
+                )}
+                <div className="flex justify-end gap-8 text-sm font-semibold border-t pt-1.5">
+                  <span>Total</span>
+                  <span className="w-24 text-right">{formatPrice(order.total_price)}</span>
+                </div>
+              </div>
             </div>
           )}
         </CardContent>

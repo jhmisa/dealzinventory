@@ -131,10 +131,10 @@ export const ORDER_SOURCES: { value: OrderSource; label: string }[] = [
 ]
 
 export const YAMATO_TIME_SLOTS = [
-  { code: '01', label: '午前中 (9:00–12:00)', label_en: 'Morning (9AM–12PM)' },
-  { code: '14', label: '14:00–16:00', label_en: '2PM–4PM' },
-  { code: '16', label: '16:00–18:00', label_en: '4PM–6PM' },
-  { code: '04', label: '18:00–20:00', label_en: '6PM–8PM' },
+  { code: '01', label: '午前中 (9:00AM–12:00PM)', label_en: 'Morning (9AM–12PM)' },
+  { code: '14', label: '14:00–16:00 (2:00PM–4:00PM)', label_en: '2PM–4PM' },
+  { code: '16', label: '16:00–18:00 (4:00PM–6:00PM)', label_en: '4PM–6PM' },
+  { code: '04', label: '18:00–20:00 (6:00PM–8:00PM)', label_en: '6PM–8PM' },
 ] as const
 
 export function getOrderStatusConfig(status: OrderStatus) {

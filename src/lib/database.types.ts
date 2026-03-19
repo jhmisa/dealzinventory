@@ -23,6 +23,7 @@ export type Database = {
           id: string
           is_active: boolean | null
           last_test_at: string | null
+          purpose: string
           service_name: string
           updated_at: string | null
         }
@@ -34,6 +35,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           last_test_at?: string | null
+          purpose?: string
           service_name: string
           updated_at?: string | null
         }
@@ -45,8 +47,48 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           last_test_at?: string | null
+          purpose?: string
           service_name?: string
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      ai_prompts: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          media_type: string
+          name: string
+          prompt_text: string
+          sample_image_url: string | null
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          media_type?: string
+          name: string
+          prompt_text: string
+          sample_image_url?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          media_type?: string
+          name?: string
+          prompt_text?: string
+          sample_image_url?: string | null
+          sort_order?: number
+          updated_at?: string
         }
         Relationships: []
       }
@@ -83,6 +125,47 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_addresses: {
+        Row: {
+          address: Json
+          care_of: string | null
+          created_at: string
+          customer_id: string
+          id: string
+          is_default: boolean
+          label: string
+          updated_at: string
+        }
+        Insert: {
+          address: Json
+          care_of?: string | null
+          created_at?: string
+          customer_id: string
+          id?: string
+          is_default?: boolean
+          label: string
+          updated_at?: string
+        }
+        Update: {
+          address?: Json
+          care_of?: string | null
+          created_at?: string
+          customer_id?: string
+          id?: string
+          is_default?: boolean
+          label?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_addresses_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           bank_account_holder: string | null
@@ -101,7 +184,7 @@ export type Database = {
           last_name: string
           phone: string | null
           pin_hash: string
-          shipping_address: string | null
+          shipping_address: Json | null
           updated_at: string
         }
         Insert: {
@@ -121,7 +204,7 @@ export type Database = {
           last_name: string
           phone?: string | null
           pin_hash: string
-          shipping_address?: string | null
+          shipping_address?: Json | null
           updated_at?: string
         }
         Update: {
@@ -141,7 +224,7 @@ export type Database = {
           last_name?: string
           phone?: string | null
           pin_hash?: string
-          shipping_address?: string | null
+          shipping_address?: Json | null
           updated_at?: string
         }
         Relationships: []
@@ -372,6 +455,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "item_costs_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      item_defects: {
+        Row: {
+          area: string
+          created_at: string
+          created_by: string | null
+          defect_type: string
+          description: string | null
+          id: string
+          item_id: string
+          photo_url: string | null
+        }
+        Insert: {
+          area: string
+          created_at?: string
+          created_by?: string | null
+          defect_type: string
+          description?: string | null
+          id?: string
+          item_id: string
+          photo_url?: string | null
+        }
+        Update: {
+          area?: string
+          created_at?: string
+          created_by?: string | null
+          defect_type?: string
+          description?: string | null
+          id?: string
+          item_id?: string
+          photo_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "item_defects_item_id_fkey"
             columns: ["item_id"]
             isOneToOne: false
             referencedRelation: "items"
@@ -797,31 +921,43 @@ export type Database = {
       }
       order_items: {
         Row: {
+          description: string | null
+          discount: number
           id: string
-          item_id: string
+          item_id: string | null
           order_id: string
           packed_at: string | null
           packed_by: string | null
+          quantity: number
+          unit_price: number
         }
         Insert: {
+          description?: string | null
+          discount?: number
           id?: string
-          item_id: string
+          item_id?: string | null
           order_id: string
           packed_at?: string | null
           packed_by?: string | null
+          quantity?: number
+          unit_price?: number
         }
         Update: {
+          description?: string | null
+          discount?: number
           id?: string
-          item_id?: string
+          item_id?: string | null
           order_id?: string
           packed_at?: string | null
           packed_by?: string | null
+          quantity?: number
+          unit_price?: number
         }
         Relationships: [
           {
             foreignKeyName: "order_items_item_id_fkey"
             columns: ["item_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "items"
             referencedColumns: ["id"]
           },
@@ -838,39 +974,51 @@ export type Database = {
         Row: {
           created_at: string
           customer_id: string
+          delivery_date: string | null
+          delivery_time_code: string | null
           id: string
+          notes: string | null
           order_code: string
           order_source: Database["public"]["Enums"]["order_source"]
           order_status: Database["public"]["Enums"]["order_status"]
           quantity: number
-          sell_group_id: string
+          sell_group_id: string | null
           shipping_address: string
+          shipping_cost: number
           total_price: number
           updated_at: string
         }
         Insert: {
           created_at?: string
           customer_id: string
+          delivery_date?: string | null
+          delivery_time_code?: string | null
           id?: string
+          notes?: string | null
           order_code: string
           order_source: Database["public"]["Enums"]["order_source"]
           order_status?: Database["public"]["Enums"]["order_status"]
           quantity: number
-          sell_group_id: string
+          sell_group_id?: string | null
           shipping_address: string
+          shipping_cost?: number
           total_price: number
           updated_at?: string
         }
         Update: {
           created_at?: string
           customer_id?: string
+          delivery_date?: string | null
+          delivery_time_code?: string | null
           id?: string
+          notes?: string | null
           order_code?: string
           order_source?: Database["public"]["Enums"]["order_source"]
           order_status?: Database["public"]["Enums"]["order_status"]
           quantity?: number
-          sell_group_id?: string
+          sell_group_id?: string | null
           shipping_address?: string
+          shipping_cost?: number
           total_price?: number
           updated_at?: string
         }
@@ -890,6 +1038,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      postal_codes: {
+        Row: {
+          city_en: string
+          city_ja: string
+          created_at: string | null
+          id: string
+          postal_code: string
+          prefecture_en: string
+          prefecture_ja: string
+          town_en: string
+          town_ja: string
+        }
+        Insert: {
+          city_en: string
+          city_ja: string
+          created_at?: string | null
+          id?: string
+          postal_code: string
+          prefecture_en: string
+          prefecture_ja: string
+          town_en?: string
+          town_ja?: string
+        }
+        Update: {
+          city_en?: string
+          city_ja?: string
+          created_at?: string | null
+          id?: string
+          postal_code?: string
+          prefecture_en?: string
+          prefecture_ja?: string
+          town_en?: string
+          town_ja?: string
+        }
+        Relationships: []
       }
       product_media: {
         Row: {
@@ -1157,6 +1341,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _hash_pin: { Args: { pin_text: string }; Returns: string }
+      _verify_pin: {
+        Args: { pin_hash: string; pin_text: string }
+        Returns: boolean
+      }
       create_intake_batch: {
         Args: {
           p_date_received: string
@@ -1209,7 +1398,7 @@ export type Database = {
         | "CANCELLED"
       media_role: "hero" | "gallery" | "video"
       media_type: "image" | "video"
-      order_source: "SHOP" | "LIVE_SELLING"
+      order_source: "SHOP" | "LIVE_SELLING" | "WALK_IN" | "FB" | "YOUTUBE"
       order_status:
         | "PENDING"
         | "CONFIRMED"
@@ -1379,7 +1568,7 @@ export const Constants = {
       ],
       media_role: ["hero", "gallery", "video"],
       media_type: ["image", "video"],
-      order_source: ["SHOP", "LIVE_SELLING"],
+      order_source: ["SHOP", "LIVE_SELLING", "WALK_IN", "FB", "YOUTUBE"],
       order_status: [
         "PENDING",
         "CONFIRMED",
@@ -1395,3 +1584,5 @@ export const Constants = {
     },
   },
 } as const
+A new version of Supabase CLI is available: v2.78.1 (currently installed v2.75.0)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli

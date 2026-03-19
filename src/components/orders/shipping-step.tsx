@@ -145,7 +145,16 @@ export function ShippingStep({
                     {option.careOf && (
                       <p className="text-sm text-muted-foreground">C/O {option.careOf}</p>
                     )}
-                    <AddressDisplay address={option.address} className="mt-1" />
+                    <div className="mt-1 grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-0.5">Japanese</p>
+                        <AddressDisplay address={option.address} format="jp" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-0.5">English</p>
+                        <AddressDisplay address={option.address} format="en" />
+                      </div>
+                    </div>
                   </label>
                 </div>
               ))}
@@ -225,10 +234,18 @@ export function ShippingStep({
                 <Input
                   type="date"
                   min={minDate}
-                  value={deliveryDate ?? ''}
-                  onChange={(e) => onDeliveryDateChange(e.target.value || null)}
+                  value={deliveryDate ?? minDate}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    // Prevent selecting a date before minDate
+                    if (val && val < minDate) {
+                      onDeliveryDateChange(minDate)
+                    } else {
+                      onDeliveryDateChange(val || null)
+                    }
+                  }}
                 />
-                <p className="text-xs text-muted-foreground">Optional — earliest is tomorrow</p>
+                <p className="text-xs text-muted-foreground">Earliest delivery is tomorrow</p>
               </div>
               <div className="space-y-1.5">
                 <Label className="text-sm">Delivery Time</Label>
