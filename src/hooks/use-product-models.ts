@@ -3,10 +3,10 @@ import { queryKeys } from '@/lib/query-keys'
 import * as productModelsService from '@/services/product-models'
 import type { ProductModelInsert, ProductModelUpdate } from '@/lib/types'
 
-export function useProductModels(search?: string) {
+export function useProductModels(filters: productModelsService.ProductModelFilters = {}) {
   return useQuery({
-    queryKey: queryKeys.productModels.list({ search }),
-    queryFn: () => productModelsService.getProductModels(search),
+    queryKey: queryKeys.productModels.list(filters),
+    queryFn: () => productModelsService.getProductModels(filters),
   })
 }
 

@@ -1,25 +1,42 @@
 import { supabase } from '@/lib/supabase'
 import type { ProductModel, ProductModelInsert, ProductModelUpdate, ProductModelWithHeroImage } from '@/lib/types'
 
-export async function getProductModels(search?: string) {
+export interface ProductModelFilters {
+  search?: string
+  categoryId?: string
+}
+
+export async function getProductModels(filters: ProductModelFilters = {}) {
   let query = supabase
     .from('product_models')
-    .select('*, product_media(count), categories(name, form_fields, description_fields)')
+    .select('*, product_media(id, media_type), categories(name, form_fields, description_fields)')
     .order('brand')
     .order('model_name')
 
-  if (search) {
-    query = query.or(`brand.ilike.%${search}%,model_name.ilike.%${search}%,color.ilike.%${search}%`)
+  if (filters.search) {
+    const s = filters.search
+    query = query.or(`brand.ilike.%${s}%,model_name.ilike.%${s}%,color.ilike.%${s}%,short_description.ilike.%${s}%`)
+  }
+
+  if (filters.categoryId) {
+    query = query.eq('category_id', filters.categoryId)
   }
 
   const { data, error } = await query
 
   if (error) throw error
 
-  return (data ?? []).map((pm) => ({
-    ...pm,
-    media_count: (pm.product_media as unknown as { count: number }[])?.[0]?.count ?? 0,
-  }))
+  return (data ?? []).map((pm) => {
+    const media = (pm.product_media as unknown as Array<{ id: string; media_type: string }>) ?? []
+    const photoCount = media.filter((m) => m.media_type === 'image').length
+    const videoCount = media.filter((m) => m.media_type === 'video').length
+    return {
+      ...pm,
+      media_count: media.length,
+      photo_count: photoCount,
+      video_count: videoCount,
+    }
+  })
 }
 
 export async function getProductModelsWithHeroImage(search?: string): Promise<ProductModelWithHeroImage[]> {
