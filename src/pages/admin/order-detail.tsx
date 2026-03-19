@@ -22,7 +22,9 @@ import {
   useRecalculateOrderTotal,
   useOrderAuditLogs,
   useUpdateOrder,
+  useCancelOrder,
 } from '@/hooks/use-orders'
+import * as ordersService from '@/services/orders'
 import { ORDER_STATUSES, ORDER_SOURCES, YAMATO_TIME_SLOTS } from '@/lib/constants'
 import { formatDateTime, formatPrice, cn } from '@/lib/utils'
 import { useState } from 'react'
@@ -93,6 +95,7 @@ export default function OrderDetailPage() {
   const navigate = useNavigate()
   const { data: order, isLoading } = useOrder(id!)
   const statusMutation = useUpdateOrderStatus()
+  const cancelMutation = useCancelOrder()
   const updateLineItem = useUpdateOrderLineItem()
   const removeLineItem = useRemoveOrderLineItem()
   const recalcTotal = useRecalculateOrderTotal()
@@ -247,6 +250,10 @@ export default function OrderDetailPage() {
           if (Object.keys(updates).length > 0) {
             await updateOrder.mutateAsync({ id: order!.id, updates })
           }
+          // Mark items as SOLD when order is shipped
+          if (nextStatus === 'SHIPPED') {
+            await ordersService.markOrderItemsSold(order!.id)
+          }
           toast.success(`Order ${getNextStatusLabel(nextStatus).toLowerCase()}`)
           setAdvanceOpen(false)
         },
@@ -256,13 +263,10 @@ export default function OrderDetailPage() {
   }
 
   function handleCancel() {
-    statusMutation.mutate(
-      { id: order!.id, status: 'CANCELLED' },
-      {
-        onSuccess: () => { toast.success('Order cancelled'); setCancelOpen(false) },
-        onError: (err) => toast.error(`Failed: ${err.message}`),
-      },
-    )
+    cancelMutation.mutate(order!.id, {
+      onSuccess: () => { toast.success('Order cancelled'); setCancelOpen(false) },
+      onError: (err) => toast.error(`Failed: ${err.message}`),
+    })
   }
 
   // Compute editing totals
@@ -735,9 +739,9 @@ export default function OrderDetailPage() {
         open={cancelOpen}
         onOpenChange={setCancelOpen}
         title="Cancel Order"
-        description={`Are you sure you want to cancel order ${order.order_code}? This action cannot be undone.`}
+        description={`Are you sure you want to cancel order ${order.order_code}? This action cannot be undone. Reserved items will be returned to available stock.`}
         onConfirm={handleCancel}
-        isLoading={statusMutation.isPending}
+        isLoading={cancelMutation.isPending}
         variant="destructive"
       />
 

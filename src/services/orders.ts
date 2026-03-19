@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase'
-import type { Order, OrderInsert, OrderUpdate } from '@/lib/types'
+import type { Order, OrderInsert, OrderUpdate, Item } from '@/lib/types'
 
 interface OrderFilters {
   search?: string
@@ -115,6 +115,45 @@ export async function updateOrder(id: string, updates: OrderUpdate) {
 
 export async function updateOrderStatus(id: string, status: string) {
   return updateOrder(id, { order_status: status as Order['order_status'] })
+}
+
+export async function cancelOrder(orderId: string) {
+  // Get all inventory items in this order
+  const { data: orderItems } = await supabase
+    .from('order_items')
+    .select('item_id')
+    .eq('order_id', orderId)
+    .not('item_id', 'is', null)
+
+  // Update order status to CANCELLED
+  const order = await updateOrder(orderId, { order_status: 'CANCELLED' as Order['order_status'] })
+
+  // Revert all inventory items to AVAILABLE
+  const itemIds = (orderItems ?? []).map((oi) => oi.item_id).filter((id): id is string => !!id)
+  if (itemIds.length > 0) {
+    await supabase
+      .from('items')
+      .update({ item_status: 'AVAILABLE' as Item['item_status'] })
+      .in('id', itemIds)
+  }
+
+  return order
+}
+
+export async function markOrderItemsSold(orderId: string) {
+  const { data: orderItems } = await supabase
+    .from('order_items')
+    .select('item_id')
+    .eq('order_id', orderId)
+    .not('item_id', 'is', null)
+
+  const itemIds = (orderItems ?? []).map((oi) => oi.item_id).filter((id): id is string => !!id)
+  if (itemIds.length > 0) {
+    await supabase
+      .from('items')
+      .update({ item_status: 'SOLD' as Item['item_status'] })
+      .in('id', itemIds)
+  }
 }
 
 // Mark an order item as packed
@@ -271,6 +310,18 @@ export async function createManualOrder(input: ManualOrderInput) {
     throw itemsError
   }
 
+  // Mark inventory items as RESERVED
+  const inventoryItemIds = input.items
+    .map((item) => item.item_id)
+    .filter((id): id is string => id !== null)
+
+  if (inventoryItemIds.length > 0) {
+    await supabase
+      .from('items')
+      .update({ item_status: 'RESERVED' as Item['item_status'] })
+      .in('id', inventoryItemIds)
+  }
+
   return order as Order
 }
 
@@ -305,16 +356,40 @@ export async function addOrderLineItem(orderId: string, item: {
     .single()
 
   if (error) throw error
+
+  // Mark inventory item as RESERVED
+  if (item.item_id) {
+    await supabase
+      .from('items')
+      .update({ item_status: 'RESERVED' as Item['item_status'] })
+      .eq('id', item.item_id)
+  }
+
   return data
 }
 
 export async function removeOrderLineItem(orderItemId: string) {
+  // Fetch the order_item to get item_id before deleting
+  const { data: orderItem } = await supabase
+    .from('order_items')
+    .select('item_id')
+    .eq('id', orderItemId)
+    .single()
+
   const { error } = await supabase
     .from('order_items')
     .delete()
     .eq('id', orderItemId)
 
   if (error) throw error
+
+  // Revert inventory item to AVAILABLE
+  if (orderItem?.item_id) {
+    await supabase
+      .from('items')
+      .update({ item_status: 'AVAILABLE' as Item['item_status'] })
+      .eq('id', orderItem.item_id)
+  }
 }
 
 export async function recalculateOrderTotal(orderId: string) {

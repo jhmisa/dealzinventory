@@ -86,8 +86,10 @@ export const CONDITION_GRADES: { value: ConditionGrade; label: string; color: st
 export const ITEM_STATUSES: { value: ItemStatus; label: string; color: string }[] = [
   { value: 'INTAKE', label: 'Intake', color: 'bg-gray-100 text-gray-800 border-gray-300' },
   { value: 'AVAILABLE', label: 'Available', color: 'bg-green-100 text-green-800 border-green-300' },
+  { value: 'RESERVED', label: 'Reserved', color: 'bg-blue-100 text-blue-800 border-blue-300' },
   { value: 'REPAIR', label: 'Repair', color: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
   { value: 'MISSING', label: 'Missing', color: 'bg-red-100 text-red-800 border-red-300' },
+  { value: 'SOLD', label: 'Sold', color: 'bg-purple-100 text-purple-800 border-purple-300' },
 ]
 
 export const SOURCE_TYPES: { value: SourceType; label: string }[] = [

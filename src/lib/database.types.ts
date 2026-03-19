@@ -1,4 +1,3 @@
-Initialising login role...
 export type Json =
   | string
   | number
@@ -12,31 +11,6 @@ export type Database = {
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.1"
-  }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
   }
   public: {
     Tables: {
@@ -1461,7 +1435,13 @@ export type Database = {
       condition_grade: "S" | "A" | "B" | "C" | "D" | "J"
       device_category: "IPHONE" | "ANDROID" | "COMPUTER" | "TABLET" | "OTHER"
       intake_adjustment_type: "VOIDED" | "RETURNED" | "REFUNDED" | "MISSING"
-      item_status: "INTAKE" | "AVAILABLE" | "REPAIR" | "MISSING"
+      item_status:
+        | "INTAKE"
+        | "AVAILABLE"
+        | "REPAIR"
+        | "MISSING"
+        | "RESERVED"
+        | "SOLD"
       kaitori_delivery_method: "SHIP" | "WALK_IN"
       kaitori_media_role:
         | "front"
@@ -1621,9 +1601,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       ac_adapter_status: ["CORRECT", "INCORRECT", "MISSING"],
@@ -1632,7 +1609,14 @@ export const Constants = {
       condition_grade: ["S", "A", "B", "C", "D", "J"],
       device_category: ["IPHONE", "ANDROID", "COMPUTER", "TABLET", "OTHER"],
       intake_adjustment_type: ["VOIDED", "RETURNED", "REFUNDED", "MISSING"],
-      item_status: ["INTAKE", "AVAILABLE", "REPAIR", "MISSING"],
+      item_status: [
+        "INTAKE",
+        "AVAILABLE",
+        "REPAIR",
+        "MISSING",
+        "RESERVED",
+        "SOLD",
+      ],
       kaitori_delivery_method: ["SHIP", "WALK_IN"],
       kaitori_media_role: [
         "front",

@@ -119,7 +119,7 @@ export async function getItemStats() {
 
   if (error) throw error
 
-  const stats = { INTAKE: 0, AVAILABLE: 0, REPAIR: 0, MISSING: 0, total: 0 }
+  const stats = { INTAKE: 0, AVAILABLE: 0, RESERVED: 0, REPAIR: 0, MISSING: 0, SOLD: 0, total: 0 }
   for (const item of data ?? []) {
     stats[item.item_status as keyof typeof stats]++
     stats.total++
