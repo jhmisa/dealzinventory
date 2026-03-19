@@ -70,41 +70,89 @@ export function ItemAssignmentBar({ item }: ItemAssignmentBarProps) {
   async function handleConfirmProductChange() {
     if (!pendingProductId) return
 
-    // DEBUG: Check what triggers exist and product data
     try {
-      const { data: triggers } = await supabase.rpc('debug_list_triggers')
-      console.log('[DEBUG] Triggers on items table:', triggers)
+      // Fetch full product model data directly for type safety
+      const { data: pm } = await supabase
+        .from('product_models')
+        .select('*')
+        .eq('id', pendingProductId)
+        .single()
 
-      const { data: prodFields } = await supabase.rpc('debug_check_product_numeric_fields', { p_product_id: pendingProductId })
-      console.log('[DEBUG] Product numeric fields:', prodFields)
-    } catch (e) {
-      console.warn('[DEBUG] Could not fetch debug info:', e)
-    }
+      const updates: ItemUpdate = { product_id: pendingProductId }
 
-    const selectedProduct = products?.find((p) => p.id === pendingProductId)
-    const updates: ItemUpdate = { product_id: pendingProductId }
+      if (pm) {
+        // Always set category and device_category from product
+        if (pm.category_id) updates.category_id = pm.category_id
+        if (pm.device_category) updates.device_category = pm.device_category
 
-    if (selectedProduct?.category_id) {
-      updates.category_id = selectedProduct.category_id
-    }
+        // Text fields — only fill if item's current value is empty/null
+        const textFields: (keyof ItemUpdate)[] = [
+          'brand', 'model_name', 'color', 'cpu', 'gpu', 'os_family',
+          'screen_size', 'carrier', 'keyboard_layout', 'chipset', 'ports',
+          'form_factor', 'other_features',
+        ]
+        for (const key of textFields) {
+          const itemVal = item[key as keyof Item]
+          const pmVal = pm[key as keyof typeof pm]
+          if ((!itemVal || itemVal === '') && pmVal && typeof pmVal === 'string' && pmVal.trim()) {
+            (updates as Record<string, unknown>)[key] = pmVal.trim()
+          }
+        }
 
-    console.log('[DEBUG] Sending update payload:', JSON.stringify(updates))
+        // Numeric fields — only fill if item's value is null, with safe number conversion
+        const numFields: (keyof ItemUpdate)[] = ['ram_gb', 'storage_gb', 'year', 'imei_slot_count']
+        for (const key of numFields) {
+          const itemVal = item[key as keyof Item]
+          const pmVal = pm[key as keyof typeof pm]
+          if (itemVal == null && pmVal != null) {
+            const num = Number(pmVal)
+            if (!isNaN(num)) {
+              (updates as Record<string, unknown>)[key] = num
+            }
+          }
+        }
 
-    updateItem.mutate(
-      { id: item.id, updates },
-      {
-        onSuccess: () => {
-          toast.success('Product updated')
-          setPendingProductId(null)
-          setConfirmOpen(false)
+        // Boolean fields — only fill if item's value is null
+        const boolFields: (keyof ItemUpdate)[] = [
+          'has_touchscreen', 'has_thunderbolt', 'supports_stylus',
+          'has_cellular', 'is_unlocked',
+        ]
+        for (const key of boolFields) {
+          const itemVal = item[key as keyof Item]
+          const pmVal = pm[key as keyof typeof pm]
+          if (itemVal == null && pmVal != null && typeof pmVal === 'boolean') {
+            (updates as Record<string, unknown>)[key] = pmVal
+          }
+        }
+
+        // Rebuild short_description from final values
+        const brand = (updates.brand as string) ?? item.brand ?? ''
+        const model = (updates.model_name as string) ?? item.model_name ?? ''
+        const color = (updates.color as string) ?? item.color ?? ''
+        const desc = [brand, model, color].filter(Boolean).join(' ')
+        if (desc) updates.short_description = desc
+      }
+
+      updateItem.mutate(
+        { id: item.id, updates },
+        {
+          onSuccess: () => {
+            toast.success('Product updated')
+            setPendingProductId(null)
+            setConfirmOpen(false)
+          },
+          onError: (err) => {
+            toast.error(`Failed to update product: ${err.message}`)
+            setPendingProductId(null)
+            setConfirmOpen(false)
+          },
         },
-        onError: (err) => {
-          toast.error(`Failed to update product: ${err.message}`)
-          setPendingProductId(null)
-          setConfirmOpen(false)
-        },
-      },
-    )
+      )
+    } catch (err) {
+      toast.error(`Failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      setPendingProductId(null)
+      setConfirmOpen(false)
+    }
   }
 
   function handleCancelProductChange() {

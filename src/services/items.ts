@@ -1,12 +1,10 @@
 import { supabase } from '@/lib/supabase'
 import type { Item, ItemInsert, ItemUpdate, ItemCost, ItemMedia } from '@/lib/types'
 
-// Debug: list all triggers on the items table
+// Temporary debug function — can be removed later
 export async function debugListItemTriggers() {
   const { data, error } = await supabase.rpc('debug_list_triggers', {})
   if (error) {
-    // If RPC doesn't exist, try raw SQL
-    console.warn('[debug] RPC not available, trying direct query')
     return null
   }
   return data
@@ -112,10 +110,6 @@ export async function createBulkItems(items: ItemInsert[]) {
 }
 
 export async function updateItem(id: string, updates: ItemUpdate) {
-  // Debug: log exact payload being sent to Supabase
-  console.log('[updateItem] id:', id)
-  console.log('[updateItem] updates payload:', JSON.stringify(updates, null, 2))
-
   const { data, error } = await supabase
     .from('items')
     .update(updates)
@@ -123,11 +117,7 @@ export async function updateItem(id: string, updates: ItemUpdate) {
     .select()
     .single()
 
-  if (error) {
-    console.error('[updateItem] Supabase error:', error)
-    console.error('[updateItem] Error details:', JSON.stringify(error, null, 2))
-    throw error
-  }
+  if (error) throw error
   return data as Item
 }
 
