@@ -125,12 +125,6 @@ export function ItemAssignmentBar({ item }: ItemAssignmentBarProps) {
           }
         }
 
-        // Rebuild short_description from final values
-        const brand = (updates.brand as string) ?? item.brand ?? ''
-        const model = (updates.model_name as string) ?? item.model_name ?? ''
-        const color = (updates.color as string) ?? item.color ?? ''
-        const desc = [brand, model, color].filter(Boolean).join(' ')
-        if (desc) updates.short_description = desc
       }
 
       updateItem.mutate(
