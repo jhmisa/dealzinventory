@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Package, CheckCircle, Wrench, AlertTriangle, Plus, ClipboardList, QrCode } from 'lucide-react'
+import { Package, CheckCircle, Wrench, AlertTriangle, Plus, ClipboardList, QrCode, Lock, ShoppingBag } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { PageHeader, StatusBadge, GradeBadge, CodeDisplay, CardSkeleton } from '@/components/shared'
@@ -7,11 +7,13 @@ import { useDashboardStats } from '@/hooks/use-dashboard'
 import { ITEM_STATUSES } from '@/lib/constants'
 import { formatDateTime } from '@/lib/utils'
 
-const STATUS_ICONS = {
+const STATUS_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   INTAKE: Package,
   AVAILABLE: CheckCircle,
+  RESERVED: Lock,
   REPAIR: Wrench,
   MISSING: AlertTriangle,
+  SOLD: ShoppingBag,
 }
 
 export default function DashboardPage() {

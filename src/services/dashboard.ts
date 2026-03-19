@@ -19,9 +19,11 @@ export async function getDashboardStats() {
   if (intakeResult.error) throw intakeResult.error
   if (recentResult.error) throw recentResult.error
 
-  const statusCounts = { INTAKE: 0, AVAILABLE: 0, REPAIR: 0, MISSING: 0 }
+  const statusCounts: Record<string, number> = { INTAKE: 0, AVAILABLE: 0, RESERVED: 0, REPAIR: 0, MISSING: 0, SOLD: 0 }
   for (const item of itemsResult.data ?? []) {
-    statusCounts[item.item_status as keyof typeof statusCounts]++
+    if (item.item_status in statusCounts) {
+      statusCounts[item.item_status]++
+    }
   }
 
   return {
