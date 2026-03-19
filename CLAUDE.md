@@ -95,7 +95,7 @@ All codes are auto-generated sequentially. Never allow manual entry.
 | G-code | G000000 | G000456 | sell_groups.sell_group_code | Sell group |
 | KT-code | KT000000 | KT000789 | kaitori_requests.kaitori_code | Kaitori request |
 | ORD-code | ORD000000 | ORD000001 | orders.order_code | Order |
-| CUST-code | CUST000000 | CUST000001 | customers.customer_code | Customer |
+| C-code | C000000 | C000001 | customers.customer_code | Customer |
 
 ---
 

@@ -67,7 +67,7 @@ export async function updateCustomer(id: string, updates: CustomerUpdate) {
 
 export async function generateCustomerCode(): Promise<string> {
   const { data, error } = await supabase.rpc('generate_code', {
-    prefix: 'CUST',
+    prefix: 'C',
     seq_name: 'cust_code_seq',
   })
 
