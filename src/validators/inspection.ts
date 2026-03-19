@@ -3,20 +3,6 @@ import { z } from 'zod'
 const funcStatusEnum = z.enum(['WORKING', 'PROBLEM', '']).default('')
 
 export const inspectionChecklistSchema = z.object({
-  // Body defects (checked = defect found)
-  body_scratches: z.boolean().default(false),
-  body_dents: z.boolean().default(false),
-  body_cracks: z.boolean().default(false),
-  body_discoloration: z.boolean().default(false),
-  body_missing_parts: z.boolean().default(false),
-
-  // Screen defects (checked = defect found)
-  screen_mura: z.boolean().default(false),
-  screen_white_spots: z.boolean().default(false),
-  screen_dead_pixels: z.boolean().default(false),
-  screen_scratches: z.boolean().default(false),
-  screen_backlight_bleed: z.boolean().default(false),
-
   // Functionality — status + note pairs
   func_keyboard_status: funcStatusEnum,
   func_keyboard_note: z.string().default(''),
@@ -52,12 +38,10 @@ export const inspectionSchema = z.object({
   product_id: z.string().optional().or(z.literal('')),
   ac_adapter_status: z.enum(['CORRECT', 'INCORRECT', 'MISSING']).optional(),
 
-  // Condition assessments
-  body_condition: z.enum(['GOOD', 'FAIR', 'POOR', 'DAMAGED']).optional(),
-  screen_condition: z.enum(['GOOD', 'FAIR', 'POOR', 'CRACKED']).optional(),
+  // Battery
   battery_health_pct: z.coerce.number().int().min(0).max(100).nullable().optional(),
 
-  // Inspection checklist (JSONB)
+  // Inspection checklist (JSONB) — functionality checks only
   inspection_checklist: inspectionChecklistSchema.default({}),
 
   // Spec correction fields (saved directly to item columns)
@@ -73,9 +57,16 @@ export const inspectionSchema = z.object({
   is_unlocked: z.boolean().nullable().optional(),
   imei: z.string().optional().or(z.literal('')),
 
+  // Specs verified by IT (confirms specs match what's in the system)
+  specs_verified: z.boolean().default(false),
+
   // Notes
   specs_notes: z.string().optional().or(z.literal('')),
   condition_notes: z.string().optional().or(z.literal('')),
+
+  // Pricing
+  purchase_price: z.coerce.number().nonnegative().nullable().optional(),
+  selling_price: z.coerce.number().nonnegative().nullable().optional(),
 }).refine(
   (data) => !(data.condition_grade === 'J' && data.item_status === 'AVAILABLE'),
   { message: 'Grade J items cannot be set to Available', path: ['item_status'] },

@@ -1,7 +1,5 @@
 export { ItemHeaderCard } from './item-header-card'
 export { SpecsCheckSection } from './specs-check-section'
-export { BodyConditionSection } from './body-condition-section'
-export { ScreenConditionSection } from './screen-condition-section'
 export { OthersSection } from './others-section'
 export { AdditionalCostsSection } from './additional-costs-section'
-export { ConditionPhotosSection } from './condition-photos-section'
+export { DefectSection } from './defect-section'
