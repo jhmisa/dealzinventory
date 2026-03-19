@@ -13,7 +13,7 @@ import { useProductModels } from '@/hooks/use-product-models'
 import { useUpdateItem } from '@/hooks/use-items'
 import { CONDITION_GRADES } from '@/lib/constants'
 import { ConfirmDialog } from '@/components/shared'
-import type { Item } from '@/lib/types'
+import type { Item, ItemUpdate } from '@/lib/types'
 
 interface ItemAssignmentBarProps {
   item: Item
@@ -40,7 +40,7 @@ export function ItemAssignmentBar({ item }: ItemAssignmentBarProps) {
       { id: item.id, updates: { category_id: categoryId } },
       {
         onSuccess: () => toast.success('Category updated'),
-        onError: () => toast.error('Failed to update category'),
+        onError: (err) => toast.error(`Failed to update category: ${err.message}`),
       },
     )
   }
@@ -55,7 +55,7 @@ export function ItemAssignmentBar({ item }: ItemAssignmentBarProps) {
         { id: item.id, updates: { product_id: null } },
         {
           onSuccess: () => toast.success('Product cleared'),
-          onError: () => toast.error('Failed to update product'),
+          onError: (err) => toast.error(`Failed to update product: ${err.message}`),
         },
       )
       return
@@ -70,18 +70,18 @@ export function ItemAssignmentBar({ item }: ItemAssignmentBarProps) {
     if (!pendingProductId) return
 
     const selectedProduct = products?.find((p) => p.id === pendingProductId)
-    const updates: Record<string, string | number | null> = { product_id: pendingProductId }
+    const updates: ItemUpdate = { product_id: pendingProductId }
 
     if (selectedProduct?.category_id) {
       updates.category_id = selectedProduct.category_id
     }
 
     // Auto-populate year and other_features from product when item fields are empty
-    if (selectedProduct?.year != null && item.year == null) {
-      updates.year = selectedProduct.year
+    if (selectedProduct && 'year' in selectedProduct && selectedProduct.year != null && item.year == null) {
+      updates.year = selectedProduct.year as number
     }
-    if (selectedProduct?.other_features && !item.other_features) {
-      updates.other_features = selectedProduct.other_features
+    if (selectedProduct && 'other_features' in selectedProduct && selectedProduct.other_features && !item.other_features) {
+      updates.other_features = selectedProduct.other_features as string
     }
 
     updateItem.mutate(
@@ -92,8 +92,8 @@ export function ItemAssignmentBar({ item }: ItemAssignmentBarProps) {
           setPendingProductId(null)
           setConfirmOpen(false)
         },
-        onError: () => {
-          toast.error('Failed to update product')
+        onError: (err) => {
+          toast.error(`Failed to update product: ${err.message}`)
           setPendingProductId(null)
           setConfirmOpen(false)
         },
@@ -113,7 +113,7 @@ export function ItemAssignmentBar({ item }: ItemAssignmentBarProps) {
       { id: item.id, updates: { condition_grade: value } },
       {
         onSuccess: () => toast.success(`Grade updated to ${value}`),
-        onError: () => toast.error('Failed to update grade'),
+        onError: (err) => toast.error(`Failed to update grade: ${err.message}`),
       },
     )
   }
