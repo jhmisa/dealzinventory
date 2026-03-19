@@ -86,9 +86,10 @@ export function ItemAssignmentBar({ item }: ItemAssignmentBarProps) {
         if (pm.device_category) updates.device_category = pm.device_category
 
         // Text fields — only fill if item's current value is empty/null
+        // Only include fields that exist on the items table
         const textFields: (keyof ItemUpdate)[] = [
           'brand', 'model_name', 'color', 'cpu', 'gpu', 'os_family',
-          'screen_size', 'carrier', 'keyboard_layout', 'chipset', 'ports',
+          'screen_size', 'carrier', 'keyboard_layout',
           'form_factor', 'other_features',
         ]
         for (const key of textFields) {
@@ -100,7 +101,7 @@ export function ItemAssignmentBar({ item }: ItemAssignmentBarProps) {
         }
 
         // Numeric fields — only fill if item's value is null, with safe number conversion
-        const numFields: (keyof ItemUpdate)[] = ['ram_gb', 'storage_gb', 'year', 'imei_slot_count']
+        const numFields: (keyof ItemUpdate)[] = ['ram_gb', 'storage_gb', 'year']
         for (const key of numFields) {
           const itemVal = item[key as keyof Item]
           const pmVal = pm[key as keyof typeof pm]
@@ -112,10 +113,9 @@ export function ItemAssignmentBar({ item }: ItemAssignmentBarProps) {
           }
         }
 
-        // Boolean fields — only fill if item's value is null
+        // Boolean fields — only include columns that exist on the items table
         const boolFields: (keyof ItemUpdate)[] = [
-          'has_touchscreen', 'has_thunderbolt', 'supports_stylus',
-          'has_cellular', 'is_unlocked',
+          'has_touchscreen', 'is_unlocked',
         ]
         for (const key of boolFields) {
           const itemVal = item[key as keyof Item]
