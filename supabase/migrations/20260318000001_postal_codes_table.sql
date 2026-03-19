@@ -19,3 +19,14 @@ ALTER TABLE postal_codes ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Anyone can read postal codes"
   ON postal_codes FOR SELECT
   USING (true);
+
+-- Authenticated users (admin staff) can manage postal codes
+CREATE POLICY "Authenticated users can insert postal codes"
+  ON postal_codes FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can delete postal codes"
+  ON postal_codes FOR DELETE
+  TO authenticated
+  USING (true);

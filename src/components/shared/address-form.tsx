@@ -9,9 +9,16 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { JAPAN_PREFECTURES, SHIPPING_COUNTRIES } from '@/lib/prefectures'
-import { usePostalCodeLookup } from '@/hooks/use-postal-codes'
+import { usePostalCodeLookup, useReverseLookup } from '@/hooks/use-postal-codes'
 import type { ShippingAddress, ShippingAddressJP, ShippingAddressIntl } from '@/lib/address-types'
 import { isJPAddress, isIntlAddress, isLegacyAddress } from '@/lib/address-types'
+
+/** Format postal code with dash: 1234567 → 123-4567 */
+function formatPostalCodeInput(value: string): string {
+  const digits = value.replace(/[^\d]/g, '')
+  if (digits.length <= 3) return digits
+  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}`
+}
 
 interface AddressFormProps {
   value: ShippingAddress | null
@@ -42,16 +49,20 @@ export function AddressForm({ value, onChange, required = false }: AddressFormPr
   const [intlState, setIntlState] = useState('')
   const [intlPostalCode, setIntlPostalCode] = useState('')
 
-  // Postal code lookup
+  // Postal code → address lookup (forward)
   const { data: postalResults } = usePostalCodeLookup(postalCode)
   const [hasAutoFilled, setHasAutoFilled] = useState(false)
+
+  // Address → postal code lookup (reverse)
+  const { data: reverseResults } = useReverseLookup(prefectureJa, cityJa, townJa)
+  const [hasReverseAutoFilled, setHasReverseAutoFilled] = useState(false)
 
   // Initialize from value prop
   useEffect(() => {
     if (!value) return
     if (isJPAddress(value)) {
       setCountry('JP')
-      setPostalCode(value.postal_code)
+      setPostalCode(formatPostalCodeInput(value.postal_code))
       setPrefectureJa(value.prefecture_ja)
       setPrefectureEn(value.prefecture_en)
       setCityJa(value.city_ja)
@@ -86,10 +97,28 @@ export function AddressForm({ value, onChange, required = false }: AddressFormPr
     setHasAutoFilled(true)
   }, [postalResults, hasAutoFilled])
 
+  // Reverse auto-fill: when prefecture + city + town are set but postal code is empty
+  useEffect(() => {
+    if (hasReverseAutoFilled || hasAutoFilled) return
+    if (!reverseResults?.length) return
+    // Only reverse-fill if postal code is currently empty
+    const normalizedPostal = postalCode.replace(/-/g, '')
+    if (normalizedPostal.length === 7) return
+
+    if (reverseResults.length === 1) {
+      setPostalCode(formatPostalCodeInput(reverseResults[0].postal_code))
+      // Also fill English fields if they came from reverse lookup
+      if (!cityEn) setCityEn(reverseResults[0].city_en)
+      if (!townEn) setTownEn(reverseResults[0].town_en)
+      setHasReverseAutoFilled(true)
+    }
+  }, [reverseResults, hasReverseAutoFilled, hasAutoFilled, postalCode, cityEn, townEn])
+
   // Reset auto-fill flag when postal code changes
   const handlePostalCodeChange = useCallback((val: string) => {
-    setPostalCode(val)
+    setPostalCode(formatPostalCodeInput(val))
     setHasAutoFilled(false)
+    setHasReverseAutoFilled(true) // Don't reverse-fill when user is typing postal code
   }, [])
 
   // Emit address on any field change
@@ -138,6 +167,7 @@ export function AddressForm({ value, onChange, required = false }: AddressFormPr
     setPrefectureJa(ja)
     const match = JAPAN_PREFECTURES.find(p => p.ja === ja)
     if (match) setPrefectureEn(match.en)
+    setHasReverseAutoFilled(false) // Allow reverse lookup to fire
   }
 
   // Handle country change
@@ -198,6 +228,7 @@ export function AddressForm({ value, onChange, required = false }: AddressFormPr
               onChange={(e) => handlePostalCodeChange(e.target.value)}
               onBlur={handleBlurJP}
               maxLength={8}
+              inputMode="numeric"
               className="w-36"
             />
           </div>
@@ -226,7 +257,7 @@ export function AddressForm({ value, onChange, required = false }: AddressFormPr
               <Input
                 placeholder="渋谷区"
                 value={cityJa}
-                onChange={(e) => setCityJa(e.target.value)}
+                onChange={(e) => { setCityJa(e.target.value); setHasReverseAutoFilled(false) }}
                 onBlur={handleBlurJP}
               />
             </div>
@@ -248,7 +279,7 @@ export function AddressForm({ value, onChange, required = false }: AddressFormPr
               <Input
                 placeholder="神南"
                 value={townJa}
-                onChange={(e) => setTownJa(e.target.value)}
+                onChange={(e) => { setTownJa(e.target.value); setHasReverseAutoFilled(false) }}
                 onBlur={handleBlurJP}
               />
             </div>

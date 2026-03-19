@@ -11,3 +11,12 @@ export function usePostalCodeLookup(code: string) {
     staleTime: Infinity, // Postal codes rarely change
   })
 }
+
+export function useReverseLookup(prefectureJa: string, cityJa: string, townJa: string) {
+  return useQuery({
+    queryKey: queryKeys.postalCodes.reverse(prefectureJa, cityJa, townJa),
+    queryFn: () => postalCodesService.reverseLookupPostalCode(prefectureJa, cityJa, townJa),
+    enabled: !!prefectureJa && !!cityJa,
+    staleTime: Infinity,
+  })
+}
