@@ -81,6 +81,73 @@ export function useAvailableItems(filters: AvailableItemFilters = {}) {
   })
 }
 
+export function useUpdateOrderLineItem() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ orderItemId, updates }: {
+      orderItemId: string
+      updates: { unit_price?: number; discount?: number; quantity?: number; description?: string }
+    }) => ordersService.updateOrderLineItem(orderItemId, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all })
+    },
+  })
+}
+
+export function useAddOrderLineItem() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ orderId, item }: {
+      orderId: string
+      item: { item_id: string | null; description: string; quantity: number; unit_price: number; discount: number }
+    }) => ordersService.addOrderLineItem(orderId, item),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.items.all })
+    },
+  })
+}
+
+export function useRemoveOrderLineItem() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (orderItemId: string) => ordersService.removeOrderLineItem(orderItemId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.items.all })
+    },
+  })
+}
+
+export function useRecalculateOrderTotal() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (orderId: string) => ordersService.recalculateOrderTotal(orderId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all })
+    },
+  })
+}
+
+export function useOrderAuditLogs(orderId: string) {
+  return useQuery({
+    queryKey: [...queryKeys.orders.detail(orderId), 'audit-logs'],
+    queryFn: () => ordersService.getOrderAuditLogs(orderId),
+    enabled: !!orderId,
+  })
+}
+
+export function useUpdateOrder() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: Record<string, unknown> }) =>
+      ordersService.updateOrder(id, updates as Parameters<typeof ordersService.updateOrder>[1]),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all })
+    },
+  })
+}
+
 export function useCreateManualOrder() {
   const queryClient = useQueryClient()
   return useMutation({

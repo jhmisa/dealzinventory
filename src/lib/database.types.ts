@@ -1,3 +1,4 @@
+Initialising login role...
 export type Json =
   | string
   | number
@@ -11,6 +12,31 @@ export type Database = {
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.1"
+  }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -919,6 +945,60 @@ export type Database = {
           },
         ]
       }
+      order_audit_logs: {
+        Row: {
+          changed_by: string | null
+          changed_by_email: string | null
+          created_at: string
+          field_name: string
+          id: string
+          new_value: string | null
+          old_value: string | null
+          order_id: string
+          order_item_id: string | null
+          reason: string | null
+        }
+        Insert: {
+          changed_by?: string | null
+          changed_by_email?: string | null
+          created_at?: string
+          field_name: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          order_id: string
+          order_item_id?: string | null
+          reason?: string | null
+        }
+        Update: {
+          changed_by?: string | null
+          changed_by_email?: string | null
+          created_at?: string
+          field_name?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          order_id?: string
+          order_item_id?: string | null
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_audit_logs_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_audit_logs_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_items: {
         Row: {
           description: string | null
@@ -983,9 +1063,11 @@ export type Database = {
           order_status: Database["public"]["Enums"]["order_status"]
           quantity: number
           sell_group_id: string | null
+          shipped_date: string | null
           shipping_address: string
           shipping_cost: number
           total_price: number
+          tracking_number: string | null
           updated_at: string
         }
         Insert: {
@@ -1000,9 +1082,11 @@ export type Database = {
           order_status?: Database["public"]["Enums"]["order_status"]
           quantity: number
           sell_group_id?: string | null
+          shipped_date?: string | null
           shipping_address: string
           shipping_cost?: number
           total_price: number
+          tracking_number?: string | null
           updated_at?: string
         }
         Update: {
@@ -1017,9 +1101,11 @@ export type Database = {
           order_status?: Database["public"]["Enums"]["order_status"]
           quantity?: number
           sell_group_id?: string | null
+          shipped_date?: string | null
           shipping_address?: string
           shipping_cost?: number
           total_price?: number
+          tracking_number?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1535,6 +1621,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       ac_adapter_status: ["CORRECT", "INCORRECT", "MISSING"],

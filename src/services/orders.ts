@@ -274,6 +274,89 @@ export async function createManualOrder(input: ManualOrderInput) {
   return order as Order
 }
 
+// --- Order Editing ---
+
+export async function updateOrderLineItem(
+  orderItemId: string,
+  updates: { unit_price?: number; discount?: number; quantity?: number; description?: string }
+) {
+  const { data, error } = await supabase
+    .from('order_items')
+    .update(updates)
+    .eq('id', orderItemId)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export async function addOrderLineItem(orderId: string, item: {
+  item_id: string | null
+  description: string
+  quantity: number
+  unit_price: number
+  discount: number
+}) {
+  const { data, error } = await supabase
+    .from('order_items')
+    .insert({ order_id: orderId, ...item })
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export async function removeOrderLineItem(orderItemId: string) {
+  const { error } = await supabase
+    .from('order_items')
+    .delete()
+    .eq('id', orderItemId)
+
+  if (error) throw error
+}
+
+export async function recalculateOrderTotal(orderId: string) {
+  // Fetch current line items and shipping cost
+  const { data: order } = await supabase
+    .from('orders')
+    .select('shipping_cost')
+    .eq('id', orderId)
+    .single()
+
+  const { data: items } = await supabase
+    .from('order_items')
+    .select('unit_price, quantity, discount')
+    .eq('order_id', orderId)
+
+  if (!items) return
+
+  const shippingCost = (order as Record<string, unknown>)?.shipping_cost as number ?? 0
+  const quantity = items.reduce((sum, i) => sum + i.quantity, 0)
+  const totalPrice = items.reduce(
+    (sum, i) => sum + i.unit_price * i.quantity - i.discount, 0
+  ) + shippingCost
+
+  await supabase
+    .from('orders')
+    .update({ quantity, total_price: totalPrice })
+    .eq('id', orderId)
+}
+
+// --- Order Audit Logs ---
+
+export async function getOrderAuditLogs(orderId: string) {
+  const { data, error } = await supabase
+    .from('order_audit_logs')
+    .select('*')
+    .eq('order_id', orderId)
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+  return data ?? []
+}
+
 // Get orders ready for packing (CONFIRMED status)
 export async function getPackableOrders() {
   const { data, error } = await supabase

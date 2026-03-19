@@ -1,7 +1,8 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Check, Circle, Package } from 'lucide-react'
+import { ArrowLeft, Check, Circle, Package, Pencil, X, Plus, History, Truck } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   PageHeader,
@@ -13,13 +14,22 @@ import {
   FormSkeleton,
 } from '@/components/shared'
 import { AddressDisplay } from '@/components/shared/address-display'
-import { useOrder, useUpdateOrderStatus } from '@/hooks/use-orders'
+import {
+  useOrder,
+  useUpdateOrderStatus,
+  useUpdateOrderLineItem,
+  useRemoveOrderLineItem,
+  useRecalculateOrderTotal,
+  useOrderAuditLogs,
+  useUpdateOrder,
+} from '@/hooks/use-orders'
 import { ORDER_STATUSES, ORDER_SOURCES, YAMATO_TIME_SLOTS } from '@/lib/constants'
 import { formatDateTime, formatPrice, cn } from '@/lib/utils'
 import { useState } from 'react'
 import type { ShippingAddress } from '@/lib/address-types'
 
 const STATUS_FLOW = ['PENDING', 'CONFIRMED', 'PACKED', 'SHIPPED', 'DELIVERED'] as const
+const EDITABLE_STATUSES = ['PENDING', 'CONFIRMED', 'PACKED']
 
 function getNextStatus(current: string): string | null {
   const idx = STATUS_FLOW.indexOf(current as typeof STATUS_FLOW[number])
@@ -41,6 +51,25 @@ function parseShippingAddress(raw: string | null): ShippingAddress | null {
   }
 }
 
+const ORDER_AUDIT_FIELD_LABELS: Record<string, string> = {
+  order_status: 'Status',
+  order_source: 'Source',
+  total_price: 'Total',
+  quantity: 'Quantity',
+  shipping_cost: 'Delivery Fee',
+  shipping_address: 'Address',
+  delivery_date: 'Delivery Date',
+  delivery_time_code: 'Time Slot',
+  notes: 'Notes',
+  shipped_date: 'Shipped Date',
+  tracking_number: 'Tracking Number',
+  unit_price: 'Unit Price',
+  discount: 'Discount',
+  description: 'Description',
+  item_added: 'Item Added',
+  item_removed: 'Item Removed',
+}
+
 interface OrderItemRow {
   id: string
   item_id: string | null
@@ -53,14 +82,31 @@ interface OrderItemRow {
   items: { id: string; item_code: string; condition_grade: string; item_status: string } | null
 }
 
+interface EditingItem {
+  unit_price: number
+  discount: number
+  quantity: number
+}
+
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { data: order, isLoading } = useOrder(id!)
   const statusMutation = useUpdateOrderStatus()
+  const updateLineItem = useUpdateOrderLineItem()
+  const removeLineItem = useRemoveOrderLineItem()
+  const recalcTotal = useRecalculateOrderTotal()
+  const updateOrder = useUpdateOrder()
+  const { data: auditLogs } = useOrderAuditLogs(id!)
 
   const [cancelOpen, setCancelOpen] = useState(false)
   const [advanceOpen, setAdvanceOpen] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editingItems, setEditingItems] = useState<Record<string, EditingItem>>({})
+  const [editShippingCost, setEditShippingCost] = useState(0)
+  const [editTrackingNumber, setEditTrackingNumber] = useState('')
+  const [showAuditLog, setShowAuditLog] = useState(false)
+  const [removeConfirmId, setRemoveConfirmId] = useState<string | null>(null)
 
   if (isLoading) return <FormSkeleton fields={6} />
   if (!order) return <div className="text-center py-12 text-muted-foreground">Order not found.</div>
@@ -77,24 +123,133 @@ export default function OrderDetailPage() {
   const sourceCfg = ORDER_SOURCES.find(s => s.value === order.order_source)
   const nextStatus = getNextStatus(order.order_status)
   const canCancel = order.order_status !== 'SHIPPED' && order.order_status !== 'DELIVERED' && order.order_status !== 'CANCELLED'
+  const canEdit = EDITABLE_STATUSES.includes(order.order_status)
 
   const shippingAddr = parseShippingAddress(order.shipping_address as string | null)
   const deliveryDate = (order as Record<string, unknown>).delivery_date as string | null
   const deliveryTimeCode = (order as Record<string, unknown>).delivery_time_code as string | null
   const orderNotes = (order as Record<string, unknown>).notes as string | null
   const shippingCost = ((order as Record<string, unknown>).shipping_cost as number) ?? 0
+  const shippedDate = (order as Record<string, unknown>).shipped_date as string | null
+  const trackingNumber = (order as Record<string, unknown>).tracking_number as string | null
   const timeSlot = YAMATO_TIME_SLOTS.find(s => s.code === deliveryTimeCode)
 
   // Compute totals from line items
   const subtotal = orderItems.reduce((sum, oi) => sum + (oi.unit_price * oi.quantity), 0)
   const totalDiscount = orderItems.reduce((sum, oi) => sum + oi.discount, 0)
 
+  function enterEditMode() {
+    const items: Record<string, EditingItem> = {}
+    for (const oi of orderItems) {
+      items[oi.id] = { unit_price: oi.unit_price, discount: oi.discount, quantity: oi.quantity }
+    }
+    setEditingItems(items)
+    setEditShippingCost(shippingCost)
+    setEditTrackingNumber(trackingNumber ?? '')
+    setIsEditing(true)
+  }
+
+  async function saveEdits() {
+    try {
+      // Update each changed line item
+      for (const oi of orderItems) {
+        const edited = editingItems[oi.id]
+        if (!edited) continue
+        if (
+          edited.unit_price !== oi.unit_price ||
+          edited.discount !== oi.discount ||
+          edited.quantity !== oi.quantity
+        ) {
+          await updateLineItem.mutateAsync({
+            orderItemId: oi.id,
+            updates: {
+              unit_price: edited.unit_price,
+              discount: edited.discount,
+              quantity: edited.quantity,
+            },
+          })
+        }
+      }
+
+      // Update order-level fields
+      const orderUpdates: Record<string, unknown> = {}
+      if (editShippingCost !== shippingCost) {
+        orderUpdates.shipping_cost = editShippingCost
+      }
+      if (editTrackingNumber !== (trackingNumber ?? '')) {
+        orderUpdates.tracking_number = editTrackingNumber || null
+      }
+      if (Object.keys(orderUpdates).length > 0) {
+        await updateOrder.mutateAsync({ id: order.id, updates: orderUpdates })
+      }
+
+      // Recalculate total
+      await recalcTotal.mutateAsync(order.id)
+
+      // If order was PACKED and items changed, revert to CONFIRMED
+      if (order.order_status === 'PACKED') {
+        const hasItemChanges = orderItems.some((oi) => {
+          const edited = editingItems[oi.id]
+          return edited && (
+            edited.unit_price !== oi.unit_price ||
+            edited.discount !== oi.discount ||
+            edited.quantity !== oi.quantity
+          )
+        })
+        if (hasItemChanges) {
+          await statusMutation.mutateAsync({ id: order.id, status: 'CONFIRMED' })
+          toast.warning('Order reverted to Confirmed because items were modified')
+        }
+      }
+
+      setIsEditing(false)
+      toast.success('Order updated')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save changes')
+    }
+  }
+
+  async function handleRemoveItem(orderItemId: string) {
+    try {
+      await removeLineItem.mutateAsync(orderItemId)
+      await recalcTotal.mutateAsync(order.id)
+
+      // Remove from editing state
+      const updated = { ...editingItems }
+      delete updated[orderItemId]
+      setEditingItems(updated)
+
+      if (order.order_status === 'PACKED') {
+        await statusMutation.mutateAsync({ id: order.id, status: 'CONFIRMED' })
+        toast.warning('Order reverted to Confirmed because items were modified')
+      }
+
+      toast.success('Item removed')
+      setRemoveConfirmId(null)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to remove item')
+    }
+  }
+
   function handleAdvance() {
     if (!nextStatus) return
+
+    const updates: Record<string, unknown> = {}
+    // Auto-set shipped_date when advancing to SHIPPED
+    if (nextStatus === 'SHIPPED') {
+      updates.shipped_date = new Date().toISOString()
+    }
+
     statusMutation.mutate(
       { id: order!.id, status: nextStatus },
       {
-        onSuccess: () => { toast.success(`Order ${getNextStatusLabel(nextStatus).toLowerCase()}`); setAdvanceOpen(false) },
+        onSuccess: async () => {
+          if (Object.keys(updates).length > 0) {
+            await updateOrder.mutateAsync({ id: order!.id, updates })
+          }
+          toast.success(`Order ${getNextStatusLabel(nextStatus).toLowerCase()}`)
+          setAdvanceOpen(false)
+        },
         onError: (err) => toast.error(`Failed: ${err.message}`),
       },
     )
@@ -110,6 +265,22 @@ export default function OrderDetailPage() {
     )
   }
 
+  // Compute editing totals
+  const editSubtotal = isEditing
+    ? orderItems.reduce((sum, oi) => {
+        const e = editingItems[oi.id]
+        return sum + (e ? e.unit_price * e.quantity : oi.unit_price * oi.quantity)
+      }, 0)
+    : subtotal
+  const editTotalDiscount = isEditing
+    ? orderItems.reduce((sum, oi) => {
+        const e = editingItems[oi.id]
+        return sum + (e ? e.discount : oi.discount)
+      }, 0)
+    : totalDiscount
+  const displayShippingCost = isEditing ? editShippingCost : shippingCost
+  const displayTotal = editSubtotal - editTotalDiscount + displayShippingCost
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -120,12 +291,28 @@ export default function OrderDetailPage() {
           title={order.order_code}
           actions={
             <div className="flex gap-2">
-              {nextStatus && order.order_status !== 'CANCELLED' && (
+              {canEdit && !isEditing && (
+                <Button variant="outline" size="sm" onClick={enterEditMode}>
+                  <Pencil className="h-4 w-4 mr-1" />
+                  Edit Order
+                </Button>
+              )}
+              {isEditing && (
+                <>
+                  <Button size="sm" onClick={saveEdits} disabled={updateLineItem.isPending || updateOrder.isPending}>
+                    Save Changes
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)}>
+                    Cancel
+                  </Button>
+                </>
+              )}
+              {!isEditing && nextStatus && order.order_status !== 'CANCELLED' && (
                 <Button size="sm" onClick={() => setAdvanceOpen(true)}>
                   Advance to {getNextStatusLabel(nextStatus)}
                 </Button>
               )}
-              {canCancel && (
+              {!isEditing && canCancel && (
                 <Button variant="destructive" size="sm" onClick={() => setCancelOpen(true)}>
                   Cancel Order
                 </Button>
@@ -248,19 +435,39 @@ export default function OrderDetailPage() {
           </CardContent>
         </Card>
 
-        {/* Delivery Info */}
+        {/* Shipping & Delivery Info */}
         <Card>
           <CardHeader>
-            <CardTitle>Delivery</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Truck className="h-4 w-4" />
+              Shipping & Delivery
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Date</span>
+              <span className="text-muted-foreground">Expected Delivery</span>
               <span>{deliveryDate ?? '—'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Time Slot</span>
-              <span>{timeSlot ? `${timeSlot.label_en}` : '—'}</span>
+              <span>{timeSlot ? timeSlot.label_en : '—'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Shipped Date</span>
+              <span>{shippedDate ? formatDateTime(shippedDate) : '—'}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground">Tracking Number</span>
+              {isEditing ? (
+                <Input
+                  className="w-40 h-7 text-sm"
+                  value={editTrackingNumber}
+                  onChange={(e) => setEditTrackingNumber(e.target.value)}
+                  placeholder="e.g. 1234-5678-9012"
+                />
+              ) : (
+                <span>{trackingNumber ?? '—'}</span>
+              )}
             </div>
             {sg && (
               <div className="pt-2 border-t">
@@ -289,27 +496,39 @@ export default function OrderDetailPage() {
           ) : (
             <div>
               {/* Table Header */}
-              <div className="grid grid-cols-[2rem_1fr_4rem_6rem_6rem_6rem_5rem] gap-2 px-3 py-2 text-xs font-medium text-muted-foreground uppercase border-b">
+              <div className={cn(
+                'gap-2 px-3 py-2 text-xs font-medium text-muted-foreground uppercase border-b',
+                isEditing
+                  ? 'grid grid-cols-[2rem_1fr_4rem_6rem_6rem_6rem_2rem]'
+                  : 'grid grid-cols-[2rem_1fr_4rem_6rem_6rem_6rem_5rem]',
+              )}>
                 <span>#</span>
                 <span>Description</span>
                 <span className="text-right">Qty</span>
                 <span className="text-right">Unit Price</span>
                 <span className="text-right">Discount</span>
                 <span className="text-right">Subtotal</span>
-                <span className="text-center">Packed</span>
+                <span className="text-center">{isEditing ? '' : 'Packed'}</span>
               </div>
 
               {/* Table Rows */}
               {orderItems.map((oi, idx) => {
                 const item = oi.items
-                const lineSubtotal = oi.unit_price * oi.quantity - oi.discount
+                const edited = editingItems[oi.id]
+                const displayPrice = isEditing && edited ? edited.unit_price : oi.unit_price
+                const displayDiscount = isEditing && edited ? edited.discount : oi.discount
+                const displayQty = isEditing && edited ? edited.quantity : oi.quantity
+                const lineSubtotal = displayPrice * displayQty - displayDiscount
 
                 return (
                   <div
                     key={oi.id}
                     className={cn(
-                      'grid grid-cols-[2rem_1fr_4rem_6rem_6rem_6rem_5rem] gap-2 items-center px-3 py-2.5 border-b last:border-0',
-                      oi.packed_at ? 'bg-green-50' : '',
+                      'gap-2 items-center px-3 py-2.5 border-b last:border-0',
+                      isEditing
+                        ? 'grid grid-cols-[2rem_1fr_4rem_6rem_6rem_6rem_2rem]'
+                        : 'grid grid-cols-[2rem_1fr_4rem_6rem_6rem_6rem_5rem]',
+                      !isEditing && oi.packed_at ? 'bg-green-50' : '',
                     )}
                   >
                     <span className="text-sm text-muted-foreground">{idx + 1}</span>
@@ -329,17 +548,76 @@ export default function OrderDetailPage() {
                         </div>
                       )}
                     </div>
-                    <span className="text-sm text-right">{oi.quantity}</span>
-                    <span className="text-sm text-right">{formatPrice(oi.unit_price)}</span>
-                    <span className="text-sm text-right">{oi.discount > 0 ? `-${formatPrice(oi.discount)}` : '—'}</span>
+
+                    {/* Qty */}
+                    {isEditing && !item ? (
+                      <Input
+                        type="number"
+                        min={1}
+                        className="h-7 text-sm text-right px-1"
+                        value={displayQty}
+                        onChange={(e) => setEditingItems(prev => ({
+                          ...prev,
+                          [oi.id]: { ...prev[oi.id], quantity: parseInt(e.target.value) || 1 },
+                        }))}
+                      />
+                    ) : (
+                      <span className="text-sm text-right">{displayQty}</span>
+                    )}
+
+                    {/* Unit Price */}
+                    {isEditing ? (
+                      <Input
+                        type="number"
+                        min={0}
+                        className="h-7 text-sm text-right px-1"
+                        value={displayPrice}
+                        onChange={(e) => setEditingItems(prev => ({
+                          ...prev,
+                          [oi.id]: { ...prev[oi.id], unit_price: parseInt(e.target.value) || 0 },
+                        }))}
+                      />
+                    ) : (
+                      <span className="text-sm text-right">{formatPrice(displayPrice)}</span>
+                    )}
+
+                    {/* Discount */}
+                    {isEditing ? (
+                      <Input
+                        type="number"
+                        min={0}
+                        className="h-7 text-sm text-right px-1"
+                        value={displayDiscount}
+                        onChange={(e) => setEditingItems(prev => ({
+                          ...prev,
+                          [oi.id]: { ...prev[oi.id], discount: parseInt(e.target.value) || 0 },
+                        }))}
+                      />
+                    ) : (
+                      <span className="text-sm text-right">{oi.discount > 0 ? `-${formatPrice(oi.discount)}` : '—'}</span>
+                    )}
+
                     <span className="text-sm font-medium text-right">{formatPrice(lineSubtotal)}</span>
-                    <div className="text-center">
-                      {oi.packed_at ? (
-                        <StatusBadge label="Packed" color="bg-green-100 text-green-800 border-green-300" />
-                      ) : (
-                        <StatusBadge label="Unpacked" color="bg-gray-100 text-gray-800 border-gray-300" />
-                      )}
-                    </div>
+
+                    {/* Packed / Remove */}
+                    {isEditing ? (
+                      <button
+                        type="button"
+                        onClick={() => setRemoveConfirmId(oi.id)}
+                        className="text-muted-foreground hover:text-destructive transition-colors"
+                        title="Remove item"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    ) : (
+                      <div className="text-center">
+                        {oi.packed_at ? (
+                          <StatusBadge label="Packed" color="bg-green-100 text-green-800 border-green-300" />
+                        ) : (
+                          <StatusBadge label="Unpacked" color="bg-gray-100 text-gray-800 border-gray-300" />
+                        )}
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -348,21 +626,31 @@ export default function OrderDetailPage() {
               <div className="border-t mt-2 pt-3 space-y-1.5 px-3">
                 <div className="flex justify-end gap-8 text-sm">
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span className="w-24 text-right font-medium">{formatPrice(subtotal)}</span>
+                  <span className="w-24 text-right font-medium">{formatPrice(editSubtotal)}</span>
                 </div>
-                <div className="flex justify-end gap-8 text-sm">
+                <div className="flex justify-end gap-8 text-sm items-center">
                   <span className="text-muted-foreground">Delivery Fee</span>
-                  <span className="w-24 text-right">{formatPrice(shippingCost)}</span>
+                  {isEditing ? (
+                    <Input
+                      type="number"
+                      min={0}
+                      className="w-24 h-7 text-sm text-right"
+                      value={editShippingCost}
+                      onChange={(e) => setEditShippingCost(parseInt(e.target.value) || 0)}
+                    />
+                  ) : (
+                    <span className="w-24 text-right">{formatPrice(displayShippingCost)}</span>
+                  )}
                 </div>
-                {totalDiscount > 0 && (
+                {editTotalDiscount > 0 && (
                   <div className="flex justify-end gap-8 text-sm">
                     <span className="text-muted-foreground">Discount</span>
-                    <span className="w-24 text-right text-muted-foreground">({formatPrice(totalDiscount)})</span>
+                    <span className="w-24 text-right text-muted-foreground">({formatPrice(editTotalDiscount)})</span>
                   </div>
                 )}
                 <div className="flex justify-end gap-8 text-sm font-semibold border-t pt-1.5">
                   <span>Total</span>
-                  <span className="w-24 text-right">{formatPrice(order.total_price)}</span>
+                  <span className="w-24 text-right">{formatPrice(displayTotal)}</span>
                 </div>
               </div>
             </div>
@@ -370,11 +658,75 @@ export default function OrderDetailPage() {
         </CardContent>
       </Card>
 
+      {/* Audit History */}
+      <Card>
+        <CardHeader>
+          <CardTitle
+            className="flex items-center gap-2 cursor-pointer select-none"
+            onClick={() => setShowAuditLog(!showAuditLog)}
+          >
+            <History className="h-4 w-4" />
+            Change History
+            <span className="text-xs font-normal text-muted-foreground ml-1">
+              ({auditLogs?.length ?? 0} entries)
+            </span>
+            <span className="ml-auto text-xs text-muted-foreground">
+              {showAuditLog ? '▲ Hide' : '▼ Show'}
+            </span>
+          </CardTitle>
+        </CardHeader>
+        {showAuditLog && (
+          <CardContent>
+            {!auditLogs || auditLogs.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No changes recorded yet.</p>
+            ) : (
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {auditLogs.map((log: Record<string, unknown>) => {
+                  const fieldLabel = ORDER_AUDIT_FIELD_LABELS[log.field_name as string] ?? (log.field_name as string)
+                  const isAddRemove = log.field_name === 'item_added' || log.field_name === 'item_removed'
+
+                  return (
+                    <div key={log.id as string} className="text-sm border-b border-border/50 pb-2 last:border-0 last:pb-0">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="font-medium">{fieldLabel}</span>
+                        <span className="text-xs text-muted-foreground shrink-0">
+                          {log.changed_by_email && (
+                            <span title={log.changed_by_email as string}>
+                              {(log.changed_by_email as string).split('@')[0]}
+                              {' · '}
+                            </span>
+                          )}
+                          {formatDateTime(log.created_at as string)}
+                        </span>
+                      </div>
+                      <div className="text-muted-foreground mt-0.5">
+                        {isAddRemove ? (
+                          <span className={log.field_name === 'item_added' ? 'text-green-700' : 'text-red-600/70'}>
+                            {log.field_name === 'item_added' ? '+ ' : '- '}
+                            {(log.new_value ?? log.old_value) as string}
+                          </span>
+                        ) : (
+                          <>
+                            <span className="text-red-600/70 line-through">{(log.old_value as string) ?? '(empty)'}</span>
+                            {' → '}
+                            <span className="text-green-700">{(log.new_value as string) ?? '(empty)'}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </CardContent>
+        )}
+      </Card>
+
       <ConfirmDialog
         open={advanceOpen}
         onOpenChange={setAdvanceOpen}
         title={`Advance to ${getNextStatusLabel(nextStatus)}`}
-        description={`Move order ${order.order_code} to "${getNextStatusLabel(nextStatus)}" status?`}
+        description={`Move order ${order.order_code} to "${getNextStatusLabel(nextStatus)}" status?${nextStatus === 'SHIPPED' ? ' This will set the shipped date to now.' : ''}`}
         onConfirm={handleAdvance}
         isLoading={statusMutation.isPending}
       />
@@ -386,6 +738,16 @@ export default function OrderDetailPage() {
         description={`Are you sure you want to cancel order ${order.order_code}? This action cannot be undone.`}
         onConfirm={handleCancel}
         isLoading={statusMutation.isPending}
+        variant="destructive"
+      />
+
+      <ConfirmDialog
+        open={!!removeConfirmId}
+        onOpenChange={(open) => !open && setRemoveConfirmId(null)}
+        title="Remove Item"
+        description="Are you sure you want to remove this item from the order?"
+        onConfirm={() => removeConfirmId && handleRemoveItem(removeConfirmId)}
+        isLoading={removeLineItem.isPending}
         variant="destructive"
       />
     </div>
