@@ -85,12 +85,18 @@ export function ItemAssignmentBar({ item }: ItemAssignmentBarProps) {
         if (pm.category_id) updates.category_id = pm.category_id
         if (pm.device_category) updates.device_category = pm.device_category
 
-        // Text fields — only fill if item's current value is empty/null
-        // Only include fields that exist on the items table
+        // === Fields verified against items table schema (database.types.ts) ===
+        // Items table has: brand, carrier, color, cpu, form_factor, gpu,
+        //   keyboard_layout, model_name, os_family, other_features (text)
+        //   ram_gb, storage_gb, year, screen_size (numeric)
+        //   has_touchscreen, is_unlocked (boolean)
+        // NOT on items: chipset, ports, short_description, has_cellular,
+        //   has_thunderbolt, supports_stylus, imei_slot_count
+
+        // Text fields on BOTH tables
         const textFields: (keyof ItemUpdate)[] = [
           'brand', 'model_name', 'color', 'cpu', 'gpu', 'os_family',
-          'screen_size', 'carrier', 'keyboard_layout',
-          'form_factor', 'other_features',
+          'carrier', 'keyboard_layout', 'form_factor', 'other_features',
         ]
         for (const key of textFields) {
           const itemVal = item[key as keyof Item]
@@ -100,8 +106,8 @@ export function ItemAssignmentBar({ item }: ItemAssignmentBarProps) {
           }
         }
 
-        // Numeric fields — only fill if item's value is null, with safe number conversion
-        const numFields: (keyof ItemUpdate)[] = ['ram_gb', 'storage_gb', 'year']
+        // Numeric fields on BOTH tables (screen_size is numeric on both)
+        const numFields: (keyof ItemUpdate)[] = ['ram_gb', 'storage_gb', 'year', 'screen_size']
         for (const key of numFields) {
           const itemVal = item[key as keyof Item]
           const pmVal = pm[key as keyof typeof pm]
@@ -113,10 +119,8 @@ export function ItemAssignmentBar({ item }: ItemAssignmentBarProps) {
           }
         }
 
-        // Boolean fields — only include columns that exist on the items table
-        const boolFields: (keyof ItemUpdate)[] = [
-          'has_touchscreen', 'is_unlocked',
-        ]
+        // Boolean fields on BOTH tables
+        const boolFields: (keyof ItemUpdate)[] = ['has_touchscreen', 'is_unlocked']
         for (const key of boolFields) {
           const itemVal = item[key as keyof Item]
           const pmVal = pm[key as keyof typeof pm]
