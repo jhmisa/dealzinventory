@@ -1035,6 +1035,8 @@ export type Database = {
           order_code: string
           order_source: Database["public"]["Enums"]["order_source"]
           order_status: Database["public"]["Enums"]["order_status"]
+          packed_by: string | null
+          packed_date: string | null
           quantity: number
           sell_group_id: string | null
           shipped_date: string | null
@@ -1054,6 +1056,8 @@ export type Database = {
           order_code: string
           order_source: Database["public"]["Enums"]["order_source"]
           order_status?: Database["public"]["Enums"]["order_status"]
+          packed_by?: string | null
+          packed_date?: string | null
           quantity: number
           sell_group_id?: string | null
           shipped_date?: string | null
@@ -1073,6 +1077,8 @@ export type Database = {
           order_code?: string
           order_source?: Database["public"]["Enums"]["order_source"]
           order_status?: Database["public"]["Enums"]["order_status"]
+          packed_by?: string | null
+          packed_date?: string | null
           quantity?: number
           sell_group_id?: string | null
           shipped_date?: string | null

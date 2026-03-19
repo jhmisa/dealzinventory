@@ -27,6 +27,7 @@ import {
   useAddOrderLineItem,
 } from '@/hooks/use-orders'
 import * as ordersService from '@/services/orders'
+import { useAuth } from '@/hooks/use-auth'
 import { ORDER_STATUSES, ORDER_SOURCES, YAMATO_TIME_SLOTS } from '@/lib/constants'
 import { formatDateTime, formatPrice, cn } from '@/lib/utils'
 import { useState, useRef, useEffect } from 'react'
@@ -70,6 +71,8 @@ const ORDER_AUDIT_FIELD_LABELS: Record<string, string> = {
   unit_price: 'Unit Price',
   discount: 'Discount',
   description: 'Description',
+  packed_date: 'Packed Date',
+  packed_by: 'Packed By',
   item_added: 'Item Added',
   item_removed: 'Item Removed',
 }
@@ -95,6 +98,7 @@ interface EditingItem {
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { session } = useAuth()
   const { data: order, isLoading } = useOrder(id!)
   const statusMutation = useUpdateOrderStatus()
   const cancelMutation = useCancelOrder()
@@ -166,6 +170,8 @@ export default function OrderDetailPage() {
   const shippingCost = ((order as Record<string, unknown>).shipping_cost as number) ?? 0
   const shippedDate = (order as Record<string, unknown>).shipped_date as string | null
   const trackingNumber = (order as Record<string, unknown>).tracking_number as string | null
+  const packedDate = (order as Record<string, unknown>).packed_date as string | null
+  const packedBy = (order as Record<string, unknown>).packed_by as string | null
   const timeSlot = YAMATO_TIME_SLOTS.find(s => s.code === deliveryTimeCode)
 
   // Compute totals from line items
@@ -269,6 +275,11 @@ export default function OrderDetailPage() {
     if (!nextStatus) return
 
     const updates: Record<string, unknown> = {}
+    // Auto-set packed_date when advancing to PACKED
+    if (nextStatus === 'PACKED') {
+      updates.packed_date = new Date().toISOString()
+      updates.packed_by = session?.user?.id ?? null
+    }
     // Auto-set shipped_date when advancing to SHIPPED
     if (nextStatus === 'SHIPPED') {
       updates.shipped_date = new Date().toISOString()
@@ -554,6 +565,16 @@ export default function OrderDetailPage() {
               <span className="text-muted-foreground">Time Slot</span>
               <span>{timeSlot ? timeSlot.label_en : '—'}</span>
             </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Packed Date</span>
+              <span>{packedDate ? formatDateTime(packedDate) : '—'}</span>
+            </div>
+            {packedBy && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Packed By</span>
+                <span className="text-xs">{session?.user?.id === packedBy ? session?.user?.email?.split('@')[0] ?? 'You' : packedBy.slice(0, 8)}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-muted-foreground">Shipped Date</span>
               <span>{shippedDate ? formatDateTime(shippedDate) : '—'}</span>

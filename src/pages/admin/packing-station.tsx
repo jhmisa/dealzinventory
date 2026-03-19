@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/select'
 import { PageHeader, CodeDisplay, StatusBadge, ManualCodeInput } from '@/components/shared'
 import { QRScannerCamera } from '@/components/shared/media'
-import { usePackableOrders, usePackOrderItem, useUpdateOrderStatus } from '@/hooks/use-orders'
+import { usePackableOrders, usePackOrderItem, useUpdateOrderStatus, useUpdateOrder } from '@/hooks/use-orders'
 import { useAuth } from '@/hooks/use-auth'
 import { cn } from '@/lib/utils'
 
@@ -29,6 +29,7 @@ export default function PackingStationPage() {
   const { data: orders } = usePackableOrders()
   const packMutation = usePackOrderItem()
   const statusMutation = useUpdateOrderStatus()
+  const updateOrder = useUpdateOrder()
 
   const [selectedOrderId, setSelectedOrderId] = useState<string>('')
   const [scanMode, setScanMode] = useState<'camera' | 'manual'>('manual')
@@ -99,7 +100,15 @@ export default function PackingStationPage() {
     statusMutation.mutate(
       { id: selectedOrder.id, status: 'PACKED' },
       {
-        onSuccess: () => {
+        onSuccess: async () => {
+          // Record packed_date and packed_by
+          await updateOrder.mutateAsync({
+            id: selectedOrder.id,
+            updates: {
+              packed_date: new Date().toISOString(),
+              packed_by: session?.user?.id ?? null,
+            },
+          })
           toast.success(`Order ${selectedOrder.order_code} marked as packed`)
           setSelectedOrderId('')
         },
