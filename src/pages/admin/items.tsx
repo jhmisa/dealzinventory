@@ -105,8 +105,8 @@ export default function ItemListPage() {
   // Fetch all items (no status filter) so we can compute tab counts
   const { data: allItems, isLoading } = useItems({
     search: debouncedSearch || undefined,
-    grade: gradeFilter || undefined,
-    source: sourceFilter || undefined,
+    grade: gradeFilter && gradeFilter !== 'all' ? gradeFilter : undefined,
+    source: sourceFilter && sourceFilter !== 'all' ? sourceFilter : undefined,
   })
 
   const items = (allItems ?? []) as ItemRow[]
