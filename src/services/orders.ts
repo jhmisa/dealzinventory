@@ -9,11 +9,24 @@ interface OrderFilters {
 }
 
 export async function getOrders(filters: OrderFilters = {}) {
+  // If searching, first find matching customer IDs (PostgREST can't .or() across joins)
+  let matchingCustomerIds: string[] | null = null
+  if (filters.search) {
+    const term = filters.search
+    const { data: customers } = await supabase
+      .from('customers')
+      .select('id')
+      .or(
+        `customer_code.ilike.%${term}%,last_name.ilike.%${term}%,first_name.ilike.%${term}%,email.ilike.%${term}%,phone.ilike.%${term}%`
+      )
+    matchingCustomerIds = customers?.map((c) => c.id) ?? []
+  }
+
   let query = supabase
     .from('orders')
     .select(`
       *,
-      customers(customer_code, last_name, first_name),
+      customers(customer_code, last_name, first_name, email, phone),
       sell_groups(sell_group_code, condition_grade, base_price,
         product_models(brand, model_name, cpu, ram_gb, storage_gb)
       ),
@@ -22,7 +35,14 @@ export async function getOrders(filters: OrderFilters = {}) {
     .order('created_at', { ascending: false })
 
   if (filters.search) {
-    query = query.ilike('order_code', `%${filters.search}%`)
+    // Match orders by order_code OR by customer
+    if (matchingCustomerIds && matchingCustomerIds.length > 0) {
+      query = query.or(
+        `order_code.ilike.%${filters.search}%,customer_id.in.(${matchingCustomerIds.join(',')})`
+      )
+    } else {
+      query = query.ilike('order_code', `%${filters.search}%`)
+    }
   }
   if (filters.status) {
     query = query.eq('order_status', filters.status)

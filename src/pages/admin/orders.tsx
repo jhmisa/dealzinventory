@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
-import { PageHeader, SearchBar, DataTable, StatusBadge, GradeBadge, CodeDisplay, PriceDisplay, TableSkeleton } from '@/components/shared'
+import { PageHeader, SearchBar, DataTable, StatusBadge, CodeDisplay, PriceDisplay, TableSkeleton } from '@/components/shared'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/select'
 import { useOrders } from '@/hooks/use-orders'
 import { ORDER_STATUSES, ORDER_SOURCES } from '@/lib/constants'
-import { formatDateTime } from '@/lib/utils'
+import { formatDateTime, cn } from '@/lib/utils'
 
 type OrderRow = {
   id: string
@@ -24,7 +24,7 @@ type OrderRow = {
   total_price: number
   shipping_address: string
   created_at: string
-  customers: { customer_code: string; last_name: string; first_name: string | null } | null
+  customers: { customer_code: string; last_name: string; first_name: string | null; email: string | null; phone: string | null } | null
   sell_groups: {
     sell_group_code: string
     condition_grade: string
@@ -33,6 +33,11 @@ type OrderRow = {
   } | null
   order_items: { count: number }[]
 }
+
+const STATUS_TABS = [
+  { value: 'all', label: 'All' },
+  ...ORDER_STATUSES.map((s) => ({ value: s.value, label: s.label })),
+]
 
 const columns: ColumnDef<OrderRow>[] = [
   {
@@ -45,7 +50,13 @@ const columns: ColumnDef<OrderRow>[] = [
     header: 'Customer',
     cell: ({ row }) => {
       const c = row.original.customers
-      return c ? `${c.last_name} ${c.first_name ?? ''}`.trim() : '—'
+      if (!c) return '—'
+      return (
+        <div>
+          <span>{`${c.last_name} ${c.first_name ?? ''}`.trim()}</span>
+          <span className="ml-2 text-xs text-muted-foreground">{c.customer_code}</span>
+        </div>
+      )
     },
   },
   {
@@ -92,14 +103,27 @@ const columns: ColumnDef<OrderRow>[] = [
 export default function OrderListPage() {
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [statusTab, setStatusTab] = useState('all')
   const [sourceFilter, setSourceFilter] = useState<string>('all')
 
-  const { data: orders, isLoading } = useOrders({
+  // Fetch all orders (no status filter) so we can compute tab counts
+  const { data: allOrders, isLoading } = useOrders({
     search: search || undefined,
-    status: statusFilter === 'all' ? undefined : statusFilter,
     source: sourceFilter === 'all' ? undefined : sourceFilter,
   })
+
+  const orders = (allOrders ?? []) as OrderRow[]
+
+  // Compute counts per status
+  const statusCounts: Record<string, number> = { all: orders.length }
+  for (const order of orders) {
+    statusCounts[order.order_status] = (statusCounts[order.order_status] ?? 0) + 1
+  }
+
+  // Filter by active tab
+  const filteredOrders = statusTab === 'all'
+    ? orders
+    : orders.filter((o) => o.order_status === statusTab)
 
   return (
     <div className="space-y-6">
@@ -116,19 +140,49 @@ export default function OrderListPage() {
         }
       />
 
+      {/* Status Tabs */}
+      <div className="border-b">
+        <nav className="flex gap-0 -mb-px overflow-x-auto">
+          {STATUS_TABS.map((tab) => {
+            const count = statusCounts[tab.value] ?? 0
+            const isActive = statusTab === tab.value
+            return (
+              <button
+                key={tab.value}
+                type="button"
+                onClick={() => setStatusTab(tab.value)}
+                className={cn(
+                  'px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors',
+                  isActive
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30',
+                )}
+              >
+                {tab.label}
+                <span
+                  className={cn(
+                    'ml-1.5 inline-flex items-center justify-center rounded-full px-2 py-0.5 text-xs',
+                    isActive
+                      ? 'bg-primary/10 text-primary'
+                      : 'bg-muted text-muted-foreground',
+                  )}
+                >
+                  {count}
+                </span>
+              </button>
+            )
+          })}
+        </nav>
+      </div>
+
+      {/* Search & Source Filter */}
       <div className="flex items-center gap-4 flex-wrap">
-        <SearchBar value={search} onChange={setSearch} placeholder="Search ORD-code..." />
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            {ORDER_STATUSES.map((s) => (
-              <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SearchBar
+          value={search}
+          onChange={setSearch}
+          placeholder="Search by order code, customer name, code, email, phone..."
+          className="flex-1 min-w-[300px]"
+        />
         <Select value={sourceFilter} onValueChange={setSourceFilter}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="Source" />
@@ -147,7 +201,7 @@ export default function OrderListPage() {
       ) : (
         <DataTable
           columns={columns}
-          data={(orders ?? []) as OrderRow[]}
+          data={filteredOrders}
           onRowClick={(row) => navigate(`/admin/orders/${row.id}`)}
         />
       )}
