@@ -30,3 +30,6 @@ dist-ssr
 .agents/
 .cursor/
 .vercel
+
+# Supabase CLI temp files
+supabase/.temp/

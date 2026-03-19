@@ -144,7 +144,11 @@ export async function createCustomer(params: {
     },
   })
 
-  if (error) throw error
+  if (error) {
+    // Try to extract a meaningful message from the response data first
+    if (data?.error) throw new Error(data.error)
+    throw new Error(error.message ?? 'Failed to call customer-auth function')
+  }
   if (data?.error) throw new Error(data.error)
 
   const customer = data.customer as Customer

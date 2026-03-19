@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { Eye, EyeOff } from 'lucide-react'
 import {
   adminCreateCustomerSchema,
   type AdminCreateCustomerFormValues,
@@ -28,6 +29,24 @@ import { Separator } from '@/components/ui/separator'
 import { AddressForm } from '@/components/shared'
 import type { ShippingAddress } from '@/lib/address-types'
 
+/** Format Japan phone number with dashes: 09012345678 → 090-1234-5678 */
+function formatJapanPhone(value: string): string {
+  const digits = value.replace(/[^\d]/g, '')
+  // Mobile: 090/080/070/050 → XXX-XXXX-XXXX
+  if (/^0[5789]0/.test(digits)) {
+    if (digits.length <= 3) return digits
+    if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`
+    return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7, 11)}`
+  }
+  // Landline: 03/06/etc → XX-XXXX-XXXX
+  if (/^0[1-9]/.test(digits)) {
+    if (digits.length <= 2) return digits
+    if (digits.length <= 6) return `${digits.slice(0, 2)}-${digits.slice(2)}`
+    return `${digits.slice(0, 2)}-${digits.slice(2, 6)}-${digits.slice(6, 10)}`
+  }
+  return digits
+}
+
 interface CustomerFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -42,6 +61,7 @@ export function CustomerFormDialog({
   onSubmit,
 }: CustomerFormDialogProps) {
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(null)
+  const [showPin, setShowPin] = useState(false)
 
   const form = useForm<AdminCreateCustomerFormValues>({
     resolver: zodResolver(adminCreateCustomerSchema),
@@ -70,6 +90,7 @@ export function CustomerFormDialog({
     if (!nextOpen) {
       form.reset()
       setShippingAddress(null)
+      setShowPin(false)
     }
     onOpenChange(nextOpen)
   }
@@ -91,7 +112,12 @@ export function CustomerFormDialog({
                   <FormItem>
                     <FormLabel>Last Name *</FormLabel>
                     <FormControl>
-                      <Input placeholder="Tanaka" {...field} />
+                      <Input
+                        placeholder="TANAKA"
+                        {...field}
+                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                        className="uppercase"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -104,7 +130,12 @@ export function CustomerFormDialog({
                   <FormItem>
                     <FormLabel>First Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="Taro" {...field} />
+                      <Input
+                        placeholder="TARO"
+                        {...field}
+                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                        className="uppercase"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -135,7 +166,12 @@ export function CustomerFormDialog({
                 <FormItem>
                   <FormLabel>Phone</FormLabel>
                   <FormControl>
-                    <Input type="tel" placeholder="090-1234-5678" {...field} />
+                    <Input
+                      type="tel"
+                      placeholder="090-1234-5678"
+                      {...field}
+                      onChange={(e) => field.onChange(formatJapanPhone(e.target.value))}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -150,13 +186,23 @@ export function CustomerFormDialog({
                 <FormItem>
                   <FormLabel>PIN (6 digits) *</FormLabel>
                   <FormControl>
-                    <Input
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={6}
-                      placeholder="000000"
-                      {...field}
-                    />
+                    <div className="relative">
+                      <Input
+                        type={showPin ? 'text' : 'password'}
+                        inputMode="numeric"
+                        maxLength={6}
+                        placeholder="******"
+                        {...field}
+                      />
+                      <button
+                        type="button"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        onClick={() => setShowPin(!showPin)}
+                        tabIndex={-1}
+                      >
+                        {showPin ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                   </FormControl>
                   <FormDescription>Customer uses this to log in</FormDescription>
                   <FormMessage />

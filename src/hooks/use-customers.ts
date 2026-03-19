@@ -42,6 +42,16 @@ export function useCustomerKaitoriRequests(customerId: string) {
   })
 }
 
+export function useCreateCustomer() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: customersService.createCustomer,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.customers.all })
+    },
+  })
+}
+
 export function useUpdateCustomer() {
   const queryClient = useQueryClient()
   return useMutation({
