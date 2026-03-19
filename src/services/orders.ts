@@ -157,6 +157,21 @@ export async function markOrderItemsSold(orderId: string) {
   }
 }
 
+// Reset all packing progress on an order (clear packed_at/packed_by on all order_items and packed_date/packed_by on order)
+export async function resetOrderPacking(orderId: string) {
+  // Clear packed_at on all order_items
+  await supabase
+    .from('order_items')
+    .update({ packed_at: null, packed_by: null })
+    .eq('order_id', orderId)
+
+  // Clear packed_date on the order
+  await supabase
+    .from('orders')
+    .update({ packed_date: null, packed_by: null })
+    .eq('id', orderId)
+}
+
 // Mark an order item as packed
 export async function packOrderItem(orderItemId: string, packedBy: string) {
   const { data, error } = await supabase

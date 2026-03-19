@@ -237,8 +237,9 @@ export default function OrderDetailPage() {
           )
         })
         if (hasItemChanges) {
+          await ordersService.resetOrderPacking(order.id)
           await statusMutation.mutateAsync({ id: order.id, status: 'CONFIRMED' })
-          toast.warning('Order reverted to Confirmed because items were modified')
+          toast.warning('Order reverted to Confirmed — packing checklist reset')
         }
       }
 
@@ -260,8 +261,9 @@ export default function OrderDetailPage() {
       setEditingItems(updated)
 
       if (order.order_status === 'PACKED') {
+        await ordersService.resetOrderPacking(order.id)
         await statusMutation.mutateAsync({ id: order.id, status: 'CONFIRMED' })
-        toast.warning('Order reverted to Confirmed because items were modified')
+        toast.warning('Order reverted to Confirmed — packing checklist reset')
       }
 
       toast.success('Item removed')
@@ -338,8 +340,9 @@ export default function OrderDetailPage() {
       toast.success(`Added ${item.item_code}`)
 
       if (order.order_status === 'PACKED') {
+        await ordersService.resetOrderPacking(order.id)
         await statusMutation.mutateAsync({ id: order.id, status: 'CONFIRMED' })
-        toast.warning('Order reverted to Confirmed because items were modified')
+        toast.warning('Order reverted to Confirmed — packing checklist reset')
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to add item')
@@ -370,8 +373,9 @@ export default function OrderDetailPage() {
       toast.success('Custom item added')
 
       if (order.order_status === 'PACKED') {
+        await ordersService.resetOrderPacking(order.id)
         await statusMutation.mutateAsync({ id: order.id, status: 'CONFIRMED' })
-        toast.warning('Order reverted to Confirmed because items were modified')
+        toast.warning('Order reverted to Confirmed — packing checklist reset')
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to add item')
