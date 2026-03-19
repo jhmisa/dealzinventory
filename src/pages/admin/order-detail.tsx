@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Check, Circle, Package, Pencil, X, Plus, History, Truck } from 'lucide-react'
+import { ArrowLeft, Check, Circle, Package, Pencil, X, Plus, History, Truck, Search, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -23,11 +23,13 @@ import {
   useOrderAuditLogs,
   useUpdateOrder,
   useCancelOrder,
+  useAvailableItems,
+  useAddOrderLineItem,
 } from '@/hooks/use-orders'
 import * as ordersService from '@/services/orders'
 import { ORDER_STATUSES, ORDER_SOURCES, YAMATO_TIME_SLOTS } from '@/lib/constants'
 import { formatDateTime, formatPrice, cn } from '@/lib/utils'
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import type { ShippingAddress } from '@/lib/address-types'
 
 const STATUS_FLOW = ['PENDING', 'CONFIRMED', 'PACKED', 'SHIPPED', 'DELIVERED'] as const
@@ -110,6 +112,35 @@ export default function OrderDetailPage() {
   const [editTrackingNumber, setEditTrackingNumber] = useState('')
   const [showAuditLog, setShowAuditLog] = useState(false)
   const [removeConfirmId, setRemoveConfirmId] = useState<string | null>(null)
+  const [addItemSearch, setAddItemSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false)
+  const [addingCustom, setAddingCustom] = useState(false)
+  const [customDesc, setCustomDesc] = useState('')
+  const [customPrice, setCustomPrice] = useState(0)
+  const [customQty, setCustomQty] = useState(1)
+  const searchRef = useRef<HTMLDivElement>(null)
+  const addLineItem = useAddOrderLineItem()
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(addItemSearch), 300)
+    return () => clearTimeout(timer)
+  }, [addItemSearch])
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setShowSearchDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const { data: availableData, isLoading: searchLoading } = useAvailableItems({ search: debouncedSearch })
+  const searchResults = availableData?.items ?? []
 
   if (isLoading) return <FormSkeleton fields={6} />
   if (!order) return <div className="text-center py-12 text-muted-foreground">Order not found.</div>
@@ -267,6 +298,73 @@ export default function OrderDetailPage() {
       onSuccess: () => { toast.success('Order cancelled'); setCancelOpen(false) },
       onError: (err) => toast.error(`Failed: ${err.message}`),
     })
+  }
+
+  // IDs of inventory items already in the order (to prevent duplicates)
+  const existingItemIds = new Set(
+    orderItems.filter((oi) => oi.item_id).map((oi) => oi.item_id)
+  )
+
+  async function handleAddInventoryItem(item: { id: string; item_code: string; condition_grade: string; selling_price: number | null; product_models: { brand: string; model_name: string } | null }) {
+    if (existingItemIds.has(item.id)) return
+    try {
+      const pm = item.product_models
+      const description = pm ? `${pm.brand} ${pm.model_name}` : item.item_code
+      await addLineItem.mutateAsync({
+        orderId: order.id,
+        item: {
+          item_id: item.id,
+          description,
+          quantity: 1,
+          unit_price: item.selling_price ?? 0,
+          discount: 0,
+        },
+      })
+      await recalcTotal.mutateAsync(order.id)
+      setAddItemSearch('')
+      setDebouncedSearch('')
+      setShowSearchDropdown(false)
+      toast.success(`Added ${item.item_code}`)
+
+      if (order.order_status === 'PACKED') {
+        await statusMutation.mutateAsync({ id: order.id, status: 'CONFIRMED' })
+        toast.warning('Order reverted to Confirmed because items were modified')
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to add item')
+    }
+  }
+
+  async function handleAddCustomItem() {
+    if (!customDesc.trim()) {
+      toast.error('Description is required')
+      return
+    }
+    try {
+      await addLineItem.mutateAsync({
+        orderId: order.id,
+        item: {
+          item_id: null,
+          description: customDesc.trim(),
+          quantity: customQty,
+          unit_price: customPrice,
+          discount: 0,
+        },
+      })
+      await recalcTotal.mutateAsync(order.id)
+      setCustomDesc('')
+      setCustomPrice(0)
+      setCustomQty(1)
+      setAddingCustom(false)
+      toast.success('Custom item added')
+
+      if (order.order_status === 'PACKED') {
+        await statusMutation.mutateAsync({ id: order.id, status: 'CONFIRMED' })
+        toast.warning('Order reverted to Confirmed because items were modified')
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to add item')
+    }
   }
 
   // Compute editing totals
@@ -554,7 +652,7 @@ export default function OrderDetailPage() {
                     </div>
 
                     {/* Qty */}
-                    {isEditing && !item ? (
+                    {isEditing ? (
                       <Input
                         type="number"
                         min={1}
@@ -625,6 +723,123 @@ export default function OrderDetailPage() {
                   </div>
                 )
               })}
+
+              {/* Add Item (edit mode only) */}
+              {isEditing && (
+                <div className="border-t mt-2 pt-3 px-3 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <div ref={searchRef} className="relative flex-1">
+                      <div className="relative">
+                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          className="pl-8 h-8 text-sm"
+                          placeholder="Search by P-code or product name to add..."
+                          value={addItemSearch}
+                          onChange={(e) => {
+                            setAddItemSearch(e.target.value)
+                            setShowSearchDropdown(true)
+                          }}
+                          onFocus={() => addItemSearch && setShowSearchDropdown(true)}
+                        />
+                        {searchLoading && (
+                          <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                        )}
+                      </div>
+                      {showSearchDropdown && debouncedSearch && (
+                        <div className="absolute z-50 mt-1 w-full bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                          {searchResults.length === 0 ? (
+                            <div className="px-3 py-2 text-sm text-muted-foreground">
+                              {searchLoading ? 'Searching...' : 'No available items found'}
+                            </div>
+                          ) : (
+                            searchResults.map((item) => {
+                              const pm = item.product_models as { brand: string; model_name: string } | null
+                              const alreadyAdded = existingItemIds.has(item.id)
+                              return (
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  disabled={alreadyAdded || addLineItem.isPending}
+                                  className={cn(
+                                    'w-full flex items-center justify-between px-3 py-2 text-sm text-left hover:bg-muted transition-colors',
+                                    alreadyAdded && 'opacity-50 cursor-not-allowed',
+                                  )}
+                                  onClick={() => handleAddInventoryItem({
+                                    id: item.id,
+                                    item_code: item.item_code,
+                                    condition_grade: item.condition_grade,
+                                    selling_price: item.selling_price,
+                                    product_models: pm,
+                                  })}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <CodeDisplay code={item.item_code} />
+                                    <GradeBadge grade={item.condition_grade} />
+                                    <span className="text-muted-foreground">
+                                      {pm ? `${pm.brand} ${pm.model_name}` : '—'}
+                                    </span>
+                                  </div>
+                                  <span className="text-muted-foreground">
+                                    {item.selling_price ? formatPrice(item.selling_price) : '—'}
+                                  </span>
+                                </button>
+                              )
+                            })
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setAddingCustom(!addingCustom)}
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Custom
+                    </Button>
+                  </div>
+
+                  {addingCustom && (
+                    <div className="flex items-end gap-2 bg-muted/50 p-3 rounded-md">
+                      <div className="flex-1 space-y-1">
+                        <label className="text-xs text-muted-foreground">Description</label>
+                        <Input
+                          className="h-8 text-sm"
+                          placeholder="e.g. LAN Cable"
+                          value={customDesc}
+                          onChange={(e) => setCustomDesc(e.target.value)}
+                        />
+                      </div>
+                      <div className="w-20 space-y-1">
+                        <label className="text-xs text-muted-foreground">Qty</label>
+                        <Input
+                          type="number"
+                          min={1}
+                          className="h-8 text-sm text-right"
+                          value={customQty}
+                          onChange={(e) => setCustomQty(parseInt(e.target.value) || 1)}
+                        />
+                      </div>
+                      <div className="w-28 space-y-1">
+                        <label className="text-xs text-muted-foreground">Price (¥)</label>
+                        <Input
+                          type="number"
+                          min={0}
+                          className="h-8 text-sm text-right"
+                          value={customPrice}
+                          onChange={(e) => setCustomPrice(parseInt(e.target.value) || 0)}
+                        />
+                      </div>
+                      <Button size="sm" className="h-8" onClick={handleAddCustomItem} disabled={addLineItem.isPending}>
+                        Add
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-8" onClick={() => setAddingCustom(false)}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Summary */}
               <div className="border-t mt-2 pt-3 space-y-1.5 px-3">
