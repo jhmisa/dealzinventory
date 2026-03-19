@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react'
-import { Package, Check, X, Camera, Keyboard } from 'lucide-react'
+import { Package, Check, X, Camera, Keyboard, PackageCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -19,6 +19,8 @@ import { cn } from '@/lib/utils'
 type PackingItem = {
   id: string
   packed_at: string | null
+  description: string | null
+  item_id: string | null
   items: { id: string; item_code: string } | null
 }
 
@@ -73,6 +75,24 @@ export default function PackingStationPage() {
       },
     )
   }, [selectedOrder, orderItems, packMutation, session])
+
+  function handleManualPack(orderItemId: string, label: string) {
+    if (processingRef.current) return
+    processingRef.current = true
+    packMutation.mutate(
+      { orderItemId, packedBy: session?.user?.id ?? '' },
+      {
+        onSuccess: () => {
+          toast.success(`${label} packed`)
+          processingRef.current = false
+        },
+        onError: (err) => {
+          toast.error(`Failed: ${err.message}`)
+          processingRef.current = false
+        },
+      },
+    )
+  }
 
   function handleMarkPacked() {
     if (!selectedOrder) return
@@ -143,7 +163,7 @@ export default function PackingStationPage() {
                     {statusMutation.isPending ? 'Updating...' : 'Mark as Packed'}
                   </Button>
                 ) : (
-                  <p className="text-sm text-muted-foreground pt-2">Scan all items to complete</p>
+                  <p className="text-sm text-muted-foreground pt-2">Pack all items to complete</p>
                 )}
               </CardContent>
             </Card>
@@ -185,6 +205,11 @@ export default function PackingStationPage() {
               <div className="space-y-1">
                 {orderItems.map((oi) => {
                   const isPacked = !!oi.packed_at
+                  const isInventoryItem = !!oi.item_id
+                  const displayLabel = isInventoryItem
+                    ? oi.items?.item_code ?? '—'
+                    : oi.description ?? 'Custom item'
+
                   return (
                     <div
                       key={oi.id}
@@ -195,17 +220,45 @@ export default function PackingStationPage() {
                     >
                       <div className="flex items-center gap-3">
                         {isPacked ? (
-                          <Check className="h-5 w-5 text-green-600" />
+                          <Check className="h-5 w-5 text-green-600 shrink-0" />
                         ) : (
-                          <X className="h-5 w-5 text-muted-foreground/40" />
+                          <X className="h-5 w-5 text-muted-foreground/40 shrink-0" />
                         )}
-                        <CodeDisplay code={oi.items?.item_code ?? '—'} />
+                        {isInventoryItem ? (
+                          <div className="flex items-center gap-2">
+                            <CodeDisplay code={oi.items?.item_code ?? '—'} />
+                            {oi.description && (
+                              <span className="text-sm text-muted-foreground">{oi.description}</span>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">{oi.description ?? 'Custom item'}</span>
+                            <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">(custom)</span>
+                          </div>
+                        )}
                       </div>
-                      {isPacked ? (
-                        <StatusBadge label="Packed" color="bg-green-100 text-green-800 border-green-300" />
-                      ) : (
-                        <StatusBadge label="Waiting" color="bg-gray-100 text-gray-800 border-gray-300" />
-                      )}
+                      <div className="flex items-center gap-2">
+                        {isPacked ? (
+                          <StatusBadge label="Packed" color="bg-green-100 text-green-800 border-green-300" />
+                        ) : (
+                          <>
+                            {!isInventoryItem && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs"
+                                disabled={packMutation.isPending}
+                                onClick={() => handleManualPack(oi.id, displayLabel)}
+                              >
+                                <PackageCheck className="h-3.5 w-3.5 mr-1" />
+                                Confirm Packed
+                              </Button>
+                            )}
+                            <StatusBadge label="Waiting" color="bg-gray-100 text-gray-800 border-gray-300" />
+                          </>
+                        )}
+                      </div>
                     </div>
                   )
                 })}

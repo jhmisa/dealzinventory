@@ -443,7 +443,7 @@ export async function getPackableOrders() {
         product_models(brand, model_name)
       ),
       order_items(
-        id, packed_at,
+        id, packed_at, description, item_id,
         items(id, item_code)
       )
     `)
