@@ -1189,6 +1189,7 @@ export type Database = {
           cpu: string | null
           created_at: string
           device_category: Database["public"]["Enums"]["device_category"]
+          form_factor: string | null
           gpu: string | null
           has_cellular: boolean | null
           has_thunderbolt: boolean | null
@@ -1224,6 +1225,7 @@ export type Database = {
           cpu?: string | null
           created_at?: string
           device_category?: Database["public"]["Enums"]["device_category"]
+          form_factor?: string | null
           gpu?: string | null
           has_cellular?: boolean | null
           has_thunderbolt?: boolean | null
@@ -1259,6 +1261,7 @@ export type Database = {
           cpu?: string | null
           created_at?: string
           device_category?: Database["public"]["Enums"]["device_category"]
+          form_factor?: string | null
           gpu?: string | null
           has_cellular?: boolean | null
           has_thunderbolt?: boolean | null
