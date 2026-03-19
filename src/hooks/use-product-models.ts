@@ -76,3 +76,14 @@ export function useDeleteProductMedia() {
     },
   })
 }
+
+export function useReorderProductMedia() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (items: { id: string; sort_order: number }[]) =>
+      productModelsService.reorderProductMedia(items),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.productModels.all })
+    },
+  })
+}

@@ -165,3 +165,12 @@ export async function deleteProductMedia(mediaId: string) {
 
   if (error) throw error
 }
+
+export async function reorderProductMedia(items: { id: string; sort_order: number }[]) {
+  const promises = items.map(({ id, sort_order }) =>
+    supabase.from('product_media').update({ sort_order }).eq('id', id)
+  )
+  const results = await Promise.all(promises)
+  const failed = results.find((r) => r.error)
+  if (failed?.error) throw failed.error
+}

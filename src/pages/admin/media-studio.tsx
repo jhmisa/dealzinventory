@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Image, Video } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -10,6 +10,8 @@ import { useProductModel } from '@/hooks/use-product-models'
 export default function MediaStudioPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const initialTab = searchParams.get('tab') === 'video' ? 'video' : 'photos'
 
   const { data: product, isLoading } = useProductModel(id!)
 
@@ -67,7 +69,7 @@ export default function MediaStudioPage() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="photos">
+      <Tabs defaultValue={initialTab}>
         <TabsList>
           <TabsTrigger value="photos" className="flex items-center gap-2">
             <Image className="h-4 w-4" />

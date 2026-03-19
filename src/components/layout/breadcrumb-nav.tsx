@@ -29,6 +29,7 @@ const labelMap: Record<string, string> = {
   reports: 'Reports',
   settings: 'Settings',
   ai: 'AI Configuration',
+  'postal-codes': 'Postal Codes',
   shop: 'Shop',
   sell: 'Sell',
   account: 'My Account',

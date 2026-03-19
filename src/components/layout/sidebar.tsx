@@ -16,6 +16,7 @@ import {
   FileText,
   BrainCircuit,
   Tags,
+  MapPin,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -90,6 +91,7 @@ const navSections = [
     label: 'Settings',
     items: [
       { title: 'AI Configuration', href: '/admin/settings/ai', icon: BrainCircuit },
+      { title: 'Postal Codes', href: '/admin/settings/postal-codes', icon: MapPin },
     ],
   },
 ]
