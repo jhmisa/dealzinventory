@@ -134,6 +134,7 @@ export async function getAvailableItems(filters: AvailableItemFilters = {}) {
       )
     `, { count: 'exact' })
     .eq('item_status', 'AVAILABLE')
+    .neq('condition_grade', 'J')
     .order('created_at', { ascending: false })
     .range(from, to)
 
@@ -146,7 +147,38 @@ export async function getAvailableItems(filters: AvailableItemFilters = {}) {
 
   const { data, error, count } = await query
   if (error) throw error
-  return { items: data ?? [], total: count ?? 0 }
+
+  // If searching and got few results from item_code, also search by product model name
+  let items = data ?? []
+  if (filters.search && items.length < pageSize) {
+    const { data: modelResults, error: modelError } = await supabase
+      .from('items')
+      .select(`
+        id, item_code, condition_grade, selling_price, item_status,
+        product_models!inner(id, brand, model_name, color,
+          product_media(file_url, role, sort_order)
+        )
+      `)
+      .eq('item_status', 'AVAILABLE')
+      .neq('condition_grade', 'J')
+      .or(
+        `brand.ilike.%${filters.search}%,model_name.ilike.%${filters.search}%`,
+        { referencedTable: 'product_models' }
+      )
+      .order('created_at', { ascending: false })
+      .limit(pageSize)
+
+    if (!modelError && modelResults) {
+      const existingIds = new Set(items.map((i) => i.id))
+      for (const item of modelResults) {
+        if (!existingIds.has(item.id)) {
+          items.push(item)
+        }
+      }
+    }
+  }
+
+  return { items, total: count ?? items.length }
 }
 
 // --- Manual Order Creation ---
@@ -158,14 +190,25 @@ interface ManualOrderInput {
   delivery_date?: string | null
   delivery_time_code?: string | null
   notes?: string | null
-  items: { item_id: string; unit_price: number }[]
+  shipping_cost: number
+  items: {
+    item_id: string | null
+    description: string
+    quantity: number
+    unit_price: number
+    discount: number
+  }[]
 }
 
 export async function createManualOrder(input: ManualOrderInput) {
   const orderCode = await generateOrderCode()
 
-  const quantity = input.items.length
-  const totalPrice = input.items.reduce((sum, item) => sum + item.unit_price, 0)
+  const quantity = input.items.reduce((sum, item) => sum + item.quantity, 0)
+  const totalPrice =
+    input.items.reduce(
+      (sum, item) => sum + item.unit_price * item.quantity - item.discount,
+      0
+    ) + input.shipping_cost
 
   const { data: order, error: orderError } = await supabase
     .from('orders')
@@ -179,6 +222,7 @@ export async function createManualOrder(input: ManualOrderInput) {
       delivery_date: input.delivery_date ?? null,
       delivery_time_code: input.delivery_time_code ?? null,
       notes: input.notes ?? null,
+      shipping_cost: input.shipping_cost,
       sell_group_id: null,
     })
     .select()
@@ -189,7 +233,10 @@ export async function createManualOrder(input: ManualOrderInput) {
   const orderItems = input.items.map((item) => ({
     order_id: (order as Order).id,
     item_id: item.item_id,
+    description: item.description,
+    quantity: item.quantity,
     unit_price: item.unit_price,
+    discount: item.discount,
   }))
 
   const { error: itemsError } = await supabase

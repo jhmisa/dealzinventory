@@ -77,6 +77,7 @@ export function useAvailableItems(filters: AvailableItemFilters = {}) {
   return useQuery({
     queryKey: queryKeys.orders.list({ _type: 'available-items', ...filters }),
     queryFn: () => ordersService.getAvailableItems(filters),
+    enabled: !!filters.search && filters.search.length >= 1,
   })
 }
 

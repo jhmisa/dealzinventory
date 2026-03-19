@@ -4,31 +4,29 @@ import { Card, CardContent } from '@/components/ui/card'
 import { PageHeader } from '@/components/shared'
 import { CustomerPicker } from '@/components/orders/customer-picker'
 import { ShippingStep } from '@/components/orders/shipping-step'
-import { ItemBrowser } from '@/components/orders/item-browser'
-import { OrderReview } from '@/components/orders/order-review'
+import { OrderLineItems } from '@/components/orders/order-line-items'
+import type { OrderLineItem } from '@/components/orders/order-line-items'
 import { useCreateManualOrder } from '@/hooks/use-orders'
 import { toast } from 'sonner'
 import type { Customer } from '@/lib/types'
 import type { ShippingAddress } from '@/lib/address-types'
-import type { ManualOrderItemValues } from '@/validators/manual-order'
 
 export default function CreateOrderPage() {
   const navigate = useNavigate()
   const createOrder = useCreateManualOrder()
 
-  // Step 1: Customer
+  // Section 1: Customer
   const [customer, setCustomer] = useState<Customer | null>(null)
 
-  // Step 2: Shipping
+  // Section 2: Shipping
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(null)
   const [careOf, setCareOf] = useState<string | null>(null)
   const [deliveryDate, setDeliveryDate] = useState<string | null>(null)
   const [deliveryTimeCode, setDeliveryTimeCode] = useState<string | null>(null)
 
-  // Step 3: Items
-  const [selectedItems, setSelectedItems] = useState<ManualOrderItemValues[]>([])
-
-  // Step 4: Review
+  // Section 3: Order
+  const [lineItems, setLineItems] = useState<OrderLineItem[]>([])
+  const [shippingCost, setShippingCost] = useState(0)
   const [orderSource, setOrderSource] = useState<string>('SHOP')
   const [notes, setNotes] = useState('')
 
@@ -37,28 +35,15 @@ export default function CreateOrderPage() {
     setCareOf(co ?? null)
   }
 
-  const handleToggleItem = (item: ManualOrderItemValues) => {
-    setSelectedItems((prev) => {
-      const exists = prev.find((i) => i.item_id === item.item_id)
-      if (exists) {
-        return prev.filter((i) => i.item_id !== item.item_id)
-      }
-      return [...prev, item]
-    })
-  }
-
-  const handlePriceChange = (itemId: string, price: number) => {
-    setSelectedItems((prev) =>
-      prev.map((i) => (i.item_id === itemId ? { ...i, unit_price: price } : i))
-    )
-  }
-
-  const handleRemoveItem = (itemId: string) => {
-    setSelectedItems((prev) => prev.filter((i) => i.item_id !== itemId))
-  }
+  const canSubmit =
+    !!customer &&
+    !!shippingAddress &&
+    lineItems.length > 0 &&
+    !!orderSource &&
+    lineItems.every((li) => li.description.trim().length > 0)
 
   const handleSubmit = async () => {
-    if (!customer || !shippingAddress || selectedItems.length === 0) return
+    if (!customer || !shippingAddress || lineItems.length === 0) return
 
     try {
       const order = await createOrder.mutateAsync({
@@ -68,14 +53,17 @@ export default function CreateOrderPage() {
         delivery_date: deliveryDate,
         delivery_time_code: deliveryTimeCode,
         notes: notes || null,
-        items: selectedItems.map((i) => ({
-          item_id: i.item_id,
-          unit_price: i.unit_price,
+        shipping_cost: shippingCost,
+        items: lineItems.map((li) => ({
+          item_id: li.item_id,
+          description: li.description,
+          quantity: li.quantity,
+          unit_price: li.unit_price,
+          discount: li.discount,
         })),
       })
 
       toast.success(`Order ${order.order_code} created`)
-
       navigate(`/admin/orders/${order.id}`)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to create order')
@@ -89,14 +77,13 @@ export default function CreateOrderPage() {
         description="Manually create an order for a customer."
       />
 
-      {/* Step 1: Customer */}
+      {/* Section 1: Customer */}
       <section>
         <h2 className="text-lg font-semibold mb-3">1. Customer</h2>
         <CustomerPicker
           selectedCustomer={customer}
           onSelect={(c) => {
             setCustomer(c)
-            // Reset downstream when customer changes
             if (!c) {
               setShippingAddress(null)
               setCareOf(null)
@@ -105,7 +92,7 @@ export default function CreateOrderPage() {
         />
       </section>
 
-      {/* Step 2: Shipping & Delivery */}
+      {/* Section 2: Shipping & Delivery */}
       <section className={!customer ? 'opacity-50 pointer-events-none' : ''}>
         <h2 className="text-lg font-semibold mb-3">2. Shipping & Delivery</h2>
         {customer ? (
@@ -128,15 +115,22 @@ export default function CreateOrderPage() {
         )}
       </section>
 
-      {/* Step 3: Items */}
+      {/* Section 3: Order */}
       <section className={!shippingAddress ? 'opacity-50 pointer-events-none' : ''}>
-        <h2 className="text-lg font-semibold mb-3">3. Items</h2>
+        <h2 className="text-lg font-semibold mb-3">3. Order</h2>
         {shippingAddress ? (
-          <ItemBrowser
-            selectedItems={selectedItems}
-            onToggleItem={handleToggleItem}
-            onPriceChange={handlePriceChange}
-            onRemoveItem={handleRemoveItem}
+          <OrderLineItems
+            lineItems={lineItems}
+            onLineItemsChange={setLineItems}
+            shippingCost={shippingCost}
+            onShippingCostChange={setShippingCost}
+            orderSource={orderSource}
+            onOrderSourceChange={setOrderSource}
+            notes={notes}
+            onNotesChange={setNotes}
+            onSubmit={handleSubmit}
+            isSubmitting={createOrder.isPending}
+            canSubmit={canSubmit}
           />
         ) : (
           <Card>
@@ -145,25 +139,6 @@ export default function CreateOrderPage() {
             </CardContent>
           </Card>
         )}
-      </section>
-
-      {/* Step 4: Review & Submit */}
-      <section>
-        <h2 className="text-lg font-semibold mb-3">4. Review & Submit</h2>
-        <OrderReview
-          customer={customer}
-          orderSource={orderSource}
-          onOrderSourceChange={setOrderSource}
-          shippingAddress={shippingAddress}
-          careOf={careOf}
-          deliveryDate={deliveryDate}
-          deliveryTimeCode={deliveryTimeCode}
-          items={selectedItems}
-          notes={notes}
-          onNotesChange={setNotes}
-          onSubmit={handleSubmit}
-          isSubmitting={createOrder.isPending}
-        />
       </section>
     </div>
   )
