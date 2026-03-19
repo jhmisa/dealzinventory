@@ -14,7 +14,7 @@ import { PageHeader, SearchBar, DataTable, StatusBadge, GradeBadge, CodeDisplay,
 import { useItems } from '@/hooks/use-items'
 import { useDebounce } from '@/hooks/use-debounce'
 import { ITEM_STATUSES, CONDITION_GRADES, SOURCE_TYPES } from '@/lib/constants'
-import { formatDate } from '@/lib/utils'
+import { formatDate, cn } from '@/lib/utils'
 
 type ItemRow = {
   id: string
@@ -32,6 +32,11 @@ type ItemRow = {
   suppliers: { supplier_name: string } | null
   product_models: { brand: string; model_name: string; color: string; short_description: string | null } | null
 }
+
+const STATUS_TABS = [
+  { value: 'all', label: 'All' },
+  ...ITEM_STATUSES.map((s) => ({ value: s.value, label: s.label })),
+]
 
 const columns: ColumnDef<ItemRow>[] = [
   {
@@ -93,16 +98,29 @@ export default function ItemListPage() {
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebounce(search, 400)
-  const [statusFilter, setStatusFilter] = useState<string>('')
+  const [statusTab, setStatusTab] = useState('all')
   const [gradeFilter, setGradeFilter] = useState<string>('')
   const [sourceFilter, setSourceFilter] = useState<string>('')
 
-  const { data: items, isLoading } = useItems({
+  // Fetch all items (no status filter) so we can compute tab counts
+  const { data: allItems, isLoading } = useItems({
     search: debouncedSearch || undefined,
-    status: statusFilter || undefined,
     grade: gradeFilter || undefined,
     source: sourceFilter || undefined,
   })
+
+  const items = (allItems ?? []) as ItemRow[]
+
+  // Compute counts per status
+  const statusCounts: Record<string, number> = { all: items.length }
+  for (const item of items) {
+    statusCounts[item.item_status] = (statusCounts[item.item_status] ?? 0) + 1
+  }
+
+  // Filter by active tab
+  const filteredItems = statusTab === 'all'
+    ? items
+    : items.filter((i) => i.item_status === statusTab)
 
   return (
     <div className="space-y-4">
@@ -123,24 +141,49 @@ export default function ItemListPage() {
         }
       />
 
+      {/* Status Tabs */}
+      <div className="border-b">
+        <nav className="flex gap-0 -mb-px overflow-x-auto">
+          {STATUS_TABS.map((tab) => {
+            const count = statusCounts[tab.value] ?? 0
+            const isActive = statusTab === tab.value
+            return (
+              <button
+                key={tab.value}
+                type="button"
+                onClick={() => setStatusTab(tab.value)}
+                className={cn(
+                  'px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors',
+                  isActive
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30',
+                )}
+              >
+                {tab.label}
+                <span
+                  className={cn(
+                    'ml-1.5 inline-flex items-center justify-center rounded-full px-2 py-0.5 text-xs',
+                    isActive
+                      ? 'bg-primary/10 text-primary'
+                      : 'bg-muted text-muted-foreground',
+                  )}
+                >
+                  {count}
+                </span>
+              </button>
+            )
+          })}
+        </nav>
+      </div>
+
+      {/* Search & Filters */}
       <div className="flex flex-wrap items-center gap-3">
         <SearchBar
           value={search}
           onChange={setSearch}
           placeholder="Search P-code..."
-          className="max-w-xs"
+          className="flex-1 min-w-[250px]"
         />
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            {ITEM_STATUSES.map((s) => (
-              <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
         <Select value={gradeFilter} onValueChange={setGradeFilter}>
           <SelectTrigger className="w-[130px]">
             <SelectValue placeholder="Grade" />
@@ -170,7 +213,7 @@ export default function ItemListPage() {
       ) : (
         <DataTable
           columns={columns}
-          data={(items ?? []) as ItemRow[]}
+          data={filteredItems}
           onRowClick={(row) => navigate(`/admin/items/${row.id}`)}
         />
       )}
