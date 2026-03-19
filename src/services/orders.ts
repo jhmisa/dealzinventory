@@ -32,6 +32,7 @@ export async function getOrders(filters: OrderFilters = {}) {
       ),
       order_items(count)
     `)
+    .order('delivery_date', { ascending: true, nullsFirst: false })
     .order('created_at', { ascending: false })
 
   if (filters.search) {
@@ -434,6 +435,11 @@ export async function getOrderAuditLogs(orderId: string) {
 
 // Get orders ready for packing (CONFIRMED status)
 export async function getPackableOrders() {
+  // Only show CONFIRMED orders with delivery_date within 3 days (or no delivery date = pack ASAP)
+  const cutoffDate = new Date()
+  cutoffDate.setDate(cutoffDate.getDate() + 3)
+  const cutoff = cutoffDate.toISOString().split('T')[0]
+
   const { data, error } = await supabase
     .from('orders')
     .select(`
@@ -448,7 +454,8 @@ export async function getPackableOrders() {
       )
     `)
     .eq('order_status', 'CONFIRMED')
-    .order('created_at', { ascending: true })
+    .or(`delivery_date.is.null,delivery_date.lte.${cutoff}`)
+    .order('delivery_date', { ascending: true, nullsFirst: true })
 
   if (error) throw error
   return data ?? []

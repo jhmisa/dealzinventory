@@ -23,6 +23,7 @@ type OrderRow = {
   quantity: number
   total_price: number
   shipping_address: string
+  delivery_date: string | null
   created_at: string
   customers: { customer_code: string; last_name: string; first_name: string | null; email: string | null; phone: string | null } | null
   sell_groups: {
@@ -91,6 +92,27 @@ const columns: ColumnDef<OrderRow>[] = [
     cell: ({ row }) => {
       const cfg = ORDER_STATUSES.find(s => s.value === row.original.order_status)
       return cfg ? <StatusBadge label={cfg.label} color={cfg.color} /> : row.original.order_status
+    },
+  },
+  {
+    accessorKey: 'delivery_date',
+    header: 'Delivery',
+    cell: ({ row }) => {
+      const dd = row.original.delivery_date
+      if (!dd) return <span className="text-xs text-muted-foreground">—</span>
+      const today = new Date().toISOString().split('T')[0]
+      const isToday = dd === today
+      const isPast = dd < today
+      return (
+        <span className={cn(
+          'text-xs',
+          isPast && row.original.order_status !== 'DELIVERED' && row.original.order_status !== 'SHIPPED' && row.original.order_status !== 'CANCELLED'
+            ? 'text-red-600 font-medium'
+            : isToday ? 'text-orange-600 font-medium' : 'text-muted-foreground',
+        )}>
+          {dd}
+        </span>
+      )
     },
   },
   {
