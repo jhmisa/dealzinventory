@@ -21,7 +21,12 @@ export default function CreateOrderPage() {
   // Section 2: Shipping
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(null)
   const [careOf, setCareOf] = useState<string | null>(null)
-  const [deliveryDate, setDeliveryDate] = useState<string | null>(null)
+  // Default delivery date to tomorrow
+  const tomorrow = new Date()
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  const [deliveryDate, setDeliveryDate] = useState<string | null>(
+    tomorrow.toISOString().split('T')[0]
+  )
   const [deliveryTimeCode, setDeliveryTimeCode] = useState<string | null>(null)
 
   // Section 3: Order
