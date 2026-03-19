@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { useCategories } from '@/hooks/use-categories'
 import { useProductModels } from '@/hooks/use-product-models'
 import { useUpdateItem } from '@/hooks/use-items'
+import { supabase } from '@/lib/supabase'
 import { CONDITION_GRADES } from '@/lib/constants'
 import { ConfirmDialog } from '@/components/shared'
 import type { Item, ItemUpdate } from '@/lib/types'
@@ -66,8 +67,19 @@ export function ItemAssignmentBar({ item }: ItemAssignmentBarProps) {
     setConfirmOpen(true)
   }
 
-  function handleConfirmProductChange() {
+  async function handleConfirmProductChange() {
     if (!pendingProductId) return
+
+    // DEBUG: Check what triggers exist and product data
+    try {
+      const { data: triggers } = await supabase.rpc('debug_list_triggers')
+      console.log('[DEBUG] Triggers on items table:', triggers)
+
+      const { data: prodFields } = await supabase.rpc('debug_check_product_numeric_fields', { p_product_id: pendingProductId })
+      console.log('[DEBUG] Product numeric fields:', prodFields)
+    } catch (e) {
+      console.warn('[DEBUG] Could not fetch debug info:', e)
+    }
 
     const selectedProduct = products?.find((p) => p.id === pendingProductId)
     const updates: ItemUpdate = { product_id: pendingProductId }
@@ -76,8 +88,7 @@ export function ItemAssignmentBar({ item }: ItemAssignmentBarProps) {
       updates.category_id = selectedProduct.category_id
     }
 
-    // Let the DB trigger handle auto-populating specs from the product.
-    // We only set product_id and category_id here — the trigger fills blank fields.
+    console.log('[DEBUG] Sending update payload:', JSON.stringify(updates))
 
     updateItem.mutate(
       { id: item.id, updates },
