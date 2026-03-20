@@ -14,7 +14,7 @@ import { useUpdateItem } from '@/hooks/use-items'
 import { supabase } from '@/lib/supabase'
 import { CONDITION_GRADES } from '@/lib/constants'
 import { ConfirmDialog } from '@/components/shared'
-import type { Item, ItemUpdate } from '@/lib/types'
+import type { Item, ItemUpdate, FieldSources, FieldSource } from '@/lib/types'
 
 interface ItemAssignmentBarProps {
   item: Item
@@ -71,7 +71,6 @@ export function ItemAssignmentBar({ item }: ItemAssignmentBarProps) {
     if (!pendingProductId) return
 
     try {
-      // Fetch full product model data directly for type safety
       const { data: pm } = await supabase
         .from('product_models')
         .select('*')
@@ -79,56 +78,64 @@ export function ItemAssignmentBar({ item }: ItemAssignmentBarProps) {
         .single()
 
       const updates: ItemUpdate = { product_id: pendingProductId }
+      const currentSources: FieldSources = (item.field_sources as FieldSources) ?? {}
+      const newSources: FieldSources = { ...currentSources }
 
       if (pm) {
         // Always set category and device_category from product
         if (pm.category_id) updates.category_id = pm.category_id
         if (pm.device_category) updates.device_category = pm.device_category
 
-        // === Fields verified against items table schema (database.types.ts) ===
-        // Items table has: brand, carrier, color, cpu, form_factor, gpu,
-        //   keyboard_layout, model_name, os_family, other_features (text)
-        //   ram_gb, storage_gb, year, screen_size (numeric)
-        //   has_touchscreen, is_unlocked (boolean)
-        // NOT on items: chipset, ports, short_description, has_cellular,
-        //   has_thunderbolt, supports_stylus, imei_slot_count
+        // Helper: should we write this field?
+        // Yes if source is "template" or missing (not "user")
+        const canOverwrite = (key: string): boolean => {
+          const source = currentSources[key] as FieldSource | undefined
+          if (source === 'user') return false
+          return true
+        }
 
-        // Text fields on BOTH tables
+        // Text fields
         const textFields: (keyof ItemUpdate)[] = [
           'brand', 'model_name', 'color', 'cpu', 'gpu', 'os_family',
           'carrier', 'keyboard_layout', 'form_factor', 'other_features',
         ]
         for (const key of textFields) {
-          const itemVal = item[key as keyof Item]
           const pmVal = pm[key as keyof typeof pm]
-          if ((!itemVal || itemVal === '') && pmVal && typeof pmVal === 'string' && pmVal.trim()) {
-            (updates as Record<string, unknown>)[key] = pmVal.trim()
-          }
-        }
-
-        // Numeric fields on BOTH tables (screen_size is numeric on both)
-        const numFields: (keyof ItemUpdate)[] = ['ram_gb', 'storage_gb', 'year', 'screen_size']
-        for (const key of numFields) {
-          const itemVal = item[key as keyof Item]
-          const pmVal = pm[key as keyof typeof pm]
-          if (itemVal == null && pmVal != null) {
-            const num = Number(pmVal)
-            if (!isNaN(num)) {
-              (updates as Record<string, unknown>)[key] = num
+          if (pmVal && typeof pmVal === 'string' && pmVal.trim()) {
+            if (canOverwrite(key)) {
+              (updates as Record<string, unknown>)[key] = pmVal.trim()
+              newSources[key] = 'template'
             }
           }
         }
 
-        // Boolean fields on BOTH tables
-        const boolFields: (keyof ItemUpdate)[] = ['has_touchscreen', 'is_unlocked']
-        for (const key of boolFields) {
-          const itemVal = item[key as keyof Item]
+        // Numeric fields
+        const numFields: (keyof ItemUpdate)[] = ['ram_gb', 'storage_gb', 'year', 'screen_size']
+        for (const key of numFields) {
           const pmVal = pm[key as keyof typeof pm]
-          if (itemVal == null && pmVal != null && typeof pmVal === 'boolean') {
-            (updates as Record<string, unknown>)[key] = pmVal
+          if (pmVal != null) {
+            const num = Number(pmVal)
+            if (!isNaN(num) && canOverwrite(key)) {
+              (updates as Record<string, unknown>)[key] = num
+              newSources[key] = 'template'
+            }
           }
         }
 
+        // Boolean fields
+        const boolFields: (keyof ItemUpdate)[] = ['has_touchscreen', 'is_unlocked']
+        for (const key of boolFields) {
+          const pmVal = pm[key as keyof typeof pm]
+          if (pmVal != null && typeof pmVal === 'boolean') {
+            if (canOverwrite(key)) {
+              (updates as Record<string, unknown>)[key] = pmVal
+              newSources[key] = 'template'
+            }
+          }
+        }
+
+        // Persist updated field_sources
+        updates.field_sources = newSources
       }
 
       updateItem.mutate(

@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label'
 import { useUpdateItem } from '@/hooks/use-items'
 import { itemSpecsSchema, type ItemSpecsFormValues } from '@/validators/item'
 import { getSpecFieldLabel } from '@/lib/constants'
-import type { Item, ProductModel, ItemUpdate } from '@/lib/types'
+import type { Item, ProductModel, ItemUpdate, FieldSources } from '@/lib/types'
 
 type ProductModelJoined = ProductModel & {
   categories?: { name: string; form_fields: string[] } | null
@@ -76,12 +76,15 @@ export function EditableSpecsCard({ item, productModel }: EditableSpecsCardProps
 
   function handleSave(values: ItemSpecsFormValues) {
     const updates: ItemUpdate = {}
+    const currentSources: FieldSources = (item.field_sources as FieldSources) ?? {}
+    const newSources: FieldSources = { ...currentSources }
     let hasChanges = false
 
     for (const key of TEXT_FIELDS) {
       const newVal = values[key] || null
       if (newVal !== (item[key as keyof Item] ?? null)) {
         ;(updates as Record<string, unknown>)[key] = newVal
+        newSources[key] = 'user'
         hasChanges = true
       }
     }
@@ -91,6 +94,7 @@ export function EditableSpecsCard({ item, productModel }: EditableSpecsCardProps
       const parsed = newVal != null && newVal !== (undefined as unknown) ? newVal : null
       if (parsed !== (item[key as keyof Item] ?? null)) {
         ;(updates as Record<string, unknown>)[key] = parsed
+        newSources[key] = 'user'
         hasChanges = true
       }
     }
@@ -99,6 +103,7 @@ export function EditableSpecsCard({ item, productModel }: EditableSpecsCardProps
       const newVal = values[key] ?? null
       if (newVal !== (item[key as keyof Item] ?? null)) {
         ;(updates as Record<string, unknown>)[key] = newVal
+        newSources[key] = 'user'
         hasChanges = true
       }
     }
@@ -108,6 +113,7 @@ export function EditableSpecsCard({ item, productModel }: EditableSpecsCardProps
       const newVal = values[key] || null
       if (newVal !== (item[key] ?? null)) {
         ;(updates as Record<string, unknown>)[key] = newVal
+        newSources[key] = 'user'
         hasChanges = true
       }
     }
@@ -116,6 +122,9 @@ export function EditableSpecsCard({ item, productModel }: EditableSpecsCardProps
       setEditing(false)
       return
     }
+
+    // Include updated field_sources in the save
+    updates.field_sources = newSources
 
     updateItem.mutate(
       { id: item.id, updates },

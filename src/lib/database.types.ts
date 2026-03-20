@@ -557,6 +557,7 @@ export type Database = {
           cpu: string | null
           created_at: string
           device_category: Database["public"]["Enums"]["device_category"] | null
+          field_sources: Record<string, string> | null
           form_factor: string | null
           gallery_photo_order: Json | null
           gpu: string | null
@@ -612,6 +613,7 @@ export type Database = {
           device_category?:
             | Database["public"]["Enums"]["device_category"]
             | null
+          field_sources?: Record<string, string> | null
           form_factor?: string | null
           gallery_photo_order?: Json | null
           gpu?: string | null
@@ -667,6 +669,7 @@ export type Database = {
           device_category?:
             | Database["public"]["Enums"]["device_category"]
             | null
+          field_sources?: Record<string, string> | null
           form_factor?: string | null
           gallery_photo_order?: Json | null
           gpu?: string | null

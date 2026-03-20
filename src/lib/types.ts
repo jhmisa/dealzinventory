@@ -65,6 +65,9 @@ export type IntakeReceiptLineItemInsert = Tables['intake_receipt_line_items']['I
 export type IntakeAdjustment = Tables['intake_adjustments']['Row']
 export type IntakeAdjustmentInsert = Tables['intake_adjustments']['Insert']
 
+export type FieldSource = 'template' | 'user'
+export type FieldSources = Record<string, FieldSource>
+
 export interface ParsedSpecs {
   brand?: string
   model_name?: string
