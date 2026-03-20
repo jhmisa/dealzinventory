@@ -13,8 +13,8 @@ import { useProductModels } from '@/hooks/use-product-models'
 import { useUpdateItem } from '@/hooks/use-items'
 import { supabase } from '@/lib/supabase'
 import { CONDITION_GRADES } from '@/lib/constants'
-import { ConfirmDialog } from '@/components/shared'
-import type { Item, ItemUpdate, FieldSources, FieldSource } from '@/lib/types'
+import { ProductTemplateDiffDialog } from './product-template-diff-dialog'
+import type { Item, ItemUpdate } from '@/lib/types'
 
 interface ItemAssignmentBarProps {
   item: Item
@@ -67,7 +67,7 @@ export function ItemAssignmentBar({ item }: ItemAssignmentBarProps) {
     setConfirmOpen(true)
   }
 
-  async function handleConfirmProductChange() {
+  async function handleConfirmProductChange(fieldsToApply: string[]) {
     if (!pendingProductId) return
 
     try {
@@ -78,64 +78,21 @@ export function ItemAssignmentBar({ item }: ItemAssignmentBarProps) {
         .single()
 
       const updates: ItemUpdate = { product_id: pendingProductId }
-      const currentSources: FieldSources = (item.field_sources as FieldSources) ?? {}
-      const newSources: FieldSources = { ...currentSources }
 
       if (pm) {
-        // Always set category and device_category from product
+        // Always set category and device_category from the product (not user-selectable —
+        // these are inherent to the product template, not debatable specs)
         if (pm.category_id) updates.category_id = pm.category_id
         if (pm.device_category) updates.device_category = pm.device_category
 
-        // Helper: should we write this field?
-        // Yes if source is "template" or missing (not "user")
-        const canOverwrite = (key: string): boolean => {
-          const source = currentSources[key] as FieldSource | undefined
-          if (source === 'user') return false
-          return true
-        }
-
-        // Text fields
-        const textFields: (keyof ItemUpdate)[] = [
-          'brand', 'model_name', 'color', 'cpu', 'gpu', 'os_family',
-          'carrier', 'keyboard_layout', 'form_factor', 'other_features',
-        ]
-        for (const key of textFields) {
-          const pmVal = pm[key as keyof typeof pm]
-          if (pmVal && typeof pmVal === 'string' && pmVal.trim()) {
-            if (canOverwrite(key)) {
-              (updates as Record<string, unknown>)[key] = pmVal.trim()
-              newSources[key] = 'template'
-            }
-          }
-        }
-
-        // Numeric fields
-        const numFields: (keyof ItemUpdate)[] = ['ram_gb', 'storage_gb', 'year', 'screen_size']
-        for (const key of numFields) {
+        // Only apply fields the user checked in the diff dialog
+        for (const key of fieldsToApply) {
           const pmVal = pm[key as keyof typeof pm]
           if (pmVal != null) {
-            const num = Number(pmVal)
-            if (!isNaN(num) && canOverwrite(key)) {
-              (updates as Record<string, unknown>)[key] = num
-              newSources[key] = 'template'
-            }
+            ;(updates as Record<string, unknown>)[key] =
+              typeof pmVal === 'string' ? pmVal.trim() : pmVal
           }
         }
-
-        // Boolean fields
-        const boolFields: (keyof ItemUpdate)[] = ['has_touchscreen', 'is_unlocked']
-        for (const key of boolFields) {
-          const pmVal = pm[key as keyof typeof pm]
-          if (pmVal != null && typeof pmVal === 'boolean') {
-            if (canOverwrite(key)) {
-              (updates as Record<string, unknown>)[key] = pmVal
-              newSources[key] = 'template'
-            }
-          }
-        }
-
-        // Persist updated field_sources
-        updates.field_sources = newSources
       }
 
       updateItem.mutate(
@@ -244,16 +201,11 @@ export function ItemAssignmentBar({ item }: ItemAssignmentBarProps) {
         </Select>
       </div>
 
-      <ConfirmDialog
+      <ProductTemplateDiffDialog
         open={confirmOpen}
         onOpenChange={(open) => { if (!open) handleCancelProductChange() }}
-        title="Change Product Assignment"
-        description={
-          item.supplier_description
-            ? `You are changing a critical part of the item. Please double-check the information from the Supplier and the Product template you want to use. — Supplier Description: "${item.supplier_description}"`
-            : 'You are changing a critical part of the item. Please double-check the information from the Supplier and the Product template you want to use.'
-        }
-        confirmLabel="Change"
+        item={item}
+        pendingProductId={pendingProductId}
         loading={updateItem.isPending}
         onConfirm={handleConfirmProductChange}
       />
