@@ -138,6 +138,16 @@ export async function cancelOrder(orderId: string) {
       .in('id', itemIds)
   }
 
+  // NULL out item_ids on cancelled order's items to free the unique index for re-use
+  // (can't delete rows due to audit log FK trigger)
+  if (itemIds.length > 0) {
+    await supabase
+      .from('order_items')
+      .update({ item_id: null })
+      .eq('order_id', orderId)
+      .not('item_id', 'is', null)
+  }
+
   return order
 }
 
