@@ -87,10 +87,9 @@ function MediaViewer({
   const photos = allMedia.filter((m) => m.media_type === 'image')
   const videos = allMedia.filter((m) => m.media_type === 'video')
 
-  // "Actual" tab: combine item media images + defect photos
-  const itemImages = itemMedia.filter((m) => m.media_type === 'image')
+  // "Actual" tab: combine item media photos + defect photos
   const actualPhotos = [
-    ...itemImages.map((m) => ({ id: m.id, file_url: m.file_url, label: m.description ?? 'Item photo' })),
+    ...itemMedia.map((m) => ({ id: m.id, file_url: m.file_url, label: m.description ?? 'Item photo' })),
     ...defectPhotos,
   ]
 
