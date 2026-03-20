@@ -1,6 +1,5 @@
 import { supabase } from '@/lib/supabase'
 import type { Offer, Item } from '@/lib/types'
-import { createManualOrder } from './orders'
 
 // --- Code Generation ---
 
@@ -352,94 +351,34 @@ export async function getActiveOfferForItem(itemId: string) {
 
 interface ClaimOfferInput {
   offerId: string
-  lastName: string
+  customerId?: string
+  lastName?: string
   firstName?: string
-  email: string
+  email?: string
   phone?: string
   shippingAddress: string
+  deliveryDate?: string | null
+  deliveryTimeCode?: string | null
 }
 
 export async function claimOffer(input: ClaimOfferInput) {
-  // Get the offer with items
-  const { data: offer, error: offerError } = await supabase
-    .from('offers')
-    .select('*, offer_items(id, item_id, description, unit_price, quantity)')
-    .eq('id', input.offerId)
-    .single()
-
-  if (offerError || !offer) throw new Error('Offer not found')
-  if (offer.offer_status !== 'PENDING') throw new Error(`Offer is ${offer.offer_status.toLowerCase()}, cannot be claimed`)
-  if (new Date(offer.expires_at) < new Date()) throw new Error('Offer has expired')
-
-  // Find or create customer by email
-  const { data: existingCustomer } = await supabase
-    .from('customers')
-    .select('id')
-    .eq('email', input.email)
-    .limit(1)
-    .single()
-
-  let customerId: string
-
-  if (existingCustomer) {
-    customerId = existingCustomer.id
-  } else {
-    // Create a minimal customer record
-    const { data: codeData, error: codeError } = await supabase.rpc('generate_code', {
-      prefix: 'C',
-      seq_name: 'cust_code_seq',
-    })
-    if (codeError) throw codeError
-
-    const { data: newCustomer, error: custError } = await supabase
-      .from('customers')
-      .insert({
-        customer_code: codeData as string,
-        last_name: input.lastName.toUpperCase(),
-        first_name: input.firstName?.toUpperCase() || null,
-        email: input.email,
-        phone: input.phone || null,
-      })
-      .select()
-      .single()
-
-    if (custError) throw custError
-    customerId = newCustomer.id
-  }
-
-  // Create real order via createManualOrder
-  const offerItems = (offer.offer_items as { id: string; item_id: string | null; description: string; unit_price: number; quantity: number }[]) ?? []
-
-  const order = await createManualOrder({
-    customer_id: customerId,
-    order_source: 'FB',
-    shipping_address: input.shippingAddress,
-    shipping_cost: 0,
-    notes: offer.notes || null,
-    items: offerItems.map(oi => ({
-      item_id: oi.item_id,
-      description: oi.description,
-      quantity: oi.quantity,
-      unit_price: Number(oi.unit_price),
-      discount: 0,
-    })),
+  const { data, error } = await supabase.functions.invoke('claim-offer', {
+    body: {
+      offer_id: input.offerId,
+      customer_id: input.customerId,
+      last_name: input.lastName,
+      first_name: input.firstName,
+      email: input.email,
+      phone: input.phone,
+      shipping_address: input.shippingAddress,
+      delivery_date: input.deliveryDate,
+      delivery_time_code: input.deliveryTimeCode,
+    },
   })
 
-  // Update offer: CLAIMED + link to order + customer
-  const { error: claimError } = await supabase
-    .from('offers')
-    .update({
-      offer_status: 'CLAIMED' as Offer['offer_status'],
-      order_id: order.id,
-      customer_id: customerId,
-      claimed_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', input.offerId)
-
-  if (claimError) throw claimError
-
-  return order
+  if (error) throw error
+  if (data?.error) throw new Error(data.error)
+  return data as { order_code: string; order_id: string }
 }
 
 // --- Cancel ---
