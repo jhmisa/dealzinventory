@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { productModelSchema, type ProductModelFormValues } from '@/validators/product-model'
 import type { ProductModel, Category } from '@/lib/types'
 import { useCategories } from '@/hooks/use-categories'
-import { getSpecFieldLabel } from '@/lib/constants'
+import { buildShortDescription } from '@/lib/utils'
 import {
   Form,
   FormControl,
@@ -32,24 +32,6 @@ interface ProductFormProps {
   loading?: boolean
   onSubmit: (values: ProductModelFormValues) => void
   onCancel: () => void
-}
-
-function generateShortDescription(
-  values: Record<string, unknown>,
-  descriptionFields: string[],
-): string {
-  return descriptionFields
-    .map((key) => {
-      const val = values[key]
-      if (val == null || val === '' || val === false) return null
-      if (key === 'ram_gb' && val) return `${val}GB`
-      if (key === 'storage_gb' && val) return `${val}GB`
-      if (key === 'screen_size' && val) return `${val}"`
-      if (typeof val === 'boolean') return val ? getSpecFieldLabel(key) : null
-      return String(val)
-    })
-    .filter(Boolean)
-    .join(' ')
 }
 
 export function ProductForm({ product, loading = false, onSubmit, onCancel }: ProductFormProps) {
@@ -107,7 +89,7 @@ export function ProductForm({ product, loading = false, onSubmit, onCancel }: Pr
   const watchedValues = form.watch()
   useEffect(() => {
     if (!selectedCategory) return
-    const desc = generateShortDescription(watchedValues, selectedCategory.description_fields)
+    const desc = buildShortDescription(watchedValues, selectedCategory.description_fields)
     const current = form.getValues('short_description')
     if (desc !== current) {
       form.setValue('short_description', desc)

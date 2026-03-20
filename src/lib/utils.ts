@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { format } from "date-fns"
+import { getSpecFieldLabel } from '@/lib/constants'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -23,4 +24,26 @@ export function formatDate(dateString: string | null | undefined): string {
 export function formatDateTime(dateString: string | null | undefined): string {
   if (!dateString) return '—'
   return format(new Date(dateString), 'yyyy-MM-dd HH:mm')
+}
+
+/**
+ * Build a short description string from field values using an ordered list of field keys.
+ * Used by product forms and item table display.
+ */
+export function buildShortDescription(
+  values: Record<string, unknown>,
+  descriptionFields: string[],
+): string {
+  return descriptionFields
+    .map((key) => {
+      const val = values[key]
+      if (val == null || val === '' || val === false) return null
+      if (key === 'ram_gb' && val) return `${val}GB`
+      if (key === 'storage_gb' && val) return `${val}GB`
+      if (key === 'screen_size' && val) return `${val}"`
+      if (typeof val === 'boolean') return val ? getSpecFieldLabel(key) : null
+      return String(val)
+    })
+    .filter(Boolean)
+    .join(' ')
 }

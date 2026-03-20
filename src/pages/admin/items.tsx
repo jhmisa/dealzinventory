@@ -14,7 +14,7 @@ import { PageHeader, SearchBar, DataTable, StatusBadge, GradeBadge, CodeDisplay,
 import { useItems } from '@/hooks/use-items'
 import { useDebounce } from '@/hooks/use-debounce'
 import { ITEM_STATUSES, CONDITION_GRADES, SOURCE_TYPES } from '@/lib/constants'
-import { formatDate, cn } from '@/lib/utils'
+import { formatDate, cn, buildShortDescription } from '@/lib/utils'
 
 type ItemRow = {
   id: string
@@ -33,7 +33,7 @@ type ItemRow = {
   storage_gb: number | null
   screen_size: number | null
   suppliers: { supplier_name: string } | null
-  product_models: { brand: string; model_name: string; color: string; short_description: string | null; screen_size: number | null } | null
+  product_models: { brand: string; model_name: string; color: string; short_description: string | null; screen_size: number | null; categories: { description_fields: string[] } | null } | null
 }
 
 const STATUS_TABS = [
@@ -53,10 +53,13 @@ const columns: ColumnDef<ItemRow>[] = [
     cell: ({ row }) => {
       const pm = row.original.product_models
       const { condition_notes } = row.original
+      const descFields = pm?.categories?.description_fields
       let modelLine: string
-      if (pm?.short_description) {
-        modelLine = pm.short_description
+      if (descFields && descFields.length > 0) {
+        // Use category template with item-level values
+        modelLine = buildShortDescription(row.original, descFields) || '—'
       } else {
+        // Fallback: no category template
         const { brand, model_name, cpu, ram_gb, storage_gb, screen_size } = row.original
         const modelName = brand && model_name
           ? `${brand} ${model_name}`
