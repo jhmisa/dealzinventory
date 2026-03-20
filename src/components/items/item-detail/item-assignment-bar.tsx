@@ -18,11 +18,12 @@ import type { Item, ItemUpdate } from '@/lib/types'
 
 interface ItemAssignmentBarProps {
   item: Item
+  locked?: boolean
 }
 
 const NO_VALUE = '__none__'
 
-export function ItemAssignmentBar({ item }: ItemAssignmentBarProps) {
+export function ItemAssignmentBar({ item, locked }: ItemAssignmentBarProps) {
   const { data: categories } = useCategories()
   const { data: products } = useProductModels()
   const updateItem = useUpdateItem()
@@ -142,7 +143,7 @@ export function ItemAssignmentBar({ item }: ItemAssignmentBarProps) {
         <Select
           value={item.category_id ?? NO_VALUE}
           onValueChange={handleCategoryChange}
-          disabled={updateItem.isPending}
+          disabled={locked || updateItem.isPending}
         >
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Select category" />
@@ -164,7 +165,7 @@ export function ItemAssignmentBar({ item }: ItemAssignmentBarProps) {
         <Select
           value={item.product_id ?? NO_VALUE}
           onValueChange={handleProductChange}
-          disabled={updateItem.isPending}
+          disabled={locked || updateItem.isPending}
         >
           <SelectTrigger className="w-[260px]">
             <SelectValue placeholder="Select product" />
@@ -186,7 +187,7 @@ export function ItemAssignmentBar({ item }: ItemAssignmentBarProps) {
         <Select
           value={item.condition_grade ?? ''}
           onValueChange={handleGradeChange}
-          disabled={updateItem.isPending}
+          disabled={locked || updateItem.isPending}
         >
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Select grade" />

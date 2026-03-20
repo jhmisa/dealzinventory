@@ -16,9 +16,10 @@ import { formatPrice } from '@/lib/utils'
 interface FinancialsCardProps {
   item: Item
   costs: ItemCost[]
+  locked?: boolean
 }
 
-export function FinancialsCard({ item, costs }: FinancialsCardProps) {
+export function FinancialsCard({ item, costs, locked }: FinancialsCardProps) {
   const [showAddCost, setShowAddCost] = useState(false)
   const [showSellingPrice, setShowSellingPrice] = useState(false)
   const addCost = useAddItemCost()
@@ -97,21 +98,23 @@ export function FinancialsCard({ item, costs }: FinancialsCardProps) {
                 <span className="truncate flex-1">{cost.description}</span>
                 <div className="flex items-center gap-2">
                   <PriceDisplay amount={cost.amount} />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={() => handleDeleteCost(cost.id)}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
+                  {!locked && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => handleDeleteCost(cost.id)}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}
           </div>
         )}
 
-        {showAddCost ? (
+        {!locked && (showAddCost ? (
           <form onSubmit={costForm.handleSubmit(handleAddCost)} className="flex gap-2 items-start">
             <Input
               placeholder="Description"
@@ -136,7 +139,7 @@ export function FinancialsCard({ item, costs }: FinancialsCardProps) {
             <Plus className="h-3 w-3 mr-1" />
             Add Cost
           </Button>
-        )}
+        ))}
 
         <div className="border-t pt-3 space-y-2">
           <div className="flex justify-between font-medium">
@@ -149,11 +152,13 @@ export function FinancialsCard({ item, costs }: FinancialsCardProps) {
             <div className="flex items-center gap-2">
               <PriceDisplay amount={item.selling_price} className="font-medium" />
               <Dialog open={showSellingPrice} onOpenChange={setShowSellingPrice}>
-                <DialogTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-6 w-6">
-                    <Pencil className="h-3 w-3" />
-                  </Button>
-                </DialogTrigger>
+                {!locked && (
+                  <DialogTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-6 w-6">
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                  </DialogTrigger>
+                )}
                 <DialogContent className="sm:max-w-[320px]">
                   <DialogHeader>
                     <DialogTitle>Set Selling Price</DialogTitle>

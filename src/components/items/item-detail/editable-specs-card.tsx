@@ -20,6 +20,7 @@ type ProductModelJoined = ProductModel & {
 interface EditableSpecsCardProps {
   item: Item
   productModel: ProductModelJoined | null
+  locked?: boolean
 }
 
 // Fields that live only on the product model (read-only even in edit mode)
@@ -40,7 +41,7 @@ const NUMBER_FIELDS = [
 // Editable boolean fields
 const BOOLEAN_FIELDS = ['has_touchscreen', 'is_unlocked'] as const
 
-export function EditableSpecsCard({ item, productModel }: EditableSpecsCardProps) {
+export function EditableSpecsCard({ item, productModel, locked }: EditableSpecsCardProps) {
   const [editing, setEditing] = useState(false)
   const updateItem = useUpdateItem()
 
@@ -229,10 +230,12 @@ export function EditableSpecsCard({ item, productModel }: EditableSpecsCardProps
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Specs</CardTitle>
-        <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
-          <Pencil className="h-3 w-3 mr-1" />
-          Edit
-        </Button>
+        {!locked && (
+          <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
+            <Pencil className="h-3 w-3 mr-1" />
+            Edit
+          </Button>
+        )}
       </CardHeader>
       <CardContent className="space-y-2 text-sm">
         {TEXT_FIELDS.map((key) => (

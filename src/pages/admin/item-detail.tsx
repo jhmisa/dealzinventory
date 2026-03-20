@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ClipboardEdit, QrCode, Send } from 'lucide-react'
+import { ArrowLeft, ClipboardEdit, Lock, QrCode, Send, Unlock } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Button } from '@/components/ui/button'
 import { PageHeader, FormSkeleton, StatusBadge, GradeBadge, CodeDisplay } from '@/components/shared'
@@ -31,6 +31,7 @@ export default function ItemDetailPage() {
   const { data: item, isLoading } = useItem(id!)
   const [showQr, setShowQr] = useState(false)
   const [showOfferDialog, setShowOfferDialog] = useState(false)
+  const [unlocked, setUnlocked] = useState(false)
   const { data: activeOffer } = useActiveOfferForItem(id!)
   const cancelOffer = useCancelOffer()
 
@@ -54,6 +55,11 @@ export default function ItemDetailPage() {
   const description = pm?.short_description || (brand && modelName ? `${brand} ${modelName}${color ? ` (${color})` : ''}` : undefined)
 
   const statusConfig = ITEM_STATUSES.find((s) => s.value === item.item_status)
+
+  // Locking logic
+  const isReserved = item.item_status === 'RESERVED'
+  const isSold = item.item_status === 'SOLD'
+  const isLocked = isSold || (isReserved && !unlocked)
 
   return (
     <div className="space-y-6">
@@ -88,6 +94,60 @@ export default function ItemDetailPage() {
           }
         />
       </div>
+
+      {/* Lock banner for RESERVED items */}
+      {isReserved && (
+        <div className={`flex items-center justify-between px-4 py-3 rounded-lg border ${
+          unlocked
+            ? 'border-amber-300 bg-amber-50'
+            : 'border-blue-300 bg-blue-50'
+        }`}>
+          <div className="flex items-center gap-2">
+            {unlocked ? (
+              <>
+                <Unlock className="h-4 w-4 text-amber-600" />
+                <span className="text-sm font-medium text-amber-800">
+                  Editing unlocked — changes may affect a pending order
+                </span>
+              </>
+            ) : (
+              <>
+                <Lock className="h-4 w-4 text-blue-600" />
+                <span className="text-sm font-medium text-blue-800">
+                  This item is reserved for an order. Editing is locked.
+                </span>
+              </>
+            )}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setUnlocked(!unlocked)}
+          >
+            {unlocked ? (
+              <>
+                <Lock className="h-3.5 w-3.5 mr-1" />
+                Re-lock
+              </>
+            ) : (
+              <>
+                <Unlock className="h-3.5 w-3.5 mr-1" />
+                Unlock for Editing
+              </>
+            )}
+          </Button>
+        </div>
+      )}
+
+      {/* Lock banner for SOLD items */}
+      {isSold && (
+        <div className="flex items-center gap-2 px-4 py-3 rounded-lg border border-gray-300 bg-gray-50">
+          <Lock className="h-4 w-4 text-gray-500" />
+          <span className="text-sm font-medium text-gray-600">
+            This item has been sold. Editing is permanently locked.
+          </span>
+        </div>
+      )}
 
       {/* Collapsible QR code */}
       {showQr && (
@@ -143,14 +203,14 @@ export default function ItemDetailPage() {
       <SupplierDescriptionBanner description={item.supplier_description} />
 
       {/* Category, Product, Grade assignment */}
-      <ItemAssignmentBar item={item} />
+      <ItemAssignmentBar item={item} locked={isLocked} />
 
       {/* Photos (left) + Specs/Financials/Source stacked (right) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <UnifiedGalleryCard item={item} productMedia={productMedia} itemMedia={itemMedia} />
         <div className="space-y-6">
-          <EditableSpecsCard item={item} productModel={pm} />
-          <FinancialsCard item={item} costs={itemCosts} />
+          <EditableSpecsCard item={item} productModel={pm} locked={isLocked} />
+          <FinancialsCard item={item} costs={itemCosts} locked={isLocked} />
           <SourceAuditTabs item={item} supplier={supplier} itemId={item.id} />
         </div>
       </div>
