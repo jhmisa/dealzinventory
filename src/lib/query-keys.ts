@@ -102,6 +102,15 @@ export const queryKeys = {
     list: (filters: Record<string, unknown>) => [...queryKeys.aiPrompts.lists(), filters] as const,
     active: (mediaType?: string) => [...queryKeys.aiPrompts.all, 'active', mediaType] as const,
   },
+  offers: {
+    all: ['offers'] as const,
+    lists: () => [...queryKeys.offers.all, 'list'] as const,
+    list: (filters: Record<string, unknown>) => [...queryKeys.offers.lists(), filters] as const,
+    details: () => [...queryKeys.offers.all, 'detail'] as const,
+    detail: (id: string) => [...queryKeys.offers.details(), id] as const,
+    byCode: (code: string) => [...queryKeys.offers.all, 'code', code] as const,
+    forItem: (itemId: string) => [...queryKeys.offers.all, 'item', itemId] as const,
+  },
   postalCodes: {
     all: ['postal-codes'] as const,
     lookup: (code: string) => ['postal-codes', 'lookup', code] as const,

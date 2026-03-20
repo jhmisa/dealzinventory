@@ -1,4 +1,4 @@
-import type { ConditionGrade, ItemStatus, SourceType, SupplierType, ProductStatus, AcAdapterStatus, OrderStatus, OrderSource, KaitoriStatus, KaitoriDeliveryMethod, KaitoriPaymentMethod, BatteryCondition, ScreenCondition, BodyCondition, KaitoriMediaRole, IntakeAdjustmentType } from './types'
+import type { ConditionGrade, ItemStatus, SourceType, SupplierType, ProductStatus, AcAdapterStatus, OrderStatus, OrderSource, KaitoriStatus, KaitoriDeliveryMethod, KaitoriPaymentMethod, BatteryCondition, ScreenCondition, BodyCondition, KaitoriMediaRole, IntakeAdjustmentType, OfferStatus } from './types'
 
 // --- Device Category Groupings ---
 
@@ -253,6 +253,19 @@ export const INTAKE_ADJUSTMENT_TYPES: { value: IntakeAdjustmentType; label: stri
 
 export function getAdjustmentTypeConfig(type: IntakeAdjustmentType) {
   return INTAKE_ADJUSTMENT_TYPES.find(t => t.value === type) ?? { value: type, label: type, color: 'bg-gray-100 text-gray-800 border-gray-300' }
+}
+
+// --- Offers ---
+
+export const OFFER_STATUSES: { value: OfferStatus; label: string; color: string }[] = [
+  { value: 'PENDING', label: 'Pending', color: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
+  { value: 'CLAIMED', label: 'Claimed', color: 'bg-green-100 text-green-800 border-green-300' },
+  { value: 'EXPIRED', label: 'Expired', color: 'bg-gray-100 text-gray-800 border-gray-300' },
+  { value: 'CANCELLED', label: 'Cancelled', color: 'bg-red-100 text-red-800 border-red-300' },
+]
+
+export function getOfferStatusConfig(status: OfferStatus) {
+  return OFFER_STATUSES.find(s => s.value === status) ?? { value: status, label: status, color: 'bg-gray-100 text-gray-800 border-gray-300' }
 }
 
 // --- Defect Types (for inspection defect-based condition tracking) ---

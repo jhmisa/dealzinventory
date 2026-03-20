@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ClipboardEdit, QrCode } from 'lucide-react'
+import { ArrowLeft, ClipboardEdit, QrCode, Send } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Button } from '@/components/ui/button'
 import { PageHeader, FormSkeleton, StatusBadge, GradeBadge, CodeDisplay } from '@/components/shared'
@@ -14,7 +14,11 @@ import {
   SourceAuditTabs,
 } from '@/components/items/item-detail'
 import { ITEM_STATUSES } from '@/lib/constants'
-import type { ProductModel, ProductMedia, Supplier, ItemCost, ItemMedia } from '@/lib/types'
+import { useActiveOfferForItem, useCancelOffer } from '@/hooks/use-offers'
+import { CreateOfferDialog } from '@/components/offers'
+import { formatPrice } from '@/lib/utils'
+import { toast } from 'sonner'
+import type { Item, ProductModel, ProductMedia, Supplier, ItemCost, ItemMedia } from '@/lib/types'
 
 type ProductModelJoined = ProductModel & {
   categories?: { name: string; form_fields: string[]; description_fields: string[] } | null
@@ -26,6 +30,9 @@ export default function ItemDetailPage() {
   const navigate = useNavigate()
   const { data: item, isLoading } = useItem(id!)
   const [showQr, setShowQr] = useState(false)
+  const [showOfferDialog, setShowOfferDialog] = useState(false)
+  const { data: activeOffer } = useActiveOfferForItem(id!)
+  const cancelOffer = useCancelOffer()
 
   if (isLoading) {
     return <FormSkeleton fields={6} />
@@ -65,6 +72,12 @@ export default function ItemDetailPage() {
               <Button variant="ghost" size="icon" onClick={() => setShowQr(!showQr)} title="Toggle QR code">
                 <QrCode className="h-4 w-4" />
               </Button>
+              {item.item_status === 'AVAILABLE' && (
+                <Button variant="outline" onClick={() => setShowOfferDialog(true)}>
+                  <Send className="h-4 w-4 mr-2" />
+                  Create Offer
+                </Button>
+              )}
               {item.item_status === 'INTAKE' && (
                 <Button onClick={() => navigate(`/admin/inspection/${item.id}`)}>
                   <ClipboardEdit className="h-4 w-4 mr-2" />
@@ -87,6 +100,45 @@ export default function ItemDetailPage() {
         </div>
       )}
 
+      {/* Active offer banner */}
+      {activeOffer && (() => {
+        const offer = activeOffer.offers as { id: string; offer_code: string; fb_name: string; expires_at: string; offer_items: { id: string; description: string; unit_price: number; quantity: number }[] }
+        const expiresAt = new Date(offer.expires_at)
+        const now = new Date()
+        const hoursLeft = Math.max(0, Math.round((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60)))
+        const total = (offer.offer_items ?? []).reduce((sum: number, oi: { unit_price: number; quantity: number }) => sum + Number(oi.unit_price) * oi.quantity, 0)
+        return (
+          <div className="border border-yellow-300 bg-yellow-50 rounded-lg p-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="font-medium text-yellow-800">Active Offer: </span>
+                <span className="font-mono font-medium">{offer.offer_code}</span>
+                <span className="ml-2 text-sm text-muted-foreground">for {offer.fb_name}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">{hoursLeft}h left</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-red-600 hover:text-red-700"
+                  onClick={() => cancelOffer.mutate(offer.id, {
+                    onSuccess: () => toast.success('Offer cancelled'),
+                    onError: (err) => toast.error(err.message),
+                  })}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+            {(offer.offer_items ?? []).length > 1 && (
+              <div className="text-sm text-muted-foreground">
+                {(offer.offer_items ?? []).length} items — Total: {formatPrice(total)}
+              </div>
+            )}
+          </div>
+        )
+      })()}
+
       {/* Supplier description banner */}
       <SupplierDescriptionBanner description={item.supplier_description} />
 
@@ -102,6 +154,12 @@ export default function ItemDetailPage() {
           <SourceAuditTabs item={item} supplier={supplier} itemId={item.id} />
         </div>
       </div>
+      {/* Create Offer Dialog */}
+      <CreateOfferDialog
+        open={showOfferDialog}
+        onOpenChange={setShowOfferDialog}
+        item={item as Item & { product_models?: ProductModel | null }}
+      />
     </div>
   )
 }

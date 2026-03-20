@@ -65,6 +65,13 @@ export type IntakeReceiptLineItemInsert = Tables['intake_receipt_line_items']['I
 export type IntakeAdjustment = Tables['intake_adjustments']['Row']
 export type IntakeAdjustmentInsert = Tables['intake_adjustments']['Insert']
 
+export type Offer = Tables['offers']['Row']
+export type OfferInsert = Tables['offers']['Insert']
+export type OfferUpdate = Tables['offers']['Update']
+
+export type OfferItem = Tables['offer_items']['Row']
+export type OfferItemInsert = Tables['offer_items']['Insert']
+
 
 export interface ParsedSpecs {
   brand?: string
@@ -112,6 +119,7 @@ export type ScreenCondition = Enums['screen_condition']
 export type BodyCondition = Enums['body_condition']
 export type KaitoriMediaRole = Enums['kaitori_media_role']
 export type IntakeAdjustmentType = Enums['intake_adjustment_type']
+export type OfferStatus = Enums['offer_status']
 
 // Joined / composite types used across the app
 export type ItemWithRelations = Item & {

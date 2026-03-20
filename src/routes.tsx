@@ -36,6 +36,7 @@ const CategoriesPage = lazy(() => import('@/pages/admin/categories'))
 const AiSettingsPage = lazy(() => import('@/pages/admin/ai-settings'))
 const PostalCodesPage = lazy(() => import('@/pages/admin/postal-codes'))
 const MediaStudioPage = lazy(() => import('@/pages/admin/media-studio'))
+const OfferClaimPage = lazy(() => import('@/pages/offer/claim'))
 const ShopBrowsePage = lazy(() => import('@/pages/shop/browse'))
 const ShopProductDetailPage = lazy(() => import('@/pages/shop/product-detail'))
 const CheckoutPage = lazy(() => import('@/pages/shop/checkout'))
@@ -115,6 +116,13 @@ export const router = createBrowserRouter([
       { index: true, element: lazyElement(ShopBrowsePage) },
       { path: 'product/:id', element: lazyElement(ShopProductDetailPage) },
       { path: 'checkout/:sellGroupId', element: lazyElement(CheckoutPage) },
+    ],
+  },
+  {
+    path: '/offer/:offerCode',
+    element: <ShopLayout />,
+    children: [
+      { index: true, element: lazyElement(OfferClaimPage) },
     ],
   },
   {

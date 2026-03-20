@@ -557,7 +557,7 @@ export type Database = {
           cpu: string | null
           created_at: string
           device_category: Database["public"]["Enums"]["device_category"] | null
-          field_sources: Record<string, string> | null
+          field_sources: Json | null
           form_factor: string | null
           gallery_photo_order: Json | null
           gpu: string | null
@@ -613,7 +613,7 @@ export type Database = {
           device_category?:
             | Database["public"]["Enums"]["device_category"]
             | null
-          field_sources?: Record<string, string> | null
+          field_sources?: Json | null
           form_factor?: string | null
           gallery_photo_order?: Json | null
           gpu?: string | null
@@ -669,7 +669,7 @@ export type Database = {
           device_category?:
             | Database["public"]["Enums"]["device_category"]
             | null
-          field_sources?: Record<string, string> | null
+          field_sources?: Json | null
           form_factor?: string | null
           gallery_photo_order?: Json | null
           gpu?: string | null
@@ -921,6 +921,114 @@ export type Database = {
             columns: ["product_model_id"]
             isOneToOne: false
             referencedRelation: "product_models"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      offer_items: {
+        Row: {
+          added_by: string
+          created_at: string
+          description: string
+          id: string
+          item_id: string | null
+          offer_id: string
+          quantity: number
+          unit_price: number
+        }
+        Insert: {
+          added_by?: string
+          created_at?: string
+          description: string
+          id?: string
+          item_id?: string | null
+          offer_id: string
+          quantity?: number
+          unit_price: number
+        }
+        Update: {
+          added_by?: string
+          created_at?: string
+          description?: string
+          id?: string
+          item_id?: string | null
+          offer_id?: string
+          quantity?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offer_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offer_items_offer_id_fkey"
+            columns: ["offer_id"]
+            isOneToOne: false
+            referencedRelation: "offers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      offers: {
+        Row: {
+          claimed_at: string | null
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          expires_at: string
+          fb_name: string
+          id: string
+          notes: string | null
+          offer_code: string
+          offer_status: Database["public"]["Enums"]["offer_status"]
+          order_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          claimed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          expires_at: string
+          fb_name: string
+          id?: string
+          notes?: string | null
+          offer_code: string
+          offer_status?: Database["public"]["Enums"]["offer_status"]
+          order_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          claimed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          expires_at?: string
+          fb_name?: string
+          id?: string
+          notes?: string | null
+          offer_code?: string
+          offer_status?: Database["public"]["Enums"]["offer_status"]
+          order_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offers_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offers_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
         ]
@@ -1433,6 +1541,23 @@ export type Database = {
         }
         Returns: Json
       }
+      debug_check_product_numeric_fields: {
+        Args: { p_product_id: string }
+        Returns: {
+          field_name: string
+          field_type: string
+          raw_value: string
+        }[]
+      }
+      debug_list_triggers: {
+        Args: never
+        Returns: {
+          event: string
+          function_name: string
+          timing: string
+          trigger_name: string
+        }[]
+      }
       generate_code: {
         Args: { prefix: string; seq_name: string }
         Returns: string
@@ -1479,6 +1604,7 @@ export type Database = {
         | "CANCELLED"
       media_role: "hero" | "gallery" | "video"
       media_type: "image" | "video"
+      offer_status: "PENDING" | "CLAIMED" | "EXPIRED" | "CANCELLED"
       order_source: "SHOP" | "LIVE_SELLING" | "WALK_IN" | "FB" | "YOUTUBE"
       order_status:
         | "PENDING"
@@ -1656,6 +1782,7 @@ export const Constants = {
       ],
       media_role: ["hero", "gallery", "video"],
       media_type: ["image", "video"],
+      offer_status: ["PENDING", "CLAIMED", "EXPIRED", "CANCELLED"],
       order_source: ["SHOP", "LIVE_SELLING", "WALK_IN", "FB", "YOUTUBE"],
       order_status: [
         "PENDING",
@@ -1672,5 +1799,3 @@ export const Constants = {
     },
   },
 } as const
-A new version of Supabase CLI is available: v2.78.1 (currently installed v2.75.0)
-We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
