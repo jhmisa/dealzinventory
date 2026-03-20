@@ -1299,12 +1299,14 @@ export type Database = {
           carrier: string | null
           category_id: string | null
           chipset: string | null
+          camera: string | null
           color: string
           cpu: string | null
           created_at: string
           device_category: Database["public"]["Enums"]["device_category"]
           form_factor: string | null
           gpu: string | null
+          has_bluetooth: boolean
           has_cellular: boolean | null
           has_thunderbolt: boolean | null
           has_touchscreen: boolean | null
@@ -1332,6 +1334,7 @@ export type Database = {
         }
         Insert: {
           brand: string
+          camera?: string | null
           carrier?: string | null
           category_id?: string | null
           chipset?: string | null
@@ -1341,6 +1344,7 @@ export type Database = {
           device_category?: Database["public"]["Enums"]["device_category"]
           form_factor?: string | null
           gpu?: string | null
+          has_bluetooth?: boolean
           has_cellular?: boolean | null
           has_thunderbolt?: boolean | null
           has_touchscreen?: boolean | null
@@ -1368,6 +1372,7 @@ export type Database = {
         }
         Update: {
           brand?: string
+          camera?: string | null
           carrier?: string | null
           category_id?: string | null
           chipset?: string | null
@@ -1377,6 +1382,7 @@ export type Database = {
           device_category?: Database["public"]["Enums"]["device_category"]
           form_factor?: string | null
           gpu?: string | null
+          has_bluetooth?: boolean
           has_cellular?: boolean | null
           has_thunderbolt?: boolean | null
           has_touchscreen?: boolean | null

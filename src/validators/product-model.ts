@@ -24,6 +24,8 @@ export const productModelSchema = z.object({
   has_thunderbolt: z.boolean().default(false),
   supports_stylus: z.boolean().default(false),
   has_cellular: z.boolean().default(false),
+  has_bluetooth: z.boolean().default(false),
+  camera: z.string().optional().or(z.literal('')),
   imei_slot_count: z.coerce.number().int().nonnegative().optional().or(z.literal(0).transform(() => undefined)),
   match_pattern: z.string().optional().or(z.literal('')),
   match_priority: z.coerce.number().int().default(0),
