@@ -17,6 +17,7 @@ import {
   BrainCircuit,
   Tags,
   MapPin,
+  RotateCcw,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -59,6 +60,7 @@ const navSections = [
     items: [
       { title: 'Sell Groups', href: '/admin/sell-groups', icon: ShoppingBag },
       { title: 'Orders', href: '/admin/orders', icon: ClipboardList },
+      { title: 'Returns', href: '/admin/returns', icon: RotateCcw },
       { title: 'Packing', href: '/admin/packing', icon: PackageCheck },
     ],
   },

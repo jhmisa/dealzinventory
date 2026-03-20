@@ -111,6 +111,15 @@ export const queryKeys = {
     byCode: (code: string) => [...queryKeys.offers.all, 'code', code] as const,
     forItem: (itemId: string) => [...queryKeys.offers.all, 'item', itemId] as const,
   },
+  returns: {
+    all: ['returns'] as const,
+    lists: () => [...queryKeys.returns.all, 'list'] as const,
+    list: (filters: Record<string, unknown>) => [...queryKeys.returns.lists(), filters] as const,
+    details: () => [...queryKeys.returns.all, 'detail'] as const,
+    detail: (id: string) => [...queryKeys.returns.details(), id] as const,
+    customer: (customerId: string) => [...queryKeys.returns.all, 'customer', customerId] as const,
+    media: (id: string) => [...queryKeys.returns.all, 'media', id] as const,
+  },
   postalCodes: {
     all: ['postal-codes'] as const,
     lookup: (code: string) => ['postal-codes', 'lookup', code] as const,

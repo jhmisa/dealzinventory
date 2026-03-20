@@ -1,5 +1,5 @@
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Check, Circle, Package, Truck, CalendarDays } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Check, Circle, Package, Truck, CalendarDays } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -269,6 +269,16 @@ export default function CustomerOrderDetailPage() {
             <p className="text-sm text-muted-foreground whitespace-pre-wrap">{order.notes}</p>
           </CardContent>
         </Card>
+      )}
+
+      {/* Report a Problem */}
+      {['SHIPPED', 'DELIVERED'].includes(order.order_status) && (
+        <Button variant="outline" asChild className="w-full">
+          <Link to={`/account/orders/${order.id}/return`}>
+            <AlertTriangle className="h-4 w-4 mr-2" />
+            Report a Problem
+          </Link>
+        </Button>
       )}
     </div>
   )

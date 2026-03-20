@@ -268,6 +268,42 @@ export function getOfferStatusConfig(status: OfferStatus) {
   return OFFER_STATUSES.find(s => s.value === status) ?? { value: status, label: status, color: 'bg-gray-100 text-gray-800 border-gray-300' }
 }
 
+// --- Returns ---
+
+export type ReturnStatus = 'SUBMITTED' | 'APPROVED' | 'SHIPPED_BACK' | 'RECEIVED' | 'INSPECTING' | 'RESOLVED' | 'REJECTED' | 'CANCELLED'
+export type ReturnReasonCategory = 'DEFECTIVE' | 'WRONG_ITEM' | 'DAMAGED_IN_TRANSIT' | 'NOT_AS_DESCRIBED' | 'OTHER'
+export type ReturnResolution = 'REFUND' | 'REPLACE' | 'REPAIR' | 'REJECTED'
+
+export const RETURN_STATUSES: { value: ReturnStatus; label: string; color: string }[] = [
+  { value: 'SUBMITTED', label: 'Submitted', color: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
+  { value: 'APPROVED', label: 'Approved', color: 'bg-blue-100 text-blue-800 border-blue-300' },
+  { value: 'SHIPPED_BACK', label: 'Shipped Back', color: 'bg-cyan-100 text-cyan-800 border-cyan-300' },
+  { value: 'RECEIVED', label: 'Received', color: 'bg-indigo-100 text-indigo-800 border-indigo-300' },
+  { value: 'INSPECTING', label: 'Inspecting', color: 'bg-purple-100 text-purple-800 border-purple-300' },
+  { value: 'RESOLVED', label: 'Resolved', color: 'bg-green-100 text-green-800 border-green-300' },
+  { value: 'REJECTED', label: 'Rejected', color: 'bg-red-100 text-red-800 border-red-300' },
+  { value: 'CANCELLED', label: 'Cancelled', color: 'bg-gray-100 text-gray-800 border-gray-300' },
+]
+
+export const RETURN_REASONS: { value: ReturnReasonCategory; label: string }[] = [
+  { value: 'DEFECTIVE', label: 'Item is defective / not working' },
+  { value: 'WRONG_ITEM', label: 'Received wrong item' },
+  { value: 'DAMAGED_IN_TRANSIT', label: 'Damaged during shipping' },
+  { value: 'NOT_AS_DESCRIBED', label: 'Not as described (specs, condition)' },
+  { value: 'OTHER', label: 'Other issue' },
+]
+
+export const RESOLUTION_TYPES: { value: ReturnResolution; label: string; color: string }[] = [
+  { value: 'REFUND', label: 'Refund', color: 'bg-green-100 text-green-800 border-green-300' },
+  { value: 'REPLACE', label: 'Replace', color: 'bg-blue-100 text-blue-800 border-blue-300' },
+  { value: 'REPAIR', label: 'Repair', color: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
+  { value: 'REJECTED', label: 'Rejected', color: 'bg-red-100 text-red-800 border-red-300' },
+]
+
+export function getReturnStatusConfig(status: ReturnStatus) {
+  return RETURN_STATUSES.find(s => s.value === status) ?? { value: status, label: status, color: 'bg-gray-100 text-gray-800 border-gray-300' }
+}
+
 // --- Defect Types (for inspection defect-based condition tracking) ---
 
 export const DEFECT_TYPES = {

@@ -51,6 +51,11 @@ const CustomerOrderDetailPage = lazy(() => import('@/pages/customer/order-detail
 const CustomerKaitoriPage = lazy(() => import('@/pages/customer/kaitori'))
 const CustomerSettingsPage = lazy(() => import('@/pages/customer/settings'))
 const CustomerVerifyIdPage = lazy(() => import('@/pages/customer/verify-id'))
+const CustomerReturnsPage = lazy(() => import('@/pages/customer/returns'))
+const CustomerReturnDetailPage = lazy(() => import('@/pages/customer/return-detail'))
+const CustomerReturnRequestPage = lazy(() => import('@/pages/customer/return-request'))
+const AdminReturnsPage = lazy(() => import('@/pages/admin/returns'))
+const AdminReturnDetailPage = lazy(() => import('@/pages/admin/return-detail'))
 
 function lazyElement(Component: React.LazyExoticComponent<ComponentType>) {
   return (
@@ -102,6 +107,8 @@ export const router = createBrowserRouter([
           { path: 'receiving-reports', element: lazyElement(ReceivingReportsPage) },
           { path: 'receiving-reports/:id', element: lazyElement(ReceivingReportDetailPage) },
           { path: 'reports', element: lazyElement(ReportsPage) },
+          { path: 'returns', element: lazyElement(AdminReturnsPage) },
+          { path: 'returns/:id', element: lazyElement(AdminReturnDetailPage) },
           { path: 'suppliers', element: lazyElement(SupplierListPage) },
           { path: 'settings/ai', element: lazyElement(AiSettingsPage) },
           { path: 'settings/postal-codes', element: lazyElement(PostalCodesPage) },
@@ -151,6 +158,9 @@ export const router = createBrowserRouter([
       { path: 'orders', element: lazyElement(CustomerOrdersPage) },
       { path: 'orders/:id', element: lazyElement(CustomerOrderDetailPage) },
       { path: 'kaitori', element: lazyElement(CustomerKaitoriPage) },
+      { path: 'orders/:orderId/return', element: lazyElement(CustomerReturnRequestPage) },
+      { path: 'returns', element: lazyElement(CustomerReturnsPage) },
+      { path: 'returns/:id', element: lazyElement(CustomerReturnDetailPage) },
       { path: 'settings', element: lazyElement(CustomerSettingsPage) },
       { path: 'verify-id', element: lazyElement(CustomerVerifyIdPage) },
     ],
