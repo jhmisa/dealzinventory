@@ -155,6 +155,7 @@ Deno.serve(async (req) => {
         order_code: orderCode,
         customer_id: resolvedCustomerId,
         order_source: 'FB',
+        order_status: 'CONFIRMED',
         shipping_address,
         quantity,
         total_price: totalPrice,
