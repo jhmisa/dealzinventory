@@ -39,7 +39,7 @@ export async function getProductModels(filters: ProductModelFilters = {}) {
   })
 }
 
-export async function getProductModelsWithHeroImage(search?: string): Promise<ProductModelWithHeroImage[]> {
+export async function getProductModelsWithHeroImage(search?: string, categoryId?: string): Promise<ProductModelWithHeroImage[]> {
   let query = supabase
     .from('product_models')
     .select('*, product_media(id, file_url, role, sort_order), categories(name)')
@@ -50,6 +50,10 @@ export async function getProductModelsWithHeroImage(search?: string): Promise<Pr
     query = query.or(
       `brand.ilike.%${search}%,model_name.ilike.%${search}%,color.ilike.%${search}%,short_description.ilike.%${search}%`
     )
+  }
+
+  if (categoryId) {
+    query = query.eq('category_id', categoryId)
   }
 
   const { data, error } = await query

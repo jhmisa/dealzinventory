@@ -9,10 +9,11 @@ import {
 } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { useCategories } from '@/hooks/use-categories'
-import { useProductModels } from '@/hooks/use-product-models'
+import { useProductModelsWithHeroImage } from '@/hooks/use-product-models'
 import { useUpdateItem } from '@/hooks/use-items'
 import { supabase } from '@/lib/supabase'
 import { CONDITION_GRADES } from '@/lib/constants'
+import { ProductPicker } from '@/components/intake/product-picker'
 import { ProductTemplateDiffDialog } from './product-template-diff-dialog'
 import type { Item, ItemUpdate } from '@/lib/types'
 
@@ -25,14 +26,10 @@ const NO_VALUE = '__none__'
 
 export function ItemAssignmentBar({ item, locked }: ItemAssignmentBarProps) {
   const { data: categories } = useCategories()
-  const { data: products } = useProductModels()
+  const { data: productsWithHero } = useProductModelsWithHeroImage(undefined, item.category_id ?? undefined)
   const updateItem = useUpdateItem()
   const [pendingProductId, setPendingProductId] = useState<string | null>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
-
-  const filteredProducts = item.category_id
-    ? products?.filter((p) => p.category_id === item.category_id)
-    : products
 
   function handleCategoryChange(value: string) {
     const categoryId = value === NO_VALUE ? null : value
@@ -162,23 +159,13 @@ export function ItemAssignmentBar({ item, locked }: ItemAssignmentBarProps) {
       {/* Product */}
       <div className="flex items-center gap-2 min-w-0">
         <Label className="text-sm font-medium shrink-0">Product</Label>
-        <Select
-          value={item.product_id ?? NO_VALUE}
-          onValueChange={handleProductChange}
-          disabled={locked || updateItem.isPending}
-        >
-          <SelectTrigger className="w-[260px]">
-            <SelectValue placeholder="Select product" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={NO_VALUE}>No product</SelectItem>
-            {filteredProducts?.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.brand} {p.model_name} ({p.color})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="w-[320px]">
+          <ProductPicker
+            value={item.product_id ?? ''}
+            onSelect={(productId) => handleProductChange(productId || NO_VALUE)}
+            products={productsWithHero ?? []}
+          />
+        </div>
       </div>
 
       {/* Grade */}

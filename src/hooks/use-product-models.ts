@@ -10,10 +10,10 @@ export function useProductModels(filters: productModelsService.ProductModelFilte
   })
 }
 
-export function useProductModelsWithHeroImage(search?: string) {
+export function useProductModelsWithHeroImage(search?: string, categoryId?: string) {
   return useQuery({
-    queryKey: queryKeys.productModels.list({ search, withHero: true }),
-    queryFn: () => productModelsService.getProductModelsWithHeroImage(search),
+    queryKey: queryKeys.productModels.list({ search, categoryId, withHero: true }),
+    queryFn: () => productModelsService.getProductModelsWithHeroImage(search, categoryId),
   })
 }
 

@@ -24,7 +24,10 @@ interface EditableSpecsCardProps {
 }
 
 // Fields that live only on the product model (read-only even in edit mode)
-const PRODUCT_ONLY_FIELDS = ['chipset', 'ports', 'has_thunderbolt', 'supports_stylus', 'has_cellular', 'imei_slot_count'] as const
+const PRODUCT_ONLY_FIELDS = ['chipset', 'ports', 'has_thunderbolt', 'supports_stylus', 'has_cellular', 'imei_slot_count', 'camera', 'has_bluetooth'] as const
+
+// Fields always shown regardless of category
+const ALWAYS_VISIBLE = new Set(['brand', 'model_name', 'color', 'year', 'other_features', 'battery_health_pct'])
 
 // Editable text fields
 const TEXT_FIELDS = ['brand', 'model_name', 'color', 'cpu', 'os_family', 'gpu', 'carrier', 'keyboard_layout', 'other_features'] as const
@@ -44,6 +47,17 @@ const BOOLEAN_FIELDS = ['has_touchscreen', 'is_unlocked'] as const
 export function EditableSpecsCard({ item, productModel, locked }: EditableSpecsCardProps) {
   const [editing, setEditing] = useState(false)
   const updateItem = useUpdateItem()
+
+  // Category-aware field visibility
+  const categoryFields = productModel?.categories?.form_fields
+  const visibleFields = categoryFields ? new Set(categoryFields) : null
+  function show(field: string) { return !visibleFields || ALWAYS_VISIBLE.has(field) || visibleFields.has(field) }
+
+  const filteredTextFields = TEXT_FIELDS.filter((key) => ALWAYS_VISIBLE.has(key) || show(key))
+  const filteredNumberFields = NUMBER_FIELDS.filter(({ key }) => ALWAYS_VISIBLE.has(key) || show(key))
+  const filteredBooleanFields = BOOLEAN_FIELDS.filter((key) => show(key))
+  const showImei = show('imei_slot_count')
+  const filteredProductOnlyFields = PRODUCT_ONLY_FIELDS.filter((key) => show(key))
 
   const form = useForm<ItemSpecsFormValues>({
     resolver: zodResolver(itemSpecsSchema),
@@ -144,7 +158,7 @@ export function EditableSpecsCard({ item, productModel, locked }: EditableSpecsC
         <CardContent>
           <form onSubmit={form.handleSubmit(handleSave)} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {TEXT_FIELDS.map((key) => (
+              {filteredTextFields.map((key) => (
                 <div key={key} className="space-y-1">
                   <Label className="text-xs text-muted-foreground">{getSpecFieldLabel(key)}</Label>
                   <Input
@@ -155,7 +169,7 @@ export function EditableSpecsCard({ item, productModel, locked }: EditableSpecsC
                 </div>
               ))}
 
-              {NUMBER_FIELDS.map(({ key, suffix }) => (
+              {filteredNumberFields.map(({ key, suffix }) => (
                 <div key={key} className="space-y-1">
                   <Label className="text-xs text-muted-foreground">{getSpecFieldLabel(key)}</Label>
                   <div className="flex items-center gap-1">
@@ -175,16 +189,20 @@ export function EditableSpecsCard({ item, productModel, locked }: EditableSpecsC
                 </div>
               ))}
 
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">IMEI</Label>
-                <Input {...form.register('imei')} placeholder="—" className="h-8 text-sm" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">IMEI 2</Label>
-                <Input {...form.register('imei2')} placeholder="—" className="h-8 text-sm" />
-              </div>
+              {showImei && (
+                <>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">IMEI</Label>
+                    <Input {...form.register('imei')} placeholder="—" className="h-8 text-sm" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">IMEI 2</Label>
+                    <Input {...form.register('imei2')} placeholder="—" className="h-8 text-sm" />
+                  </div>
+                </>
+              )}
 
-              {BOOLEAN_FIELDS.map((key) => (
+              {filteredBooleanFields.map((key) => (
                 <div key={key} className="flex items-center justify-between py-1">
                   <Label className="text-xs text-muted-foreground">{getSpecFieldLabel(key)}</Label>
                   <Switch
@@ -196,10 +214,10 @@ export function EditableSpecsCard({ item, productModel, locked }: EditableSpecsC
             </div>
 
             {/* Product-model-only fields (read-only) */}
-            {PRODUCT_ONLY_FIELDS.some((f) => productModel?.[f as keyof ProductModel] != null) && (
+            {filteredProductOnlyFields.some((f) => productModel?.[f as keyof ProductModel] != null) && (
               <div className="border-t pt-3 space-y-2">
                 <p className="text-xs text-muted-foreground italic">From product model (read-only)</p>
-                {PRODUCT_ONLY_FIELDS.map((key) => {
+                {filteredProductOnlyFields.map((key) => {
                   const val = productModel?.[key as keyof ProductModel]
                   if (val == null) return null
                   return (
@@ -238,21 +256,25 @@ export function EditableSpecsCard({ item, productModel, locked }: EditableSpecsC
         )}
       </CardHeader>
       <CardContent className="space-y-2 text-sm">
-        {TEXT_FIELDS.map((key) => (
+        {filteredTextFields.map((key) => (
           <Row key={key} label={getSpecFieldLabel(key)} value={getResolvedValue(key) as string | null} />
         ))}
-        {NUMBER_FIELDS.map(({ key, suffix }) => {
+        {filteredNumberFields.map(({ key, suffix }) => {
           const val = getResolvedValue(key) as number | null
           return <Row key={key} label={getSpecFieldLabel(key)} value={val != null ? `${val}${suffix}` : null} />
         })}
-        <Row label="IMEI" value={item.imei} />
-        <Row label="IMEI 2" value={item.imei2} />
-        {BOOLEAN_FIELDS.map((key) => (
+        {showImei && (
+          <>
+            <Row label="IMEI" value={item.imei} />
+            <Row label="IMEI 2" value={item.imei2} />
+          </>
+        )}
+        {filteredBooleanFields.map((key) => (
           <BooleanRow key={key} label={getSpecFieldLabel(key)} value={getResolvedValue(key) as boolean | null} />
         ))}
 
         {/* Product-model-only fields */}
-        {PRODUCT_ONLY_FIELDS.map((key) => {
+        {filteredProductOnlyFields.map((key) => {
           const val = productModel?.[key as keyof ProductModel]
           if (val == null) return null
           if (typeof val === 'boolean') {

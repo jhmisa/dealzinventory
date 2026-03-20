@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, ClipboardEdit, Lock, QrCode, Send, Unlock } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { PageHeader, FormSkeleton, StatusBadge, GradeBadge, CodeDisplay } from '@/components/shared'
 import { useItem } from '@/hooks/use-items'
 import {
@@ -198,6 +200,20 @@ export default function ItemDetailPage() {
           </div>
         )
       })()}
+
+      {/* Short description banner */}
+      {description && (
+        <Card>
+          <CardContent className="py-3 px-4">
+            <p className="text-base font-medium">{description}</p>
+            {pm?.categories?.name && (
+              <Badge variant="secondary" className="mt-1 text-xs">
+                {pm.categories.name}
+              </Badge>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Supplier description banner */}
       <SupplierDescriptionBanner description={item.supplier_description} />

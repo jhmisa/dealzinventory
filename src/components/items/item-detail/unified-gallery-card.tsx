@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react'
-import { GripVertical, Eye, EyeOff, X, Plus } from 'lucide-react'
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
+import { GripVertical, Eye, EyeOff, X, Plus, Upload, Camera, Video, Loader2, CircleDot, Square } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   DndContext,
@@ -22,7 +22,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { MediaUploader } from '@/components/shared/media-uploader'
+import { Progress } from '@/components/ui/progress'
+import { processImage } from '@/components/media-studio/image-processor'
+import { processVideo, VIDEO_SPECS } from '@/components/media-studio/video-processor'
+import { supabase } from '@/lib/supabase'
 import { useUpdateItem, useAddItemMedia, useUpdateItemMedia, useDeleteItemMedia } from '@/hooks/use-items'
 import { cn } from '@/lib/utils'
 import type { Item, ProductMedia, ItemMedia } from '@/lib/types'
@@ -148,12 +151,306 @@ export function UnifiedGalleryCard({ item, productMedia, itemMedia }: UnifiedGal
     )
   }
 
-  function handleUpload(url: string) {
-    addMedia.mutate(
-      { itemId: item.id, fileUrl: url },
-      { onError: () => toast.error('Failed to save media record') },
+  // --- Image upload with processing ---
+  const BUCKET = 'item-media'
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const videoInputRef = useRef<HTMLInputElement>(null)
+  const videoCameraInputRef = useRef<HTMLInputElement>(null)
+  const [imageUploads, setImageUploads] = useState<{ fileName: string; stage: string; progress: number }[]>([])
+
+  // Camera state
+  const [cameraOpen, setCameraOpen] = useState(false)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+
+  // Video recording state
+  const [videoRecordOpen, setVideoRecordOpen] = useState(false)
+  const [recording, setRecording] = useState(false)
+  const [recordingTime, setRecordingTime] = useState(0)
+  const videoRecordRef = useRef<HTMLVideoElement>(null)
+  const videoStreamRef = useRef<MediaStream | null>(null)
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Video processing state
+  const [videoProcessing, setVideoProcessing] = useState(false)
+  const [videoProgress, setVideoProgress] = useState(0)
+
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+
+  const uploadProcessedImage = useCallback(
+    async (file: File) => {
+      const fileName = file.name
+      setImageUploads((prev) => [...prev, { fileName, stage: 'processing', progress: 0 }])
+
+      try {
+        setImageUploads((prev) =>
+          prev.map((u) => (u.fileName === fileName ? { ...u, stage: 'processing', progress: 30 } : u)),
+        )
+        const processed = await processImage(file)
+
+        setImageUploads((prev) =>
+          prev.map((u) => (u.fileName === fileName ? { ...u, stage: 'uploading', progress: 50 } : u)),
+        )
+
+        const basePath = `items/${item.id}`
+        const sizes = [
+          { blob: processed.full, suffix: '_full.webp' },
+          { blob: processed.display, suffix: '_display.webp' },
+          { blob: processed.thumbnail, suffix: '_thumb.webp' },
+        ] as const
+
+        for (let i = 0; i < sizes.length; i++) {
+          const { blob, suffix } = sizes[i]
+          const filePath = `${basePath}/${processed.id}${suffix}`
+
+          const { error } = await supabase.storage.from(BUCKET).upload(filePath, blob, {
+            contentType: 'image/webp',
+            upsert: false,
+          })
+          if (error) throw error
+
+          setImageUploads((prev) =>
+            prev.map((u) =>
+              u.fileName === fileName
+                ? { ...u, progress: 50 + Math.round(((i + 1) / sizes.length) * 40) }
+                : u,
+            ),
+          )
+        }
+
+        const displayPath = `${basePath}/${processed.id}_display.webp`
+        const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(displayPath)
+
+        addMedia.mutate(
+          { itemId: item.id, fileUrl: urlData.publicUrl },
+          {
+            onSuccess: () => toast.success(`Uploaded ${fileName}`),
+            onError: (err) => toast.error(`Failed to save: ${err.message}`),
+          },
+        )
+
+        setImageUploads((prev) =>
+          prev.map((u) => (u.fileName === fileName ? { ...u, progress: 100 } : u)),
+        )
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error'
+        toast.error(`Failed to process ${fileName}: ${message}`)
+      } finally {
+        setTimeout(() => {
+          setImageUploads((prev) => prev.filter((u) => u.fileName !== fileName))
+        }, 500)
+      }
+    },
+    [item.id, addMedia],
+  )
+
+  function handleImageFiles(files: FileList | null) {
+    if (!files) return
+    Array.from(files).forEach(uploadProcessedImage)
+  }
+
+  async function handleVideoFile(file: File) {
+    setVideoProcessing(true)
+    setVideoProgress(0)
+
+    try {
+      const result = await processVideo(file, (progress) => {
+        setVideoProgress(Math.round(progress * 100))
+      })
+
+      const filePath = `items/${item.id}/${result.fileName}`
+      const { error } = await supabase.storage.from(BUCKET).upload(filePath, result.blob, {
+        contentType: 'video/mp4',
+        upsert: false,
+      })
+      if (error) throw error
+
+      const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(filePath)
+
+      addMedia.mutate(
+        { itemId: item.id, fileUrl: urlData.publicUrl },
+        {
+          onSuccess: () => toast.success('Video uploaded'),
+          onError: (err) => toast.error(`Failed to save: ${err.message}`),
+        },
+      )
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      toast.error(`Video processing failed: ${message}`)
+    } finally {
+      setVideoProcessing(false)
+      setVideoProgress(0)
+    }
+  }
+
+  // Camera functions
+  function handleCameraClick() {
+    if (isMobile) {
+      cameraInputRef.current?.click()
+    } else {
+      openCamera()
+    }
+  }
+
+  async function openCamera() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 2048 }, height: { ideal: 2048 } },
+      })
+      streamRef.current = stream
+      setCameraOpen(true)
+      setTimeout(() => {
+        if (videoRef.current) videoRef.current.srcObject = stream
+      }, 50)
+    } catch (err) {
+      toast.error(`Camera error: ${err instanceof Error ? err.message : 'Could not access camera'}`)
+    }
+  }
+
+  function closeCamera() {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop())
+      streamRef.current = null
+    }
+    setCameraOpen(false)
+  }
+
+  function capturePhoto() {
+    const video = videoRef.current
+    if (!video) return
+    const canvas = document.createElement('canvas')
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    ctx.drawImage(video, 0, 0)
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) return
+        const file = new File([blob], `capture_${Date.now()}.jpg`, { type: 'image/jpeg' })
+        uploadProcessedImage(file)
+        toast.success('Photo captured!')
+      },
+      'image/jpeg',
+      0.92,
     )
   }
+
+  // Video recording functions
+  function handleVideoRecordClick() {
+    if (isMobile) {
+      videoCameraInputRef.current?.click()
+    } else {
+      openVideoCamera()
+    }
+  }
+
+  async function openVideoCamera() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1080 }, height: { ideal: 1080 } },
+        audio: false,
+      })
+      videoStreamRef.current = stream
+      setVideoRecordOpen(true)
+      setTimeout(() => {
+        if (videoRecordRef.current) videoRecordRef.current.srcObject = stream
+      }, 50)
+    } catch (err) {
+      toast.error(`Camera error: ${err instanceof Error ? err.message : 'Could not access camera'}`)
+    }
+  }
+
+  function closeVideoCamera() {
+    stopVideoRecording()
+    if (videoStreamRef.current) {
+      videoStreamRef.current.getTracks().forEach((t) => t.stop())
+      videoStreamRef.current = null
+    }
+    setVideoRecordOpen(false)
+    setRecordingTime(0)
+  }
+
+  function startVideoRecording() {
+    if (!videoStreamRef.current) return
+    chunksRef.current = []
+    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+      ? 'video/webm;codecs=vp9'
+      : MediaRecorder.isTypeSupported('video/webm')
+        ? 'video/webm'
+        : 'video/mp4'
+
+    const recorder = new MediaRecorder(videoStreamRef.current, { mimeType })
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) chunksRef.current.push(e.data)
+    }
+    recorder.onstop = () => {
+      const blob = new Blob(chunksRef.current, { type: mimeType })
+      const file = new File([blob], `recording_${Date.now()}.webm`, { type: mimeType })
+      closeVideoCamera()
+      handleVideoFile(file)
+    }
+    recorder.start(1000)
+    recorderRef.current = recorder
+    setRecording(true)
+    setRecordingTime(0)
+    timerRef.current = setInterval(() => {
+      setRecordingTime((prev) => {
+        const next = prev + 1
+        if (next >= VIDEO_SPECS.maxDurationSec) stopVideoRecording()
+        return next
+      })
+    }, 1000)
+  }
+
+  const stopVideoRecording = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
+    if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+      recorderRef.current.stop()
+    }
+    recorderRef.current = null
+    setRecording(false)
+  }, [])
+
+  function formatTime(seconds: number): string {
+    const m = Math.floor(seconds / 60)
+    const s = seconds % 60
+    return `${m}:${String(s).padStart(2, '0')}`
+  }
+
+  // Drag & drop
+  const [isDragging, setIsDragging] = useState(false)
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault()
+    setIsDragging(true)
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault()
+    setIsDragging(false)
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setIsDragging(false)
+    handleImageFiles(e.dataTransfer.files)
+  }
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop())
+      if (videoStreamRef.current) videoStreamRef.current.getTracks().forEach((t) => t.stop())
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
+  }, [])
 
   const firstVisibleId = photos.find((p) => p.visible)?.id
 
@@ -189,11 +486,212 @@ export function UnifiedGalleryCard({ item, productMedia, itemMedia }: UnifiedGal
         )}
 
         {showUploader && (
-          <MediaUploader
-            bucket="item-media"
-            pathPrefix={`items/${item.id}`}
-            onUpload={handleUpload}
-          />
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              {/* Drag & Drop upload area */}
+              <div
+                className={cn(
+                  'flex-1 border-2 border-dashed rounded-lg px-4 py-3 text-center cursor-pointer transition-colors flex items-center gap-3',
+                  isDragging
+                    ? 'border-primary bg-primary/5'
+                    : 'border-muted-foreground/25 hover:border-primary/50',
+                )}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Upload className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                <div className="text-left">
+                  <p className="text-sm text-muted-foreground">Drop images or click to browse</p>
+                  <p className="text-xs text-muted-foreground/60">Auto-processed to 3 sizes</p>
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    handleImageFiles(e.target.files)
+                    e.target.value = ''
+                  }}
+                />
+              </div>
+
+              {/* Take Photo */}
+              <div
+                className="border-2 border-dashed rounded-lg px-4 py-3 flex items-center gap-2 cursor-pointer transition-colors border-muted-foreground/25 hover:border-primary/50 hover:bg-primary/5"
+                onClick={handleCameraClick}
+              >
+                <Camera className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                <p className="text-sm text-muted-foreground font-medium whitespace-nowrap">Take Photo</p>
+              </div>
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => {
+                  handleImageFiles(e.target.files)
+                  e.target.value = ''
+                }}
+              />
+
+              {/* Record Video */}
+              <div
+                className="border-2 border-dashed rounded-lg px-4 py-3 flex items-center gap-2 cursor-pointer transition-colors border-muted-foreground/25 hover:border-primary/50 hover:bg-primary/5"
+                onClick={handleVideoRecordClick}
+              >
+                <Video className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                <p className="text-sm text-muted-foreground font-medium whitespace-nowrap">Record Video</p>
+              </div>
+              <input
+                ref={videoCameraInputRef}
+                type="file"
+                accept="video/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => {
+                  const files = e.target.files
+                  if (files?.[0]) handleVideoFile(files[0])
+                  e.target.value = ''
+                }}
+              />
+            </div>
+
+            {/* Upload a video file */}
+            <div
+              className="border-2 border-dashed rounded-lg px-4 py-2 cursor-pointer transition-colors border-muted-foreground/25 hover:border-primary/50 flex items-center gap-3"
+              onClick={() => videoInputRef.current?.click()}
+            >
+              <Video className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <p className="text-sm text-muted-foreground">Upload video file</p>
+              <input
+                ref={videoInputRef}
+                type="file"
+                accept="video/*"
+                className="hidden"
+                onChange={(e) => {
+                  const files = e.target.files
+                  if (files?.[0]) handleVideoFile(files[0])
+                  e.target.value = ''
+                }}
+              />
+            </div>
+
+            {/* Live Camera Viewfinder (photos) */}
+            {cameraOpen && (
+              <div className="rounded-lg overflow-hidden border bg-black relative">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full max-h-[400px] object-contain"
+                />
+                <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-3">
+                  <Button
+                    size="lg"
+                    className="rounded-full h-14 w-14 shadow-lg"
+                    onClick={capturePhoto}
+                    title="Capture"
+                  >
+                    <Camera className="h-6 w-6" />
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="rounded-full h-10 w-10 shadow-lg self-center"
+                    onClick={closeCamera}
+                    title="Close camera"
+                  >
+                    <X className="h-5 w-5" />
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Live Camera Viewfinder (video recording) */}
+            {videoRecordOpen && (
+              <div className="rounded-lg overflow-hidden border bg-black relative">
+                <video
+                  ref={videoRecordRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full max-h-[400px] object-contain"
+                />
+                {recording && (
+                  <div className="absolute top-4 left-4 flex items-center gap-2 bg-black/60 rounded-full px-3 py-1.5">
+                    <div className="h-3 w-3 rounded-full bg-red-500 animate-pulse" />
+                    <span className="text-white text-sm font-mono">
+                      {formatTime(recordingTime)} / {formatTime(VIDEO_SPECS.maxDurationSec)}
+                    </span>
+                  </div>
+                )}
+                <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-3">
+                  {!recording ? (
+                    <Button
+                      size="lg"
+                      variant="destructive"
+                      className="rounded-full h-14 w-14 shadow-lg"
+                      onClick={startVideoRecording}
+                      title="Start recording"
+                    >
+                      <CircleDot className="h-6 w-6" />
+                    </Button>
+                  ) : (
+                    <Button
+                      size="lg"
+                      variant="destructive"
+                      className="rounded-full h-14 w-14 shadow-lg"
+                      onClick={stopVideoRecording}
+                      title="Stop recording"
+                    >
+                      <Square className="h-5 w-5" />
+                    </Button>
+                  )}
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="rounded-full h-10 w-10 shadow-lg self-center"
+                    onClick={closeVideoCamera}
+                    title="Close camera"
+                  >
+                    <X className="h-5 w-5" />
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Image Upload Progress */}
+            {imageUploads.length > 0 && (
+              <div className="space-y-2">
+                {imageUploads.map((upload) => (
+                  <div key={upload.fileName} className="flex items-center gap-3 text-sm">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary flex-shrink-0" />
+                    <span className="truncate flex-1">{upload.fileName}</span>
+                    <span className="text-muted-foreground text-xs capitalize">{upload.stage}</span>
+                    <span className="text-muted-foreground w-10 text-right">{upload.progress}%</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Video Processing Progress */}
+            {videoProcessing && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-3 text-sm">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary flex-shrink-0" />
+                  <span className="flex-1">Processing video...</span>
+                  <span className="text-muted-foreground w-10 text-right">{videoProgress}%</span>
+                </div>
+                <Progress value={videoProgress} />
+              </div>
+            )}
+          </div>
         )}
       </CardContent>
     </Card>
