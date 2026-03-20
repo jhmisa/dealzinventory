@@ -23,6 +23,7 @@ type ItemRow = {
   condition_grade: string | null
   source_type: string
   purchase_price: number | null
+  selling_price: number | null
   created_at: string
   brand: string | null
   model_name: string | null
@@ -84,8 +85,14 @@ const columns: ColumnDef<ItemRow>[] = [
   },
   {
     accessorKey: 'purchase_price',
-    header: 'Price',
-    cell: ({ row }) => <PriceDisplay amount={row.original.purchase_price} />,
+    header: 'Buy / Sell',
+    cell: ({ row }) => (
+      <div className="flex items-center gap-1.5 text-sm">
+        <PriceDisplay amount={row.original.purchase_price} />
+        <span className="text-muted-foreground">/</span>
+        <PriceDisplay amount={row.original.selling_price} />
+      </div>
+    ),
   },
   {
     accessorKey: 'created_at',
