@@ -52,21 +52,32 @@ const columns: ColumnDef<ItemRow>[] = [
     header: 'Model',
     cell: ({ row }) => {
       const pm = row.original.product_models
-      if (pm?.short_description) return pm.short_description
-      const { brand, model_name, cpu, ram_gb, storage_gb, screen_size, condition_notes } = row.original
-      const modelName = brand && model_name
-        ? `${brand} ${model_name}`
-        : pm ? `${pm.brand} ${pm.model_name}` : null
-      const screenVal = screen_size ?? pm?.screen_size
-      const parts = [
-        modelName,
-        cpu,
-        ram_gb ? `${ram_gb}GB` : null,
-        storage_gb ? `${storage_gb}GB` : null,
-        screenVal ? `${screenVal}"` : null,
-        condition_notes,
-      ].filter(Boolean)
-      return parts.length > 0 ? parts.join(' / ') : '—'
+      const { condition_notes } = row.original
+      let modelLine: string
+      if (pm?.short_description) {
+        modelLine = pm.short_description
+      } else {
+        const { brand, model_name, cpu, ram_gb, storage_gb, screen_size } = row.original
+        const modelName = brand && model_name
+          ? `${brand} ${model_name}`
+          : pm ? `${pm.brand} ${pm.model_name}` : null
+        const screenVal = screen_size ?? pm?.screen_size
+        const parts = [
+          modelName,
+          cpu,
+          ram_gb ? `${ram_gb}GB` : null,
+          storage_gb ? `${storage_gb}GB` : null,
+          screenVal ? `${screenVal}"` : null,
+        ].filter(Boolean)
+        modelLine = parts.length > 0 ? parts.join(' / ') : '—'
+      }
+      if (!condition_notes) return modelLine
+      return (
+        <div>
+          <div>{modelLine}</div>
+          <div className="text-xs text-muted-foreground">{condition_notes}</div>
+        </div>
+      )
     },
   },
   {
