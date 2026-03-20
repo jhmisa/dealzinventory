@@ -226,14 +226,21 @@ export async function rejectReturn(id: string, reason: string) {
 
 // --- Media ---
 
-export async function uploadReturnMedia(returnRequestId: string, file: File) {
-  const ext = file.name.split('.').pop() ?? 'jpg'
+export async function uploadReturnMedia(
+  returnRequestId: string,
+  file: Blob | File,
+  mediaType?: 'image' | 'video',
+) {
+  const isFile = file instanceof File
+  const detectedType = mediaType ?? (file.type.startsWith('video/') ? 'video' : 'image')
+  const ext = isFile
+    ? (file as File).name.split('.').pop() ?? (detectedType === 'video' ? 'mp4' : 'webp')
+    : detectedType === 'video' ? 'mp4' : 'webp'
   const path = `${returnRequestId}/${crypto.randomUUID()}.${ext}`
-  const mediaType = file.type.startsWith('video/') ? 'video' : 'image'
 
   const { error: uploadError } = await supabase.storage
     .from('return-media')
-    .upload(path, file)
+    .upload(path, file, { contentType: file.type || (detectedType === 'video' ? 'video/mp4' : 'image/webp') })
 
   if (uploadError) throw uploadError
 
@@ -246,7 +253,7 @@ export async function uploadReturnMedia(returnRequestId: string, file: File) {
     .insert({
       return_request_id: returnRequestId,
       file_url: urlData.publicUrl,
-      media_type: mediaType,
+      media_type: detectedType,
     })
     .select()
     .single()

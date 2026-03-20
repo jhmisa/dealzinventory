@@ -1,11 +1,12 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArrowLeft, ArrowRight, Upload, X, Loader2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Upload, X, Loader2, Camera, Video, CircleDot, Square } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
+import { Progress } from '@/components/ui/progress'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -16,6 +17,8 @@ import { FormSkeleton, PriceDisplay } from '@/components/shared'
 import { RETURN_REASONS } from '@/lib/constants'
 import { createReturnSchema, type CreateReturnFormValues } from '@/validators/return'
 import { cn } from '@/lib/utils'
+import { processReturnImage } from '@/components/media-studio/image-processor'
+import { processVideo, VIDEO_SPECS } from '@/components/media-studio/video-processor'
 
 type OrderItemRow = {
   id: string
@@ -35,8 +38,16 @@ type OrderItemRow = {
   } | null
 }
 
-const STEPS = ['Select Items', 'Describe Issue', 'Upload Photos', 'Review & Submit'] as const
+const STEPS = ['Select Items', 'Describe Issue', 'Upload Evidence', 'Review & Submit'] as const
 const MAX_FILES = 5
+
+const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+
+interface MediaItem {
+  blob: Blob
+  previewUrl: string
+  type: 'image' | 'video'
+}
 
 export default function CustomerReturnRequestPage() {
   const { orderId } = useParams<{ orderId: string }>()
@@ -46,11 +57,25 @@ export default function CustomerReturnRequestPage() {
   const createReturn = useCreateReturnRequest()
   const uploadMedia = useUploadReturnMedia()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const videoInputRef = useRef<HTMLInputElement>(null)
 
   const [step, setStep] = useState(0)
-  const [files, setFiles] = useState<File[]>([])
-  const [previews, setPreviews] = useState<string[]>([])
+  const [mediaItems, setMediaItems] = useState<MediaItem[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [processing, setProcessing] = useState(false)
+  const [processProgress, setProcessProgress] = useState(0)
+  const [processLabel, setProcessLabel] = useState('')
+
+  // Desktop camera state
+  const [cameraMode, setCameraMode] = useState<'photo' | 'video' | null>(null)
+  const [recording, setRecording] = useState(false)
+  const [recordingTime, setRecordingTime] = useState(0)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const form = useForm<CreateReturnFormValues>({
     resolver: zodResolver(createReturnSchema),
@@ -84,23 +109,202 @@ export default function CustomerReturnRequestPage() {
     }
   }
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const newFiles = Array.from(e.target.files ?? [])
-    const remaining = MAX_FILES - files.length
-    const toAdd = newFiles.slice(0, remaining)
+  // --- Media processing ---
 
-    const newPreviews = toAdd.map(f => URL.createObjectURL(f))
-    setFiles(prev => [...prev, ...toAdd])
-    setPreviews(prev => [...prev, ...newPreviews])
+  const addProcessedMedia = useCallback((blob: Blob, type: 'image' | 'video') => {
+    const previewUrl = URL.createObjectURL(blob)
+    setMediaItems(prev => [...prev, { blob, previewUrl, type }])
+  }, [])
 
-    if (fileInputRef.current) fileInputRef.current.value = ''
+  async function processAndAddImage(file: File | Blob) {
+    if (mediaItems.length >= MAX_FILES) return
+    setProcessing(true)
+    setProcessLabel('Compressing image…')
+    setProcessProgress(30)
+    try {
+      const compressed = await processReturnImage(file)
+      setProcessProgress(100)
+      addProcessedMedia(compressed, 'image')
+      toast.success('Photo ready')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      toast.error(`Image processing failed: ${message}`)
+    } finally {
+      setProcessing(false)
+      setProcessProgress(0)
+      setProcessLabel('')
+    }
   }
 
-  function removeFile(index: number) {
-    URL.revokeObjectURL(previews[index])
-    setFiles(prev => prev.filter((_, i) => i !== index))
-    setPreviews(prev => prev.filter((_, i) => i !== index))
+  async function processAndAddVideo(file: File) {
+    if (mediaItems.length >= MAX_FILES) return
+    setProcessing(true)
+    setProcessLabel('Compressing video…')
+    setProcessProgress(0)
+    try {
+      const result = await processVideo(file, (p) => {
+        setProcessProgress(Math.round(p * 100))
+      })
+      addProcessedMedia(result.blob, 'video')
+      toast.success('Video ready')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      toast.error(`Video processing failed: ${message}`)
+    } finally {
+      setProcessing(false)
+      setProcessProgress(0)
+      setProcessLabel('')
+    }
   }
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const fileList = Array.from(e.target.files ?? [])
+    e.target.value = ''
+    const remaining = MAX_FILES - mediaItems.length
+    const toProcess = fileList.slice(0, remaining)
+    for (const file of toProcess) {
+      if (file.type.startsWith('video/')) {
+        await processAndAddVideo(file)
+      } else {
+        await processAndAddImage(file)
+      }
+    }
+  }
+
+  function removeMediaItem(index: number) {
+    setMediaItems(prev => {
+      URL.revokeObjectURL(prev[index].previewUrl)
+      return prev.filter((_, i) => i !== index)
+    })
+  }
+
+  // --- Camera: photo ---
+
+  function handleTakePhoto() {
+    if (isMobile) {
+      cameraInputRef.current?.click()
+    } else {
+      openCamera('photo')
+    }
+  }
+
+  // --- Camera: video ---
+
+  function handleRecordVideo() {
+    if (isMobile) {
+      videoInputRef.current?.click()
+    } else {
+      openCamera('video')
+    }
+  }
+
+  async function openCamera(mode: 'photo' | 'video') {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1080 }, height: { ideal: 1080 } },
+        audio: false,
+      })
+      streamRef.current = stream
+      setCameraMode(mode)
+      setTimeout(() => {
+        if (videoRef.current) videoRef.current.srcObject = stream
+      }, 50)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not access camera'
+      toast.error(`Camera error: ${message}`)
+    }
+  }
+
+  function closeCamera() {
+    stopRecording()
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop())
+      streamRef.current = null
+    }
+    setCameraMode(null)
+    setRecordingTime(0)
+  }
+
+  function capturePhoto() {
+    const video = videoRef.current
+    if (!video) return
+    const canvas = document.createElement('canvas')
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    ctx.drawImage(video, 0, 0)
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) return
+        closeCamera()
+        processAndAddImage(blob)
+      },
+      'image/jpeg',
+      0.92,
+    )
+  }
+
+  function startRecording() {
+    if (!streamRef.current) return
+    chunksRef.current = []
+    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+      ? 'video/webm;codecs=vp9'
+      : MediaRecorder.isTypeSupported('video/webm')
+        ? 'video/webm'
+        : 'video/mp4'
+    const recorder = new MediaRecorder(streamRef.current, { mimeType })
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) chunksRef.current.push(e.data)
+    }
+    recorder.onstop = () => {
+      const blob = new Blob(chunksRef.current, { type: mimeType })
+      const file = new File([blob], `recording_${Date.now()}.webm`, { type: mimeType })
+      closeCamera()
+      processAndAddVideo(file)
+    }
+    recorder.start(1000)
+    recorderRef.current = recorder
+    setRecording(true)
+    setRecordingTime(0)
+    timerRef.current = setInterval(() => {
+      setRecordingTime(prev => {
+        const next = prev + 1
+        if (next >= VIDEO_SPECS.maxDurationSec) stopRecording()
+        return next
+      })
+    }, 1000)
+  }
+
+  const stopRecording = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
+    if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+      recorderRef.current.stop()
+    }
+    recorderRef.current = null
+    setRecording(false)
+  }, [])
+
+  function formatTime(seconds: number): string {
+    const m = Math.floor(seconds / 60)
+    const s = seconds % 60
+    return `${m}:${String(s).padStart(2, '0')}`
+  }
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop())
+      }
+      if (timerRef.current) clearInterval(timerRef.current)
+      mediaItems.forEach(m => URL.revokeObjectURL(m.previewUrl))
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function canAdvance(): Promise<boolean> {
     if (step === 0) {
@@ -135,8 +339,12 @@ export default function CustomerReturnRequestPage() {
 
       const returnId = result.id
 
-      for (const file of files) {
-        await uploadMedia.mutateAsync({ returnRequestId: returnId, file })
+      for (const item of mediaItems) {
+        await uploadMedia.mutateAsync({
+          returnRequestId: returnId,
+          file: item.blob,
+          mediaType: item.type,
+        })
       }
 
       navigate(`/account/returns/${returnId}`)
@@ -294,59 +502,176 @@ export default function CustomerReturnRequestPage() {
         </Card>
       )}
 
-      {/* Step 3: Upload Photos */}
+      {/* Step 3: Upload Evidence */}
       {step === 2 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Upload photos or videos</CardTitle>
+            <CardTitle className="text-lg">Upload evidence</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Upload up to {MAX_FILES} photos or videos showing the issue. This helps us process your return faster.
+              Take photos or record a video showing the issue. Up to {MAX_FILES} files — all media is automatically compressed.
             </p>
 
-            {files.length < MAX_FILES && (
-              <div>
-                <Input
+            {/* Action buttons */}
+            {mediaItems.length < MAX_FILES && !processing && !cameraMode && (
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" onClick={handleTakePhoto} className="gap-2">
+                  <Camera className="h-4 w-4" />
+                  Take Photo
+                </Button>
+                <Button variant="outline" onClick={handleRecordVideo} className="gap-2">
+                  <Video className="h-4 w-4" />
+                  Record Video
+                </Button>
+                <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="gap-2">
+                  <Upload className="h-4 w-4" />
+                  Upload File
+                </Button>
+
+                {/* Hidden file inputs */}
+                <input
                   ref={fileInputRef}
                   type="file"
                   accept="image/*,video/*"
                   multiple
-                  onChange={handleFileChange}
                   className="hidden"
-                  id="return-media-upload"
+                  onChange={handleFileUpload}
                 />
-                <Button
-                  variant="outline"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="gap-2"
-                >
-                  <Upload className="h-4 w-4" />
-                  Add Files ({files.length}/{MAX_FILES})
-                </Button>
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    e.target.value = ''
+                    if (file) processAndAddImage(file)
+                  }}
+                />
+                <input
+                  ref={videoInputRef}
+                  type="file"
+                  accept="video/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    e.target.value = ''
+                    if (file) processAndAddVideo(file)
+                  }}
+                />
               </div>
             )}
 
-            {previews.length > 0 && (
+            {/* Desktop Camera Viewfinder */}
+            {cameraMode && (
+              <div className="rounded-lg overflow-hidden border bg-black relative">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full max-h-[400px] object-contain"
+                />
+
+                {/* Recording indicator */}
+                {recording && (
+                  <div className="absolute top-3 left-3 flex items-center gap-2 bg-black/60 rounded-full px-3 py-1.5">
+                    <div className="h-3 w-3 rounded-full bg-red-500 animate-pulse" />
+                    <span className="text-white text-sm font-mono">
+                      {formatTime(recordingTime)} / {formatTime(VIDEO_SPECS.maxDurationSec)}
+                    </span>
+                  </div>
+                )}
+
+                <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-3">
+                  {cameraMode === 'photo' ? (
+                    <Button
+                      size="lg"
+                      className="rounded-full h-14 w-14 shadow-lg"
+                      onClick={capturePhoto}
+                      title="Capture photo"
+                    >
+                      <Camera className="h-6 w-6" />
+                    </Button>
+                  ) : !recording ? (
+                    <Button
+                      size="lg"
+                      variant="destructive"
+                      className="rounded-full h-14 w-14 shadow-lg"
+                      onClick={startRecording}
+                      title="Start recording"
+                    >
+                      <CircleDot className="h-6 w-6" />
+                    </Button>
+                  ) : (
+                    <Button
+                      size="lg"
+                      variant="destructive"
+                      className="rounded-full h-14 w-14 shadow-lg"
+                      onClick={stopRecording}
+                      title="Stop recording"
+                    >
+                      <Square className="h-5 w-5" />
+                    </Button>
+                  )}
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="rounded-full h-10 w-10 shadow-lg self-center"
+                    onClick={closeCamera}
+                    title="Close camera"
+                  >
+                    <X className="h-5 w-5" />
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Processing progress */}
+            {processing && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-3 text-sm">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  <span className="flex-1">{processLabel}</span>
+                  <span className="text-muted-foreground">{processProgress}%</span>
+                </div>
+                <Progress value={processProgress} />
+              </div>
+            )}
+
+            {/* Thumbnails grid */}
+            {mediaItems.length > 0 && (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-                {previews.map((url, idx) => (
+                {mediaItems.map((item, idx) => (
                   <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border">
-                    {files[idx].type.startsWith('video/') ? (
-                      <video src={url} className="w-full h-full object-cover" />
+                    {item.type === 'video' ? (
+                      <video src={item.previewUrl} className="w-full h-full object-cover" />
                     ) : (
-                      <img src={url} alt={`Upload ${idx + 1}`} className="w-full h-full object-cover" />
+                      <img src={item.previewUrl} alt={`Evidence ${idx + 1}`} className="w-full h-full object-cover" />
                     )}
                     <button
                       type="button"
-                      onClick={() => removeFile(idx)}
+                      onClick={() => removeMediaItem(idx)}
                       className="absolute top-1 right-1 h-6 w-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center"
                     >
                       <X className="h-3 w-3" />
                     </button>
+                    {item.type === 'video' && (
+                      <div className="absolute bottom-1 left-1 bg-black/60 rounded px-1.5 py-0.5">
+                        <Video className="h-3 w-3 text-white" />
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
             )}
+
+            <p className="text-xs text-muted-foreground">
+              {mediaItems.length}/{MAX_FILES} files added
+            </p>
           </CardContent>
         </Card>
       )}
@@ -388,16 +713,21 @@ export default function CustomerReturnRequestPage() {
               <p className="text-sm whitespace-pre-wrap">{description}</p>
             </div>
 
-            {files.length > 0 && (
+            {mediaItems.length > 0 && (
               <div className="border-t pt-3">
-                <p className="text-xs text-muted-foreground mb-1">Attached files ({files.length})</p>
+                <p className="text-xs text-muted-foreground mb-1">Attached files ({mediaItems.length})</p>
                 <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
-                  {previews.map((url, idx) => (
-                    <div key={idx} className="aspect-square rounded-lg overflow-hidden border">
-                      {files[idx].type.startsWith('video/') ? (
-                        <video src={url} className="w-full h-full object-cover" />
+                  {mediaItems.map((item, idx) => (
+                    <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border">
+                      {item.type === 'video' ? (
+                        <video src={item.previewUrl} className="w-full h-full object-cover" />
                       ) : (
-                        <img src={url} alt={`Upload ${idx + 1}`} className="w-full h-full object-cover" />
+                        <img src={item.previewUrl} alt={`Evidence ${idx + 1}`} className="w-full h-full object-cover" />
+                      )}
+                      {item.type === 'video' && (
+                        <div className="absolute bottom-1 left-1 bg-black/60 rounded px-1.5 py-0.5">
+                          <Video className="h-3 w-3 text-white" />
+                        </div>
                       )}
                     </div>
                   ))}

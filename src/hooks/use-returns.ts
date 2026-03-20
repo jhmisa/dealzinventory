@@ -81,8 +81,10 @@ export function useRejectReturn() {
 export function useUploadReturnMedia() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ returnRequestId, file }: { returnRequestId: string; file: File }) =>
-      returnsService.uploadReturnMedia(returnRequestId, file),
+    mutationFn: ({ returnRequestId, file, mediaType }: {
+      returnRequestId: string; file: Blob | File; mediaType?: 'image' | 'video'
+    }) =>
+      returnsService.uploadReturnMedia(returnRequestId, file, mediaType),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.returns.all })
     },

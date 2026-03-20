@@ -161,6 +161,28 @@ function generateId(): string {
 }
 
 /**
+ * Process a single image to a specific size. Useful for return media or other
+ * contexts where only one size variant is needed.
+ *
+ * @param file   The source image file.
+ * @param width  Target width (default 1080).
+ * @param height Target height (default 1080).
+ * @param quality Compression quality 0-1 (default 0.80).
+ * @returns A single compressed Blob.
+ */
+export async function processReturnImage(
+  file: File | Blob,
+  width = 1080,
+  height = 1080,
+  quality = 0.80,
+): Promise<Blob> {
+  const imageFile = file instanceof File ? file : new File([file], "capture.jpg", { type: file.type || "image/jpeg" });
+  const img = await loadImage(imageFile);
+  const { mimeType } = getOutputFormat();
+  return resizeAndCompress(img, width, height, quality, mimeType);
+}
+
+/**
  * Process a raw image file into three standard sizes.
  *
  * Pipeline:
