@@ -80,7 +80,7 @@ export function ProductForm({ product, loading = false, onSubmit, onCancel }: Pr
       supports_stylus: product?.supports_stylus ?? false,
       has_cellular: product?.has_cellular ?? false,
       has_bluetooth: product?.has_bluetooth ?? false,
-      camera: product?.camera ?? '',
+      has_camera: product?.has_camera ?? false,
       is_unlocked: product?.is_unlocked ?? true,
       imei_slot_count: product?.imei_slot_count ?? undefined,
       match_pattern: product?.match_pattern ?? '',
@@ -125,7 +125,7 @@ export function ProductForm({ product, loading = false, onSubmit, onCancel }: Pr
     watchedValues.chipset,
     watchedValues.carrier,
     watchedValues.screen_size,
-    watchedValues.camera,
+    watchedValues.has_camera,
     selectedCategory,
   ])
 
@@ -141,7 +141,7 @@ export function ProductForm({ product, loading = false, onSubmit, onCancel }: Pr
       gpu: values.gpu || undefined,
       carrier: values.carrier || undefined,
       keyboard_layout: values.keyboard_layout || undefined,
-      camera: values.camera || undefined,
+      has_camera: values.has_camera,
       match_pattern: values.match_pattern || undefined,
       short_description: values.short_description || undefined,
     })
@@ -426,25 +426,6 @@ export function ProductForm({ product, loading = false, onSubmit, onCancel }: Pr
           </div>
         )}
 
-        {/* Camera */}
-        {show('camera') && (
-          <div className="grid grid-cols-3 gap-4">
-            <FormField
-              control={form.control}
-              name="camera"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Camera</FormLabel>
-                  <FormControl>
-                    <Input placeholder="12MP + 8MP, FaceTime HD" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-        )}
-
         {/* Keyboard / IMEI */}
         {(show('keyboard_layout') || show('imei_slot_count')) && (
           <div className="grid grid-cols-3 gap-4">
@@ -482,7 +463,7 @@ export function ProductForm({ product, loading = false, onSubmit, onCancel }: Pr
         )}
 
         {/* Boolean toggles — only show relevant ones */}
-        {(show('has_touchscreen') || show('has_thunderbolt') || show('supports_stylus') || show('has_cellular') || show('has_bluetooth') || show('is_unlocked')) && (
+        {(show('has_touchscreen') || show('has_thunderbolt') || show('supports_stylus') || show('has_cellular') || show('has_bluetooth') || show('has_camera') || show('is_unlocked')) && (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {show('has_touchscreen') && (
               <FormField
@@ -547,6 +528,20 @@ export function ProductForm({ product, loading = false, onSubmit, onCancel }: Pr
                 render={({ field }) => (
                   <FormItem className="flex items-center justify-between rounded-lg border p-3">
                     <FormLabel className="text-sm">Bluetooth</FormLabel>
+                    <FormControl>
+                      <Switch checked={field.value} onCheckedChange={field.onChange} />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            )}
+            {show('has_camera') && (
+              <FormField
+                control={form.control}
+                name="has_camera"
+                render={({ field }) => (
+                  <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                    <FormLabel className="text-sm">Camera</FormLabel>
                     <FormControl>
                       <Switch checked={field.value} onCheckedChange={field.onChange} />
                     </FormControl>

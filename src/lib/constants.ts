@@ -233,7 +233,7 @@ export const AVAILABLE_SPEC_FIELDS: { key: string; label: string }[] = [
   { key: 'ports', label: 'Ports' },
   { key: 'year', label: 'Year' },
   { key: 'other_features', label: 'Other Features' },
-  { key: 'camera', label: 'Camera' },
+  { key: 'has_camera', label: 'Camera' },
   { key: 'has_bluetooth', label: 'Bluetooth' },
 ]
 

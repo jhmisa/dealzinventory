@@ -24,7 +24,7 @@ interface EditableSpecsCardProps {
 }
 
 // Fields that live only on the product model (read-only even in edit mode)
-const PRODUCT_ONLY_FIELDS = ['chipset', 'ports', 'has_thunderbolt', 'supports_stylus', 'has_cellular', 'imei_slot_count', 'camera', 'has_bluetooth'] as const
+const PRODUCT_ONLY_FIELDS = ['chipset', 'ports', 'has_thunderbolt', 'supports_stylus', 'has_cellular', 'imei_slot_count', 'has_camera', 'has_bluetooth'] as const
 
 // Fields always shown regardless of category
 const ALWAYS_VISIBLE = new Set(['brand', 'model_name', 'color', 'year', 'other_features', 'battery_health_pct'])

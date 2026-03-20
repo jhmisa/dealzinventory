@@ -1115,7 +1115,7 @@ export default function InspectItemPage() {
                 'text-[10px] lg:text-[11px] leading-3.5',
                 batteryDone ? 'text-muted-foreground' : 'text-muted-foreground',
               )}>
-                Battery Health (%)
+                Battery
                 {!batteryDone && <span className="text-destructive ml-0.5">*</span>}
               </Label>
               <Input
