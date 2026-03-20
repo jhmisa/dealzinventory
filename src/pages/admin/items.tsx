@@ -21,6 +21,7 @@ type ItemRow = {
   item_code: string
   item_status: string
   condition_grade: string | null
+  condition_notes: string | null
   source_type: string
   purchase_price: number | null
   selling_price: number | null
@@ -30,8 +31,9 @@ type ItemRow = {
   cpu: string | null
   ram_gb: number | null
   storage_gb: number | null
+  screen_size: number | null
   suppliers: { supplier_name: string } | null
-  product_models: { brand: string; model_name: string; color: string; short_description: string | null } | null
+  product_models: { brand: string; model_name: string; color: string; short_description: string | null; screen_size: number | null } | null
 }
 
 const STATUS_TABS = [
@@ -51,18 +53,20 @@ const columns: ColumnDef<ItemRow>[] = [
     cell: ({ row }) => {
       const pm = row.original.product_models
       if (pm?.short_description) return pm.short_description
-      const { brand, model_name } = row.original
-      if (brand && model_name) return `${brand} ${model_name}`
-      return pm ? `${pm.brand} ${pm.model_name}` : '—'
-    },
-  },
-  {
-    id: 'config',
-    header: 'Config',
-    cell: ({ row }) => {
-      const { cpu, ram_gb, storage_gb } = row.original
-      if (!cpu && !ram_gb && !storage_gb) return '—'
-      return [cpu, ram_gb ? `${ram_gb}GB` : null, storage_gb ? `${storage_gb}GB` : null].filter(Boolean).join(' / ')
+      const { brand, model_name, cpu, ram_gb, storage_gb, screen_size, condition_notes } = row.original
+      const modelName = brand && model_name
+        ? `${brand} ${model_name}`
+        : pm ? `${pm.brand} ${pm.model_name}` : null
+      const screenVal = screen_size ?? pm?.screen_size
+      const parts = [
+        modelName,
+        cpu,
+        ram_gb ? `${ram_gb}GB` : null,
+        storage_gb ? `${storage_gb}GB` : null,
+        screenVal ? `${screenVal}"` : null,
+        condition_notes,
+      ].filter(Boolean)
+      return parts.length > 0 ? parts.join(' / ') : '—'
     },
   },
   {
