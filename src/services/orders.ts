@@ -71,7 +71,11 @@ export async function getOrder(id: string) {
       ),
       order_items(
         id, item_id, description, quantity, unit_price, discount, packed_at, packed_by,
-        items(id, item_code, condition_grade, item_status)
+        items(id, item_code, condition_grade, item_status,
+          product_models(brand, model_name, color, cpu, ram_gb, storage_gb,
+            product_media(file_url, role, sort_order)
+          )
+        )
       )
     `)
     .eq('id', id)

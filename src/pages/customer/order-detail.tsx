@@ -1,13 +1,38 @@
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Check, Circle } from 'lucide-react'
+import { ArrowLeft, Check, Circle, Package, Truck, CalendarDays } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { useOrder } from '@/hooks/use-orders'
 import { StatusBadge, CodeDisplay, PriceDisplay, FormSkeleton } from '@/components/shared'
-import { ORDER_STATUSES } from '@/lib/constants'
-import { formatDateTime, cn } from '@/lib/utils'
+import { ORDER_STATUSES, CONDITION_GRADES, YAMATO_TIME_SLOTS } from '@/lib/constants'
+import { formatDateTime, formatDate, formatPrice, cn } from '@/lib/utils'
 
 const STATUS_FLOW = ['PENDING', 'CONFIRMED', 'PACKED', 'SHIPPED', 'DELIVERED'] as const
+
+type OrderItemRow = {
+  id: string
+  item_id: string | null
+  description: string
+  quantity: number
+  unit_price: number
+  discount: number
+  items: {
+    id: string
+    item_code: string
+    condition_grade: string
+    item_status: string
+    product_models: {
+      brand: string
+      model_name: string
+      color: string | null
+      cpu: string | null
+      ram_gb: number | null
+      storage_gb: number | null
+      product_media: { file_url: string; role: string; sort_order: number }[]
+    } | null
+  } | null
+}
 
 export default function CustomerOrderDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -16,21 +41,19 @@ export default function CustomerOrderDetailPage() {
   if (isLoading) return <FormSkeleton fields={6} />
   if (!order) return <div className="text-center py-12 text-muted-foreground">Order not found.</div>
 
-  const sg = order.sell_groups as {
-    sell_group_code: string
-    condition_grade: string
-    base_price: number
-    product_models: {
-      brand: string
-      model_name: string
-      cpu: string | null
-      ram_gb: number | null
-      storage_gb: number | null
-    } | null
-  } | null
-
+  const orderItems = (order.order_items ?? []) as OrderItemRow[]
   const currentIdx = STATUS_FLOW.indexOf(order.order_status as typeof STATUS_FLOW[number])
   const isCancelled = order.order_status === 'CANCELLED'
+
+  const subtotal = orderItems.reduce(
+    (sum, oi) => sum + Number(oi.unit_price) * oi.quantity - Number(oi.discount),
+    0,
+  )
+  const shippingCost = Number(order.shipping_cost ?? 0)
+
+  const timeSlot = order.delivery_time_code
+    ? YAMATO_TIME_SLOTS.find(s => s.code === order.delivery_time_code)
+    : null
 
   return (
     <div className="space-y-6">
@@ -103,57 +126,150 @@ export default function CustomerOrderDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Order Details */}
-      <div className="grid md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Product</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {sg?.product_models && (
-              <div>
-                <p className="font-medium">
-                  {sg.product_models.brand} {sg.product_models.model_name}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {[sg.product_models.cpu, sg.product_models.ram_gb && `${sg.product_models.ram_gb}GB RAM`, sg.product_models.storage_gb && `${sg.product_models.storage_gb}GB`]
-                    .filter(Boolean)
-                    .join(' / ')}
-                </p>
-              </div>
-            )}
-            {sg && (
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-muted-foreground">Group:</span>
-                <CodeDisplay code={sg.sell_group_code} />
-                <span className="text-muted-foreground">Grade: {sg.condition_grade}</span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      {/* Items */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Package className="h-5 w-5" />
+            Items
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {orderItems.map((oi) => {
+            const pm = oi.items?.product_models
+            const heroMedia = pm?.product_media
+              ?.filter(m => m.role === 'hero')
+              .sort((a, b) => a.sort_order - b.sort_order)[0]
+            const fallbackMedia = pm?.product_media
+              ?.sort((a, b) => a.sort_order - b.sort_order)[0]
+            const imgUrl = heroMedia?.file_url ?? fallbackMedia?.file_url
+            const gradeInfo = oi.items
+              ? CONDITION_GRADES.find(g => g.value === oi.items!.condition_grade)
+              : null
 
+            return (
+              <div key={oi.id} className="flex gap-4 p-3 border rounded-lg">
+                {imgUrl ? (
+                  <img
+                    src={imgUrl}
+                    alt={oi.description}
+                    className="w-20 h-20 rounded-lg object-cover shrink-0"
+                  />
+                ) : (
+                  <div className="w-20 h-20 rounded-lg bg-muted flex items-center justify-center text-muted-foreground text-xs shrink-0">
+                    No img
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium">{oi.description}</p>
+                  {pm && (
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      {[
+                        pm.color,
+                        pm.cpu,
+                        pm.ram_gb && `${pm.ram_gb}GB RAM`,
+                        pm.storage_gb && `${pm.storage_gb}GB`,
+                      ]
+                        .filter(Boolean)
+                        .join(' / ')}
+                    </p>
+                  )}
+                  <div className="flex items-center gap-2 mt-1">
+                    {oi.items && (
+                      <span className="text-xs text-muted-foreground font-mono">{oi.items.item_code}</span>
+                    )}
+                    {gradeInfo && (
+                      <Badge variant="outline" className={cn('text-xs', gradeInfo.color)}>
+                        Grade {gradeInfo.value}
+                      </Badge>
+                    )}
+                    {oi.quantity > 1 && (
+                      <span className="text-xs text-muted-foreground">&times;{oi.quantity}</span>
+                    )}
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <PriceDisplay price={Number(oi.unit_price) * oi.quantity} />
+                  {Number(oi.discount) > 0 && (
+                    <p className="text-xs text-green-600">-{formatPrice(Number(oi.discount))}</p>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </CardContent>
+      </Card>
+
+      <div className="grid md:grid-cols-2 gap-6">
+        {/* Order Summary */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Order Summary</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Quantity</span>
-              <span>{order.quantity}</span>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">
+                Subtotal ({order.quantity} item{order.quantity !== 1 ? 's' : ''})
+              </span>
+              <span>{formatPrice(subtotal)}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Total</span>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Shipping</span>
+              <span>{shippingCost > 0 ? formatPrice(shippingCost) : 'Free'}</span>
+            </div>
+            <div className="flex justify-between font-bold text-lg border-t pt-2">
+              <span>Total</span>
               <PriceDisplay price={order.total_price} className="text-lg font-bold" />
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Delivery & Shipping */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Truck className="h-5 w-5" />
+              Delivery
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {(order.delivery_date || timeSlot) && (
+              <div className="flex items-start gap-2">
+                <CalendarDays className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                <div>
+                  {order.delivery_date && (
+                    <p className="text-sm font-medium">{formatDate(order.delivery_date)}</p>
+                  )}
+                  {timeSlot && (
+                    <p className="text-sm text-muted-foreground">{timeSlot.label}</p>
+                  )}
+                </div>
+              </div>
+            )}
+            {!order.delivery_date && !timeSlot && (
+              <p className="text-sm text-muted-foreground">No delivery date scheduled yet.</p>
+            )}
             {order.shipping_address && (
               <div className="pt-2 border-t">
-                <span className="text-sm text-muted-foreground">Shipping to:</span>
-                <p className="text-sm mt-1">{order.shipping_address}</p>
+                <p className="text-xs text-muted-foreground mb-1">Shipping to:</p>
+                <p className="text-sm whitespace-pre-wrap">{order.shipping_address}</p>
               </div>
             )}
           </CardContent>
         </Card>
       </div>
+
+      {/* Notes */}
+      {order.notes && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Notes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground whitespace-pre-wrap">{order.notes}</p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

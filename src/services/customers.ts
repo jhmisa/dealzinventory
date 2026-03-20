@@ -87,7 +87,19 @@ export async function getCustomerOrders(customerId: string) {
     .from('orders')
     .select(`
       *,
-      sell_groups(sell_group_code, product_models(brand, model_name, cpu, ram_gb, storage_gb))
+      sell_groups(sell_group_code, condition_grade, base_price,
+        product_models(brand, model_name, color, cpu, ram_gb, storage_gb,
+          product_media(file_url, role, sort_order)
+        )
+      ),
+      order_items(
+        id, item_id, description, quantity, unit_price, discount,
+        items(id, item_code, condition_grade,
+          product_models(brand, model_name, color, cpu, ram_gb, storage_gb,
+            product_media(file_url, role, sort_order)
+          )
+        )
+      )
     `)
     .eq('customer_id', customerId)
     .order('created_at', { ascending: false })
