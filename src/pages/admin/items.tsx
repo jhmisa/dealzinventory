@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input'
 import { PageHeader, SearchBar, DataTable, StatusBadge, GradeBadge, CodeDisplay, PriceDisplay, TableSkeleton } from '@/components/shared'
 import { useItems } from '@/hooks/use-items'
 import { useDebounce } from '@/hooks/use-debounce'
-import { ITEM_STATUSES, CONDITION_GRADES, SOURCE_TYPES } from '@/lib/constants'
+import { ITEM_STATUSES, CONDITION_GRADES } from '@/lib/constants'
 import { formatDate, cn, buildShortDescription } from '@/lib/utils'
 
 type ItemRow = {
@@ -126,7 +126,6 @@ export default function ItemListPage() {
   const debouncedSearch = useDebounce(search, 400)
   const [statusTab, setStatusTab] = useState('all')
   const [gradeFilter, setGradeFilter] = useState<string>('')
-  const [sourceFilter, setSourceFilter] = useState<string>('')
   const [categoryFilter, setCategoryFilter] = useState<string>('')
   const [brandFilter, setBrandFilter] = useState<string>('')
   const [descriptionSearch, setDescriptionSearch] = useState('')
@@ -140,7 +139,6 @@ export default function ItemListPage() {
   const { data: allItems, isLoading } = useItems({
     search: debouncedSearch || undefined,
     grade: gradeFilter && gradeFilter !== 'all' ? gradeFilter : undefined,
-    source: sourceFilter && sourceFilter !== 'all' ? sourceFilter : undefined,
   })
 
   const items = (allItems ?? []) as ItemRow[]
@@ -238,7 +236,7 @@ export default function ItemListPage() {
           value={search}
           onChange={setSearch}
           placeholder="Search P-code..."
-          className="flex-1 min-w-[250px]"
+          className="w-[140px]"
         />
         <Select value={gradeFilter} onValueChange={setGradeFilter}>
           <SelectTrigger className="w-[130px]">
@@ -248,17 +246,6 @@ export default function ItemListPage() {
             <SelectItem value="all">All Grades</SelectItem>
             {CONDITION_GRADES.map((g) => (
               <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={sourceFilter} onValueChange={setSourceFilter}>
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Source" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Sources</SelectItem>
-            {SOURCE_TYPES.map((s) => (
-              <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>
