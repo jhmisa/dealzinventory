@@ -39,7 +39,7 @@ export const inspectionSchema = z.object({
   ac_adapter_status: z.enum(['CORRECT', 'INCORRECT', 'MISSING']).optional(),
 
   // Battery
-  battery_health_pct: z.coerce.number().int().min(0).max(100).nullable().optional(),
+  battery_health_pct: z.coerce.number().int().min(-1).max(100).nullable().optional(),
 
   // Inspection checklist (JSONB) — functionality checks only
   inspection_checklist: inspectionChecklistSchema.default({}),

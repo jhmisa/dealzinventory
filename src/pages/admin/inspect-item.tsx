@@ -17,6 +17,7 @@ import {
   Video,
   X,
   Edit3,
+  Package,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -508,7 +509,9 @@ export default function InspectItemPage() {
   const totalCost = purchasePrice + totalCosts
   const estProfit = sellingPrice - totalCost
 
+  const sellingPriceReg = form.register('selling_price', { valueAsNumber: true })
   const effectiveProductId = form.watch('product_id') || item?.product_id
+  const hasProduct = !!effectiveProductId
 
   // --- Auto-generate condition notes from defects + functionality problems ---
   const manuallyEditedNotes = useRef(false)
@@ -832,6 +835,33 @@ export default function InspectItemPage() {
         </div>
       )}
 
+      {/* Mobile: Product picker (always visible) */}
+      <div className="lg:hidden flex items-center gap-2 px-5 pt-3">
+        <span className="text-xs text-muted-foreground">Product</span>
+        <Controller
+          control={form.control}
+          name="product_id"
+          render={({ field }) => (
+            <ProductPicker
+              value={field.value ?? ''}
+              onSelect={field.onChange}
+              products={productsWithHero ?? []}
+              initialSearch={item.supplier_description?.split(' ').slice(0, 3).join(' ')}
+            />
+          )}
+        />
+      </div>
+
+      {!hasProduct ? (
+        <div className="flex flex-col items-center justify-center py-20 px-5 text-center">
+          <Package className="h-10 w-10 text-muted-foreground mb-3" />
+          <h3 className="text-lg font-semibold mb-1">Select a Product First</h3>
+          <p className="text-sm text-muted-foreground max-w-sm">
+            Choose a product from the picker above to determine which specs and checks apply.
+          </p>
+        </div>
+      ) : (
+      <>
       {/* === Two-column layout (desktop) / Single column (mobile) === */}
       <div className="flex flex-col lg:flex-row w-full items-start pt-3 lg:pt-5 gap-5 lg:gap-6 px-5 lg:px-12">
         {/* Left column: Media viewer */}
@@ -847,23 +877,6 @@ export default function InspectItemPage() {
                 label: `${d.area}: ${d.defect_type}`,
               }))}
           />
-
-          {/* Mobile: Product picker */}
-          <div className="lg:hidden flex items-center gap-2 pt-3">
-            <span className="text-xs text-muted-foreground">Product</span>
-            <Controller
-              control={form.control}
-              name="product_id"
-              render={({ field }) => (
-                <ProductPicker
-                  value={field.value ?? ''}
-                  onSelect={field.onChange}
-                  products={productsWithHero ?? []}
-                  initialSearch={item.supplier_description?.split(' ').slice(0, 3).join(' ')}
-                />
-              )}
-            />
-          </div>
         </div>
 
         {/* Right column: Specs + Defects */}
@@ -1118,14 +1131,35 @@ export default function InspectItemPage() {
                 Battery
                 {!batteryDone && <span className="text-destructive ml-0.5">*</span>}
               </Label>
-              <Input
-                type="number"
-                min={0}
-                max={100}
-                placeholder="e.g. 87"
-                className={cn('h-8 text-xs', !batteryDone && 'border-destructive/50')}
-                {...form.register('battery_health_pct')}
-              />
+              {watchedBattery === -1 ? (
+                <button
+                  type="button"
+                  className="h-8 rounded-md bg-muted px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted/80"
+                  onClick={() => form.setValue('battery_health_pct', null, { shouldDirty: true })}
+                  title="Click to re-enter a value"
+                >
+                  N/A
+                </button>
+              ) : (
+                <div className="flex items-center gap-1">
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    placeholder="e.g. 87"
+                    className={cn('h-8 text-xs', !batteryDone && 'border-destructive/50')}
+                    {...form.register('battery_health_pct')}
+                  />
+                  <button
+                    type="button"
+                    className="h-8 rounded-md border border-border px-1.5 text-[10px] text-muted-foreground hover:bg-muted shrink-0"
+                    onClick={() => form.setValue('battery_health_pct', -1, { shouldDirty: true })}
+                    title="No battery / not applicable"
+                  >
+                    N/A
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* AC Adapter */}
@@ -1198,8 +1232,11 @@ export default function InspectItemPage() {
                 type="number"
                 min={0}
                 className="w-28 h-7 text-sm font-semibold"
-                {...form.register('selling_price', { valueAsNumber: true })}
-                onBlur={() => setEditingSellingPrice(false)}
+                {...sellingPriceReg}
+                onBlur={(e) => {
+                  sellingPriceReg.onBlur(e)
+                  setEditingSellingPrice(false)
+                }}
                 autoFocus
               />
             ) : (
@@ -1383,6 +1420,8 @@ export default function InspectItemPage() {
           </span>
         </button>
       </div>
+      </>
+      )}
     </form>
   )
 }

@@ -322,7 +322,10 @@ export function EditableSpecsCard({ item, productModel, locked }: EditableSpecsC
           }
           if (field.type === 'number') {
             const val = getResolvedValue(field.key) as number | null
-            return <Row key={field.key} label={getSpecFieldLabel(field.key)} value={val != null ? `${val}${field.suffix}` : null} />
+            const display = val != null
+              ? (field.key === 'battery_health_pct' && val === -1 ? 'N/A' : `${val}${field.suffix}`)
+              : null
+            return <Row key={field.key} label={getSpecFieldLabel(field.key)} value={display} />
           }
           if (field.type === 'boolean') {
             return <BooleanRow key={field.key} label={getSpecFieldLabel(field.key)} value={getResolvedValue(field.key) as boolean | null} />

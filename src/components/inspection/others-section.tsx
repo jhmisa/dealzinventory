@@ -1,5 +1,6 @@
 import { Controller, type UseFormReturn } from 'react-hook-form'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -81,15 +82,38 @@ export function OthersSection({ form, deviceCategory }: OthersSectionProps) {
           <Label htmlFor="battery_health_pct" className="text-sm font-medium">
             Battery Health (%)
           </Label>
-          <Input
-            id="battery_health_pct"
-            type="number"
-            min={0}
-            max={100}
-            placeholder="e.g. 87"
-            className="w-32"
-            {...form.register('battery_health_pct')}
-          />
+          {form.watch('battery_health_pct') === -1 ? (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="rounded-md bg-muted px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted/80"
+                onClick={() => form.setValue('battery_health_pct', null, { shouldDirty: true })}
+              >
+                N/A
+              </button>
+              <span className="text-xs text-muted-foreground">Click to re-enter a value</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Input
+                id="battery_health_pct"
+                type="number"
+                min={0}
+                max={100}
+                placeholder="e.g. 87"
+                className="w-32"
+                {...form.register('battery_health_pct')}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => form.setValue('battery_health_pct', -1, { shouldDirty: true })}
+              >
+                N/A
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* AC Adapter */}
