@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { useUpdateItem } from '@/hooks/use-items'
@@ -48,7 +49,7 @@ const SPEC_FIELDS = [
   { key: 'has_touchscreen', type: 'boolean' },
   { key: 'is_unlocked', type: 'boolean' },
   { key: 'carrier', type: 'text' },
-  { key: 'other_features', type: 'text' },
+  { key: 'other_features', type: 'textarea' },
 ] as const
 
 export function EditableSpecsCard({ item, productModel, locked }: EditableSpecsCardProps) {
@@ -103,7 +104,7 @@ export function EditableSpecsCard({ item, productModel, locked }: EditableSpecsC
       if (PRODUCT_ONLY_FIELDS.includes(field.key as typeof PRODUCT_ONLY_FIELDS[number])) continue
 
       const formKey = field.key as keyof ItemSpecsFormValues
-      if (field.type === 'text') {
+      if (field.type === 'text' || field.type === 'textarea') {
         const newVal = values[formKey] as string || null
         if (newVal !== (item[field.key as keyof Item] ?? null)) {
           ;(updates as Record<string, unknown>)[field.key] = newVal
@@ -236,6 +237,20 @@ export function EditableSpecsCard({ item, productModel, locked }: EditableSpecsC
                   )
                 }
 
+                if (field.type === 'textarea') {
+                  return (
+                    <div key={field.key} className="space-y-1 sm:col-span-2">
+                      <Label className="text-xs text-muted-foreground">{getSpecFieldLabel(field.key)}</Label>
+                      <Textarea
+                        {...form.register(field.key as keyof ItemSpecsFormValues)}
+                        placeholder="—"
+                        className="text-sm min-h-[60px]"
+                        rows={2}
+                      />
+                    </div>
+                  )
+                }
+
                 return null
               })}
 
@@ -311,6 +326,16 @@ export function EditableSpecsCard({ item, productModel, locked }: EditableSpecsC
           }
           if (field.type === 'boolean') {
             return <BooleanRow key={field.key} label={getSpecFieldLabel(field.key)} value={getResolvedValue(field.key) as boolean | null} />
+          }
+          if (field.type === 'textarea') {
+            const val = getResolvedValue(field.key) as string | null
+            if (!val) return null
+            return (
+              <div key={field.key}>
+                <span className="text-muted-foreground">{getSpecFieldLabel(field.key)}</span>
+                <p className="mt-1 whitespace-pre-wrap">{val}</p>
+              </div>
+            )
           }
           return null
         })}
