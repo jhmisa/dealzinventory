@@ -25,7 +25,7 @@ const SPEC_COLUMNS: { key: SpecField; label: string; type: 'text' | 'number'; wi
   { key: 'brand', label: 'Brand', type: 'text', width: 'w-28' },
   { key: 'model_name', label: 'Model', type: 'text', width: 'w-32' },
   { key: 'cpu', label: 'CPU', type: 'text', width: 'w-28' },
-  { key: 'ram_gb', label: 'RAM (GB)', type: 'number', width: 'w-20' },
+  { key: 'ram_gb', label: 'Memory (GB)', type: 'number', width: 'w-20' },
   { key: 'storage_gb', label: 'Storage (GB)', type: 'number', width: 'w-24' },
   { key: 'screen_size', label: 'Screen (\u2033)', type: 'number', width: 'w-20' },
   { key: 'serial_number', label: 'Serial', type: 'text', width: 'w-32' },

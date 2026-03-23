@@ -62,7 +62,7 @@ export const FUNCTIONALITY_CHECKS: FunctionalityCheckEntry[] = [
 
 export const SPEC_CHECK_FIELDS: SpecCheckFieldEntry[] = [
   { key: 'cpu', label: 'CPU', type: 'text', categories: NON_PHONE },
-  { key: 'ram_gb', label: 'RAM (GB)', type: 'number', categories: NON_PHONE },
+  { key: 'ram_gb', label: 'Memory (GB)', type: 'number', categories: NON_PHONE },
   { key: 'storage_gb', label: 'Storage (GB)', type: 'number', categories: ALL_CATEGORIES },
   { key: 'os_family', label: 'OS Family', type: 'text', categories: NON_PHONE },
   { key: 'screen_size', label: 'Screen Size', type: 'number', categories: NON_PHONE },
@@ -216,7 +216,7 @@ export const AVAILABLE_SPEC_FIELDS: { key: string; label: string }[] = [
   { key: 'model_name', label: 'Model Name' },
   { key: 'color', label: 'Color' },
   { key: 'cpu', label: 'CPU' },
-  { key: 'ram_gb', label: 'RAM (GB)' },
+  { key: 'ram_gb', label: 'Memory (GB)' },
   { key: 'storage_gb', label: 'Storage (GB)' },
   { key: 'os_family', label: 'OS Family' },
   { key: 'gpu', label: 'GPU' },
@@ -354,7 +354,7 @@ export const AUDIT_FIELD_LABELS: Record<string, string> = {
   color: 'Color',
   short_description: 'Short Description',
   cpu: 'CPU',
-  ram_gb: 'RAM (GB)',
+  ram_gb: 'Memory (GB)',
   storage_gb: 'Storage (GB)',
   screen_size: 'Screen Size',
   os_family: 'OS',

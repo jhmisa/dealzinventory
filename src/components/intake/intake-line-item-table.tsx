@@ -85,7 +85,7 @@ const FIELD_LABELS: Record<SpecField, string> = {
   brand: 'Brand',
   model_name: 'Model',
   cpu: 'CPU',
-  ram_gb: 'RAM',
+  ram_gb: 'Memory',
   storage_gb: 'Storage',
   screen_size: 'Screen',
 }
