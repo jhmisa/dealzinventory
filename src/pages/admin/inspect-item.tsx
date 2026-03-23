@@ -16,7 +16,6 @@ import {
   Plus,
   Video,
   X,
-  Edit3,
   Package,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -428,7 +427,6 @@ export default function InspectItemPage() {
   const { data: item, isLoading } = useItem(id!)
   const { data: productsWithHero } = useProductModelsWithHeroImage()
   const updateMutation = useUpdateItem()
-  const [editingSellingPrice, setEditingSellingPrice] = useState(false)
 
   const pm = item?.product_models as ProductModel | null
   const supplier = (item?.suppliers as { supplier_name: string } | null)?.supplier_name ?? null
@@ -1227,28 +1225,12 @@ export default function InspectItemPage() {
           <div className="w-px h-4 bg-border" />
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-muted-foreground">Selling Price</span>
-            {editingSellingPrice ? (
-              <Input
-                type="number"
-                min={0}
-                className="w-28 h-7 text-sm font-semibold"
-                {...sellingPriceReg}
-                onBlur={(e) => {
-                  sellingPriceReg.onBlur(e)
-                  setEditingSellingPrice(false)
-                }}
-                autoFocus
-              />
-            ) : (
-              <button
-                type="button"
-                className="flex items-center gap-1 hover:opacity-70 transition-opacity"
-                onClick={() => setEditingSellingPrice(true)}
-              >
-                <span className="text-sm font-semibold">{formatPrice(sellingPrice)}</span>
-                <Edit3 className="h-2.5 w-2.5 text-muted-foreground" />
-              </button>
-            )}
+            <Input
+              type="number"
+              min={0}
+              className="w-28 h-7 text-right text-sm font-semibold"
+              {...sellingPriceReg}
+            />
           </div>
           <div className="w-px h-4 bg-border" />
           <div className="flex items-center gap-1.5">
