@@ -41,6 +41,8 @@ export function buildShortDescription(
       if (key === 'ram_gb' && val) return `${val}GB`
       if (key === 'storage_gb' && val) return `${val}GB`
       if (key === 'screen_size' && val) return `${val}"`
+      if (key === 'battery_health_pct' && val) return `Battery ${val}%`
+      if (key === 'condition_notes' && val) return String(val)
       if (typeof val === 'boolean') return val ? getSpecFieldLabel(key) : null
       return String(val)
     })

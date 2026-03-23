@@ -43,8 +43,7 @@ export default function CustomerKaitoriPage() {
                   {model && (
                     <p className="text-sm text-muted-foreground">
                       {model.brand} {model.model_name}
-                      {model.ram_gb && ` / ${model.ram_gb}GB`}
-                      {model.storage_gb && ` / ${model.storage_gb}GB`}
+                      {model.short_description && ` — ${model.short_description}`}
                     </p>
                   )}
                   <p className="text-xs text-muted-foreground">{formatDate(req.created_at)}</p>

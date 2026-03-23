@@ -158,7 +158,7 @@ export default function CheckoutPage() {
                 {pm ? `${pm.brand} ${pm.model_name}` : sg.sell_group_code}
               </h3>
               <p className="text-sm text-muted-foreground">
-                {pm ? `${pm.cpu ?? ''} / ${pm.ram_gb ?? '?'}GB / ${pm.storage_gb ?? '?'}GB` : ''}
+                {pm?.short_description ?? ''}
               </p>
             </div>
             <div className="text-right">

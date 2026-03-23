@@ -113,7 +113,7 @@ export async function getCustomerKaitoriRequests(customerId: string) {
     .from('kaitori_requests')
     .select(`
       *,
-      product_models(brand, model_name, cpu, ram_gb, storage_gb)
+      product_models(brand, model_name, cpu, ram_gb, storage_gb, short_description)
     `)
     .eq('customer_id', customerId)
     .order('created_at', { ascending: false })

@@ -9,7 +9,7 @@ import { ConfidenceBadge } from '@/components/intake/confidence-badge'
 import { AdjustmentDialog } from '@/components/intake/adjustment-dialog'
 import { generateReceiptPdf } from '@/components/intake/receipt-pdf'
 import { useIntakeReceipt, useReceiptItems, useReceiptAdjustments } from '@/hooks/use-intake-receipts'
-import { formatDate, formatDateTime, formatPrice } from '@/lib/utils'
+import { formatDate, formatDateTime, formatPrice, buildShortDescription } from '@/lib/utils'
 import { getStatusConfig, getAdjustmentTypeConfig } from '@/lib/constants'
 import type { Item, IntakeAdjustment } from '@/lib/types'
 
@@ -172,11 +172,22 @@ export default function ReceivingReportDetailPage() {
                   const model = item.brand && item.model_name
                     ? `${item.brand} ${item.model_name}`
                     : '—'
-                  const config = [
-                    item.cpu,
-                    item.ram_gb ? `${item.ram_gb}GB` : null,
-                    item.storage_gb ? `${item.storage_gb}GB` : null,
-                  ].filter(Boolean).join(' / ') || '—'
+                  const pm = item.product_models
+                  const descFields = pm?.categories?.description_fields
+                  let config: string
+                  if (descFields && descFields.length > 0) {
+                    const resolved: Record<string, unknown> = {}
+                    for (const key of descFields) {
+                      resolved[key] = (item as Record<string, unknown>)[key] ?? (pm as Record<string, unknown> | null)?.[key]
+                    }
+                    config = buildShortDescription(resolved, descFields) || '—'
+                  } else {
+                    config = [
+                      item.cpu,
+                      item.ram_gb ? `${item.ram_gb}GB` : null,
+                      item.storage_gb ? `${item.storage_gb}GB` : null,
+                    ].filter(Boolean).join(' / ') || '—'
+                  }
                   return (
                     <tr key={item.id} className="border-t">
                       <td className="px-3 py-2">

@@ -207,9 +207,7 @@ export default function ShopBrowsePage() {
                     {pm ? `${pm.brand} ${pm.model_name}` : sg.sell_group_code}
                   </h3>
                   <p className="text-xs text-muted-foreground line-clamp-1">
-                    {pm?.short_description
-                      ? pm.short_description
-                      : pm ? [pm.cpu, pm.ram_gb ? `${pm.ram_gb}GB` : null, pm.storage_gb ? `${pm.storage_gb}GB` : null].filter(Boolean).join(' / ') : ''}
+                    {pm?.short_description ?? ''}
                   </p>
                   <div className="flex items-center justify-between pt-1">
                     <span className="text-lg font-bold">{formatPrice(Number(sg.base_price))}</span>

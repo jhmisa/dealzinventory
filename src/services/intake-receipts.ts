@@ -55,7 +55,7 @@ export async function getReceiptItems(receiptId: string) {
     .from('items')
     .select(`
       *,
-      product_models(brand, model_name, color, cpu, ram_gb, storage_gb)
+      product_models(brand, model_name, color, cpu, ram_gb, storage_gb, screen_size, os_family, categories(description_fields))
     `)
     .eq('intake_receipt_id', receiptId)
     .order('item_code', { ascending: true })

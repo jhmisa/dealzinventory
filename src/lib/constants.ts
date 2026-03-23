@@ -235,6 +235,8 @@ export const AVAILABLE_SPEC_FIELDS: { key: string; label: string }[] = [
   { key: 'other_features', label: 'Other Features' },
   { key: 'has_camera', label: 'Camera' },
   { key: 'has_bluetooth', label: 'Bluetooth' },
+  { key: 'battery_health_pct', label: 'Battery Health (%)' },
+  { key: 'condition_notes', label: 'Condition Notes' },
 ]
 
 // Fields always shown in the description (available even if not in form_fields)

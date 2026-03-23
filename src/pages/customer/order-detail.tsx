@@ -162,16 +162,9 @@ export default function CustomerOrderDetailPage() {
                 )}
                 <div className="flex-1 min-w-0">
                   <p className="font-medium">{oi.description}</p>
-                  {pm && (
+                  {pm?.short_description && (
                     <p className="text-sm text-muted-foreground mt-0.5">
-                      {[
-                        pm.color,
-                        pm.cpu,
-                        pm.ram_gb && `${pm.ram_gb}GB RAM`,
-                        pm.storage_gb && `${pm.storage_gb}GB`,
-                      ]
-                        .filter(Boolean)
-                        .join(' / ')}
+                      {pm.short_description}
                     </p>
                   )}
                   <div className="flex items-center gap-2 mt-1">

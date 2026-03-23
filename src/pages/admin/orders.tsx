@@ -68,7 +68,7 @@ const columns: ColumnDef<OrderRow>[] = [
     cell: ({ row }) => {
       const sg = row.original.sell_groups
       const pm = sg?.product_models
-      return pm ? `${pm.brand} ${pm.model_name}` : sg?.sell_group_code ?? '—'
+      return pm ? `${pm.brand} ${pm.model_name}${pm.short_description ? ' — ' + pm.short_description : ''}` : sg?.sell_group_code ?? '—'
     },
   },
   {

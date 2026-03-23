@@ -28,7 +28,7 @@ export async function getOrders(filters: OrderFilters = {}) {
       *,
       customers(customer_code, last_name, first_name, email, phone),
       sell_groups(sell_group_code, condition_grade, base_price,
-        product_models(brand, model_name, cpu, ram_gb, storage_gb)
+        product_models(brand, model_name, cpu, ram_gb, storage_gb, short_description)
       ),
       order_items(count)
     `)
@@ -71,8 +71,10 @@ export async function getOrder(id: string) {
       ),
       order_items(
         id, item_id, description, quantity, unit_price, discount, packed_at, packed_by,
-        items(id, item_code, condition_grade, item_status,
-          product_models(brand, model_name, color, cpu, ram_gb, storage_gb,
+        items(id, item_code, condition_grade, condition_notes, item_status,
+          cpu, ram_gb, storage_gb, screen_size, os_family, color,
+          product_models(brand, model_name, color, cpu, ram_gb, storage_gb, screen_size, os_family, short_description,
+            categories(description_fields),
             product_media(file_url, role, sort_order)
           )
         )

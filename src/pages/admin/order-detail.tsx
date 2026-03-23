@@ -29,7 +29,7 @@ import {
 import * as ordersService from '@/services/orders'
 import { useAuth } from '@/hooks/use-auth'
 import { ORDER_STATUSES, ORDER_SOURCES, YAMATO_TIME_SLOTS } from '@/lib/constants'
-import { formatDateTime, formatPrice, cn } from '@/lib/utils'
+import { formatDateTime, formatPrice, cn, buildShortDescription } from '@/lib/utils'
 import { useState, useRef, useEffect } from 'react'
 import type { ShippingAddress } from '@/lib/address-types'
 
@@ -660,15 +660,30 @@ export default function OrderDetailPage() {
                   >
                     <span className="text-sm text-muted-foreground">{idx + 1}</span>
                     <div>
-                      {item ? (
-                        <div className="flex items-center gap-2">
-                          <CodeDisplay code={item.item_code} />
-                          <GradeBadge grade={item.condition_grade} />
-                          {oi.description && (
-                            <span className="text-sm text-muted-foreground truncate">{oi.description}</span>
-                          )}
-                        </div>
-                      ) : (
+                      {item ? (() => {
+                        const pm = item.product_models as Record<string, unknown> | null
+                        const descFields = (pm?.categories as Record<string, unknown> | null)?.description_fields as string[] | undefined
+                        let shortDesc: string | undefined
+                        if (descFields && descFields.length > 0) {
+                          const resolved: Record<string, unknown> = {}
+                          for (const key of descFields) {
+                            resolved[key] = (item as Record<string, unknown>)[key] ?? (pm as Record<string, unknown> | null)?.[key]
+                          }
+                          shortDesc = buildShortDescription(resolved, descFields) || undefined
+                        }
+                        return (
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <CodeDisplay code={item.item_code} />
+                              <GradeBadge grade={item.condition_grade} />
+                              <span className="text-sm text-muted-foreground truncate">{shortDesc || oi.description}</span>
+                            </div>
+                            {item.condition_notes && (
+                              <p className="text-xs text-muted-foreground mt-0.5 truncate pl-0.5">{item.condition_notes}</p>
+                            )}
+                          </div>
+                        )
+                      })() : (
                         <div className="flex items-center gap-2">
                           <span className="text-sm">{oi.description ?? 'Custom item'}</span>
                           <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">(custom)</span>
