@@ -507,7 +507,6 @@ export default function InspectItemPage() {
   const totalCost = purchasePrice + totalCosts
   const estProfit = sellingPrice - totalCost
 
-  const sellingPriceReg = form.register('selling_price', { valueAsNumber: true })
   const effectiveProductId = form.watch('product_id') || item?.product_id
   const hasProduct = !!effectiveProductId
 
@@ -1225,11 +1224,19 @@ export default function InspectItemPage() {
           <div className="w-px h-4 bg-border" />
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-muted-foreground">Selling Price</span>
-            <Input
-              type="number"
-              min={0}
-              className="w-28 h-7 text-right text-sm font-semibold"
-              {...sellingPriceReg}
+            <Controller
+              control={form.control}
+              name="selling_price"
+              render={({ field }) => (
+                <Input
+                  type="number"
+                  min={0}
+                  className="w-28 h-7 text-right text-sm font-semibold"
+                  value={field.value ?? ''}
+                  onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
+                  onBlur={field.onBlur}
+                />
+              )}
             />
           </div>
           <div className="w-px h-4 bg-border" />
@@ -1263,11 +1270,19 @@ export default function InspectItemPage() {
           </div>
           <div className="flex items-baseline justify-between py-1.5 border-b border-border">
             <span className="text-[13px] text-muted-foreground">Selling Price</span>
-            <Input
-              type="number"
-              min={0}
-              className="w-24 h-7 text-right text-sm font-semibold"
-              {...form.register('selling_price', { valueAsNumber: true })}
+            <Controller
+              control={form.control}
+              name="selling_price"
+              render={({ field }) => (
+                <Input
+                  type="number"
+                  min={0}
+                  className="w-24 h-7 text-right text-sm font-semibold"
+                  value={field.value ?? ''}
+                  onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
+                  onBlur={field.onBlur}
+                />
+              )}
             />
           </div>
           <div className="flex items-baseline justify-between pt-2">
