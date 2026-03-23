@@ -29,20 +29,27 @@ const PRODUCT_ONLY_FIELDS = ['chipset', 'ports', 'has_thunderbolt', 'supports_st
 // Fields always shown regardless of category
 const ALWAYS_VISIBLE = new Set(['brand', 'model_name', 'color', 'year', 'other_features', 'battery_health_pct'])
 
-// Editable text fields
-const TEXT_FIELDS = ['brand', 'model_name', 'color', 'cpu', 'os_family', 'gpu', 'carrier', 'keyboard_layout', 'other_features'] as const
-
-// Editable number fields
-const NUMBER_FIELDS = [
-  { key: 'screen_size', suffix: '"' },
-  { key: 'ram_gb', suffix: ' GB' },
-  { key: 'storage_gb', suffix: ' GB' },
-  { key: 'battery_health_pct', suffix: '%' },
-  { key: 'year', suffix: '' },
+// Unified ordered spec fields array
+const SPEC_FIELDS = [
+  { key: 'brand', type: 'text' },
+  { key: 'model_name', type: 'text' },
+  { key: 'cpu', type: 'text' },
+  { key: 'ram_gb', type: 'number', suffix: ' GB' },
+  { key: 'screen_size', type: 'number', suffix: '"' },
+  { key: 'storage_gb', type: 'number', suffix: ' GB' },
+  { key: 'color', type: 'text' },
+  { key: 'year', type: 'number', suffix: '' },
+  { key: 'has_camera', type: 'boolean' },
+  { key: 'has_bluetooth', type: 'boolean' },
+  { key: 'os_family', type: 'text' },
+  { key: 'gpu', type: 'text' },
+  { key: 'keyboard_layout', type: 'text' },
+  { key: 'battery_health_pct', type: 'number', suffix: '%' },
+  { key: 'has_touchscreen', type: 'boolean' },
+  { key: 'is_unlocked', type: 'boolean' },
+  { key: 'carrier', type: 'text' },
+  { key: 'other_features', type: 'text' },
 ] as const
-
-// Editable boolean fields
-const BOOLEAN_FIELDS = ['has_touchscreen', 'is_unlocked'] as const
 
 export function EditableSpecsCard({ item, productModel, locked }: EditableSpecsCardProps) {
   const [editing, setEditing] = useState(false)
@@ -53,9 +60,7 @@ export function EditableSpecsCard({ item, productModel, locked }: EditableSpecsC
   const visibleFields = categoryFields ? new Set(categoryFields) : null
   function show(field: string) { return !visibleFields || ALWAYS_VISIBLE.has(field) || visibleFields.has(field) }
 
-  const filteredTextFields = TEXT_FIELDS.filter((key) => ALWAYS_VISIBLE.has(key) || show(key))
-  const filteredNumberFields = NUMBER_FIELDS.filter(({ key }) => ALWAYS_VISIBLE.has(key) || show(key))
-  const filteredBooleanFields = BOOLEAN_FIELDS.filter((key) => show(key))
+  const filteredSpecFields = SPEC_FIELDS.filter(({ key }) => ALWAYS_VISIBLE.has(key) || show(key))
   const showImei = show('imei_slot_count')
   const filteredProductOnlyFields = PRODUCT_ONLY_FIELDS.filter((key) => show(key))
 
@@ -93,28 +98,30 @@ export function EditableSpecsCard({ item, productModel, locked }: EditableSpecsC
     const updates: ItemUpdate = {}
     let hasChanges = false
 
-    for (const key of TEXT_FIELDS) {
-      const newVal = values[key] || null
-      if (newVal !== (item[key as keyof Item] ?? null)) {
-        ;(updates as Record<string, unknown>)[key] = newVal
-        hasChanges = true
-      }
-    }
+    for (const field of SPEC_FIELDS) {
+      // Skip product-only fields (not editable per-item)
+      if (PRODUCT_ONLY_FIELDS.includes(field.key as typeof PRODUCT_ONLY_FIELDS[number])) continue
 
-    for (const { key } of NUMBER_FIELDS) {
-      const newVal = values[key as keyof ItemSpecsFormValues] as number | null | undefined
-      const parsed = newVal != null && newVal !== (undefined as unknown) ? newVal : null
-      if (parsed !== (item[key as keyof Item] ?? null)) {
-        ;(updates as Record<string, unknown>)[key] = parsed
-        hasChanges = true
-      }
-    }
-
-    for (const key of BOOLEAN_FIELDS) {
-      const newVal = values[key] ?? null
-      if (newVal !== (item[key as keyof Item] ?? null)) {
-        ;(updates as Record<string, unknown>)[key] = newVal
-        hasChanges = true
+      const formKey = field.key as keyof ItemSpecsFormValues
+      if (field.type === 'text') {
+        const newVal = values[formKey] as string || null
+        if (newVal !== (item[field.key as keyof Item] ?? null)) {
+          ;(updates as Record<string, unknown>)[field.key] = newVal
+          hasChanges = true
+        }
+      } else if (field.type === 'number') {
+        const newVal = values[formKey] as number | null | undefined
+        const parsed = newVal != null && newVal !== (undefined as unknown) ? newVal : null
+        if (parsed !== (item[field.key as keyof Item] ?? null)) {
+          ;(updates as Record<string, unknown>)[field.key] = parsed
+          hasChanges = true
+        }
+      } else if (field.type === 'boolean') {
+        const newVal = values[formKey] as boolean | null ?? null
+        if (newVal !== (item[field.key as keyof Item] ?? null)) {
+          ;(updates as Record<string, unknown>)[field.key] = newVal
+          hasChanges = true
+        }
       }
     }
 
@@ -158,36 +165,79 @@ export function EditableSpecsCard({ item, productModel, locked }: EditableSpecsC
         <CardContent>
           <form onSubmit={form.handleSubmit(handleSave)} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {filteredTextFields.map((key) => (
-                <div key={key} className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">{getSpecFieldLabel(key)}</Label>
-                  <Input
-                    {...form.register(key)}
-                    placeholder={productModel?.[key as keyof ProductModel] as string | undefined ?? '—'}
-                    className="h-8 text-sm"
-                  />
-                </div>
-              ))}
+              {filteredSpecFields.map((field) => {
+                const isProductOnly = PRODUCT_ONLY_FIELDS.includes(field.key as typeof PRODUCT_ONLY_FIELDS[number])
 
-              {filteredNumberFields.map(({ key, suffix }) => (
-                <div key={key} className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">{getSpecFieldLabel(key)}</Label>
-                  <div className="flex items-center gap-1">
-                    <Input
-                      type="number"
-                      step={key === 'screen_size' ? '0.1' : '1'}
-                      {...form.register(key as keyof ItemSpecsFormValues)}
-                      placeholder={
-                        productModel?.[key as keyof ProductModel] != null
-                          ? String(productModel[key as keyof ProductModel])
-                          : '—'
-                      }
-                      className="h-8 text-sm"
-                    />
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">{suffix}</span>
-                  </div>
-                </div>
-              ))}
+                if (field.type === 'text') {
+                  return (
+                    <div key={field.key} className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">{getSpecFieldLabel(field.key)}</Label>
+                      <Input
+                        {...form.register(field.key as keyof ItemSpecsFormValues)}
+                        placeholder={productModel?.[field.key as keyof ProductModel] as string | undefined ?? '—'}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                  )
+                }
+
+                if (field.type === 'number') {
+                  if (isProductOnly) {
+                    const val = productModel?.[field.key as keyof ProductModel]
+                    if (val == null) return null
+                    return (
+                      <div key={field.key} className="flex justify-between text-sm py-1">
+                        <span className="text-muted-foreground">{getSpecFieldLabel(field.key)}</span>
+                        <span>{String(val)}{field.suffix}</span>
+                      </div>
+                    )
+                  }
+                  return (
+                    <div key={field.key} className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">{getSpecFieldLabel(field.key)}</Label>
+                      <div className="flex items-center gap-1">
+                        <Input
+                          type="number"
+                          step={field.key === 'screen_size' ? '0.1' : '1'}
+                          {...form.register(field.key as keyof ItemSpecsFormValues)}
+                          placeholder={
+                            productModel?.[field.key as keyof ProductModel] != null
+                              ? String(productModel[field.key as keyof ProductModel])
+                              : '—'
+                          }
+                          className="h-8 text-sm"
+                        />
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">{field.suffix}</span>
+                      </div>
+                    </div>
+                  )
+                }
+
+                if (field.type === 'boolean') {
+                  if (isProductOnly) {
+                    const val = productModel?.[field.key as keyof ProductModel] as boolean | null
+                    if (val == null) return null
+                    return (
+                      <div key={field.key} className="flex items-center justify-between py-1">
+                        <Label className="text-xs text-muted-foreground">{getSpecFieldLabel(field.key)}</Label>
+                        <Switch checked={val} disabled />
+                      </div>
+                    )
+                  }
+                  const formKey = field.key as keyof ItemSpecsFormValues
+                  return (
+                    <div key={field.key} className="flex items-center justify-between py-1">
+                      <Label className="text-xs text-muted-foreground">{getSpecFieldLabel(field.key)}</Label>
+                      <Switch
+                        checked={form.watch(formKey) as boolean ?? false}
+                        onCheckedChange={(val) => form.setValue(formKey, val)}
+                      />
+                    </div>
+                  )
+                }
+
+                return null
+              })}
 
               {showImei && (
                 <>
@@ -201,34 +251,29 @@ export function EditableSpecsCard({ item, productModel, locked }: EditableSpecsC
                   </div>
                 </>
               )}
-
-              {filteredBooleanFields.map((key) => (
-                <div key={key} className="flex items-center justify-between py-1">
-                  <Label className="text-xs text-muted-foreground">{getSpecFieldLabel(key)}</Label>
-                  <Switch
-                    checked={form.watch(key) ?? false}
-                    onCheckedChange={(val) => form.setValue(key, val)}
-                  />
-                </div>
-              ))}
             </div>
 
-            {/* Product-model-only fields (read-only) */}
-            {filteredProductOnlyFields.some((f) => productModel?.[f as keyof ProductModel] != null) && (
-              <div className="border-t pt-3 space-y-2">
-                <p className="text-xs text-muted-foreground italic">From product model (read-only)</p>
-                {filteredProductOnlyFields.map((key) => {
-                  const val = productModel?.[key as keyof ProductModel]
-                  if (val == null) return null
-                  return (
-                    <div key={key} className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">{getSpecFieldLabel(key)}</span>
-                      <span>{typeof val === 'boolean' ? (val ? 'Yes' : 'No') : String(val)}</span>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
+            {/* Product-model-only fields not already in SPEC_FIELDS (read-only) */}
+            {(() => {
+              const specKeys = new Set(SPEC_FIELDS.map((f) => f.key))
+              const remaining = filteredProductOnlyFields.filter((key) => !specKeys.has(key))
+              if (!remaining.some((f) => productModel?.[f as keyof ProductModel] != null)) return null
+              return (
+                <div className="border-t pt-3 space-y-2">
+                  <p className="text-xs text-muted-foreground italic">From product model (read-only)</p>
+                  {remaining.map((key) => {
+                    const val = productModel?.[key as keyof ProductModel]
+                    if (val == null) return null
+                    return (
+                      <div key={key} className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">{getSpecFieldLabel(key)}</span>
+                        <span>{typeof val === 'boolean' ? (val ? 'Yes' : 'No') : String(val)}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })()}
 
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" size="sm" onClick={handleCancel}>
@@ -256,12 +301,18 @@ export function EditableSpecsCard({ item, productModel, locked }: EditableSpecsC
         )}
       </CardHeader>
       <CardContent className="space-y-2 text-sm">
-        {filteredTextFields.map((key) => (
-          <Row key={key} label={getSpecFieldLabel(key)} value={getResolvedValue(key) as string | null} />
-        ))}
-        {filteredNumberFields.map(({ key, suffix }) => {
-          const val = getResolvedValue(key) as number | null
-          return <Row key={key} label={getSpecFieldLabel(key)} value={val != null ? `${val}${suffix}` : null} />
+        {filteredSpecFields.map((field) => {
+          if (field.type === 'text') {
+            return <Row key={field.key} label={getSpecFieldLabel(field.key)} value={getResolvedValue(field.key) as string | null} />
+          }
+          if (field.type === 'number') {
+            const val = getResolvedValue(field.key) as number | null
+            return <Row key={field.key} label={getSpecFieldLabel(field.key)} value={val != null ? `${val}${field.suffix}` : null} />
+          }
+          if (field.type === 'boolean') {
+            return <BooleanRow key={field.key} label={getSpecFieldLabel(field.key)} value={getResolvedValue(field.key) as boolean | null} />
+          }
+          return null
         })}
         {showImei && (
           <>
@@ -269,19 +320,21 @@ export function EditableSpecsCard({ item, productModel, locked }: EditableSpecsC
             <Row label="IMEI 2" value={item.imei2} />
           </>
         )}
-        {filteredBooleanFields.map((key) => (
-          <BooleanRow key={key} label={getSpecFieldLabel(key)} value={getResolvedValue(key) as boolean | null} />
-        ))}
 
-        {/* Product-model-only fields */}
-        {filteredProductOnlyFields.map((key) => {
-          const val = productModel?.[key as keyof ProductModel]
-          if (val == null) return null
-          if (typeof val === 'boolean') {
-            return <BooleanRow key={key} label={getSpecFieldLabel(key)} value={val} />
-          }
-          return <Row key={key} label={getSpecFieldLabel(key)} value={String(val)} />
-        })}
+        {/* Product-model-only fields not already in SPEC_FIELDS */}
+        {(() => {
+          const specKeys = new Set(SPEC_FIELDS.map((f) => f.key))
+          return filteredProductOnlyFields
+            .filter((key) => !specKeys.has(key))
+            .map((key) => {
+              const val = productModel?.[key as keyof ProductModel]
+              if (val == null) return null
+              if (typeof val === 'boolean') {
+                return <BooleanRow key={key} label={getSpecFieldLabel(key)} value={val} />
+              }
+              return <Row key={key} label={getSpecFieldLabel(key)} value={String(val)} />
+            })
+        })()}
 
         {/* Notes inline */}
         {item.condition_notes && (
