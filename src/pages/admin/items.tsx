@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Input } from '@/components/ui/input'
 import { PageHeader, SearchBar, DataTable, StatusBadge, GradeBadge, CodeDisplay, PriceDisplay, TableSkeleton } from '@/components/shared'
 import { useItems } from '@/hooks/use-items'
 import { useDebounce } from '@/hooks/use-debounce'
@@ -33,7 +34,7 @@ type ItemRow = {
   storage_gb: number | null
   screen_size: number | null
   suppliers: { supplier_name: string } | null
-  product_models: { brand: string; model_name: string; color: string; short_description: string | null; screen_size: number | null; categories: { description_fields: string[] } | null } | null
+  product_models: { brand: string; model_name: string; color: string; short_description: string | null; screen_size: number | null; categories: { name: string; description_fields: string[] } | null } | null
 }
 
 const STATUS_TABS = [
@@ -126,6 +127,14 @@ export default function ItemListPage() {
   const [statusTab, setStatusTab] = useState('all')
   const [gradeFilter, setGradeFilter] = useState<string>('')
   const [sourceFilter, setSourceFilter] = useState<string>('')
+  const [categoryFilter, setCategoryFilter] = useState<string>('')
+  const [brandFilter, setBrandFilter] = useState<string>('')
+  const [descriptionSearch, setDescriptionSearch] = useState('')
+  const debouncedDescSearch = useDebounce(descriptionSearch, 400)
+  const [conditionSearch, setConditionSearch] = useState('')
+  const debouncedConditionSearch = useDebounce(conditionSearch, 400)
+  const [priceFrom, setPriceFrom] = useState<string>('')
+  const [priceTo, setPriceTo] = useState<string>('')
 
   // Fetch all items (no status filter) so we can compute tab counts
   const { data: allItems, isLoading } = useItems({
@@ -136,16 +145,38 @@ export default function ItemListPage() {
 
   const items = (allItems ?? []) as ItemRow[]
 
-  // Compute counts per status
-  const statusCounts: Record<string, number> = { all: items.length }
-  for (const item of items) {
+  // Derive dropdown options from data
+  const categoryOptions = [...new Set(items.map(i => i.product_models?.categories?.name).filter(Boolean))].sort() as string[]
+  const brandOptions = [...new Set(items.map(i => i.brand ?? i.product_models?.brand).filter(Boolean))].sort() as string[]
+
+  // Client-side filtering
+  const filtered = items.filter(item => {
+    if (categoryFilter && categoryFilter !== 'all' && item.product_models?.categories?.name !== categoryFilter) return false
+    if (brandFilter && brandFilter !== 'all' && (item.brand ?? item.product_models?.brand) !== brandFilter) return false
+    if (debouncedDescSearch) {
+      const desc = buildShortDescription(item, item.product_models?.categories?.description_fields ?? []) || ''
+      if (!desc.toLowerCase().includes(debouncedDescSearch.toLowerCase())) return false
+    }
+    if (debouncedConditionSearch) {
+      if (!item.condition_notes?.toLowerCase().includes(debouncedConditionSearch.toLowerCase())) return false
+    }
+    const pf = priceFrom ? Number(priceFrom) : null
+    const pt = priceTo ? Number(priceTo) : null
+    if (pf !== null && (item.selling_price == null || item.selling_price < pf)) return false
+    if (pt !== null && (item.selling_price == null || item.selling_price > pt)) return false
+    return true
+  })
+
+  // Compute counts per status from filtered items
+  const statusCounts: Record<string, number> = { all: filtered.length }
+  for (const item of filtered) {
     statusCounts[item.item_status] = (statusCounts[item.item_status] ?? 0) + 1
   }
 
   // Filter by active tab
   const filteredItems = statusTab === 'all'
-    ? items
-    : items.filter((i) => i.item_status === statusTab)
+    ? filtered
+    : filtered.filter((i) => i.item_status === statusTab)
 
   return (
     <div className="space-y-4">
@@ -231,6 +262,58 @@ export default function ItemListPage() {
             ))}
           </SelectContent>
         </Select>
+      </div>
+
+      {/* Additional Filters */}
+      <div className="flex flex-wrap items-center gap-3">
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="Category" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            {categoryOptions.map((c) => (
+              <SelectItem key={c} value={c}>{c}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={brandFilter} onValueChange={setBrandFilter}>
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="Brand" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Brands</SelectItem>
+            {brandOptions.map((b) => (
+              <SelectItem key={b} value={b}>{b}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <SearchBar
+          value={descriptionSearch}
+          onChange={setDescriptionSearch}
+          placeholder="Search description..."
+          className="min-w-[180px]"
+        />
+        <SearchBar
+          value={conditionSearch}
+          onChange={setConditionSearch}
+          placeholder="Search condition..."
+          className="min-w-[180px]"
+        />
+        <Input
+          type="number"
+          value={priceFrom}
+          onChange={(e) => setPriceFrom(e.target.value)}
+          placeholder="¥ From"
+          className="w-[110px]"
+        />
+        <Input
+          type="number"
+          value={priceTo}
+          onChange={(e) => setPriceTo(e.target.value)}
+          placeholder="¥ To"
+          className="w-[110px]"
+        />
       </div>
 
       {isLoading ? (

@@ -24,7 +24,7 @@ export async function getItems(filters: ItemFilters = {}) {
     .select(`
       *,
       suppliers(supplier_name),
-      product_models(brand, model_name, color, cpu, ram_gb, storage_gb, os_family, short_description, screen_size, categories(description_fields))
+      product_models(brand, model_name, color, cpu, ram_gb, storage_gb, os_family, short_description, screen_size, categories(name, description_fields))
     `)
     .order('created_at', { ascending: false })
 
