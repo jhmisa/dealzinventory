@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
 import { Plus, QrCode } from 'lucide-react'
@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { PageHeader, SearchBar, DataTable, StatusBadge, GradeBadge, CodeDisplay, PriceDisplay, TableSkeleton } from '@/components/shared'
-import { useItems } from '@/hooks/use-items'
+import { useItems, useUpdateItem } from '@/hooks/use-items'
 import { useDebounce } from '@/hooks/use-debounce'
 import { ITEM_STATUSES, CONDITION_GRADES } from '@/lib/constants'
 import { formatDate, cn, buildShortDescription } from '@/lib/utils'
@@ -26,6 +26,7 @@ type ItemRow = {
   source_type: string
   purchase_price: number | null
   selling_price: number | null
+  discount: number | null
   created_at: string
   brand: string | null
   model_name: string | null
@@ -42,86 +43,41 @@ const STATUS_TABS = [
   ...ITEM_STATUSES.map((s) => ({ value: s.value, label: s.label })),
 ]
 
-const columns: ColumnDef<ItemRow>[] = [
-  {
-    accessorKey: 'item_code',
-    header: 'P-Code',
-    cell: ({ row }) => <CodeDisplay code={row.original.item_code} />,
-  },
-  {
-    id: 'model',
-    header: 'Model',
-    cell: ({ row }) => {
-      const pm = row.original.product_models
-      const { condition_notes } = row.original
-      const descFields = pm?.categories?.description_fields
-      let modelLine: string
-      if (descFields && descFields.length > 0) {
-        // Use category template with item-level values
-        modelLine = buildShortDescription(row.original, descFields) || '—'
-      } else {
-        // Fallback: no category template
-        const { brand, model_name, cpu, ram_gb, storage_gb, screen_size } = row.original
-        const modelName = brand && model_name
-          ? `${brand} ${model_name}`
-          : pm ? `${pm.brand} ${pm.model_name}` : null
-        const screenVal = screen_size ?? pm?.screen_size
-        const parts = [
-          modelName,
-          cpu,
-          ram_gb ? `${ram_gb}GB` : null,
-          storage_gb ? `${storage_gb}GB` : null,
-          screenVal ? `${screenVal}"` : null,
-        ].filter(Boolean)
-        modelLine = parts.length > 0 ? parts.join(' / ') : '—'
-      }
-      if (!condition_notes) return modelLine
-      return (
-        <div>
-          <div>{modelLine}</div>
-          <div className="text-xs text-muted-foreground">{condition_notes}</div>
-        </div>
-      )
-    },
-  },
-  {
-    accessorKey: 'condition_grade',
-    header: 'Grade',
-    cell: ({ row }) => <GradeBadge grade={row.original.condition_grade as never} />,
-  },
-  {
-    accessorKey: 'item_status',
-    header: 'Status',
-    cell: ({ row }) => {
-      const config = ITEM_STATUSES.find((s) => s.value === row.original.item_status)
-      return config ? <StatusBadge label={config.label} color={config.color} /> : row.original.item_status
-    },
-  },
-  {
-    id: 'supplier',
-    header: 'Supplier',
-    cell: ({ row }) => row.original.suppliers?.supplier_name ?? '—',
-  },
-  {
-    accessorKey: 'purchase_price',
-    header: 'Buy / Sell',
-    cell: ({ row }) => (
-      <div className="flex items-center gap-1.5 text-sm">
-        <PriceDisplay amount={row.original.purchase_price} />
-        <span className="text-muted-foreground">/</span>
-        <PriceDisplay amount={row.original.selling_price} />
-      </div>
-    ),
-  },
-  {
-    accessorKey: 'created_at',
-    header: 'Intake Date',
-    cell: ({ row }) => formatDate(row.original.created_at),
-  },
-]
+function InlinePriceCell({
+  itemId,
+  field,
+  value,
+  updateItem,
+}: {
+  itemId: string
+  field: 'selling_price' | 'discount'
+  value: number | null
+  updateItem: ReturnType<typeof useUpdateItem>
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const handleSave = () => {
+    const raw = inputRef.current?.value ?? ''
+    const parsed = raw === '' ? null : Number(raw)
+    if (parsed === value) return
+    if (parsed !== null && isNaN(parsed)) return
+    updateItem.mutate({ id: itemId, updates: { [field]: parsed } })
+  }
+  return (
+    <Input
+      ref={inputRef}
+      type="number"
+      defaultValue={value ?? ''}
+      className="w-[90px] h-7 text-sm"
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => { if (e.key === 'Enter') { e.currentTarget.blur() } }}
+      onBlur={handleSave}
+    />
+  )
+}
 
 export default function ItemListPage() {
   const navigate = useNavigate()
+  const updateItem = useUpdateItem()
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebounce(search, 400)
   const [statusTab, setStatusTab] = useState('all')
@@ -175,6 +131,100 @@ export default function ItemListPage() {
   const filteredItems = statusTab === 'all'
     ? filtered
     : filtered.filter((i) => i.item_status === statusTab)
+
+  const columns: ColumnDef<ItemRow>[] = [
+    {
+      accessorKey: 'item_code',
+      header: 'P-Code',
+      cell: ({ row }) => <CodeDisplay code={row.original.item_code} />,
+    },
+    {
+      id: 'model',
+      header: 'Model',
+      cell: ({ row }) => {
+        const pm = row.original.product_models
+        const { condition_notes } = row.original
+        const descFields = pm?.categories?.description_fields
+        let modelLine: string
+        if (descFields && descFields.length > 0) {
+          modelLine = buildShortDescription(row.original, descFields) || '—'
+        } else {
+          const { brand, model_name, cpu, ram_gb, storage_gb, screen_size } = row.original
+          const modelName = brand && model_name
+            ? `${brand} ${model_name}`
+            : pm ? `${pm.brand} ${pm.model_name}` : null
+          const screenVal = screen_size ?? pm?.screen_size
+          const parts = [
+            modelName,
+            cpu,
+            ram_gb ? `${ram_gb}GB` : null,
+            storage_gb ? `${storage_gb}GB` : null,
+            screenVal ? `${screenVal}"` : null,
+          ].filter(Boolean)
+          modelLine = parts.length > 0 ? parts.join(' / ') : '—'
+        }
+        if (!condition_notes) return modelLine
+        return (
+          <div>
+            <div>{modelLine}</div>
+            <div className="text-xs text-muted-foreground">{condition_notes}</div>
+          </div>
+        )
+      },
+    },
+    {
+      accessorKey: 'condition_grade',
+      header: 'Grade',
+      cell: ({ row }) => <GradeBadge grade={row.original.condition_grade as never} />,
+    },
+    {
+      accessorKey: 'item_status',
+      header: 'Status',
+      cell: ({ row }) => {
+        const config = ITEM_STATUSES.find((s) => s.value === row.original.item_status)
+        return config ? <StatusBadge label={config.label} color={config.color} /> : row.original.item_status
+      },
+    },
+    {
+      id: 'supplier',
+      header: 'Supplier',
+      cell: ({ row }) => row.original.suppliers?.supplier_name ?? '—',
+    },
+    {
+      accessorKey: 'purchase_price',
+      header: 'Buy',
+      cell: ({ row }) => <PriceDisplay amount={row.original.purchase_price} />,
+    },
+    {
+      id: 'selling_price',
+      header: 'Sell',
+      cell: ({ row }) => (
+        <InlinePriceCell
+          itemId={row.original.id}
+          field="selling_price"
+          value={row.original.selling_price}
+          updateItem={updateItem}
+        />
+      ),
+    },
+    {
+      id: 'discount',
+      header: 'Discount',
+      cell: ({ row }) => (
+        <InlinePriceCell
+          itemId={row.original.id}
+          field="discount"
+          value={row.original.discount}
+          updateItem={updateItem}
+        />
+      ),
+    },
+    {
+      accessorKey: 'created_at',
+      header: 'Intake Date',
+      cell: ({ row }) => formatDate(row.original.created_at),
+    },
+  ]
 
   return (
     <div className="space-y-4">
@@ -244,6 +294,7 @@ export default function ItemListPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Grades</SelectItem>
+            <SelectItem value="UNGRADED">Ungraded</SelectItem>
             {CONDITION_GRADES.map((g) => (
               <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>
             ))}
@@ -304,7 +355,7 @@ export default function ItemListPage() {
       </div>
 
       {isLoading ? (
-        <TableSkeleton rows={8} columns={7} />
+        <TableSkeleton rows={8} columns={9} />
       ) : (
         <DataTable
           columns={columns}

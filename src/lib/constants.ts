@@ -371,6 +371,7 @@ export const AUDIT_FIELD_LABELS: Record<string, string> = {
   serial_number: 'Serial Number',
   purchase_price: 'Purchase Price',
   selling_price: 'Selling Price',
+  discount: 'Discount',
   supplier_description: 'Supplier Description',
   ac_adapter_status: 'AC Adapter',
   notes: 'Notes',

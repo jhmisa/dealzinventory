@@ -557,6 +557,7 @@ export type Database = {
           cpu: string | null
           created_at: string
           device_category: Database["public"]["Enums"]["device_category"] | null
+          discount: number | null
           field_sources: Json | null
           form_factor: string | null
           gallery_photo_order: Json | null
@@ -613,6 +614,7 @@ export type Database = {
           device_category?:
             | Database["public"]["Enums"]["device_category"]
             | null
+          discount?: number | null
           field_sources?: Json | null
           form_factor?: string | null
           gallery_photo_order?: Json | null
@@ -669,6 +671,7 @@ export type Database = {
           device_category?:
             | Database["public"]["Enums"]["device_category"]
             | null
+          discount?: number | null
           field_sources?: Json | null
           form_factor?: string | null
           gallery_photo_order?: Json | null
@@ -1296,6 +1299,7 @@ export type Database = {
       product_models: {
         Row: {
           brand: string
+          camera: string | null
           carrier: string | null
           category_id: string | null
           chipset: string | null
@@ -1334,6 +1338,7 @@ export type Database = {
         }
         Insert: {
           brand: string
+          camera?: string | null
           carrier?: string | null
           category_id?: string | null
           chipset?: string | null
@@ -1372,6 +1377,7 @@ export type Database = {
         }
         Update: {
           brand?: string
+          camera?: string | null
           carrier?: string | null
           category_id?: string | null
           chipset?: string | null
@@ -1414,6 +1420,159 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      return_request_items: {
+        Row: {
+          id: string
+          item_id: string | null
+          order_item_id: string
+          reason_note: string | null
+          return_request_id: string
+        }
+        Insert: {
+          id?: string
+          item_id?: string | null
+          order_item_id: string
+          reason_note?: string | null
+          return_request_id: string
+        }
+        Update: {
+          id?: string
+          item_id?: string | null
+          order_item_id?: string
+          reason_note?: string | null
+          return_request_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "return_request_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "return_request_items_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "return_request_items_return_request_id_fkey"
+            columns: ["return_request_id"]
+            isOneToOne: false
+            referencedRelation: "return_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      return_request_media: {
+        Row: {
+          file_url: string
+          id: string
+          media_type: string
+          return_request_id: string
+          sort_order: number
+          uploaded_at: string
+        }
+        Insert: {
+          file_url: string
+          id?: string
+          media_type: string
+          return_request_id: string
+          sort_order?: number
+          uploaded_at?: string
+        }
+        Update: {
+          file_url?: string
+          id?: string
+          media_type?: string
+          return_request_id?: string
+          sort_order?: number
+          uploaded_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "return_request_media_return_request_id_fkey"
+            columns: ["return_request_id"]
+            isOneToOne: false
+            referencedRelation: "return_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      return_requests: {
+        Row: {
+          approved_at: string | null
+          created_at: string
+          customer_description: string
+          customer_id: string
+          id: string
+          order_id: string
+          reason_category: string
+          received_at: string | null
+          refund_amount: number | null
+          resolution: string | null
+          resolution_notes: string | null
+          resolved_at: string | null
+          return_code: string
+          return_status: string
+          staff_notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          created_at?: string
+          customer_description: string
+          customer_id: string
+          id?: string
+          order_id: string
+          reason_category: string
+          received_at?: string | null
+          refund_amount?: number | null
+          resolution?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          return_code: string
+          return_status?: string
+          staff_notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          created_at?: string
+          customer_description?: string
+          customer_id?: string
+          id?: string
+          order_id?: string
+          reason_category?: string
+          received_at?: string | null
+          refund_amount?: number | null
+          resolution?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          return_code?: string
+          return_status?: string
+          staff_notes?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "return_requests_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "return_requests_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
         ]
@@ -1805,3 +1964,4 @@ export const Constants = {
     },
   },
 } as const
+

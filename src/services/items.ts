@@ -35,7 +35,11 @@ export async function getItems(filters: ItemFilters = {}) {
     query = query.eq('item_status', filters.status)
   }
   if (filters.grade) {
-    query = query.eq('condition_grade', filters.grade)
+    if (filters.grade === 'UNGRADED') {
+      query = query.is('condition_grade', null)
+    } else {
+      query = query.eq('condition_grade', filters.grade)
+    }
   }
   if (filters.source) {
     query = query.eq('source_type', filters.source)
