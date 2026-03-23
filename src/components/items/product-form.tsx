@@ -203,7 +203,7 @@ export function ProductForm({ product, loading = false, onSubmit, onCancel }: Pr
           />
         </div>
 
-        {/* Always visible: year, other_features, status */}
+        {/* Always visible: year, status */}
         <div className="grid grid-cols-3 gap-4">
           <FormField
             control={form.control}
@@ -213,19 +213,6 @@ export function ProductForm({ product, loading = false, onSubmit, onCancel }: Pr
                 <FormLabel>Year</FormLabel>
                 <FormControl>
                   <Input type="number" placeholder="2024" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="other_features"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Other Features</FormLabel>
-                <FormControl>
-                  <Input placeholder="Fingerprint reader, IR camera" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -595,12 +582,12 @@ export function ProductForm({ product, loading = false, onSubmit, onCancel }: Pr
 
         <FormField
           control={form.control}
-          name="model_notes"
+          name="other_features"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Notes</FormLabel>
+              <FormLabel>Other Features</FormLabel>
               <FormControl>
-                <Textarea placeholder="Additional notes" rows={3} {...field} />
+                <Textarea placeholder="Fingerprint reader, IR camera, etc." rows={2} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>

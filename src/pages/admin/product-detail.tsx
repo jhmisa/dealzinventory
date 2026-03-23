@@ -623,6 +623,14 @@ function ProductDetailContent({
                 )}
               </div>
             )}
+
+            {/* Other Features */}
+            {product.other_features && (
+              <div className="flex flex-col lg:w-1/2">
+                <h3 className="text-[13px] pb-3 font-semibold text-zinc-900 leading-4">Other Features</h3>
+                <p className="text-[13px] text-zinc-700 leading-5 whitespace-pre-wrap">{product.other_features}</p>
+              </div>
+            )}
           </div>
 
           {/* Desktop Action Buttons */}
