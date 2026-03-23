@@ -18,7 +18,7 @@ import {
 import { ITEM_STATUSES } from '@/lib/constants'
 import { useActiveOfferForItem, useCancelOffer } from '@/hooks/use-offers'
 import { CreateOfferDialog } from '@/components/offers'
-import { formatPrice } from '@/lib/utils'
+import { formatPrice, buildShortDescription } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { Item, ProductModel, ProductMedia, Supplier, ItemCost, ItemMedia } from '@/lib/types'
 
@@ -54,7 +54,14 @@ export default function ItemDetailPage() {
   const brand = item.brand ?? pm?.brand
   const modelName = item.model_name ?? pm?.model_name
   const color = item.color ?? pm?.color
-  const description = pm?.short_description || (brand && modelName ? `${brand} ${modelName}${color ? ` (${color})` : ''}` : undefined)
+  const descriptionFields = pm?.categories?.description_fields ?? []
+  const resolvedValues: Record<string, unknown> = {}
+  for (const key of descriptionFields) {
+    resolvedValues[key] = (item as Record<string, unknown>)[key] ?? (pm as Record<string, unknown> | null)?.[key]
+  }
+  const description = descriptionFields.length > 0
+    ? buildShortDescription(resolvedValues, descriptionFields) || undefined
+    : (brand && modelName ? `${brand} ${modelName}${color ? ` (${color})` : ''}` : undefined)
 
   const statusConfig = ITEM_STATUSES.find((s) => s.value === item.item_status)
 
