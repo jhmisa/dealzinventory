@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
 import { Plus, QrCode } from 'lucide-react'
@@ -13,6 +13,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { PageHeader, SearchBar, DataTable, StatusBadge, GradeBadge, CodeDisplay, PriceDisplay, TableSkeleton } from '@/components/shared'
 import { useItems, useUpdateItem } from '@/hooks/use-items'
+import { useItemListColumnSettings } from '@/hooks/use-settings'
 import { useDebounce } from '@/hooks/use-debounce'
 import { ITEM_STATUSES, CONDITION_GRADES } from '@/lib/constants'
 import { formatDate, cn, buildShortDescription } from '@/lib/utils'
@@ -90,6 +91,21 @@ export default function ItemListPage() {
   const debouncedConditionSearch = useDebounce(conditionSearch, 400)
   const [priceFrom, setPriceFrom] = useState<string>('')
   const [priceTo, setPriceTo] = useState<string>('')
+
+  const { data: columnSettings } = useItemListColumnSettings()
+
+  // Build VisibilityState from settings for the active tab
+  const ALL_COLUMN_IDS = ['item_code', 'model', 'condition_grade', 'item_status', 'supplier', 'purchase_price', 'selling_price', 'discount', 'created_at']
+  const columnVisibility = useMemo(() => {
+    if (!columnSettings) return {}
+    const setting = columnSettings.find((s) => s.status_tab === statusTab)
+    if (!setting) return {}
+    const vis: Record<string, boolean> = {}
+    for (const id of ALL_COLUMN_IDS) {
+      vis[id] = setting.visible_columns.includes(id)
+    }
+    return vis
+  }, [columnSettings, statusTab])
 
   // Fetch all items (no status filter) so we can compute tab counts
   const { data: allItems, isLoading } = useItems({
@@ -355,11 +371,12 @@ export default function ItemListPage() {
       </div>
 
       {isLoading ? (
-        <TableSkeleton rows={8} columns={9} />
+        <TableSkeleton rows={8} columns={Object.values(columnVisibility).filter(Boolean).length || 9} />
       ) : (
         <DataTable
           columns={columns}
           data={filteredItems}
+          columnVisibility={columnVisibility}
           onRowClick={(row) => navigate(`/admin/items/${row.id}`)}
         />
       )}

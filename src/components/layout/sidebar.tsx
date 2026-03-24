@@ -18,6 +18,7 @@ import {
   Tags,
   MapPin,
   RotateCcw,
+  Columns3,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -93,6 +94,7 @@ const navSections = [
     label: 'Settings',
     items: [
       { title: 'AI Configuration', href: '/admin/settings/ai', icon: BrainCircuit },
+      { title: 'Items Columns', href: '/admin/settings/items-columns', icon: Columns3 },
       { title: 'Postal Codes', href: '/admin/settings/postal-codes', icon: MapPin },
     ],
   },

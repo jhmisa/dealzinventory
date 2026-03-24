@@ -120,6 +120,10 @@ export const queryKeys = {
     customer: (customerId: string) => [...queryKeys.returns.all, 'customer', customerId] as const,
     media: (id: string) => [...queryKeys.returns.all, 'media', id] as const,
   },
+  settings: {
+    all: ['settings'] as const,
+    itemListColumns: () => [...queryKeys.settings.all, 'item-list-columns'] as const,
+  },
   postalCodes: {
     all: ['postal-codes'] as const,
     lookup: (code: string) => ['postal-codes', 'lookup', code] as const,

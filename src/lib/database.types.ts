@@ -503,6 +503,27 @@ export type Database = {
           },
         ]
       }
+      item_list_column_settings: {
+        Row: {
+          id: string
+          status_tab: string
+          updated_at: string | null
+          visible_columns: string[]
+        }
+        Insert: {
+          id?: string
+          status_tab: string
+          updated_at?: string | null
+          visible_columns: string[]
+        }
+        Update: {
+          id?: string
+          status_tab?: string
+          updated_at?: string | null
+          visible_columns?: string[]
+        }
+        Relationships: []
+      }
       item_media: {
         Row: {
           created_at: string

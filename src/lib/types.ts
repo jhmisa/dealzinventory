@@ -92,6 +92,8 @@ export type ItemCostInsert = Tables['item_costs']['Insert']
 
 export type ItemAuditLog = Tables['item_audit_logs']['Row']
 
+export type ItemListColumnSetting = Tables['item_list_column_settings']['Row']
+
 export type ProductModelWithHeroImage = ProductModel & {
   hero_image_url: string | null
   media_count: number

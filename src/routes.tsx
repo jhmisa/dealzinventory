@@ -34,6 +34,7 @@ const ReceivingReportsPage = lazy(() => import('@/pages/admin/receiving-reports'
 const ReceivingReportDetailPage = lazy(() => import('@/pages/admin/receiving-report-detail'))
 const CategoriesPage = lazy(() => import('@/pages/admin/categories'))
 const AiSettingsPage = lazy(() => import('@/pages/admin/ai-settings'))
+const ItemsColumnSettingsPage = lazy(() => import('@/pages/admin/items-column-settings'))
 const PostalCodesPage = lazy(() => import('@/pages/admin/postal-codes'))
 const MediaStudioPage = lazy(() => import('@/pages/admin/media-studio'))
 const OfferClaimPage = lazy(() => import('@/pages/offer/claim'))
@@ -111,6 +112,7 @@ export const router = createBrowserRouter([
           { path: 'returns/:id', element: lazyElement(AdminReturnDetailPage) },
           { path: 'suppliers', element: lazyElement(SupplierListPage) },
           { path: 'settings/ai', element: lazyElement(AiSettingsPage) },
+          { path: 'settings/items-columns', element: lazyElement(ItemsColumnSettingsPage) },
           { path: 'settings/postal-codes', element: lazyElement(PostalCodesPage) },
         ],
       },

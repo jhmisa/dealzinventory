@@ -2,6 +2,7 @@ import { useState } from 'react'
 import {
   type ColumnDef,
   type SortingState,
+  type VisibilityState,
   flexRender,
   getCoreRowModel,
   getSortedRowModel,
@@ -31,6 +32,7 @@ interface DataTableProps<TData, TValue> {
   data: TData[]
   pageSize?: number
   onRowClick?: (row: TData) => void
+  columnVisibility?: VisibilityState
 }
 
 export function DataTable<TData, TValue>({
@@ -38,6 +40,7 @@ export function DataTable<TData, TValue>({
   data,
   pageSize = 20,
   onRowClick,
+  columnVisibility,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([])
 
@@ -48,7 +51,7 @@ export function DataTable<TData, TValue>({
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     onSortingChange: setSorting,
-    state: { sorting },
+    state: { sorting, ...(columnVisibility ? { columnVisibility } : {}) },
     initialState: { pagination: { pageSize } },
   })
 
