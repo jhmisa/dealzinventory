@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Check, Circle, Package, Pencil, X, Plus, History, Truck, Search, Loader2 } from 'lucide-react'
+import { ArrowLeft, Check, Circle, Package, Pencil, X, Plus, History, Truck, Search, Loader2, Printer } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -27,6 +27,7 @@ import {
   useAddOrderLineItem,
 } from '@/hooks/use-orders'
 import * as ordersService from '@/services/orders'
+import { printInvoice } from '@/components/orders/invoice-pdf'
 import { useAuth } from '@/hooks/use-auth'
 import { ORDER_STATUSES, ORDER_SOURCES, YAMATO_TIME_SLOTS } from '@/lib/constants'
 import { formatDateTime, formatPrice, cn, buildShortDescription } from '@/lib/utils'
@@ -98,7 +99,7 @@ interface EditingItem {
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { session } = useAuth()
+  const { session, displayName } = useAuth()
   const { data: order, isLoading } = useOrder(id!)
   const statusMutation = useUpdateOrderStatus()
   const cancelMutation = useCancelOrder()
@@ -423,6 +424,16 @@ export default function OrderDetailPage() {
                     Cancel
                   </Button>
                 </>
+              )}
+              {!isEditing && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => printInvoice({ order: order as Parameters<typeof printInvoice>[0]['order'], salesAgent: displayName ?? '' })}
+                >
+                  <Printer className="h-4 w-4 mr-1" />
+                  Print Invoice
+                </Button>
               )}
               {!isEditing && nextStatus && order.order_status !== 'CANCELLED' && (
                 <Button size="sm" onClick={() => setAdvanceOpen(true)}>
