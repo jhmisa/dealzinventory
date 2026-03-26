@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { usePersistedFilters } from '@/hooks/use-persisted-filters'
 import { type ColumnDef } from '@tanstack/react-table'
 import { Plus, ImageOff, VideoOff } from 'lucide-react'
 import { toast } from 'sonner'
@@ -91,10 +92,14 @@ const columns: ColumnDef<ProductRow>[] = [
 
 export default function ProductListPage() {
   const navigate = useNavigate()
-  const [search, setSearch] = useState('')
+  const { getParam, setParam } = usePersistedFilters('products-filters')
+  const search = getParam('q')
   const debouncedSearch = useDebounce(search, 400)
-  const [categoryFilter, setCategoryFilter] = useState<string>('all')
-  const [mediaFilter, setMediaFilter] = useState<string>('all')
+  const categoryFilter = getParam('category', 'all')
+  const mediaFilter = getParam('media', 'all')
+  const setSearch = (v: string) => setParam('q', v)
+  const setCategoryFilter = (v: string) => setParam('category', v, 'all')
+  const setMediaFilter = (v: string) => setParam('media', v, 'all')
   const [formOpen, setFormOpen] = useState(false)
 
   const { data: categories } = useCategories()

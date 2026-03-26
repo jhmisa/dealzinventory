@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { type ColumnDef } from '@tanstack/react-table'
+import { usePersistedFilters } from '@/hooks/use-persisted-filters'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -44,8 +45,10 @@ const columns: ColumnDef<SupplierWithItemCount>[] = [
 ]
 
 export default function SupplierListPage() {
-  const [search, setSearch] = useState('')
+  const { getParam, setParam } = usePersistedFilters('suppliers-filters')
+  const search = getParam('q')
   const debouncedSearch = useDebounce(search, 400)
+  const setSearch = (v: string) => setParam('q', v)
   const [formOpen, setFormOpen] = useState(false)
   const [editSupplier, setEditSupplier] = useState<Supplier | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { usePersistedFilters } from '@/hooks/use-persisted-filters'
 import { type ColumnDef } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
 import { toast } from 'sonner'
@@ -73,7 +74,9 @@ const columns: ColumnDef<Customer>[] = [
 ]
 
 export default function CustomerListPage() {
-  const [search, setSearch] = useState('')
+  const { getParam, setParam } = usePersistedFilters('customers-filters')
+  const search = getParam('q')
+  const setSearch = (v: string) => setParam('q', v)
   const [dialogOpen, setDialogOpen] = useState(false)
   const { data: customers, isLoading } = useCustomers(search || undefined)
   const createMutation = useCreateCustomer()

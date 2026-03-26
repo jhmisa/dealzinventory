@@ -73,6 +73,9 @@ export async function inviteStaff(email: string, displayName: string, role: stri
     body: { email, display_name: displayName, role },
   })
 
-  if (response.error) throw response.error
+  if (response.error) {
+    const message = response.data?.error ?? response.error.message ?? 'Unknown error'
+    throw new Error(message)
+  }
   return response.data.profile as StaffProfile
 }

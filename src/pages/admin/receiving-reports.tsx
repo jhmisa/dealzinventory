@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { ColumnDef } from '@tanstack/react-table'
 import { PageHeader, DataTable, CodeDisplay, PriceDisplay } from '@/components/shared'
@@ -12,6 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useIntakeReceipts } from '@/hooks/use-intake-receipts'
+import { usePersistedFilters } from '@/hooks/use-persisted-filters'
 import { useSuppliers } from '@/hooks/use-suppliers'
 import { formatDate, formatPrice } from '@/lib/utils'
 import type { IntakeReceipt } from '@/lib/types'
@@ -62,9 +62,13 @@ const columns: ColumnDef<ReceiptRow>[] = [
 
 export default function ReceivingReportsPage() {
   const navigate = useNavigate()
-  const [supplierId, setSupplierId] = useState('')
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
+  const { getParam, setParam } = usePersistedFilters('receiving-reports-filters')
+  const supplierId = getParam('supplier')
+  const dateFrom = getParam('dateFrom')
+  const dateTo = getParam('dateTo')
+  const setSupplierId = (v: string) => setParam('supplier', v)
+  const setDateFrom = (v: string) => setParam('dateFrom', v)
+  const setDateTo = (v: string) => setParam('dateTo', v)
 
   const { data: suppliers } = useSuppliers()
   const { data: receipts, isLoading } = useIntakeReceipts({

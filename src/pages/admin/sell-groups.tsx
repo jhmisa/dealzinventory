@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { usePersistedFilters } from '@/hooks/use-persisted-filters'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { type ColumnDef } from '@tanstack/react-table'
@@ -100,7 +101,9 @@ const SELLABLE_GRADES = CONDITION_GRADES.filter(g => g.value !== 'J')
 
 export default function SellGroupListPage() {
   const navigate = useNavigate()
-  const [search, setSearch] = useState('')
+  const { getParam, setParam } = usePersistedFilters('sell-groups-filters')
+  const search = getParam('q')
+  const setSearch = (v: string) => setParam('q', v)
   const [dialogOpen, setDialogOpen] = useState(false)
 
   const { data: sellGroups, isLoading } = useSellGroups({ search: search || undefined })

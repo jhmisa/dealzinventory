@@ -36,3 +36,6 @@ supabase/.temp/
 
 # Git worktrees
 .worktrees/
+
+# Moat task system
+.moat/

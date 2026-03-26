@@ -113,13 +113,16 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="border-b px-4 py-3">
-        <Link to="/admin/dashboard" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
+        <Link to="/admin/dashboard" className="flex items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
             D
           </div>
-          <div>
-            <span className="text-base font-bold leading-none">Dealz</span>
-            <span className="text-xs text-muted-foreground block leading-tight">K.K.</span>
+          <div className="min-w-0">
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-base font-bold leading-none tracking-tight">Dealz</span>
+              <span className="text-xs font-medium text-muted-foreground leading-none">K.K.</span>
+            </div>
+            <span className="text-[10px] text-muted-foreground mt-1 block leading-none">v{__APP_VERSION__}</span>
           </div>
         </Link>
       </SidebarHeader>

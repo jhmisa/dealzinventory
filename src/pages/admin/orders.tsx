@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
 import { Plus, Copy, X } from 'lucide-react'
@@ -13,6 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useOrders } from '@/hooks/use-orders'
+import { usePersistedFilters } from '@/hooks/use-persisted-filters'
 import { useOffers, useCancelOffer } from '@/hooks/use-offers'
 import { ORDER_STATUSES, ORDER_SOURCES, OFFER_STATUSES } from '@/lib/constants'
 import { formatDateTime, formatPrice, cn } from '@/lib/utils'
@@ -139,10 +139,15 @@ type OfferRow = {
 
 export default function OrderListPage() {
   const navigate = useNavigate()
-  const [search, setSearch] = useState('')
-  const [statusTab, setStatusTab] = useState('all')
-  const [sourceFilter, setSourceFilter] = useState<string>('all')
-  const [mainTab, setMainTab] = useState<'orders' | 'offers'>('orders')
+  const { getParam, setParam } = usePersistedFilters('orders-filters')
+  const search = getParam('q')
+  const statusTab = getParam('status', 'all')
+  const sourceFilter = getParam('source', 'all')
+  const mainTab = getParam('tab', 'orders') as 'orders' | 'offers'
+  const setSearch = (v: string) => setParam('q', v)
+  const setStatusTab = (v: string) => setParam('status', v, 'all')
+  const setSourceFilter = (v: string) => setParam('source', v, 'all')
+  const setMainTab = (v: 'orders' | 'offers') => setParam('tab', v, 'orders')
 
   // Fetch all orders (no status filter) so we can compute tab counts
   const { data: allOrders, isLoading } = useOrders({

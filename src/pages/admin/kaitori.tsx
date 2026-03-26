@@ -1,10 +1,10 @@
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
 import { PageHeader, DataTable, SearchBar, StatusBadge, CodeDisplay } from '@/components/shared'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useKaitoriRequests } from '@/hooks/use-kaitori'
+import { usePersistedFilters } from '@/hooks/use-persisted-filters'
 import { KAITORI_STATUSES, getKaitoriStatusConfig } from '@/lib/constants'
 import { formatPrice, formatDateTime } from '@/lib/utils'
 import type { KaitoriStatus } from '@/lib/types'
@@ -89,8 +89,11 @@ const columns: ColumnDef<KaitoriRow>[] = [
 
 export default function KaitoriListPage() {
   const navigate = useNavigate()
-  const [search, setSearch] = useState('')
-  const [statusTab, setStatusTab] = useState<string>('all')
+  const { getParam, setParam } = usePersistedFilters('kaitori-filters')
+  const search = getParam('q')
+  const statusTab = getParam('status', 'all')
+  const setSearch = (v: string) => setParam('q', v)
+  const setStatusTab = (v: string) => setParam('status', v, 'all')
 
   const { data: requests, isLoading } = useKaitoriRequests({
     search: search || undefined,

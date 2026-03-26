@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ClipboardEdit, Lock, QrCode, Send, Unlock } from 'lucide-react'
+import { ArrowLeft, ClipboardEdit, Lock, Printer, QrCode, Send, Unlock } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -19,6 +19,7 @@ import { ITEM_STATUSES } from '@/lib/constants'
 import { useActiveOfferForItem, useCancelOffer } from '@/hooks/use-offers'
 import { CreateOfferDialog } from '@/components/offers'
 import { formatPrice, buildShortDescription } from '@/lib/utils'
+import { printItemLabel } from '@/components/items/label-print'
 import { toast } from 'sonner'
 import type { Item, ProductModel, ProductMedia, Supplier, ItemCost, ItemMedia } from '@/lib/types'
 
@@ -86,6 +87,9 @@ export default function ItemDetailPage() {
               <GradeBadge grade={item.condition_grade} />
               <Button variant="ghost" size="icon" onClick={() => setShowQr(!showQr)} title="Toggle QR code">
                 <QrCode className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="icon" onClick={() => printItemLabel({ item_code: item.item_code, description })} title="Print label">
+                <Printer className="h-4 w-4" />
               </Button>
               {item.item_status === 'AVAILABLE' && (
                 <Button variant="outline" onClick={() => setShowOfferDialog(true)}>

@@ -3,6 +3,7 @@ import { ArrowLeft, Check, Circle, Package, Pencil, X, Plus, History, Truck, Sea
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   PageHeader,
@@ -514,7 +515,27 @@ export default function OrderDetailPage() {
           <CardContent className="space-y-2 text-sm">
             <div className="flex justify-between"><span className="text-muted-foreground">Code</span><CodeDisplay code={order.order_code} /></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Status</span>{statusCfg && <StatusBadge label={statusCfg.label} color={statusCfg.color} />}</div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Source</span><span>{sourceCfg?.label ?? order.order_source}</span></div>
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground">Source</span>
+              <Select
+                value={order.order_source}
+                onValueChange={(v) => {
+                  updateOrder.mutate(
+                    { id: order.id, updates: { order_source: v } },
+                    { onError: (err: Error) => toast.error(`Failed to update source: ${err.message}`) }
+                  )
+                }}
+              >
+                <SelectTrigger className="w-[140px] h-7 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ORDER_SOURCES.map((s) => (
+                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex justify-between"><span className="text-muted-foreground">Quantity</span><span>{order.quantity}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Total</span><PriceDisplay amount={order.total_price} /></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Created</span><span>{formatDateTime(order.created_at)}</span></div>
@@ -576,9 +597,27 @@ export default function OrderDetailPage() {
               <span className="text-muted-foreground">Expected Delivery</span>
               <span>{deliveryDate ?? '—'}</span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between items-center">
               <span className="text-muted-foreground">Time Slot</span>
-              <span>{timeSlot ? timeSlot.label_en : '—'}</span>
+              <Select
+                value={deliveryTimeCode ?? 'none'}
+                onValueChange={(v) => {
+                  updateOrder.mutate(
+                    { id: order.id, updates: { delivery_time_code: v === 'none' ? null : v } },
+                    { onError: (err: Error) => toast.error(`Failed to update time slot: ${err.message}`) }
+                  )
+                }}
+              >
+                <SelectTrigger className="w-[180px] h-7 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">—</SelectItem>
+                  {YAMATO_TIME_SLOTS.map((s) => (
+                    <SelectItem key={s.code} value={s.code}>{s.label_en}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Packed Date</span>

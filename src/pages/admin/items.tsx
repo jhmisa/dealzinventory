@@ -1,7 +1,7 @@
-import { useState, useRef, useMemo } from 'react'
+import { useRef, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Plus, QrCode } from 'lucide-react'
+import { Plus, Printer, QrCode } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -14,9 +14,11 @@ import { Input } from '@/components/ui/input'
 import { PageHeader, SearchBar, DataTable, StatusBadge, GradeBadge, CodeDisplay, PriceDisplay, TableSkeleton } from '@/components/shared'
 import { useItems, useUpdateItem } from '@/hooks/use-items'
 import { useItemListColumnSettings } from '@/hooks/use-settings'
+import { usePersistedFilters } from '@/hooks/use-persisted-filters'
 import { useDebounce } from '@/hooks/use-debounce'
 import { ITEM_STATUSES, CONDITION_GRADES } from '@/lib/constants'
 import { formatDate, cn, buildShortDescription } from '@/lib/utils'
+import { printItemLabel } from '@/components/items/label-print'
 
 type ItemRow = {
   id: string
@@ -79,23 +81,37 @@ function InlinePriceCell({
 export default function ItemListPage() {
   const navigate = useNavigate()
   const updateItem = useUpdateItem()
-  const [search, setSearch] = useState('')
+  const { getParam, setParam } = usePersistedFilters('items-filters')
+
+  // Read filter state from URL search params
+  const search = getParam('q')
+  const statusTab = getParam('status', 'all')
+  const gradeFilter = getParam('grade')
+  const categoryFilter = getParam('category')
+  const brandFilter = getParam('brand')
+  const descriptionSearch = getParam('desc')
+  const conditionSearch = getParam('condition')
+  const priceFrom = getParam('priceFrom')
+  const priceTo = getParam('priceTo')
+
+  const setSearch = useCallback((v: string) => setParam('q', v), [setParam])
+  const setStatusTab = useCallback((v: string) => setParam('status', v, 'all'), [setParam])
+  const setGradeFilter = useCallback((v: string) => setParam('grade', v), [setParam])
+  const setCategoryFilter = useCallback((v: string) => setParam('category', v), [setParam])
+  const setBrandFilter = useCallback((v: string) => setParam('brand', v), [setParam])
+  const setDescriptionSearch = useCallback((v: string) => setParam('desc', v), [setParam])
+  const setConditionSearch = useCallback((v: string) => setParam('condition', v), [setParam])
+  const setPriceFrom = useCallback((v: string) => setParam('priceFrom', v), [setParam])
+  const setPriceTo = useCallback((v: string) => setParam('priceTo', v), [setParam])
+
   const debouncedSearch = useDebounce(search, 400)
-  const [statusTab, setStatusTab] = useState('all')
-  const [gradeFilter, setGradeFilter] = useState<string>('')
-  const [categoryFilter, setCategoryFilter] = useState<string>('')
-  const [brandFilter, setBrandFilter] = useState<string>('')
-  const [descriptionSearch, setDescriptionSearch] = useState('')
   const debouncedDescSearch = useDebounce(descriptionSearch, 400)
-  const [conditionSearch, setConditionSearch] = useState('')
   const debouncedConditionSearch = useDebounce(conditionSearch, 400)
-  const [priceFrom, setPriceFrom] = useState<string>('')
-  const [priceTo, setPriceTo] = useState<string>('')
 
   const { data: columnSettings } = useItemListColumnSettings()
 
   // Build VisibilityState from settings for the active tab
-  const ALL_COLUMN_IDS = ['item_code', 'model', 'condition_grade', 'item_status', 'supplier', 'purchase_price', 'selling_price', 'discount', 'created_at']
+  const ALL_COLUMN_IDS = ['item_code', 'model', 'condition_grade', 'item_status', 'supplier', 'purchase_price', 'selling_price', 'discount', 'created_at', 'actions']
   const columnVisibility = useMemo(() => {
     if (!columnSettings) return {}
     const setting = columnSettings.find((s) => s.status_tab === statusTab)
@@ -239,6 +255,29 @@ export default function ItemListPage() {
       accessorKey: 'created_at',
       header: 'Intake Date',
       cell: ({ row }) => formatDate(row.original.created_at),
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      cell: ({ row }) => {
+        const pm = row.original.product_models
+        const descFields = pm?.categories?.description_fields ?? []
+        const desc = buildShortDescription(row.original, descFields) || undefined
+        return (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            title="Print label"
+            onClick={(e) => {
+              e.stopPropagation()
+              printItemLabel({ item_code: row.original.item_code, description: desc })
+            }}
+          >
+            <Printer className="h-3.5 w-3.5" />
+          </Button>
+        )
+      },
     },
   ]
 

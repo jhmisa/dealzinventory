@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
 import { PageHeader, SearchBar, DataTable, StatusBadge, CodeDisplay, TableSkeleton } from '@/components/shared'
@@ -10,6 +9,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useReturns } from '@/hooks/use-returns'
+import { usePersistedFilters } from '@/hooks/use-persisted-filters'
 import { RETURN_STATUSES, RETURN_REASONS } from '@/lib/constants'
 import { formatDateTime, cn } from '@/lib/utils'
 
@@ -98,9 +98,13 @@ const columns: ColumnDef<ReturnRow>[] = [
 
 export default function ReturnListPage() {
   const navigate = useNavigate()
-  const [search, setSearch] = useState('')
-  const [statusTab, setStatusTab] = useState('all')
-  const [reasonFilter, setReasonFilter] = useState<string>('all')
+  const { getParam, setParam } = usePersistedFilters('returns-filters')
+  const search = getParam('q')
+  const statusTab = getParam('status', 'all')
+  const reasonFilter = getParam('reason', 'all')
+  const setSearch = (v: string) => setParam('q', v)
+  const setStatusTab = (v: string) => setParam('status', v, 'all')
+  const setReasonFilter = (v: string) => setParam('reason', v, 'all')
 
   const { data: allReturns, isLoading } = useReturns({
     search: search || undefined,
