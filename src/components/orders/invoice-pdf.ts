@@ -549,10 +549,30 @@ function buildInvoiceHtml(order: InvoiceOrder, salesAgent: string): string {
 
 export function printInvoice({ order, salesAgent }: InvoicePdfData): void {
   const html = buildInvoiceHtml(order, salesAgent)
-  const win = window.open('', '_blank', 'width=800,height=1100')
-  if (!win) return
-  win.document.write(html)
-  win.document.close()
-  win.addEventListener('afterprint', () => win.close())
-  setTimeout(() => win.print(), 250)
+
+  // Remove any previous print iframe
+  const existing = document.getElementById('invoice-print-frame')
+  if (existing) existing.remove()
+
+  const iframe = document.createElement('iframe')
+  iframe.id = 'invoice-print-frame'
+  iframe.style.position = 'fixed'
+  iframe.style.width = '0'
+  iframe.style.height = '0'
+  iframe.style.border = 'none'
+  iframe.style.left = '-9999px'
+  document.body.appendChild(iframe)
+
+  const iframeDoc = iframe.contentDocument ?? iframe.contentWindow?.document
+  if (!iframeDoc) return
+  iframeDoc.open()
+  iframeDoc.write(html)
+  iframeDoc.close()
+
+  // Small delay for rendering, then print
+  setTimeout(() => {
+    iframe.contentWindow?.print()
+    // Clean up after print dialog closes
+    setTimeout(() => iframe.remove(), 1000)
+  }, 250)
 }
