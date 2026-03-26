@@ -392,7 +392,8 @@ function parseAuctionCSV(csvText: string): ParseInvoiceResponse {
   for (const lot of lots) {
     if (!invoiceDate && lot.date) invoiceDate = lot.date;
 
-    const totalLotCost = Math.round((lot.bidPrice + lot.auctionFee) * 1.1);
+    const taxRate = parseFloat(Deno.env.get('JOA_TAX_RATE') ?? '0.10');
+    const totalLotCost = Math.round((lot.bidPrice + lot.auctionFee) * (1 + taxRate));
     const itemCount = lot.items.length;
     if (itemCount === 0) continue;
 
