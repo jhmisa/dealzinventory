@@ -4,7 +4,7 @@ import { AdminLayout } from '@/components/layout/admin-layout'
 import { ShopLayout } from '@/components/layout/shop-layout'
 import { CustomerLayout } from '@/components/layout/customer-layout'
 import { ProtectedRoute } from '@/components/layout/protected-route'
-import { AdminOnlyRoute } from '@/components/layout/admin-only-route'
+import { AdminGuard } from '@/components/layout/admin-only-route'
 import { RouteLoading } from '@/components/layout/route-loading'
 
 // Lazy-loaded page components
@@ -69,6 +69,16 @@ function lazyElement(Component: React.LazyExoticComponent<ComponentType>) {
   )
 }
 
+function adminElement(Component: React.LazyExoticComponent<ComponentType>) {
+  return (
+    <Suspense fallback={<RouteLoading />}>
+      <AdminGuard>
+        <Component />
+      </AdminGuard>
+    </Suspense>
+  )
+}
+
 export const router = createBrowserRouter([
   {
     path: '/',
@@ -114,16 +124,11 @@ export const router = createBrowserRouter([
           { path: 'returns', element: lazyElement(AdminReturnsPage) },
           { path: 'returns/:id', element: lazyElement(AdminReturnDetailPage) },
           { path: 'suppliers', element: lazyElement(SupplierListPage) },
-          {
-            element: <AdminOnlyRoute />,
-            children: [
-              { path: 'settings/general', element: lazyElement(GeneralSettingsPage) },
-              { path: 'settings/ai', element: lazyElement(AiSettingsPage) },
-              { path: 'settings/items-columns', element: lazyElement(ItemsColumnSettingsPage) },
-              { path: 'settings/postal-codes', element: lazyElement(PostalCodesPage) },
-              { path: 'settings/staff', element: lazyElement(StaffManagementPage) },
-            ],
-          },
+          { path: 'settings/general', element: adminElement(GeneralSettingsPage) },
+          { path: 'settings/ai', element: adminElement(AiSettingsPage) },
+          { path: 'settings/items-columns', element: adminElement(ItemsColumnSettingsPage) },
+          { path: 'settings/postal-codes', element: adminElement(PostalCodesPage) },
+          { path: 'settings/staff', element: adminElement(StaffManagementPage) },
         ],
       },
     ],
