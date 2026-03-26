@@ -598,8 +598,10 @@ export type Database = {
           kaitori_request_id: string | null
           keyboard_layout: string | null
           model_name: string | null
+          model_number: string | null
           os_family: string | null
           other_features: string | null
+          part_number: string | null
           product_id: string | null
           purchase_price: number | null
           ram_gb: number | null
@@ -655,8 +657,10 @@ export type Database = {
           kaitori_request_id?: string | null
           keyboard_layout?: string | null
           model_name?: string | null
+          model_number?: string | null
           os_family?: string | null
           other_features?: string | null
+          part_number?: string | null
           product_id?: string | null
           purchase_price?: number | null
           ram_gb?: number | null
@@ -712,8 +716,10 @@ export type Database = {
           kaitori_request_id?: string | null
           keyboard_layout?: string | null
           model_name?: string | null
+          model_number?: string | null
           os_family?: string | null
           other_features?: string | null
+          part_number?: string | null
           product_id?: string | null
           purchase_price?: number | null
           ram_gb?: number | null
@@ -1343,8 +1349,10 @@ export type Database = {
           match_priority: number | null
           model_name: string
           model_notes: string | null
+          model_number: string | null
           os_family: string | null
           other_features: string | null
+          part_number: string | null
           ports: string | null
           ram_gb: number | null
           screen_size: number | null
@@ -1382,8 +1390,10 @@ export type Database = {
           match_priority?: number | null
           model_name: string
           model_notes?: string | null
+          model_number?: string | null
           os_family?: string | null
           other_features?: string | null
+          part_number?: string | null
           ports?: string | null
           ram_gb?: number | null
           screen_size?: number | null
@@ -1421,8 +1431,10 @@ export type Database = {
           match_priority?: number | null
           model_name?: string
           model_notes?: string | null
+          model_number?: string | null
           os_family?: string | null
           other_features?: string | null
+          part_number?: string | null
           ports?: string | null
           ram_gb?: number | null
           screen_size?: number | null
@@ -1985,4 +1997,3 @@ export const Constants = {
     },
   },
 } as const
-

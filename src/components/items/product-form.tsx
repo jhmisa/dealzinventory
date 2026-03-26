@@ -44,6 +44,8 @@ export function ProductForm({ product, loading = false, onSubmit, onCancel }: Pr
       model_name: product?.model_name ?? '',
       color: product?.color ?? '',
       category_id: product?.category_id ?? '',
+      model_number: product?.model_number ?? '',
+      part_number: product?.part_number ?? '',
       chipset: product?.chipset ?? '',
       screen_size: product?.screen_size ?? undefined,
       ports: product?.ports ?? '',
@@ -114,6 +116,8 @@ export function ProductForm({ product, loading = false, onSubmit, onCancel }: Pr
   function handleSubmit(values: ProductModelFormValues) {
     onSubmit({
       ...values,
+      model_number: values.model_number || undefined,
+      part_number: values.part_number || undefined,
       chipset: values.chipset || undefined,
       ports: values.ports || undefined,
       other_features: values.other_features || undefined,
@@ -243,6 +247,41 @@ export function ProductForm({ product, loading = false, onSubmit, onCancel }: Pr
         </div>
 
         {/* Dynamic spec fields based on category */}
+        {(show('model_number') || show('part_number')) && (
+          <div className="grid grid-cols-2 gap-4">
+            {show('model_number') && (
+              <FormField
+                control={form.control}
+                name="model_number"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Model Number</FormLabel>
+                    <FormControl>
+                      <Input placeholder="A2221" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+            {show('part_number') && (
+              <FormField
+                control={form.control}
+                name="part_number"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Part Number</FormLabel>
+                    <FormControl>
+                      <Input placeholder="MWLT2X/A" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+          </div>
+        )}
+
         {(show('chipset') || show('screen_size') || show('ports')) && (
           <div className="grid grid-cols-3 gap-4">
             {show('chipset') && (

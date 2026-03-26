@@ -5,6 +5,8 @@ export const productModelSchema = z.object({
   model_name: z.string().min(1, 'Model name is required'),
   color: z.string().min(1, 'Color is required'),
   category_id: z.string().min(1, 'Category is required'),
+  model_number: z.string().optional().or(z.literal('')),
+  part_number: z.string().optional().or(z.literal('')),
   chipset: z.string().optional().or(z.literal('')),
   screen_size: z.coerce.number().positive().optional().or(z.literal(0).transform(() => undefined)),
   ports: z.string().optional().or(z.literal('')),

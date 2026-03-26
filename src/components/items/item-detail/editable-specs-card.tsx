@@ -34,6 +34,8 @@ const ALWAYS_VISIBLE = new Set(['brand', 'model_name', 'color', 'year', 'other_f
 const SPEC_FIELDS = [
   { key: 'brand', type: 'text' },
   { key: 'model_name', type: 'text' },
+  { key: 'model_number', type: 'text' },
+  { key: 'part_number', type: 'text' },
   { key: 'cpu', type: 'text' },
   { key: 'ram_gb', type: 'number', suffix: ' GB' },
   { key: 'storage_gb', type: 'number', suffix: ' GB' },
@@ -85,6 +87,8 @@ export function EditableSpecsCard({ item, productModel, locked }: EditableSpecsC
       imei2: item.imei2 ?? '',
       battery_health_pct: item.battery_health_pct ?? null,
       year: item.year ?? null,
+      model_number: item.model_number ?? '',
+      part_number: item.part_number ?? '',
       other_features: item.other_features ?? '',
     },
   })

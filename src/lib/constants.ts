@@ -214,6 +214,8 @@ export const KAITORI_MEDIA_ROLES: { value: KaitoriMediaRole; label: string }[] =
 export const AVAILABLE_SPEC_FIELDS: { key: string; label: string }[] = [
   { key: 'brand', label: 'Brand' },
   { key: 'model_name', label: 'Model Name' },
+  { key: 'model_number', label: 'Model Number' },
+  { key: 'part_number', label: 'Part Number' },
   { key: 'color', label: 'Color' },
   { key: 'cpu', label: 'CPU' },
   { key: 'ram_gb', label: 'Memory (GB)' },

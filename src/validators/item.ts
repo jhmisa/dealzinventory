@@ -47,6 +47,8 @@ export const itemSpecsSchema = z.object({
   brand: z.string().optional().or(z.literal('')),
   model_name: z.string().optional().or(z.literal('')),
   color: z.string().optional().or(z.literal('')),
+  model_number: z.string().optional().or(z.literal('')),
+  part_number: z.string().optional().or(z.literal('')),
   screen_size: z.coerce.number().positive().nullable().optional(),
   cpu: z.string().optional().or(z.literal('')),
   ram_gb: z.coerce.number().int().positive().nullable().optional(),
