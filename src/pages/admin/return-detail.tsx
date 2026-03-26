@@ -1,13 +1,18 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArrowLeft, CheckCircle2, XCircle, Package, Eye, Wrench, Save } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, XCircle, Package, Eye, Wrench, Save, ChevronDown, ChevronRight, FileImage } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
 import {
   Dialog,
   DialogContent,
@@ -54,6 +59,7 @@ import {
 import type { ReturnStatus, ReturnResolution } from '@/lib/constants'
 import { resolveReturnSchema } from '@/validators/return'
 import type { ResolveReturnFormValues } from '@/validators/return'
+import { getInvoiceSignedUrl } from '@/services/intake-receipts'
 import { formatDateTime, formatPrice, cn } from '@/lib/utils'
 
 export default function ReturnDetailPage() {
@@ -70,6 +76,8 @@ export default function ReturnDetailPage() {
   const [resolveOpen, setResolveOpen] = useState(false)
   const [staffNotes, setStaffNotes] = useState<string | null>(null)
   const [savingNotes, setSavingNotes] = useState(false)
+  const [invoiceProofOpen, setInvoiceProofOpen] = useState(false)
+  const [invoiceProofUrls, setInvoiceProofUrls] = useState<Record<string, string>>({})
 
   const resolveForm = useForm<ResolveReturnFormValues>({
     resolver: zodResolver(resolveReturnSchema),
@@ -110,6 +118,41 @@ export default function ReturnDetailPage() {
   const order = returnReq.orders
   const items = returnReq.return_request_items ?? []
   const media = returnReq.return_request_media ?? []
+
+  // Collect unique invoice file paths from return items
+  const invoicePaths = useMemo(() => {
+    const paths = new Set<string>()
+    for (const ri of items) {
+      const invoiceUrl = (ri as { order_items?: { items?: { intake_receipts?: { invoice_file_url?: string } | null } | null } | null }).order_items?.items?.intake_receipts?.invoice_file_url
+      if (invoiceUrl && /\.(jpe?g|png|webp)$/i.test(invoiceUrl)) {
+        paths.add(invoiceUrl)
+      }
+    }
+    return Array.from(paths)
+  }, [items])
+
+  useEffect(() => {
+    if (invoicePaths.length === 0) return
+    let cancelled = false
+    Promise.all(
+      invoicePaths.map(async (path) => {
+        try {
+          const url = await getInvoiceSignedUrl(path)
+          return [path, url] as const
+        } catch {
+          return null
+        }
+      })
+    ).then((results) => {
+      if (cancelled) return
+      const urls: Record<string, string> = {}
+      for (const r of results) {
+        if (r) urls[r[0]] = r[1]
+      }
+      setInvoiceProofUrls(urls)
+    })
+    return () => { cancelled = true }
+  }, [invoicePaths])
 
   // Initialize staff notes from data on first render
   const currentNotes = staffNotes ?? returnReq.staff_notes ?? ''
@@ -346,6 +389,35 @@ export default function ReturnDetailPage() {
                 <ImageGallery images={galleryImages} columns={4} />
               </CardContent>
             </Card>
+          )}
+
+          {/* Invoice Proof */}
+          {Object.keys(invoiceProofUrls).length > 0 && (
+            <Collapsible open={invoiceProofOpen} onOpenChange={setInvoiceProofOpen}>
+              <Card>
+                <CardHeader className="flex-row items-center space-y-0">
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="gap-2 -ml-2">
+                      {invoiceProofOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      <FileImage className="h-4 w-4" />
+                      <CardTitle className="text-base">Invoice Proof</CardTitle>
+                    </Button>
+                  </CollapsibleTrigger>
+                </CardHeader>
+                <CollapsibleContent>
+                  <CardContent className="space-y-4">
+                    {Object.entries(invoiceProofUrls).map(([path, url]) => (
+                      <img
+                        key={path}
+                        src={url}
+                        alt="Invoice"
+                        className="max-w-full rounded-md border"
+                      />
+                    ))}
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
           )}
         </div>
 

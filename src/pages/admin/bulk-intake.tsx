@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, AlertTriangle, Info } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { Button } from '@/components/ui/button'
@@ -33,6 +33,7 @@ import { useSuppliers } from '@/hooks/use-suppliers'
 import { useProductModelsWithHeroImage } from '@/hooks/use-product-models'
 import { useActiveAiConfiguration } from '@/hooks/use-ai-configurations'
 import { useCreateIntakeBatch, useUploadInvoiceFile, useParseInvoice } from '@/hooks/use-intake-receipts'
+import { getInvoiceSignedUrl } from '@/services/intake-receipts'
 import { batchMatchProducts } from '@/services/product-models'
 import { autoMatchSingle } from '@/lib/product-matcher'
 import { SOURCE_TYPES } from '@/lib/constants'
@@ -40,12 +41,27 @@ import type { SourceType } from '@/lib/types'
 
 type IntakeMode = 'upload' | 'manual'
 
+interface ExtractedMeta {
+  supplier_name?: string
+  invoice_date?: string
+  invoice_total?: number
+}
+
+function loosely_matches(a: string, b: string): boolean {
+  const normalize = (s: string) => s.toLowerCase().replace(/[\s\-_.,()（）株式会社有限会社co\.ltd\.inc\.]+/g, '')
+  const na = normalize(a)
+  const nb = normalize(b)
+  return na.includes(nb) || nb.includes(na)
+}
+
 function IntakeSharedFields({
   supplierId, setSupplierId,
   sourceType, setSourceType,
   dateReceived, setDateReceived,
   notes, setNotes,
   suppliers,
+  extractedMeta,
+  selectedSupplierName,
 }: {
   supplierId: string
   setSupplierId: (v: string) => void
@@ -56,7 +72,16 @@ function IntakeSharedFields({
   notes: string
   setNotes: (v: string) => void
   suppliers: { id: string; supplier_name: string }[] | undefined
+  extractedMeta?: ExtractedMeta | null
+  selectedSupplierName?: string
 }) {
+  const supplierMismatch = extractedMeta?.supplier_name && selectedSupplierName
+    ? !loosely_matches(extractedMeta.supplier_name, selectedSupplierName)
+    : false
+  const dateMismatch = extractedMeta?.invoice_date && dateReceived
+    ? extractedMeta.invoice_date !== dateReceived
+    : false
+
   return (
     <Card>
       <CardContent className="pt-6 space-y-4">
@@ -106,6 +131,38 @@ function IntakeSharedFields({
             className="mt-1.5"
           />
         </div>
+        {extractedMeta && (
+          <div className="rounded-md border border-blue-200 bg-blue-50 p-3 space-y-2 text-sm">
+            <div className="flex items-center gap-1.5 font-medium text-blue-800">
+              <Info className="h-4 w-4" />
+              Invoice Metadata (extracted)
+            </div>
+            {extractedMeta.supplier_name && (
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground w-28 shrink-0">Company Name</span>
+                <span>{extractedMeta.supplier_name}</span>
+                {supplierMismatch && (
+                  <AlertTriangle className="h-4 w-4 text-yellow-600 shrink-0" title="Doesn't match selected supplier" />
+                )}
+              </div>
+            )}
+            {extractedMeta.invoice_date && (
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground w-28 shrink-0">Invoice Date</span>
+                <span>{extractedMeta.invoice_date}</span>
+                {dateMismatch && (
+                  <AlertTriangle className="h-4 w-4 text-yellow-600 shrink-0" title="Differs from selected Date Received" />
+                )}
+              </div>
+            )}
+            {extractedMeta.invoice_total != null && (
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground w-28 shrink-0">Invoice Total</span>
+                <span>{`¥${extractedMeta.invoice_total.toLocaleString('ja-JP')}`}</span>
+              </div>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   )
@@ -151,6 +208,7 @@ interface IntakeDraft {
   invoiceFileUrl: string
   selectedFileName: string
   lineItems: LineItemRow[]
+  extractedMeta?: ExtractedMeta | null
 }
 
 function loadDraft(): IntakeDraft | null {
@@ -184,6 +242,7 @@ export default function BulkIntakePage() {
   const [notes, setNotes] = useState(draft?.notes ?? '')
   const [invoiceFileUrl, setInvoiceFileUrl] = useState(draft?.invoiceFileUrl ?? '')
   const [selectedFileName, setSelectedFileName] = useState(draft?.selectedFileName ?? '')
+  const [extractedMeta, setExtractedMeta] = useState<ExtractedMeta | null>(draft?.extractedMeta ?? null)
 
   // Line items
   const [lineItems, setLineItems] = useState<LineItemRow[]>(draft?.lineItems ?? [])
@@ -208,10 +267,10 @@ export default function BulkIntakePage() {
     }
     const data: IntakeDraft = {
       step, mode, supplierId, sourceType, dateReceived,
-      notes, invoiceFileUrl, selectedFileName, lineItems,
+      notes, invoiceFileUrl, selectedFileName, lineItems, extractedMeta,
     }
     sessionStorage.setItem(INTAKE_DRAFT_KEY, JSON.stringify(data))
-  }, [step, mode, supplierId, sourceType, dateReceived, notes, invoiceFileUrl, selectedFileName, lineItems])
+  }, [step, mode, supplierId, sourceType, dateReceived, notes, invoiceFileUrl, selectedFileName, lineItems, extractedMeta])
 
   // Data hooks
   const { data: suppliers } = useSuppliers()
@@ -290,19 +349,29 @@ export default function BulkIntakePage() {
     setSelectedFileName(file.name)
 
     try {
-      // Upload to storage
-      const fileUrl = await uploadMutation.mutateAsync(file)
-      setInvoiceFileUrl(fileUrl)
+      // Upload to storage (returns storage path, not signed URL)
+      const storagePath = await uploadMutation.mutateAsync(file)
+      setInvoiceFileUrl(storagePath)
+
+      // Generate a temporary signed URL for the AI to read the file
+      const signedUrl = await getInvoiceSignedUrl(storagePath)
 
       // Parse
       const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
       const fileType = ext === 'jpeg' ? 'jpg' : ext
-      const result = await parseMutation.mutateAsync({ fileUrl, fileType })
+      const result = await parseMutation.mutateAsync({ fileUrl: signedUrl, fileType })
 
       if (!result.success) {
         toast.error(`Parse failed: ${result.line_items.length === 0 ? 'No items found' : 'Unknown error'}`)
         return
       }
+
+      // Save extracted metadata for display
+      setExtractedMeta({
+        supplier_name: result.supplier_name,
+        invoice_date: result.invoice_date,
+        invoice_total: result.invoice_total,
+      })
 
       // Convert parsed items to LineItemRow
       const newItems: LineItemRow[] = result.line_items.map((item) => ({
@@ -398,6 +467,7 @@ export default function BulkIntakePage() {
     setNotes('')
     setInvoiceFileUrl('')
     setSelectedFileName('')
+    setExtractedMeta(null)
     setLineItems([])
     setSuccessData(null)
   }
@@ -449,6 +519,8 @@ export default function BulkIntakePage() {
             dateReceived={dateReceived} setDateReceived={setDateReceived}
             notes={notes} setNotes={setNotes}
             suppliers={suppliers}
+            extractedMeta={extractedMeta}
+            selectedSupplierName={supplierName}
           />
 
           {/* Upload mode */}
@@ -490,6 +562,8 @@ export default function BulkIntakePage() {
             dateReceived={dateReceived} setDateReceived={setDateReceived}
             notes={notes} setNotes={setNotes}
             suppliers={suppliers}
+            extractedMeta={extractedMeta}
+            selectedSupplierName={supplierName}
           />
 
           <IntakeLineItemTable

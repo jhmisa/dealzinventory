@@ -32,6 +32,7 @@ interface ParseInvoiceResponse {
   line_items: ParsedLineItem[];
   invoice_date?: string;
   invoice_total?: number;
+  supplier_name?: string;
   error?: string;
 }
 
@@ -578,7 +579,8 @@ Return ONLY valid JSON in this exact format:
     }
   ],
   "invoice_date": "2024-01-15",
-  "invoice_total": 50000
+  "invoice_total": 50000,
+  "supplier_name": "Company Name Co., Ltd."
 }
 
 Rules:
@@ -591,6 +593,7 @@ Rules:
 - If a field is unclear, use your best guess and lower the confidence
 - invoice_date in YYYY-MM-DD format
 - invoice_total is the grand total in Yen
+- supplier_name is the issuing company/supplier name from the invoice header
 - For the specs object: extract brand, model_name, cpu, ram_gb (integer GB), storage_gb (integer GB), screen_size (decimal inches), and serial_number when visible. Omit fields you cannot determine.`;
 
 function detectProvider(apiEndpoint: string): 'anthropic' | 'openai' | 'google' | 'generic' {
@@ -781,6 +784,7 @@ async function parseWithAI(
       line_items: lineItems,
       invoice_date: parsed.invoice_date,
       invoice_total: parsed.invoice_total,
+      supplier_name: parsed.supplier_name,
     };
   } catch (err) {
     return {

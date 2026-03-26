@@ -1,14 +1,20 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, Download, Plus } from 'lucide-react'
+import { ArrowLeft, Download, Plus, ChevronDown, ChevronRight, FileImage } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { PageHeader, CodeDisplay, TableSkeleton } from '@/components/shared'
 import { ConfidenceBadge } from '@/components/intake/confidence-badge'
 import { AdjustmentDialog } from '@/components/intake/adjustment-dialog'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
 import { generateReceiptPdf } from '@/components/intake/receipt-pdf'
 import { useIntakeReceipt, useReceiptItems, useReceiptAdjustments } from '@/hooks/use-intake-receipts'
+import { getInvoiceSignedUrl } from '@/services/intake-receipts'
 import { formatDate, formatDateTime, formatPrice, buildShortDescription } from '@/lib/utils'
 import { getStatusConfig, getAdjustmentTypeConfig } from '@/lib/constants'
 import type { Item, IntakeAdjustment } from '@/lib/types'
@@ -17,10 +23,24 @@ export default function ReceivingReportDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [adjustmentOpen, setAdjustmentOpen] = useState(false)
+  const [invoiceImageUrl, setInvoiceImageUrl] = useState<string | null>(null)
+  const [invoiceOpen, setInvoiceOpen] = useState(false)
 
   const { data: receipt, isLoading } = useIntakeReceipt(id!)
   const { data: items } = useReceiptItems(id!)
   const { data: adjustments } = useReceiptAdjustments(id!)
+
+  const invoicePath = receipt?.invoice_file_url
+  const isInvoiceImage = invoicePath && /\.(jpe?g|png|webp)$/i.test(invoicePath)
+
+  useEffect(() => {
+    if (!isInvoiceImage || !invoicePath) return
+    let cancelled = false
+    getInvoiceSignedUrl(invoicePath).then((url) => {
+      if (!cancelled) setInvoiceImageUrl(url)
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [invoicePath, isInvoiceImage])
 
   if (isLoading) return <TableSkeleton />
   if (!receipt) return <div>Receipt not found</div>
@@ -35,11 +55,27 @@ export default function ReceivingReportDetailPage() {
   }
   const totalAdjusted = Object.values(adjustmentCounts).reduce((a, b) => a + b, 0)
 
-  function handleDownloadPdf() {
+  async function handleDownloadPdf() {
+    let invoiceImageBase64: string | undefined
+    if (isInvoiceImage && invoicePath) {
+      try {
+        const url = await getInvoiceSignedUrl(invoicePath)
+        const resp = await fetch(url)
+        const blob = await resp.blob()
+        invoiceImageBase64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader()
+          reader.onloadend = () => resolve(reader.result as string)
+          reader.readAsDataURL(blob)
+        })
+      } catch {
+        // Continue without invoice image
+      }
+    }
     generateReceiptPdf({
       receipt: receipt as typeof receipt & { suppliers?: { supplier_name: string } | null },
       lineItems: (receipt as { intake_receipt_line_items?: Array<{ id: string; line_number: number; product_description: string; quantity: number; unit_price: number | null; line_total: number | null; ai_confidence: number | null; product_model_id: string | null; notes: string | null; receipt_id: string; created_at: string | null }> }).intake_receipt_line_items ?? [],
       adjustments: adjustments ?? [],
+      invoiceImageBase64,
     })
   }
 
@@ -295,6 +331,32 @@ export default function ReceivingReportDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Invoice Proof */}
+      {isInvoiceImage && invoiceImageUrl && (
+        <Collapsible open={invoiceOpen} onOpenChange={setInvoiceOpen}>
+          <Card>
+            <CardHeader className="flex-row items-center space-y-0">
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" className="gap-2 -ml-2">
+                  {invoiceOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  <FileImage className="h-4 w-4" />
+                  <CardTitle className="text-base">Invoice Proof</CardTitle>
+                </Button>
+              </CollapsibleTrigger>
+            </CardHeader>
+            <CollapsibleContent>
+              <CardContent>
+                <img
+                  src={invoiceImageUrl}
+                  alt="Invoice"
+                  className="max-w-full rounded-md border"
+                />
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
+      )}
 
       <AdjustmentDialog
         open={adjustmentOpen}

@@ -6,9 +6,10 @@ interface ReceiptPdfData {
   receipt: IntakeReceipt & { suppliers?: { supplier_name: string } | null }
   lineItems: IntakeReceiptLineItem[]
   adjustments: IntakeAdjustment[]
+  invoiceImageBase64?: string
 }
 
-export function generateReceiptPdf({ receipt, lineItems, adjustments }: ReceiptPdfData) {
+export function generateReceiptPdf({ receipt, lineItems, adjustments, invoiceImageBase64 }: ReceiptPdfData) {
   const doc = new jsPDF()
 
   // Header
@@ -85,6 +86,27 @@ export function generateReceiptPdf({ receipt, lineItems, adjustments }: ReceiptP
       styles: { fontSize: 8 },
       headStyles: { fillColor: [192, 57, 43] },
     })
+  }
+
+  // Invoice proof page
+  if (invoiceImageBase64) {
+    doc.addPage()
+    doc.setFontSize(14)
+    doc.setTextColor(0)
+    doc.text('Invoice Proof', 14, 22)
+
+    const pageWidth = doc.internal.pageSize.width
+    const pageHeight = doc.internal.pageSize.height
+    const maxW = pageWidth - 28
+    const maxH = pageHeight - 42
+
+    try {
+      const format = invoiceImageBase64.includes('image/png') ? 'PNG' : 'JPEG'
+      doc.addImage(invoiceImageBase64, format, 14, 30, maxW, maxH, undefined, 'FAST')
+    } catch {
+      doc.setFontSize(10)
+      doc.text('(Invoice image could not be embedded)', 14, 36)
+    }
   }
 
   // Footer

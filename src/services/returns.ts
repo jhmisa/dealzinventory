@@ -90,10 +90,11 @@ export async function getReturnRequest(id: string) {
       return_request_items(
         id, order_item_id, item_id, reason_note,
         order_items(id, description, unit_price, quantity,
-          items(id, item_code, condition_grade,
+          items(id, item_code, condition_grade, intake_receipt_id,
             product_models(brand, model_name, color,
               product_media(file_url, role, sort_order)
-            )
+            ),
+            intake_receipts(invoice_file_url)
           )
         )
       ),

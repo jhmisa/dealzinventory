@@ -170,12 +170,16 @@ export async function uploadInvoiceFile(file: File): Promise<string> {
 
   if (error) throw error
 
-  const { data: urlData, error: signedUrlError } = await supabase.storage
-    .from('intake-invoices')
-    .createSignedUrl(filePath, 300) // 5 min expiry
+  return filePath
+}
 
-  if (signedUrlError || !urlData?.signedUrl) throw signedUrlError ?? new Error('Failed to create signed URL')
-  return urlData.signedUrl
+export async function getInvoiceSignedUrl(path: string): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from('intake-invoices')
+    .createSignedUrl(path, 3600) // 1 hour expiry
+
+  if (error || !data?.signedUrl) throw error ?? new Error('Failed to create signed URL')
+  return data.signedUrl
 }
 
 export async function parseInvoice(fileUrl: string, fileType: string, supplierType?: string) {
@@ -208,5 +212,6 @@ export async function parseInvoice(fileUrl: string, fileType: string, supplierTy
     }>
     invoice_date?: string
     invoice_total?: number
+    supplier_name?: string
   }
 }
