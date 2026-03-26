@@ -365,7 +365,8 @@ function parseAuctionCSV(csvText: string): ParseInvoiceResponse {
   for (let i = 1; i < lines.length; i++) {
     if (!lines[i].trim()) continue;
     const row = parseCSVRow(lines[i]);
-    const isSetRow = (row[C.structure] ?? '').trim() === '\u30bb\u30c3\u30c8';
+    const structureVal = (row[C.structure] ?? '').trim();
+    const isSetRow = structureVal === '\u30bb\u30c3\u30c8' || structureVal === '\u5358\u4f53';
 
     if (isSetRow) {
       const rawDate = (row[C.date] ?? '').trim();
@@ -391,7 +392,7 @@ function parseAuctionCSV(csvText: string): ParseInvoiceResponse {
   for (const lot of lots) {
     if (!invoiceDate && lot.date) invoiceDate = lot.date;
 
-    const totalLotCost = lot.bidPrice + lot.auctionFee;
+    const totalLotCost = Math.round((lot.bidPrice + lot.auctionFee) * 1.1);
     const itemCount = lot.items.length;
     if (itemCount === 0) continue;
 
