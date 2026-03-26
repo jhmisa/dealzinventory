@@ -24,17 +24,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [staffProfileLoading, setStaffProfileLoading] = useState(true)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      if (session?.user) setStaffProfileLoading(true)
-      setLoading(false)
-    })
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
       setUser(session?.user ?? null)
-      if (session?.user) setStaffProfileLoading(true)
       setLoading(false)
     })
 
@@ -42,26 +34,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   // Fetch or auto-create staff profile when user is available
+  // Keyed on user?.id (string) to avoid re-runs from token refresh reference changes
+  const userId = user?.id ?? null
+
   useEffect(() => {
-    if (!user) {
+    if (!userId) {
       setStaffProfile(null)
       setStaffProfileLoading(false)
       return
     }
 
+    let cancelled = false
     setStaffProfileLoading(true)
 
-    async function loadStaffProfile(u: User) {
+    async function loadStaffProfile() {
       try {
         // Try to fetch existing profile
         const { data, error } = await supabase
           .from('staff_profiles')
           .select('*')
-          .eq('id', u.id)
+          .eq('id', userId)
           .single()
 
         if (data) {
-          setStaffProfile(data as StaffProfile)
+          if (!cancelled) setStaffProfile(data as StaffProfile)
           return
         }
 
@@ -75,13 +71,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (countError) throw countError
 
           const role = count === 0 ? 'ADMIN' : 'VA'
-          const displayName = (u.email ?? '').split('@')[0]
+          const email = user?.email ?? ''
+          const displayName = email.split('@')[0]
 
           const { data: newProfile, error: insertError } = await supabase
             .from('staff_profiles')
             .insert({
-              id: u.id,
-              email: u.email ?? '',
+              id: userId,
+              email,
               display_name: displayName,
               role,
               is_active: true,
@@ -90,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             .single()
 
           if (insertError) throw insertError
-          setStaffProfile(newProfile as StaffProfile)
+          if (!cancelled) setStaffProfile(newProfile as StaffProfile)
           return
         }
 
@@ -98,12 +95,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (err) {
         console.error('Failed to load staff profile:', err)
       } finally {
-        setStaffProfileLoading(false)
+        if (!cancelled) setStaffProfileLoading(false)
       }
     }
 
-    loadStaffProfile(user)
-  }, [user])
+    loadStaffProfile()
+    return () => { cancelled = true }
+  }, [userId])
 
   const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
