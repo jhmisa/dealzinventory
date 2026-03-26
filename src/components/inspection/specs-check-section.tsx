@@ -63,6 +63,7 @@ export function SpecsCheckSection({ form, item, productModel, deviceCategory }: 
                 <Input
                   id={`spec-${field.key}`}
                   type={field.type === 'number' ? 'number' : 'text'}
+                  step={field.key === 'screen_size' ? '0.1' : undefined}
                   placeholder={currentVal != null ? String(currentVal) : '—'}
                   defaultValue={currentVal != null ? String(currentVal) : ''}
                   {...form.register(formKey as 'cpu' | 'ram_gb' | 'storage_gb' | 'os_family' | 'screen_size' | 'keyboard_layout' | 'gpu' | 'color' | 'carrier' | 'imei')}

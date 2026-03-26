@@ -22,6 +22,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [staffProfile, setStaffProfile] = useState<StaffProfile | null>(null)
   const [staffProfileLoading, setStaffProfileLoading] = useState(true)
+  const [staffProfileError, setStaffProfileError] = useState(false)
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -41,11 +42,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!userId) {
       setStaffProfile(null)
       setStaffProfileLoading(false)
+      setStaffProfileError(false)
       return
     }
 
     let cancelled = false
     setStaffProfileLoading(true)
+    setStaffProfileError(false)
 
     async function loadStaffProfile() {
       try {
@@ -94,6 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (error) throw error
       } catch (err) {
         console.error('Failed to load staff profile:', err)
+        if (!cancelled) setStaffProfileError(true)
       } finally {
         if (!cancelled) setStaffProfileLoading(false)
       }
@@ -116,10 +120,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAdmin = staffProfile?.role === 'ADMIN'
   const displayName = staffProfile?.display_name ?? null
 
+  // Combined loading must stay true until:
+  // 1. Auth state has settled (loading=false), AND
+  // 2. If a user exists, their staff profile has been fetched
+  //
+  // Without the `!!user && !staffProfile` check, there's a render gap after
+  // onAuthStateChange sets user (staffProfileLoading was already set to false
+  // by the initial null-userId effect) but before the userId effect re-runs
+  // to fetch the profile. During that gap, AdminGuard sees loading=false +
+  // isAdmin=false and incorrectly redirects to dashboard.
+  const isAuthSettling = loading || staffProfileLoading
+  const isProfilePending = !!user && !staffProfile && !staffProfileLoading && !staffProfileError
+  const isLoading = isAuthSettling || isProfilePending
+
   const value: AuthContextValue = {
     user,
     session,
-    loading: loading || staffProfileLoading,
+    loading: isLoading,
     staffProfile,
     isAdmin,
     displayName,
