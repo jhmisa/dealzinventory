@@ -8,6 +8,7 @@ export function useAuth() {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
   const [staffProfile, setStaffProfile] = useState<StaffProfile | null>(null)
+  const [staffProfileLoading, setStaffProfileLoading] = useState(true)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -29,8 +30,11 @@ export function useAuth() {
   useEffect(() => {
     if (!user) {
       setStaffProfile(null)
+      setStaffProfileLoading(false)
       return
     }
+
+    setStaffProfileLoading(true)
 
     async function loadStaffProfile(u: User) {
       try {
@@ -78,6 +82,8 @@ export function useAuth() {
         if (error) throw error
       } catch (err) {
         console.error('Failed to load staff profile:', err)
+      } finally {
+        setStaffProfileLoading(false)
       }
     }
 
@@ -97,5 +103,5 @@ export function useAuth() {
   const isAdmin = staffProfile?.role === 'ADMIN'
   const displayName = staffProfile?.display_name ?? null
 
-  return { user, session, loading, signIn, signOut, staffProfile, isAdmin, displayName }
+  return { user, session, loading: loading || staffProfileLoading, signIn, signOut, staffProfile, isAdmin, displayName }
 }
