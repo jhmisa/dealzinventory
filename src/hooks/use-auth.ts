@@ -27,12 +27,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       setUser(session?.user ?? null)
+      if (session?.user) setStaffProfileLoading(true)
       setLoading(false)
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
       setUser(session?.user ?? null)
+      if (session?.user) setStaffProfileLoading(true)
       setLoading(false)
     })
 
