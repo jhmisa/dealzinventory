@@ -4,6 +4,7 @@ import { AdminLayout } from '@/components/layout/admin-layout'
 import { ShopLayout } from '@/components/layout/shop-layout'
 import { CustomerLayout } from '@/components/layout/customer-layout'
 import { ProtectedRoute } from '@/components/layout/protected-route'
+import { AdminOnlyRoute } from '@/components/layout/admin-only-route'
 import { RouteLoading } from '@/components/layout/route-loading'
 
 // Lazy-loaded page components
@@ -58,6 +59,7 @@ const CustomerReturnDetailPage = lazy(() => import('@/pages/customer/return-deta
 const CustomerReturnRequestPage = lazy(() => import('@/pages/customer/return-request'))
 const AdminReturnsPage = lazy(() => import('@/pages/admin/returns'))
 const AdminReturnDetailPage = lazy(() => import('@/pages/admin/return-detail'))
+const StaffManagementPage = lazy(() => import('@/pages/admin/staff-management'))
 
 function lazyElement(Component: React.LazyExoticComponent<ComponentType>) {
   return (
@@ -112,10 +114,16 @@ export const router = createBrowserRouter([
           { path: 'returns', element: lazyElement(AdminReturnsPage) },
           { path: 'returns/:id', element: lazyElement(AdminReturnDetailPage) },
           { path: 'suppliers', element: lazyElement(SupplierListPage) },
-          { path: 'settings/general', element: lazyElement(GeneralSettingsPage) },
-          { path: 'settings/ai', element: lazyElement(AiSettingsPage) },
-          { path: 'settings/items-columns', element: lazyElement(ItemsColumnSettingsPage) },
-          { path: 'settings/postal-codes', element: lazyElement(PostalCodesPage) },
+          {
+            element: <AdminOnlyRoute />,
+            children: [
+              { path: 'settings/general', element: lazyElement(GeneralSettingsPage) },
+              { path: 'settings/ai', element: lazyElement(AiSettingsPage) },
+              { path: 'settings/items-columns', element: lazyElement(ItemsColumnSettingsPage) },
+              { path: 'settings/postal-codes', element: lazyElement(PostalCodesPage) },
+              { path: 'settings/staff', element: lazyElement(StaffManagementPage) },
+            ],
+          },
         ],
       },
     ],

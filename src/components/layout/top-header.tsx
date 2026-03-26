@@ -7,7 +7,7 @@ import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Separator } from '@/components/ui/separator'
 
 export function TopHeader() {
-  const { user, signOut } = useAuth()
+  const { user, signOut, displayName } = useAuth()
   const { theme, setTheme } = useTheme()
 
   return (
@@ -32,7 +32,7 @@ export function TopHeader() {
           <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
         </Button>
         <span className="text-sm text-muted-foreground">
-          {user?.email}
+          {displayName || user?.email}
         </span>
         <Button variant="ghost" size="icon" onClick={signOut} aria-label="Sign out">
           <LogOut className="h-4 w-4" />

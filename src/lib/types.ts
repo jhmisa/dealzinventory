@@ -148,3 +148,18 @@ export type IntakeReceiptDetail = IntakeReceipt & {
   items: Item[]
   intake_adjustments: IntakeAdjustment[]
 }
+
+export type StaffRole = 'ADMIN' | 'VA' | 'IT' | 'LIVE_SELLER'
+
+export interface StaffProfile {
+  id: string
+  email: string
+  display_name: string
+  role: StaffRole
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export type StaffProfileInsert = Omit<StaffProfile, 'created_at' | 'updated_at'>
+export type StaffProfileUpdate = Partial<Pick<StaffProfile, 'display_name' | 'role' | 'is_active'>>

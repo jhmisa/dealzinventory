@@ -130,4 +130,12 @@ export const queryKeys = {
     reverse: (prefectureJa: string, cityJa: string, townJa: string) =>
       ['postal-codes', 'reverse', prefectureJa, cityJa, townJa] as const,
   },
+  staffProfiles: {
+    all: ['staff-profiles'] as const,
+    lists: () => [...queryKeys.staffProfiles.all, 'list'] as const,
+    list: () => [...queryKeys.staffProfiles.lists()] as const,
+    details: () => [...queryKeys.staffProfiles.all, 'detail'] as const,
+    detail: (id: string) => [...queryKeys.staffProfiles.details(), id] as const,
+    me: () => [...queryKeys.staffProfiles.all, 'me'] as const,
+  },
 }

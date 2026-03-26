@@ -12,6 +12,7 @@ import {
   HandCoins,
   List,
   Users,
+  UserCog,
   BarChart3,
   FileText,
   BrainCircuit,
@@ -21,6 +22,7 @@ import {
   Columns3,
   Settings,
 } from 'lucide-react'
+import { useAuth } from '@/hooks/use-auth'
 import {
   Sidebar,
   SidebarContent,
@@ -93,17 +95,20 @@ const navSections = [
   },
   {
     label: 'Settings',
+    adminOnly: true,
     items: [
       { title: 'General', href: '/admin/settings/general', icon: Settings },
       { title: 'AI Configuration', href: '/admin/settings/ai', icon: BrainCircuit },
       { title: 'Items Columns', href: '/admin/settings/items-columns', icon: Columns3 },
       { title: 'Postal Codes', href: '/admin/settings/postal-codes', icon: MapPin },
+      { title: 'Staff', href: '/admin/settings/staff', icon: UserCog },
     ],
   },
 ]
 
 export function AppSidebar() {
   const location = useLocation()
+  const { isAdmin } = useAuth()
 
   return (
     <Sidebar>
@@ -119,7 +124,7 @@ export function AppSidebar() {
         </Link>
       </SidebarHeader>
       <SidebarContent>
-        {navSections.map((section) => (
+        {navSections.filter((section) => !section.adminOnly || isAdmin).map((section) => (
           <SidebarGroup key={section.label}>
             <SidebarGroupLabel>{section.label}</SidebarGroupLabel>
             <SidebarGroupContent>
