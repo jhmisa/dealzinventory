@@ -35,6 +35,8 @@ type GalleryPhoto = {
   url: string
   description: string | null
   visible: boolean
+  mediaType: 'image' | 'video'
+  thumbnailUrl: string | null
 }
 
 interface UnifiedGalleryCardProps {
@@ -66,6 +68,8 @@ export function UnifiedGalleryCard({ item, productMedia, itemMedia }: UnifiedGal
         url: m.file_url,
         description: m.role !== 'hero' ? m.role : null,
         visible: !hiddenIds.includes(m.id),
+        mediaType: m.media_type as 'image' | 'video',
+        thumbnailUrl: null,
       }))
 
     const itemPhotos: GalleryPhoto[] = [...itemMedia]
@@ -76,6 +80,8 @@ export function UnifiedGalleryCard({ item, productMedia, itemMedia }: UnifiedGal
         url: m.file_url,
         description: m.description,
         visible: m.visible,
+        mediaType: m.media_type as 'image' | 'video',
+        thumbnailUrl: m.thumbnail_url ?? null,
       }))
 
     const all = [...productPhotos, ...itemPhotos]
@@ -278,9 +284,10 @@ export function UnifiedGalleryCard({ item, productMedia, itemMedia }: UnifiedGal
       })
 
       const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(filePath)
+      const { data: thumbUrlData } = supabase.storage.from(BUCKET).getPublicUrl(thumbPath)
 
       addMedia.mutate(
-        { itemId: item.id, fileUrl: urlData.publicUrl },
+        { itemId: item.id, fileUrl: urlData.publicUrl, mediaType: 'video', thumbnailUrl: thumbUrlData.publicUrl },
         {
           onSuccess: () => toast.success('Video uploaded'),
           onError: (err) => toast.error(`Failed to save: ${err.message}`),
@@ -763,14 +770,34 @@ function SortablePhotoCard({ photo, isDefault, itemId, onToggleVisibility, onDel
         isDragging && 'shadow-lg ring-2 ring-primary',
       )}
     >
-      {/* Image */}
+      {/* Media */}
       <div className={cn('aspect-square bg-muted', !photo.visible && 'opacity-40')}>
-        <img
-          src={photo.url}
-          alt={photo.description ?? ''}
-          className="w-full h-full object-cover"
-          loading="lazy"
-        />
+        {photo.mediaType === 'video' ? (
+          <video
+            src={photo.url}
+            poster={photo.thumbnailUrl ?? undefined}
+            className="w-full h-full object-cover"
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            onMouseEnter={(e) => e.currentTarget.play()}
+            onMouseLeave={(e) => { e.currentTarget.pause(); e.currentTarget.currentTime = 0 }}
+          />
+        ) : (
+          <img
+            src={photo.url}
+            alt={photo.description ?? ''}
+            className="w-full h-full object-cover"
+            loading="lazy"
+          />
+        )}
+        {photo.mediaType === 'video' && (
+          <Badge variant="secondary" className="absolute bottom-1 left-1 text-[10px] px-1 py-0 gap-0.5">
+            <Video className="h-2.5 w-2.5" />
+            Video
+          </Badge>
+        )}
       </div>
 
       {/* Controls overlay */}

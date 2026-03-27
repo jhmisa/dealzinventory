@@ -531,7 +531,9 @@ export type Database = {
           file_url: string
           id: string
           item_id: string
+          media_type: Database["public"]["Enums"]["media_type"]
           sort_order: number
+          thumbnail_url: string | null
           visible: boolean
         }
         Insert: {
@@ -540,7 +542,9 @@ export type Database = {
           file_url: string
           id?: string
           item_id: string
+          media_type?: Database["public"]["Enums"]["media_type"]
           sort_order?: number
+          thumbnail_url?: string | null
           visible?: boolean
         }
         Update: {
@@ -549,7 +553,9 @@ export type Database = {
           file_url?: string
           id?: string
           item_id?: string
+          media_type?: Database["public"]["Enums"]["media_type"]
           sort_order?: number
+          thumbnail_url?: string | null
           visible?: boolean
         }
         Relationships: [

@@ -164,7 +164,13 @@ export async function deleteItemCost(costId: string) {
 
 // --- Item Media ---
 
-export async function addItemMedia(itemId: string, fileUrl: string, description?: string) {
+export async function addItemMedia(
+  itemId: string,
+  fileUrl: string,
+  description?: string,
+  mediaType?: 'image' | 'video',
+  thumbnailUrl?: string,
+) {
   const { data: existing } = await supabase
     .from('item_media')
     .select('sort_order')
@@ -176,7 +182,14 @@ export async function addItemMedia(itemId: string, fileUrl: string, description?
 
   const { data, error } = await supabase
     .from('item_media')
-    .insert({ item_id: itemId, file_url: fileUrl, description: description ?? null, sort_order: nextOrder })
+    .insert({
+      item_id: itemId,
+      file_url: fileUrl,
+      description: description ?? null,
+      sort_order: nextOrder,
+      ...(mediaType && { media_type: mediaType }),
+      ...(thumbnailUrl && { thumbnail_url: thumbnailUrl }),
+    })
     .select()
     .single()
 

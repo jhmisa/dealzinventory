@@ -117,8 +117,8 @@ export function useDeleteItemCost() {
 export function useAddItemMedia() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (params: { itemId: string; fileUrl: string; description?: string }) =>
-      itemsService.addItemMedia(params.itemId, params.fileUrl, params.description),
+    mutationFn: (params: { itemId: string; fileUrl: string; description?: string; mediaType?: 'image' | 'video'; thumbnailUrl?: string }) =>
+      itemsService.addItemMedia(params.itemId, params.fileUrl, params.description, params.mediaType, params.thumbnailUrl),
     onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.items.detail(vars.itemId) })
     },
