@@ -10,6 +10,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
+import { processImage } from '@/lib/media'
 import { supabase } from '@/lib/supabase'
 import { useActiveAiPrompts } from '@/hooks/use-ai-prompts'
 import { useActiveAiConfiguration } from '@/hooks/use-ai-configurations'
@@ -210,19 +211,30 @@ export function AiEnhanceDialog({
       // Fetch the enhanced image
       const imageResponse = await fetch(enhancedUrl)
       if (!imageResponse.ok) throw new Error('Failed to download enhanced image')
+      const rawBlob = await imageResponse.blob()
 
-      const blob = await imageResponse.blob()
-      const uuid = crypto.randomUUID()
-      const filePath = `product-media/${productId}/${uuid}_display.webp`
+      // Process through unified pipeline (square crop + resize + compress)
+      const processed = await processImage(rawBlob)
 
-      const { error } = await supabase.storage.from(BUCKET).upload(filePath, blob, {
-        contentType: blob.type || 'image/webp',
-        upsert: false,
-      })
+      const basePath = `product-media/${productId}`
+      const displayPath = `${basePath}/${processed.id}_display.webp`
+      const thumbPath = `${basePath}/${processed.id}_thumb.webp`
 
-      if (error) throw error
+      const [displayResult, thumbResult] = await Promise.all([
+        supabase.storage.from(BUCKET).upload(displayPath, processed.display, {
+          contentType: 'image/webp',
+          upsert: false,
+        }),
+        supabase.storage.from(BUCKET).upload(thumbPath, processed.thumbnail, {
+          contentType: 'image/webp',
+          upsert: false,
+        }),
+      ])
 
-      const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(filePath)
+      if (displayResult.error) throw displayResult.error
+      if (thumbResult.error) throw thumbResult.error
+
+      const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(displayPath)
 
       addMediaMutation.mutate(
         { productId, fileUrl: urlData.publicUrl, role: 'gallery', mediaType: 'image' },
