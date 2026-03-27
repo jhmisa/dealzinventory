@@ -20,6 +20,8 @@ import {
 import { ShippingStep } from '@/components/orders/shipping-step'
 import { CustomerAuthContext, useCustomerAuthProvider } from '@/hooks/use-customer-auth'
 import { useOfferByCode, useClaimOffer, useAddItemByCode, useAddCustomOfferItem, useRemoveOfferItem } from '@/hooks/use-offers'
+import { ImageGallery } from '@/components/shared/image-gallery'
+import type { GalleryImage } from '@/components/shared/image-gallery'
 import { CONDITION_GRADES } from '@/lib/constants'
 import { formatPrice, cn } from '@/lib/utils'
 import { serializeAddress } from '@/lib/address-types'
@@ -548,53 +550,101 @@ function OfferClaimInner() {
           <CardContent className="space-y-3">
             {offerItems.map((oi) => {
               const pm = oi.items?.product_models
-              const heroMedia = pm?.product_media
-                ?.filter(m => m.role === 'hero')
-                .sort((a, b) => a.sort_order - b.sort_order)[0]
+              const sortedMedia = pm?.product_media
+                ?.slice()
+                .sort((a, b) => a.sort_order - b.sort_order) ?? []
+              const heroMedia = sortedMedia.find(m => m.role === 'hero') ?? sortedMedia[0] ?? null
+              const galleryImages: GalleryImage[] = sortedMedia.map(m => ({
+                id: m.id,
+                url: m.file_url,
+                mediaType: m.media_type === 'video' ? 'video' : 'image',
+              }))
               const gradeInfo = oi.items ? CONDITION_GRADES.find(g => g.value === oi.items!.condition_grade) : null
 
               return (
-                <div key={oi.id} className="flex items-center gap-4 p-3 border rounded-lg">
-                  {heroMedia ? (
-                    <img
-                      src={heroMedia.file_url}
-                      alt={oi.description}
-                      className="w-16 h-16 rounded-lg object-cover"
-                    />
-                  ) : (
-                    <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center text-muted-foreground text-xs">
-                      No img
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{oi.description}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      {oi.items && (
-                        <span className="text-xs text-muted-foreground font-mono">{oi.items.item_code}</span>
-                      )}
-                      {gradeInfo && (
-                        <Badge variant="outline" className={cn('text-xs', gradeInfo.color)}>
-                          {gradeInfo.value}
-                        </Badge>
-                      )}
-                      {oi.quantity > 1 && (
-                        <span className="text-xs text-muted-foreground">&times;{oi.quantity}</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="text-right flex items-center gap-2">
-                    <span className="font-medium">{formatPrice(Number(oi.unit_price) * oi.quantity)}</span>
-                    {oi.added_by === 'customer' && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:text-red-600"
-                        onClick={() => handleRemoveItem(oi.id)}
+                <div key={oi.id} className="space-y-2 p-3 border rounded-lg">
+                  <div className="flex items-center gap-4">
+                    {heroMedia ? (
+                      <button
+                        type="button"
+                        className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 hover:ring-2 hover:ring-primary transition-all"
+                        onClick={() => {
+                          const dialog = document.getElementById(`lightbox-${oi.id}`) as HTMLDialogElement | null
+                          dialog?.showModal()
+                        }}
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                        <img
+                          src={heroMedia.file_url}
+                          alt={oi.description}
+                          className="w-full h-full object-cover"
+                        />
+                      </button>
+                    ) : (
+                      <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center text-muted-foreground text-xs flex-shrink-0">
+                        No img
+                      </div>
                     )}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{oi.description}</p>
+                      {pm?.short_description && (
+                        <p className="text-sm text-muted-foreground line-clamp-2 mt-0.5">{pm.short_description}</p>
+                      )}
+                      <div className="flex items-center gap-2 mt-0.5">
+                        {oi.items && (
+                          <span className="text-xs text-muted-foreground font-mono">{oi.items.item_code}</span>
+                        )}
+                        {gradeInfo && (
+                          <Badge variant="outline" className={cn('text-xs', gradeInfo.color)}>
+                            {gradeInfo.value}
+                          </Badge>
+                        )}
+                        {oi.quantity > 1 && (
+                          <span className="text-xs text-muted-foreground">&times;{oi.quantity}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right flex items-center gap-2">
+                      <span className="font-medium">{formatPrice(Number(oi.unit_price) * oi.quantity)}</span>
+                      {oi.added_by === 'customer' && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-red-600"
+                          onClick={() => handleRemoveItem(oi.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Lightbox dialog */}
+                  {galleryImages.length > 0 && (
+                    <dialog
+                      id={`lightbox-${oi.id}`}
+                      className="fixed inset-0 z-50 bg-transparent backdrop:bg-black/80 p-0 m-auto max-w-[95vw] max-h-[95vh] overflow-visible"
+                      onClick={(e) => {
+                        if (e.target === e.currentTarget) {
+                          (e.target as HTMLDialogElement).close()
+                        }
+                      }}
+                    >
+                      <div className="relative bg-background rounded-lg p-4">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute top-2 right-2 z-10"
+                          onClick={() => {
+                            const dialog = document.getElementById(`lightbox-${oi.id}`) as HTMLDialogElement | null
+                            dialog?.close()
+                          }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                        <ImageGallery images={galleryImages} columns={3} />
+                      </div>
+                    </dialog>
+                  )}
                 </div>
               )
             })}

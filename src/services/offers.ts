@@ -317,8 +317,8 @@ export async function getOfferByCode(code: string) {
       offer_items(
         id, item_id, description, unit_price, quantity, added_by, created_at,
         items(id, item_code, condition_grade, item_status, selling_price,
-          product_models(brand, model_name, color, cpu, ram_gb, storage_gb,
-            product_media(file_url, role, sort_order)
+          product_models(brand, model_name, color, short_description, cpu, ram_gb, storage_gb,
+            product_media(id, file_url, role, sort_order, media_type)
           )
         )
       )
