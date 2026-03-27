@@ -23,8 +23,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { processImage } from '@/components/media-studio/image-processor'
-import { processVideo, VIDEO_SPECS } from '@/components/media-studio/video-processor'
+import { processImage, processVideo, VIDEO_SPECS, getImageFormat } from '@/lib/media'
 import { supabase } from '@/lib/supabase'
 import { useUpdateItem, useAddItemMedia, useUpdateItemMedia, useDeleteItemMedia } from '@/hooks/use-items'
 import { cn } from '@/lib/utils'
@@ -197,7 +196,6 @@ export function UnifiedGalleryCard({ item, productMedia, itemMedia }: UnifiedGal
 
         const basePath = `items/${item.id}`
         const sizes = [
-          { blob: processed.full, suffix: '_full.webp' },
           { blob: processed.display, suffix: '_display.webp' },
           { blob: processed.thumbnail, suffix: '_thumb.webp' },
         ] as const
@@ -261,12 +259,21 @@ export function UnifiedGalleryCard({ item, productMedia, itemMedia }: UnifiedGal
         setVideoProgress(Math.round(progress * 100))
       })
 
-      const filePath = `items/${item.id}/${result.fileName}`
-      const { error } = await supabase.storage.from(BUCKET).upload(filePath, result.blob, {
+      const filePath = `items/${item.id}/${result.id}.mp4`
+      const { error } = await supabase.storage.from(BUCKET).upload(filePath, result.video, {
         contentType: 'video/mp4',
         upsert: false,
       })
       if (error) throw error
+
+      // Upload video thumbnail
+      const { extension: imgExt } = getImageFormat()
+      const thumbPath = `items/${item.id}/${result.id}_thumb.${imgExt}`
+      const thumbContentType = imgExt === 'webp' ? 'image/webp' : 'image/jpeg'
+      await supabase.storage.from(BUCKET).upload(thumbPath, result.thumbnail, {
+        contentType: thumbContentType,
+        upsert: false,
+      })
 
       const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(filePath)
 
@@ -504,7 +511,7 @@ export function UnifiedGalleryCard({ item, productMedia, itemMedia }: UnifiedGal
                 <Upload className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                 <div className="text-left">
                   <p className="text-sm text-muted-foreground">Drop images or click to browse</p>
-                  <p className="text-xs text-muted-foreground/60">Auto-processed to 3 sizes</p>
+                  <p className="text-xs text-muted-foreground/60">Auto-processed to 2 sizes</p>
                 </div>
                 <input
                   ref={fileInputRef}
