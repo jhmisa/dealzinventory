@@ -122,7 +122,7 @@ const navSections: NavSection[] = [
       { title: 'AI Configuration', href: '/admin/settings/ai', icon: BrainCircuit },
       { title: 'Items Columns', href: '/admin/settings/items-columns', icon: Columns3 },
       { title: 'Postal Codes', href: '/admin/settings/postal-codes', icon: MapPin },
-      { title: 'Team', href: '/admin/settings/staff', icon: UserCog },
+      { title: 'Members', href: '/admin/settings/staff', icon: UserCog },
     ],
   },
 ]

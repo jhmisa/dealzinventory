@@ -119,7 +119,7 @@ function InviteDialog({ open, onOpenChange, loading, onSubmit }: InviteDialogPro
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Invite Team Member</DialogTitle>
+          <DialogTitle>Invite Member</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2">
@@ -302,7 +302,7 @@ function EditDialog({ staff, open, onOpenChange, loading, currentUserId, onSubmi
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <UserCog className="h-5 w-5" />
-            Edit Team Member
+            Edit Member
           </DialogTitle>
         </DialogHeader>
 
@@ -439,14 +439,14 @@ export default function StaffManagementPage() {
         if (!password && values.send_setup_email) {
           try {
             await sendPasswordSetupEmail(values.email)
-            toast.success(`Team member created — password setup email sent to ${values.email}`)
+            toast.success(`Member created — password setup email sent to ${values.email}`)
           } catch {
-            toast.success('Team member created, but failed to send password setup email. You can resend from the edit dialog.')
+            toast.success('Member created, but failed to send password setup email. You can resend from the edit dialog.')
           }
         } else if (password) {
-          toast.success(`Team member created with password set for ${values.email}`)
+          toast.success(`Member created with password set for ${values.email}`)
         } else {
-          toast.success(`Team member created — no email sent. Set a password from the edit dialog.`)
+          toast.success(`Member created — no email sent. Set a password from the edit dialog.`)
         }
         setInviteOpen(false)
       },
@@ -460,7 +460,7 @@ export default function StaffManagementPage() {
       { id: editStaff.id, updates: values },
       {
         onSuccess: () => {
-          toast.success('Team member updated')
+          toast.success('Member updated')
           setEditStaff(null)
         },
         onError: (err) => toast.error(`Failed to update member: ${err.message}`),
@@ -471,19 +471,19 @@ export default function StaffManagementPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Team Management"
-        description="Manage team accounts, roles, and access."
+        title="Members"
+        description="Manage member accounts, roles, and access."
         actions={
           <Button onClick={() => setInviteOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
-            Invite Team Member
+            Invite Member
           </Button>
         }
       />
 
       <Card>
         <CardHeader>
-          <CardTitle>Team Members</CardTitle>
+          <CardTitle>Members</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (
@@ -492,11 +492,11 @@ export default function StaffManagementPage() {
             </div>
           ) : isError ? (
             <div className="p-6 text-sm text-destructive">
-              Failed to load team members. Please try again.
+              Failed to load members. Please try again.
             </div>
           ) : !profiles?.length ? (
             <div className="p-6 text-sm text-muted-foreground">
-              No team members found.
+              No members found.
             </div>
           ) : (
             <Table>
