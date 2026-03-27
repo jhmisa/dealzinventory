@@ -139,7 +139,7 @@ type OfferRow = {
 
 export default function OrderListPage() {
   const navigate = useNavigate()
-  const { getParam, setParam } = usePersistedFilters('orders-filters')
+  const { getParam, setParam, setParams } = usePersistedFilters('orders-filters')
   const search = getParam('q')
   const statusTab = getParam('status', 'all')
   const sourceFilter = getParam('source', 'all')
@@ -298,7 +298,7 @@ export default function OrderListPage() {
         <nav className="flex gap-0 -mb-px">
           <button
             type="button"
-            onClick={() => { setMainTab('orders'); setSearch('') }}
+            onClick={() => setParams({ tab: { value: 'orders', defaultValue: 'orders' }, q: { value: '' } })}
             className={cn(
               'px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors',
               mainTab === 'orders'
@@ -310,7 +310,7 @@ export default function OrderListPage() {
           </button>
           <button
             type="button"
-            onClick={() => { setMainTab('offers'); setSearch(''); setStatusTab('all') }}
+            onClick={() => setParams({ tab: { value: 'offers', defaultValue: 'orders' }, q: { value: '' }, status: { value: 'all', defaultValue: 'all' } })}
             className={cn(
               'px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors',
               mainTab === 'offers'

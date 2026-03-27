@@ -53,5 +53,25 @@ export function usePersistedFilters(storageKey: string) {
     [setSearchParams],
   )
 
-  return { searchParams, setSearchParams, getParam, setParam }
+  const setParams = useCallback(
+    (updates: Record<string, { value: string; defaultValue?: string }>) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          for (const [key, { value, defaultValue = '' }] of Object.entries(updates)) {
+            if (value === defaultValue) {
+              next.delete(key)
+            } else {
+              next.set(key, value)
+            }
+          }
+          return next
+        },
+        { replace: true },
+      )
+    },
+    [setSearchParams],
+  )
+
+  return { searchParams, setSearchParams, getParam, setParam, setParams }
 }
