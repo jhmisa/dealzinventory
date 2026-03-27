@@ -6,6 +6,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Always return 200 — supabase.functions.invoke() treats non-2xx as a generic error
+// and hides the actual message. Errors are indicated by an `error` field in the body.
+function jsonResponse(data: Record<string, unknown>) {
+  return new Response(JSON.stringify(data), {
+    status: 200,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  })
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -13,10 +22,7 @@ Deno.serve(async (req: Request) => {
 
   const authHeader = req.headers.get('Authorization');
   if (!authHeader) {
-    return new Response(
-      JSON.stringify({ error: 'Missing authorization header' }),
-      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return jsonResponse({ error: 'Missing authorization header' });
   }
 
   // Verify caller is authenticated and has ADMIN role
@@ -28,10 +34,7 @@ Deno.serve(async (req: Request) => {
 
   const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
   if (authError || !user) {
-    return new Response(
-      JSON.stringify({ error: 'Invalid or expired token' }),
-      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return jsonResponse({ error: 'Invalid or expired token' });
   }
 
   const { data: callerProfile, error: profileError } = await supabaseUser
@@ -41,10 +44,7 @@ Deno.serve(async (req: Request) => {
     .single();
 
   if (profileError || !callerProfile || callerProfile.role !== 'ADMIN') {
-    return new Response(
-      JSON.stringify({ error: 'Forbidden: only ADMIN users can invite staff' }),
-      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return jsonResponse({ error: 'Forbidden: only ADMIN users can invite staff' });
   }
 
   try {
@@ -56,10 +56,7 @@ Deno.serve(async (req: Request) => {
     };
 
     if (!email || !display_name || !role) {
-      return new Response(
-        JSON.stringify({ error: 'Missing required fields: email, display_name, role' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return jsonResponse({ error: 'Missing required fields: email, display_name, role' });
     }
 
     // Use service role client for admin operations
@@ -76,10 +73,7 @@ Deno.serve(async (req: Request) => {
     });
 
     if (createUserError || !newUser.user) {
-      return new Response(
-        JSON.stringify({ error: createUserError?.message ?? 'Failed to create user' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return jsonResponse({ error: createUserError?.message ?? 'Failed to create user' });
     }
 
     // Insert the staff_profiles row
@@ -98,19 +92,11 @@ Deno.serve(async (req: Request) => {
     if (insertError || !profile) {
       // Attempt to clean up the orphaned auth user
       await supabaseAdmin.auth.admin.deleteUser(newUser.user.id);
-      return new Response(
-        JSON.stringify({ error: insertError?.message ?? 'Failed to create staff profile' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return jsonResponse({ error: insertError?.message ?? 'Failed to create staff profile' });
     }
 
-    return new Response(JSON.stringify({ profile }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return jsonResponse({ profile });
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: err instanceof Error ? err.message : 'Unknown error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return jsonResponse({ error: err instanceof Error ? err.message : 'Unknown error' });
   }
 });

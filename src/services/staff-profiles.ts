@@ -73,9 +73,12 @@ export async function inviteStaff(email: string, displayName: string, role: stri
     body: { email, display_name: displayName, role },
   })
 
+  // When function always returns 200, errors are in data.error
   if (response.error) {
-    const message = response.data?.error ?? response.error.message ?? 'Unknown error'
-    throw new Error(message)
+    throw new Error(response.error.message ?? 'Unknown error')
+  }
+  if (response.data?.error) {
+    throw new Error(response.data.error)
   }
   return response.data.profile as StaffProfile
 }
