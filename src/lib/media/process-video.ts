@@ -78,7 +78,7 @@ async function extractThumbnail(ffmpeg: FFmpeg, inputFile: string): Promise<Blob
       '-i', inputFile,
       '-ss', '2',
       '-vframes', '1',
-      '-vf', 'crop=min(iw\\,ih):min(iw\\,ih),scale=256:256',
+      '-vf', 'scale=256:256:force_original_aspect_ratio=increase,crop=256:256',
       '-q:v', '2',
       outFile,
     ])
@@ -89,7 +89,7 @@ async function extractThumbnail(ffmpeg: FFmpeg, inputFile: string): Promise<Blob
       await ffmpeg.exec([
         '-i', inputFile,
         '-vframes', '1',
-        '-vf', 'crop=min(iw\\,ih):min(iw\\,ih),scale=256:256',
+        '-vf', 'scale=256:256:force_original_aspect_ratio=increase,crop=256:256',
         '-q:v', '2',
         outFile,
       ])
@@ -124,10 +124,7 @@ export async function processVideo(
 
     const { width, height, maxDurationSec, crf, codec } = VIDEO_SPECS
 
-    const vf = [
-      'crop=min(iw\\,ih):min(iw\\,ih)',
-      `scale=${width}:${height}`,
-    ].join(',')
+    const vf = `scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height}`
 
     const exitCode = await ffmpeg.exec([
       '-i', inputName,
