@@ -23,7 +23,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { processImage, processVideo, VIDEO_SPECS, getImageFormat } from '@/lib/media'
+import { processImage, tryProcessVideo, VIDEO_SPECS, getImageFormat } from '@/lib/media'
 import { supabase } from '@/lib/supabase'
 import { useUpdateItem, useAddItemMedia, useUpdateItemMedia, useDeleteItemMedia } from '@/hooks/use-items'
 import { cn } from '@/lib/utils'
@@ -255,13 +255,15 @@ export function UnifiedGalleryCard({ item, productMedia, itemMedia }: UnifiedGal
     setVideoProgress(0)
 
     try {
-      const result = await processVideo(file, (progress) => {
+      const result = await tryProcessVideo(file, (progress) => {
         setVideoProgress(Math.round(progress * 100))
       })
 
-      const filePath = `items/${item.id}/${result.id}.mp4`
+      const ext = result.format
+      const videoContentType = ext === 'webm' ? 'video/webm' : 'video/mp4'
+      const filePath = `items/${item.id}/${result.id}.${ext}`
       const { error } = await supabase.storage.from(BUCKET).upload(filePath, result.video, {
-        contentType: 'video/mp4',
+        contentType: videoContentType,
         upsert: false,
       })
       if (error) throw error

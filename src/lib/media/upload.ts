@@ -72,12 +72,14 @@ async function uploadVideo(
   const processed = await processVideo(file, onProgress)
   const { extension: imgExt } = getImageFormat()
 
-  const videoPath = `${path}/${processed.id}.mp4`
+  const ext = processed.format
+  const videoContentType = ext === 'webm' ? 'video/webm' : 'video/mp4'
+  const videoPath = `${path}/${processed.id}.${ext}`
   const thumbPath = `${path}/${processed.id}_thumb.${imgExt}`
   const thumbContentType = imgExt === 'webp' ? 'image/webp' : 'image/jpeg'
 
   const [videoResult, thumbResult] = await Promise.all([
-    supabase.storage.from(bucket).upload(videoPath, processed.video, { contentType: 'video/mp4', upsert: false }),
+    supabase.storage.from(bucket).upload(videoPath, processed.video, { contentType: videoContentType, upsert: false }),
     supabase.storage.from(bucket).upload(thumbPath, processed.thumbnail, { contentType: thumbContentType, upsert: false }),
   ])
 
@@ -91,7 +93,7 @@ async function uploadVideo(
     id: processed.id,
     displayUrl: videoUrl.publicUrl,
     thumbnailUrl: thumbUrl.publicUrl,
-    format: 'mp4',
+    format: ext,
     duration: processed.duration,
   }
 }
