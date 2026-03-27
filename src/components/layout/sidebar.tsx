@@ -21,6 +21,7 @@ import {
   RotateCcw,
   Columns3,
   Settings,
+  MonitorPlay,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import {
@@ -35,7 +36,26 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
 
-const navSections = [
+type NavItem = {
+  title: string
+  icon: typeof LayoutDashboard
+} & ({ href: string; action?: never } | { action: string; href?: never })
+
+interface NavSection {
+  label: string
+  adminOnly?: boolean
+  items: NavItem[]
+}
+
+function openShowcaseWindow() {
+  window.open(
+    '/admin/showcase',
+    'showcase',
+    'width=720,height=1280,menubar=no,toolbar=no,location=no,status=no',
+  )
+}
+
+const navSections: NavSection[] = [
   {
     label: 'Overview',
     items: [
@@ -57,6 +77,7 @@ const navSections = [
     items: [
       { title: 'Products', href: '/admin/products', icon: Box },
       { title: 'Categories', href: '/admin/categories', icon: Tags },
+      { title: 'Showcase', action: 'showcase', icon: MonitorPlay },
     ],
   },
   {
@@ -133,6 +154,16 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <SidebarMenu>
                 {section.items.map((item) => {
+                  if (item.action) {
+                    return (
+                      <SidebarMenuItem key={item.action}>
+                        <SidebarMenuButton onClick={item.action === 'showcase' ? openShowcaseWindow : undefined}>
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.title}</span>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    )
+                  }
                   const isActive = location.pathname === item.href || location.pathname.startsWith(item.href + '/')
                   return (
                     <SidebarMenuItem key={item.href}>

@@ -1,0 +1,247 @@
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { Search, Image, Play, Clock } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { supabase } from '@/lib/supabase'
+import { formatPrice } from '@/lib/utils'
+import { getShowcaseItem, type ShowcaseItem } from '@/services/showcase'
+
+const TIMER_SECONDS = 3
+
+export default function ShowcasePage() {
+  const [authenticated, setAuthenticated] = useState<boolean | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [currentItem, setCurrentItem] = useState<ShowcaseItem | null>(null)
+  const [mediaMode, setMediaMode] = useState<'photos' | 'videos'>('photos')
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [countdown, setCountdown] = useState(TIMER_SECONDS)
+  const [loading, setLoading] = useState(false)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Auth check
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setAuthenticated(!!data.session)
+    })
+  }, [])
+
+  // Media arrays for current mode
+  const photos = currentItem?.photos ?? []
+  const videos = currentItem?.videos ?? []
+  const mediaItems = mediaMode === 'photos' ? photos : videos
+  const mediaCount = mediaItems.length
+
+  // Photo auto-advance timer
+  useEffect(() => {
+    if (timerRef.current) clearInterval(timerRef.current)
+
+    if (mediaMode !== 'photos' || mediaCount === 0) return
+
+    setCountdown(TIMER_SECONDS)
+    timerRef.current = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          setCurrentIndex((i) => (i + 1) % mediaCount)
+          return TIMER_SECONDS
+        }
+        return prev - 1
+      })
+    }, 1000)
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
+  }, [mediaMode, mediaCount, currentIndex])
+
+  // Video auto-advance on end
+  const handleVideoEnded = useCallback(() => {
+    setCurrentIndex((i) => (i + 1) % mediaCount)
+  }, [mediaCount])
+
+  // Reset index when switching modes or loading new item
+  useEffect(() => {
+    setCurrentIndex(0)
+    setCountdown(TIMER_SECONDS)
+  }, [mediaMode, currentItem])
+
+  // Search handler
+  const handleSearch = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter' || !searchQuery.trim()) return
+
+    setLoading(true)
+    try {
+      const item = await getShowcaseItem(searchQuery.trim())
+      if (item) {
+        setCurrentItem(item)
+        setMediaMode('photos')
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (authenticated === null) return null
+
+  if (!authenticated) {
+    return (
+      <div className="flex items-center justify-center w-[720px] h-[1280px] bg-white">
+        <p className="text-lg text-muted-foreground">Please log in to use the showcase.</p>
+      </div>
+    )
+  }
+
+  const price = currentItem?.selling_price ?? currentItem?.purchase_price
+  const currentMedia = mediaItems[currentIndex]
+
+  return (
+    <div className="[font-synthesis:none] flex overflow-clip w-[720px] h-[1280px] flex-col bg-white antialiased text-xs/4 relative">
+      {/* Media Viewer — 720x720 square */}
+      <div className="w-[720px] h-[720px] flex items-center justify-center relative shrink-0 bg-[#1A1A1A]">
+        {mediaMode === 'photos' && currentMedia ? (
+          <img
+            key={currentMedia.id}
+            src={currentMedia.url}
+            alt={currentItem?.item_code ?? ''}
+            className="w-full h-full object-contain"
+          />
+        ) : mediaMode === 'videos' && currentMedia ? (
+          <video
+            ref={videoRef}
+            key={currentMedia.id}
+            src={currentMedia.url}
+            autoPlay
+            muted
+            onEnded={handleVideoEnded}
+            className="w-full h-full object-contain"
+          />
+        ) : (
+          <Image className="h-16 w-16 text-[#404040]" strokeWidth={1.5} />
+        )}
+
+        {/* Photo indicator dots */}
+        {mediaCount > 1 && (
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2">
+            {mediaItems.map((m, i) => (
+              <div
+                key={m.id}
+                className={`rounded-full shrink-0 ${i === currentIndex ? 'size-2 bg-white' : 'size-1.5 bg-white/40'}`}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Timer badge — top left (photos only) */}
+        {mediaMode === 'photos' && mediaCount > 0 && (
+          <div className="absolute top-4 left-4 flex items-center rounded-full py-1.5 px-2.5 gap-1.5 bg-black/50">
+            <Clock className="h-3 w-3 text-white" strokeWidth={2} />
+            <span className="text-white font-medium text-[11px]/3.5">
+              {countdown}s
+            </span>
+          </div>
+        )}
+
+        {/* Counter badge — top right */}
+        {mediaCount > 0 && (
+          <div className="absolute top-4 right-4 flex items-center rounded-full py-1.5 px-2.5 gap-1 bg-black/50">
+            <span className="text-white font-semibold text-[11px]/3.5">
+              {currentIndex + 1}
+            </span>
+            <span className="text-white/50 text-[11px]/3.5">/</span>
+            <span className="text-white/50 text-[11px]/3.5">
+              {mediaCount}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Controls Row */}
+      <div className="flex items-center shrink-0 py-3.5 px-5 gap-2.5 border-b border-[#E4E4E7]">
+        {/* Search input */}
+        <div className="relative grow shrink basis-0">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-[15px] w-[15px] text-[#A1A1AA]" strokeWidth={2} />
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={handleSearch}
+            placeholder="Search product or barcode..."
+            className="pl-9 h-9 text-[13px]"
+            disabled={loading}
+          />
+        </div>
+
+        {/* Photos / Videos segmented toggle */}
+        <div className="flex items-center">
+          <button
+            onClick={() => setMediaMode('photos')}
+            className={`flex items-center py-2 px-3.5 gap-1.5 rounded-l-md border ${
+              mediaMode === 'photos'
+                ? 'bg-[#18181B] border-[#18181B] text-white'
+                : 'bg-white border-[#E4E4E7] text-[#71717A]'
+            }`}
+          >
+            <Image className="h-3.5 w-3.5" strokeWidth={2} />
+            <span className={`text-xs/4 ${mediaMode === 'photos' ? 'font-semibold' : 'font-medium'}`}>
+              Photos ({String(photos.length).padStart(2, '0')})
+            </span>
+          </button>
+          <button
+            onClick={() => setMediaMode('videos')}
+            className={`flex items-center py-2 px-3.5 gap-1.5 rounded-r-md border-t border-b border-r ${
+              mediaMode === 'videos'
+                ? 'bg-[#18181B] border-[#18181B] text-white'
+                : 'bg-white border-[#E4E4E7] text-[#71717A]'
+            }`}
+          >
+            <Play className="h-3.5 w-3.5" strokeWidth={2} />
+            <span className={`text-xs/4 ${mediaMode === 'videos' ? 'font-semibold' : 'font-medium'}`}>
+              Videos ({String(videos.length).padStart(2, '0')})
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* Product Info */}
+      {currentItem ? (
+        <div className="flex flex-col grow shrink basis-0 pt-6 gap-2.5 px-8 overflow-hidden">
+          <span className="tracking-[0.02em] text-[#71717A] font-semibold text-[40px]/[44px]">
+            {currentItem.item_code}
+          </span>
+
+          <span className="tracking-[-0.03em] text-[#09090B] font-bold text-[80px]/[80px]">
+            {price != null ? formatPrice(price) : '—'}
+          </span>
+
+          {currentItem.condition_grade && (
+            <div className="flex items-center self-start rounded-md py-2 px-4 bg-[#18181B]">
+              <span className="text-white font-semibold text-xl/6">
+                Rank {currentItem.condition_grade}
+              </span>
+            </div>
+          )}
+
+          {currentItem.description && (
+            <p className="pt-1 text-[#71717A] text-[26px]/9">
+              {currentItem.description}
+            </p>
+          )}
+
+          {currentItem.condition_notes && (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[#09090B] font-semibold text-lg/6">
+                Condition
+              </span>
+              <span className="text-[#71717A] text-xl/[30px]">
+                {currentItem.condition_notes}
+              </span>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center grow shrink basis-0 text-[#A1A1AA] gap-3">
+          <Search className="h-12 w-12" strokeWidth={1.5} />
+          <span className="text-lg">Scan or search a P-code to begin</span>
+        </div>
+      )}
+    </div>
+  )
+}

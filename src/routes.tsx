@@ -59,7 +59,11 @@ const CustomerReturnDetailPage = lazy(() => import('@/pages/customer/return-deta
 const CustomerReturnRequestPage = lazy(() => import('@/pages/customer/return-request'))
 const AdminReturnsPage = lazy(() => import('@/pages/admin/returns'))
 const AdminReturnDetailPage = lazy(() => import('@/pages/admin/return-detail'))
+const ShowcasePage = lazy(() => import('@/pages/admin/showcase'))
 const StaffManagementPage = lazy(() => import('@/pages/admin/staff-management'))
+const ForgotPasswordPage = lazy(() => import('@/pages/admin/forgot-password'))
+const AuthCallbackPage = lazy(() => import('@/pages/admin/auth-callback'))
+const SetPasswordPage = lazy(() => import('@/pages/admin/set-password'))
 
 function lazyElement(Component: React.LazyExoticComponent<ComponentType>) {
   return (
@@ -87,6 +91,22 @@ export const router = createBrowserRouter([
   {
     path: '/admin/login',
     element: lazyElement(LoginPage),
+  },
+  {
+    path: '/admin/forgot-password',
+    element: lazyElement(ForgotPasswordPage),
+  },
+  {
+    path: '/admin/auth/callback',
+    element: lazyElement(AuthCallbackPage),
+  },
+  {
+    path: '/admin/set-password',
+    element: lazyElement(SetPasswordPage),
+  },
+  {
+    path: '/admin/showcase',
+    element: lazyElement(ShowcasePage),
   },
   {
     element: <ProtectedRoute />,
