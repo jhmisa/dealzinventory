@@ -72,9 +72,30 @@ export async function sendPasswordSetupEmail(email: string) {
   if (error) throw error
 }
 
-export async function inviteStaff(email: string, displayName: string, role: string) {
+export async function setStaffPassword(userId: string, password: string) {
+  const { data, error } = await supabase.functions.invoke('set-staff-password', {
+    body: { user_id: userId, password },
+  })
+
+  if (error) {
+    let message = error.message
+    try {
+      const body = await (error as unknown as { context?: Response }).context?.json()
+      message = body?.error ?? body?.message ?? message
+    } catch {
+      // Response body not readable, use generic message
+    }
+    throw new Error(message)
+  }
+  if (data?.error) {
+    throw new Error(data.error)
+  }
+  return data
+}
+
+export async function inviteStaff(email: string, displayName: string, role: string, password?: string) {
   const { data, error } = await supabase.functions.invoke('invite-staff', {
-    body: { email, display_name: displayName, role },
+    body: { email, display_name: displayName, role, ...(password ? { password } : {}) },
   })
 
   if (error) {

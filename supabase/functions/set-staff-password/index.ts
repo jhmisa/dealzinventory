@@ -6,8 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Always return 200 — supabase.functions.invoke() treats non-2xx as a generic error
-// and hides the actual message. Errors are indicated by an `error` field in the body.
 function jsonResponse(data: Record<string, unknown>) {
   return new Response(JSON.stringify(data), {
     status: 200,
@@ -44,63 +42,38 @@ Deno.serve(async (req: Request) => {
     .single();
 
   if (profileError || !callerProfile || callerProfile.role !== 'ADMIN') {
-    return jsonResponse({ error: 'Forbidden: only ADMIN users can invite staff' });
+    return jsonResponse({ error: 'Forbidden: only ADMIN users can set passwords' });
   }
 
   try {
     const body = await req.json();
-    const { email, display_name, role, password: providedPassword } = body as {
-      email?: string;
-      display_name?: string;
-      role?: string;
+    const { user_id, password } = body as {
+      user_id?: string;
       password?: string;
     };
 
-    if (providedPassword && providedPassword.length < 8) {
+    if (!user_id || !password) {
+      return jsonResponse({ error: 'Missing required fields: user_id, password' });
+    }
+
+    if (password.length < 8) {
       return jsonResponse({ error: 'Password must be at least 8 characters' });
     }
 
-    if (!email || !display_name || !role) {
-      return jsonResponse({ error: 'Missing required fields: email, display_name, role' });
-    }
-
-    // Use service role client for admin operations
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // Create the auth user with a random password and email pre-confirmed
-    const { data: newUser, error: createUserError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password: providedPassword || crypto.randomUUID(),
-      email_confirm: true,
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(user_id, {
+      password,
     });
 
-    if (createUserError || !newUser.user) {
-      return jsonResponse({ error: createUserError?.message ?? 'Failed to create user' });
+    if (updateError) {
+      return jsonResponse({ error: updateError.message });
     }
 
-    // Insert the staff_profiles row
-    const { data: profile, error: insertError } = await supabaseAdmin
-      .from('staff_profiles')
-      .insert({
-        id: newUser.user.id,
-        email,
-        display_name,
-        role,
-        is_active: true,
-      })
-      .select()
-      .single();
-
-    if (insertError || !profile) {
-      // Attempt to clean up the orphaned auth user
-      await supabaseAdmin.auth.admin.deleteUser(newUser.user.id);
-      return jsonResponse({ error: insertError?.message ?? 'Failed to create staff profile' });
-    }
-
-    return jsonResponse({ profile });
+    return jsonResponse({ success: true });
   } catch (err) {
     return jsonResponse({ error: err instanceof Error ? err.message : 'Unknown error' });
   }

@@ -32,10 +32,17 @@ export function useUpdateStaffProfile() {
 export function useInviteStaff() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ email, displayName, role }: { email: string; displayName: string; role: string }) =>
-      staffProfilesService.inviteStaff(email, displayName, role),
+    mutationFn: ({ email, displayName, role, password }: { email: string; displayName: string; role: string; password?: string }) =>
+      staffProfilesService.inviteStaff(email, displayName, role, password),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.staffProfiles.all })
     },
+  })
+}
+
+export function useSetStaffPassword() {
+  return useMutation({
+    mutationFn: ({ userId, password }: { userId: string; password: string }) =>
+      staffProfilesService.setStaffPassword(userId, password),
   })
 }
