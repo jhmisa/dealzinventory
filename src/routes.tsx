@@ -164,10 +164,7 @@ export const router = createBrowserRouter([
   },
   {
     path: '/offer/:offerCode',
-    element: <ShopLayout />,
-    children: [
-      { index: true, element: lazyElement(OfferClaimPage) },
-    ],
+    element: lazyElement(OfferClaimPage),
   },
   {
     path: '/order/:sellGroupCode',

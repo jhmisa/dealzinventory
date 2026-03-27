@@ -73,8 +73,13 @@ export async function sendPasswordSetupEmail(email: string) {
 }
 
 export async function setStaffPassword(userId: string, password: string) {
+  const { data: { session } } = await supabase.auth.getSession()
+
   const { data, error } = await supabase.functions.invoke('set-staff-password', {
     body: { user_id: userId, password },
+    headers: {
+      Authorization: `Bearer ${session?.access_token}`,
+    },
   })
 
   if (error) {
@@ -94,8 +99,13 @@ export async function setStaffPassword(userId: string, password: string) {
 }
 
 export async function inviteStaff(email: string, displayName: string, role: string, password?: string) {
+  const { data: { session } } = await supabase.auth.getSession()
+
   const { data, error } = await supabase.functions.invoke('invite-staff', {
     body: { email, display_name: displayName, role, ...(password ? { password } : {}) },
+    headers: {
+      Authorization: `Bearer ${session?.access_token}`,
+    },
   })
 
   if (error) {

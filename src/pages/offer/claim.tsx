@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Check, Clock, LogIn, Plus, ShoppingBag, Trash2, UserPlus, X } from 'lucide-react'
+import { Check, Clock, LogIn, ShoppingBag, UserPlus, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/form'
 import { ShippingStep } from '@/components/orders/shipping-step'
 import { CustomerAuthContext, useCustomerAuthProvider } from '@/hooks/use-customer-auth'
-import { useOfferByCode, useClaimOffer, useAddItemByCode, useAddCustomOfferItem, useRemoveOfferItem } from '@/hooks/use-offers'
+import { useOfferByCode, useClaimOffer, useOfferRealtimeSync } from '@/hooks/use-offers'
 import { ImageGallery } from '@/components/shared/image-gallery'
 import type { GalleryImage } from '@/components/shared/image-gallery'
 import { CONDITION_GRADES } from '@/lib/constants'
@@ -352,9 +352,6 @@ function OfferClaimInner() {
   const { offerCode } = useParams<{ offerCode: string }>()
   const { data: offer, isLoading, error } = useOfferByCode(offerCode ?? '')
   const claimOffer = useClaimOffer()
-  const addItemByCode = useAddItemByCode()
-  const addCustomItem = useAddCustomOfferItem()
-  const removeItem = useRemoveOfferItem()
 
   const authState = useCustomerAuthProvider()
   const { customer, isAuthenticated, isLoading: authLoading, login, register, logout } = authState
@@ -364,11 +361,9 @@ function OfferClaimInner() {
   const [deliveryDate, setDeliveryDate] = useState<string | null>(null)
   const [deliveryTimeCode, setDeliveryTimeCode] = useState<string | null>(null)
   const [orderCreated, setOrderCreated] = useState<{ orderCode: string } | null>(null)
-  const [itemCode, setItemCode] = useState('')
-  const [showCustomItem, setShowCustomItem] = useState(false)
-  const [customDescription, setCustomDescription] = useState('')
-  const [customPrice, setCustomPrice] = useState('')
-  const [customQty, setCustomQty] = useState('1')
+
+  // Subscribe to realtime changes so staff edits appear instantly
+  useOfferRealtimeSync(offer?.id)
 
   // Loading state
   if (isLoading) {
@@ -454,52 +449,6 @@ function OfferClaimInner() {
     )
   }
 
-  function handleAddItem() {
-    if (!itemCode.trim()) return
-    addItemByCode.mutate(
-      { offerId: offer!.id, code: itemCode.trim() },
-      {
-        onSuccess: () => {
-          setItemCode('')
-          toast.success('Item added!')
-        },
-        onError: (err) => toast.error(err.message),
-      },
-    )
-  }
-
-  function handleAddCustomItem() {
-    if (!customDescription.trim() || !customPrice) return
-    addCustomItem.mutate(
-      {
-        offerId: offer!.id,
-        item: {
-          description: customDescription.trim(),
-          unit_price: Number(customPrice),
-          quantity: Number(customQty) || 1,
-        },
-        addedBy: 'customer',
-      },
-      {
-        onSuccess: () => {
-          setCustomDescription('')
-          setCustomPrice('')
-          setCustomQty('1')
-          setShowCustomItem(false)
-          toast.success('Custom item added!')
-        },
-        onError: (err) => toast.error(err.message),
-      },
-    )
-  }
-
-  function handleRemoveItem(offerItemId: string) {
-    removeItem.mutate(offerItemId, {
-      onSuccess: () => toast.success('Item removed'),
-      onError: (err) => toast.error(err.message),
-    })
-  }
-
   function handleConfirmOrder() {
     if (!selectedAddress) {
       toast.error('Please select a shipping address')
@@ -529,18 +478,26 @@ function OfferClaimInner() {
 
   return (
     <CustomerAuthContext.Provider value={authState}>
-      <div className="max-w-2xl mx-auto space-y-6 pb-12">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <ShoppingBag className="h-6 w-6" />
-              Your Offer — {offer.offer_code}
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">from {offer.fb_name}</p>
+      <div className="min-h-screen bg-background flex flex-col">
+        <div className="container max-w-2xl mx-auto space-y-6 py-8 px-4 flex-1">
+          {/* Logo */}
+          <div className="flex justify-center">
+            <Link to="/shop" className="flex items-center gap-2 font-bold text-lg">
+              <ShoppingBag className="h-5 w-5" />
+              Dealz
+            </Link>
           </div>
-          <CountdownTimer expiresAt={offer.expires_at} />
-        </div>
+
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold flex items-center gap-2">
+                Your Offer — {offer.offer_code}
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1">from {offer.fb_name}</p>
+            </div>
+            <CountdownTimer expiresAt={offer.expires_at} />
+          </div>
 
         {/* Items List */}
         <Card>
@@ -603,18 +560,8 @@ function OfferClaimInner() {
                         )}
                       </div>
                     </div>
-                    <div className="text-right flex items-center gap-2">
+                    <div className="text-right">
                       <span className="font-medium">{formatPrice(Number(oi.unit_price) * oi.quantity)}</span>
-                      {oi.added_by === 'customer' && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-red-600"
-                          onClick={() => handleRemoveItem(oi.id)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
                     </div>
                   </div>
 
@@ -649,69 +596,6 @@ function OfferClaimInner() {
               )
             })}
 
-            {/* Add item by code */}
-            <div className="flex items-center gap-2 pt-2 border-t">
-              <Input
-                placeholder="Add item by P-code or G-code..."
-                value={itemCode}
-                onChange={e => setItemCode(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleAddItem()}
-                className="flex-1"
-              />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleAddItem}
-                disabled={addItemByCode.isPending || !itemCode.trim()}
-              >
-                {addItemByCode.isPending ? '...' : 'Add'}
-              </Button>
-            </div>
-
-            {/* Add custom item */}
-            {showCustomItem ? (
-              <div className="space-y-2 p-3 bg-muted/50 rounded-lg">
-                <Input
-                  placeholder="Description (e.g., Mouse 1X)"
-                  value={customDescription}
-                  onChange={e => setCustomDescription(e.target.value)}
-                />
-                <div className="flex gap-2">
-                  <Input
-                    type="number"
-                    placeholder="Price (JPY)"
-                    value={customPrice}
-                    onChange={e => setCustomPrice(e.target.value)}
-                    className="flex-1"
-                  />
-                  <Input
-                    type="number"
-                    min={1}
-                    placeholder="Qty"
-                    value={customQty}
-                    onChange={e => setCustomQty(e.target.value)}
-                    className="w-20"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <Button size="sm" onClick={handleAddCustomItem} disabled={addCustomItem.isPending}>
-                    Add Custom Item
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setShowCustomItem(false)}>
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setShowCustomItem(true)}
-                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Add custom item
-              </button>
-            )}
           </CardContent>
         </Card>
 
@@ -820,6 +704,12 @@ function OfferClaimInner() {
             </Button>
           </>
         )}
+        </div>
+
+        {/* Footer */}
+        <footer className="py-6 text-center text-xs text-muted-foreground">
+          © {new Date().getFullYear()} Dealz K.K.
+        </footer>
       </div>
     </CustomerAuthContext.Provider>
   )

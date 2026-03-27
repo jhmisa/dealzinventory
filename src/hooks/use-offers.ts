@@ -1,5 +1,7 @@
+import { useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/query-keys'
+import { supabase } from '@/lib/supabase'
 import * as offersService from '@/services/offers'
 
 interface OfferFilters {
@@ -99,4 +101,32 @@ export function useRemoveOfferItem() {
       queryClient.invalidateQueries({ queryKey: queryKeys.items.all })
     },
   })
+}
+
+export function useOfferRealtimeSync(offerId: string | undefined) {
+  const queryClient = useQueryClient()
+
+  useEffect(() => {
+    if (!offerId) return
+
+    const channel = supabase
+      .channel(`offer-items-${offerId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'offer_items',
+          filter: `offer_id=eq.${offerId}`,
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: queryKeys.offers.all })
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [offerId, queryClient])
 }
