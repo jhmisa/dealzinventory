@@ -182,12 +182,8 @@ export default function ShowcasePage() {
         )}
       </div>
 
-      {/* Bottom Half — split into left (product info) and right (camera) */}
-      <div className="flex grow shrink basis-0 overflow-hidden">
-        {/* Left column — controls + product info */}
-        <div className="w-[360px] shrink-0 flex flex-col">
-          {/* Controls Row */}
-          <div className="flex items-center shrink-0 py-2.5 px-3 gap-2.5 border-b border-[#E4E4E7]">
+      {/* Controls Row — full width */}
+      <div className="flex items-center shrink-0 py-2.5 px-3 gap-2.5 border-b border-[#E4E4E7] w-full">
             {/* Search input */}
             <div className="relative grow shrink basis-0">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-[15px] w-[15px] text-[#A1A1AA]" strokeWidth={2} />
@@ -230,16 +226,20 @@ export default function ShowcasePage() {
                 </span>
               </button>
             </div>
-          </div>
+      </div>
 
+      {/* Bottom Half — split into left (product info) and right (camera) */}
+      <div className="flex grow shrink basis-0 overflow-hidden">
+        {/* Left column — product info */}
+        <div className="w-[360px] shrink-0 flex flex-col">
           {/* Product Info */}
           {currentItem ? (
             <div className="flex flex-col grow shrink basis-0 pt-4 gap-2.5 px-5 overflow-hidden">
-              <span className="tracking-[0.02em] text-[#71717A] font-semibold text-[24px]/[28px]">
+              <span className="tracking-[0.02em] text-[#09090B] font-bold text-[32px]/[36px]">
                 {currentItem.item_code}
               </span>
 
-              <span className="tracking-[-0.03em] text-[#09090B] font-bold text-[48px]/[48px]">
+              <span className="tracking-[-0.03em] text-[#09090B] font-extrabold text-[64px]/[64px]">
                 {price != null ? formatPrice(price) : '—'}
               </span>
 
@@ -252,17 +252,17 @@ export default function ShowcasePage() {
               )}
 
               {currentItem.description && (
-                <p className="pt-1 text-[#71717A] text-base/6">
+                <p className="pt-1 text-[#52525B] text-lg/7">
                   {currentItem.description}
                 </p>
               )}
 
               {currentItem.condition_notes && (
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[#09090B] font-semibold text-sm/5">
+                <div className="flex flex-col gap-2">
+                  <span className="text-[#09090B] font-semibold text-base/5">
                     Condition
                   </span>
-                  <span className="text-[#71717A] text-base/6">
+                  <span className="text-[#52525B] text-lg/7">
                     {currentItem.condition_notes}
                   </span>
                 </div>
@@ -277,7 +277,7 @@ export default function ShowcasePage() {
         </div>
 
         {/* Right column — camera placeholder */}
-        <div className="w-[360px] shrink-0 bg-black" />
+        <div className="w-[360px] shrink-0 bg-white" />
       </div>
     </div>
     </div>
