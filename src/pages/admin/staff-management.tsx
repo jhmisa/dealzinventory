@@ -33,6 +33,7 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { PageHeader, TableSkeleton } from '@/components/shared'
 import { useStaffProfiles, useUpdateStaffProfile, useInviteStaff } from '@/hooks/use-staff-profiles'
+import { sendPasswordSetupEmail } from '@/services/staff-profiles'
 import { useAuth } from '@/hooks/use-auth'
 import {
   inviteStaffSchema,
@@ -303,8 +304,13 @@ export default function StaffManagementPage() {
 
   function handleInvite(values: InviteStaffFormValues) {
     inviteMutation.mutate({ email: values.email, displayName: values.display_name, role: values.role }, {
-      onSuccess: () => {
-        toast.success('Invite sent successfully')
+      onSuccess: async () => {
+        try {
+          await sendPasswordSetupEmail(values.email)
+          toast.success(`Staff member created — password setup email sent to ${values.email}`)
+        } catch {
+          toast.success('Staff member created, but failed to send password setup email. You can resend from the edit dialog.')
+        }
         setInviteOpen(false)
       },
       onError: (err) => toast.error(`Failed to send invite: ${err.message}`),

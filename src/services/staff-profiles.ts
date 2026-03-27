@@ -65,6 +65,13 @@ export async function updateStaffProfile(id: string, updates: StaffProfileUpdate
   return data as StaffProfile
 }
 
+export async function sendPasswordSetupEmail(email: string) {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/admin/auth/callback`,
+  })
+  if (error) throw error
+}
+
 export async function inviteStaff(email: string, displayName: string, role: string) {
   const { data, error } = await supabase.functions.invoke('invite-staff', {
     body: { email, display_name: displayName, role },

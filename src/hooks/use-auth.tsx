@@ -10,8 +10,10 @@ interface AuthContextValue {
   staffProfile: StaffProfile | null
   isAdmin: boolean
   displayName: string | null
+  isPasswordRecovery: boolean
   signIn: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
+  clearPasswordRecovery: () => void
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -23,9 +25,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [staffProfile, setStaffProfile] = useState<StaffProfile | null>(null)
   const [staffProfileLoading, setStaffProfileLoading] = useState(true)
   const [staffProfileError, setStaffProfileError] = useState(false)
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false)
+
+  const clearPasswordRecovery = useCallback(() => {
+    setIsPasswordRecovery(false)
+  }, [])
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsPasswordRecovery(true)
+      }
       setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
@@ -140,8 +150,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     staffProfile,
     isAdmin,
     displayName,
+    isPasswordRecovery,
     signIn,
     signOut,
+    clearPasswordRecovery,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
