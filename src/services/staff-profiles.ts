@@ -66,42 +66,27 @@ export async function updateStaffProfile(id: string, updates: StaffProfileUpdate
 }
 
 export async function inviteStaff(email: string, displayName: string, role: string) {
-  // Use refreshSession() instead of getSession() to ensure a fresh access token.
-  // getSession() returns the cached token which may be expired, causing the
-  // Supabase gateway to reject the request with 401 before our function runs.
-  const { data: { session } } = await supabase.auth.refreshSession()
-  if (!session) throw new Error('Not authenticated')
+  const { data, error } = await supabase.functions.invoke('invite-staff', {
+    body: { email, display_name: displayName, role },
+  })
 
-  // Use fetch directly instead of supabase.functions.invoke() so we always
-  // get the actual response body. The SDK wraps non-2xx in a generic
-  // FunctionsHttpError that hides the real error message.
-  const res = await fetch(
-    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/invite-staff`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`,
-        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-      },
-      body: JSON.stringify({ email, display_name: displayName, role }),
+  if (error) {
+    // The SDK wraps non-2xx in a generic FunctionsHttpError that hides the
+    // real error. Read the actual message from the response body.
+    let message = error.message
+    try {
+      const body = await (error as unknown as { context?: Response }).context?.json()
+      message = body?.error ?? body?.message ?? message
+    } catch {
+      // Response body not readable, use generic message
     }
-  )
-
-  let body: { error?: string; profile?: StaffProfile }
-  try {
-    body = await res.json()
-  } catch {
-    throw new Error(`Unexpected response (HTTP ${res.status})`)
+    throw new Error(message)
   }
-
-  // Handle errors from our function ({"error":"..."}) or the gateway ({"message":"..."})
-  const errorMessage = body.error ?? (body as Record<string, unknown>).message as string | undefined
-  if (errorMessage) {
-    throw new Error(errorMessage)
+  if (data?.error) {
+    throw new Error(data.error)
   }
-  if (!body.profile) {
+  if (!data?.profile) {
     throw new Error('No profile returned')
   }
-  return body.profile
+  return data.profile as StaffProfile
 }
