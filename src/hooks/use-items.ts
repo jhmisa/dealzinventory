@@ -84,6 +84,7 @@ export function useUpdateItem() {
       itemsService.updateItem(id, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.items.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.offers.all })
     },
   })
 }

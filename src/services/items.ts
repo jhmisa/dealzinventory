@@ -122,6 +122,23 @@ export async function updateItem(id: string, updates: ItemUpdate) {
     .single()
 
   if (error) throw error
+
+  // Sync selling_price to any PENDING offer_items linked to this item
+  if (updates.selling_price !== undefined) {
+    const { data: pendingItems } = await supabase
+      .from('offer_items')
+      .select('id, offers!inner(offer_status)')
+      .eq('item_id', id)
+      .eq('offers.offer_status', 'PENDING')
+
+    if (pendingItems && pendingItems.length > 0) {
+      await supabase
+        .from('offer_items')
+        .update({ unit_price: updates.selling_price ?? 0 })
+        .in('id', pendingItems.map(oi => oi.id))
+    }
+  }
+
   return data as Item
 }
 
