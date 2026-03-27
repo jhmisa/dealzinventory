@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { toast } from 'sonner'
-import { ShieldCheck, Upload, CheckCircle2, Clock } from 'lucide-react'
+import { ShieldCheck, Upload, CheckCircle2, Clock, Loader2 } from 'lucide-react'
 import { useCustomerAuth } from '@/hooks/use-customer-auth'
-import { MediaUploader } from '@/components/shared/media'
+import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import * as customersService from '@/services/customers'
@@ -11,9 +11,39 @@ import { formatDateTime } from '@/lib/utils'
 export default function CustomerVerifyIdPage() {
   const { customer, refreshCustomer } = useCustomerAuth()
   const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const isVerified = customer?.id_verified
   const hasDocument = !!customer?.id_document_url
+
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file || !customer) return
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('File exceeds 10MB limit')
+      return
+    }
+
+    setUploading(true)
+    try {
+      const ext = file.name.split('.').pop() ?? 'jpg'
+      const filePath = `customers/${customer.id}/${crypto.randomUUID()}.${ext}`
+
+      const { error } = await supabase.storage
+        .from('id-documents')
+        .upload(filePath, file, { contentType: file.type, upsert: false })
+      if (error) throw error
+
+      const { data: urlData } = supabase.storage.from('id-documents').getPublicUrl(filePath)
+      await handleDocumentUpload(urlData.publicUrl)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Upload failed')
+    } finally {
+      setUploading(false)
+    }
+  }, [customer])
 
   async function handleDocumentUpload(url: string) {
     if (!customer) return
@@ -89,17 +119,27 @@ export default function CustomerVerifyIdPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <MediaUploader
-              bucket="id-documents"
-              pathPrefix={`customers/${customer?.id ?? 'unknown'}`}
-              onUpload={handleDocumentUpload}
-              accept="image/*"
-              multiple={false}
-              maxSizeBytes={10 * 1024 * 1024}
-            />
-            {uploading && (
-              <p className="text-sm text-muted-foreground">Uploading document...</p>
-            )}
+            <div
+              className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors border-muted-foreground/25 hover:border-primary/50"
+              onClick={() => !uploading && fileInputRef.current?.click()}
+            >
+              {uploading ? (
+                <Loader2 className="h-8 w-8 mx-auto text-primary animate-spin mb-2" />
+              ) : (
+                <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+              )}
+              <p className="text-sm text-muted-foreground">
+                {uploading ? 'Uploading document...' : 'Click to select your ID document'}
+              </p>
+              <p className="text-xs text-muted-foreground/70 mt-1">Max 10MB per file</p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileSelect}
+              />
+            </div>
 
             <div className="rounded-lg border p-3 text-sm text-muted-foreground space-y-1">
               <p className="font-medium text-foreground">Important Notes:</p>
