@@ -235,11 +235,11 @@ export default function ShowcasePage() {
           {/* Product Info */}
           {currentItem ? (
             <div className="flex flex-col grow shrink basis-0 pt-4 gap-2.5 px-5 overflow-hidden">
-              <span className="tracking-[0.02em] text-[#09090B] font-bold text-[32px]/[36px]">
+              <span className="tracking-[0.02em] text-[#09090B] font-bold text-[48px]/[52px]">
                 {currentItem.item_code}
               </span>
 
-              <span className="tracking-[-0.03em] text-[#09090B] font-extrabold text-[64px]/[64px]">
+              <span className="tracking-[-0.03em] text-[#09090B] font-extrabold text-[80px]/[80px]">
                 {price != null ? formatPrice(price) : '—'}
               </span>
 
@@ -252,17 +252,17 @@ export default function ShowcasePage() {
               )}
 
               {currentItem.description && (
-                <p className="pt-1 text-[#52525B] text-lg/7">
+                <p className="pt-1 text-[#52525B] text-[45px]/[52px]">
                   {currentItem.description}
                 </p>
               )}
 
               {currentItem.condition_notes && (
                 <div className="flex flex-col gap-2">
-                  <span className="text-[#09090B] font-semibold text-base/5">
+                  <span className="text-[#09090B] font-semibold text-[40px]/[48px]">
                     Condition
                   </span>
-                  <span className="text-[#52525B] text-lg/7">
+                  <span className="text-[#52525B] text-[45px]/[52px]">
                     {currentItem.condition_notes}
                   </span>
                 </div>
