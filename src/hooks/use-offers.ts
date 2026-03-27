@@ -81,6 +81,17 @@ export function useClaimOffer() {
   })
 }
 
+export function useUpdateOffer() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: { notes?: string } }) =>
+      offersService.updateOffer(id, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.offers.all })
+    },
+  })
+}
+
 export function useCancelOffer() {
   const queryClient = useQueryClient()
   return useMutation({

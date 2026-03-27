@@ -124,18 +124,28 @@ export async function updateItem(id: string, updates: ItemUpdate) {
   if (error) throw error
 
   // Sync selling_price to any PENDING offer_items linked to this item
-  if (updates.selling_price !== undefined) {
-    const { data: pendingItems } = await supabase
-      .from('offer_items')
-      .select('id, offers!inner(offer_status)')
-      .eq('item_id', id)
-      .eq('offers.offer_status', 'PENDING')
-
-    if (pendingItems && pendingItems.length > 0) {
-      await supabase
+  if (updates.selling_price !== undefined && updates.selling_price !== null) {
+    try {
+      const { data: pendingItems, error: fetchError } = await supabase
         .from('offer_items')
-        .update({ unit_price: updates.selling_price ?? 0 })
-        .in('id', pendingItems.map(oi => oi.id))
+        .select('id, offers!inner(offer_status)')
+        .eq('item_id', id)
+        .eq('offers.offer_status', 'PENDING')
+
+      if (fetchError) {
+        console.error('Failed to fetch pending offer items for price sync:', fetchError)
+      } else if (pendingItems && pendingItems.length > 0) {
+        const { error: updateError } = await supabase
+          .from('offer_items')
+          .update({ unit_price: updates.selling_price })
+          .in('id', pendingItems.map(oi => oi.id))
+
+        if (updateError) {
+          console.error('Failed to sync selling_price to offer items:', updateError)
+        }
+      }
+    } catch (e) {
+      console.error('Offer price sync error:', e)
     }
   }
 

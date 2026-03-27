@@ -381,6 +381,20 @@ export async function claimOffer(input: ClaimOfferInput) {
   return data as { order_code: string; order_id: string }
 }
 
+// --- Update ---
+
+export async function updateOffer(id: string, updates: { notes?: string }) {
+  const { data, error } = await supabase
+    .from('offers')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
 // --- Cancel ---
 
 export async function cancelOffer(offerId: string) {

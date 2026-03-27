@@ -42,6 +42,11 @@ const STATUS_TABS = [
   ...ORDER_STATUSES.map((s) => ({ value: s.value, label: s.label })),
 ]
 
+const OFFER_STATUS_TABS = [
+  { value: 'all', label: 'All' },
+  ...OFFER_STATUSES.map((s) => ({ value: s.value, label: s.label })),
+]
+
 const columns: ColumnDef<OrderRow>[] = [
   {
     accessorKey: 'order_code',
@@ -173,10 +178,20 @@ export default function OrderListPage() {
     statusCounts[order.order_status] = (statusCounts[order.order_status] ?? 0) + 1
   }
 
+  // Compute offer counts per status
+  const offerStatusCounts: Record<string, number> = { all: offers.length }
+  for (const offer of offers) {
+    offerStatusCounts[offer.offer_status] = (offerStatusCounts[offer.offer_status] ?? 0) + 1
+  }
+
   // Filter by active tab
   const filteredOrders = statusTab === 'all'
     ? orders
     : orders.filter((o) => o.order_status === statusTab)
+
+  const filteredOffers = statusTab === 'all'
+    ? offers
+    : offers.filter((o) => o.offer_status === statusTab)
 
   // Offers table columns
   const offerColumns: ColumnDef<OfferRow>[] = [
@@ -398,7 +413,42 @@ export default function OrderListPage() {
         </>
       ) : (
         <>
-          {/* Offers Tab */}
+          {/* Offer Status Tabs */}
+          <div className="border-b">
+            <nav className="flex gap-0 -mb-px overflow-x-auto">
+              {OFFER_STATUS_TABS.map((tab) => {
+                const count = offerStatusCounts[tab.value] ?? 0
+                const isActive = statusTab === tab.value
+                return (
+                  <button
+                    key={tab.value}
+                    type="button"
+                    onClick={() => setStatusTab(tab.value)}
+                    className={cn(
+                      'px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors',
+                      isActive
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30',
+                    )}
+                  >
+                    {tab.label}
+                    <span
+                      className={cn(
+                        'ml-1.5 inline-flex items-center justify-center rounded-full px-2 py-0.5 text-xs',
+                        isActive
+                          ? 'bg-primary/10 text-primary'
+                          : 'bg-muted text-muted-foreground',
+                      )}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                )
+              })}
+            </nav>
+          </div>
+
+          {/* Search */}
           <div className="flex items-center gap-4 flex-wrap">
             <SearchBar
               value={search}
@@ -413,7 +463,8 @@ export default function OrderListPage() {
           ) : (
             <DataTable
               columns={offerColumns}
-              data={offers}
+              data={filteredOffers}
+              onRowClick={(row) => navigate(`/admin/offers/${row.offer_code}`)}
             />
           )}
         </>

@@ -26,6 +26,7 @@ const SellGroupListPage = lazy(() => import('@/pages/admin/sell-groups'))
 const SellGroupDetailPage = lazy(() => import('@/pages/admin/sell-group-detail'))
 const OrderListPage = lazy(() => import('@/pages/admin/orders'))
 const OrderDetailPage = lazy(() => import('@/pages/admin/order-detail'))
+const OfferDetailPage = lazy(() => import('@/pages/admin/offer-detail'))
 const CreateOrderPage = lazy(() => import('@/pages/admin/create-order'))
 const PackingStationPage = lazy(() => import('@/pages/admin/packing-station'))
 const CustomerListPage = lazy(() => import('@/pages/admin/customers'))
@@ -132,6 +133,7 @@ export const router = createBrowserRouter([
           { path: 'orders', element: lazyElement(OrderListPage) },
           { path: 'orders/new', element: lazyElement(CreateOrderPage) },
           { path: 'orders/:id', element: lazyElement(OrderDetailPage) },
+          { path: 'offers/:offerCode', element: lazyElement(OfferDetailPage) },
           { path: 'packing', element: lazyElement(PackingStationPage) },
           { path: 'kaitori', element: lazyElement(KaitoriListPage) },
           { path: 'kaitori/:id', element: lazyElement(KaitoriDetailPage) },
