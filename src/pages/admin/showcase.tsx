@@ -182,94 +182,103 @@ export default function ShowcasePage() {
         )}
       </div>
 
-      {/* Controls Row */}
-      <div className="flex items-center shrink-0 py-3.5 px-5 gap-2.5 border-b border-[#E4E4E7]">
-        {/* Search input */}
-        <div className="relative grow shrink basis-0">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-[15px] w-[15px] text-[#A1A1AA]" strokeWidth={2} />
-          <Input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={handleSearch}
-            placeholder="Search product or barcode..."
-            className="pl-9 h-9 text-[13px]"
-            disabled={loading}
-          />
+      {/* Bottom Half — split into left (product info) and right (camera) */}
+      <div className="flex grow shrink basis-0 overflow-hidden">
+        {/* Left column — controls + product info */}
+        <div className="w-[360px] shrink-0 flex flex-col">
+          {/* Controls Row */}
+          <div className="flex items-center shrink-0 py-2.5 px-3 gap-2.5 border-b border-[#E4E4E7]">
+            {/* Search input */}
+            <div className="relative grow shrink basis-0">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-[15px] w-[15px] text-[#A1A1AA]" strokeWidth={2} />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={handleSearch}
+                placeholder="Search product or barcode..."
+                className="pl-9 h-9 text-[13px]"
+                disabled={loading}
+              />
+            </div>
+
+            {/* Photos / Videos segmented toggle */}
+            <div className="flex items-center">
+              <button
+                onClick={() => setMediaMode('photos')}
+                className={`flex items-center py-2 px-3.5 gap-1.5 rounded-l-md border ${
+                  mediaMode === 'photos'
+                    ? 'bg-[#18181B] border-[#18181B] text-white'
+                    : 'bg-white border-[#E4E4E7] text-[#71717A]'
+                }`}
+              >
+                <Image className="h-3.5 w-3.5" strokeWidth={2} />
+                <span className={`text-xs/4 ${mediaMode === 'photos' ? 'font-semibold' : 'font-medium'}`}>
+                  Photos ({String(photos.length).padStart(2, '0')})
+                </span>
+              </button>
+              <button
+                onClick={() => setMediaMode('videos')}
+                className={`flex items-center py-2 px-3.5 gap-1.5 rounded-r-md border-t border-b border-r ${
+                  mediaMode === 'videos'
+                    ? 'bg-[#18181B] border-[#18181B] text-white'
+                    : 'bg-white border-[#E4E4E7] text-[#71717A]'
+                }`}
+              >
+                <Play className="h-3.5 w-3.5" strokeWidth={2} />
+                <span className={`text-xs/4 ${mediaMode === 'videos' ? 'font-semibold' : 'font-medium'}`}>
+                  Videos ({String(videos.length).padStart(2, '0')})
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* Product Info */}
+          {currentItem ? (
+            <div className="flex flex-col grow shrink basis-0 pt-4 gap-2.5 px-5 overflow-hidden">
+              <span className="tracking-[0.02em] text-[#71717A] font-semibold text-[24px]/[28px]">
+                {currentItem.item_code}
+              </span>
+
+              <span className="tracking-[-0.03em] text-[#09090B] font-bold text-[48px]/[48px]">
+                {price != null ? formatPrice(price) : '—'}
+              </span>
+
+              {currentItem.condition_grade && (
+                <div className="flex items-center self-start rounded-md py-2 px-4 bg-[#18181B]">
+                  <span className="text-white font-semibold text-base/5">
+                    Rank {currentItem.condition_grade}
+                  </span>
+                </div>
+              )}
+
+              {currentItem.description && (
+                <p className="pt-1 text-[#71717A] text-base/6">
+                  {currentItem.description}
+                </p>
+              )}
+
+              {currentItem.condition_notes && (
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[#09090B] font-semibold text-sm/5">
+                    Condition
+                  </span>
+                  <span className="text-[#71717A] text-base/6">
+                    {currentItem.condition_notes}
+                  </span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center grow shrink basis-0 text-[#A1A1AA] gap-3">
+              <Search className="h-10 w-10" strokeWidth={1.5} />
+              <span className="text-base">Scan or search a P-code to begin</span>
+            </div>
+          )}
         </div>
 
-        {/* Photos / Videos segmented toggle */}
-        <div className="flex items-center">
-          <button
-            onClick={() => setMediaMode('photos')}
-            className={`flex items-center py-2 px-3.5 gap-1.5 rounded-l-md border ${
-              mediaMode === 'photos'
-                ? 'bg-[#18181B] border-[#18181B] text-white'
-                : 'bg-white border-[#E4E4E7] text-[#71717A]'
-            }`}
-          >
-            <Image className="h-3.5 w-3.5" strokeWidth={2} />
-            <span className={`text-xs/4 ${mediaMode === 'photos' ? 'font-semibold' : 'font-medium'}`}>
-              Photos ({String(photos.length).padStart(2, '0')})
-            </span>
-          </button>
-          <button
-            onClick={() => setMediaMode('videos')}
-            className={`flex items-center py-2 px-3.5 gap-1.5 rounded-r-md border-t border-b border-r ${
-              mediaMode === 'videos'
-                ? 'bg-[#18181B] border-[#18181B] text-white'
-                : 'bg-white border-[#E4E4E7] text-[#71717A]'
-            }`}
-          >
-            <Play className="h-3.5 w-3.5" strokeWidth={2} />
-            <span className={`text-xs/4 ${mediaMode === 'videos' ? 'font-semibold' : 'font-medium'}`}>
-              Videos ({String(videos.length).padStart(2, '0')})
-            </span>
-          </button>
-        </div>
+        {/* Right column — camera placeholder */}
+        <div className="w-[360px] shrink-0 bg-black" />
       </div>
-
-      {/* Product Info */}
-      {currentItem ? (
-        <div className="flex flex-col grow shrink basis-0 pt-6 gap-2.5 px-8 overflow-hidden">
-          <span className="tracking-[0.02em] text-[#71717A] font-semibold text-[40px]/[44px]">
-            {currentItem.item_code}
-          </span>
-
-          <span className="tracking-[-0.03em] text-[#09090B] font-bold text-[80px]/[80px]">
-            {price != null ? formatPrice(price) : '—'}
-          </span>
-
-          {currentItem.condition_grade && (
-            <div className="flex items-center self-start rounded-md py-2 px-4 bg-[#18181B]">
-              <span className="text-white font-semibold text-xl/6">
-                Rank {currentItem.condition_grade}
-              </span>
-            </div>
-          )}
-
-          {currentItem.description && (
-            <p className="pt-1 text-[#71717A] text-[26px]/9">
-              {currentItem.description}
-            </p>
-          )}
-
-          {currentItem.condition_notes && (
-            <div className="flex flex-col gap-1.5">
-              <span className="text-[#09090B] font-semibold text-lg/6">
-                Condition
-              </span>
-              <span className="text-[#71717A] text-xl/[30px]">
-                {currentItem.condition_notes}
-              </span>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="flex flex-col items-center justify-center grow shrink basis-0 text-[#A1A1AA] gap-3">
-          <Search className="h-12 w-12" strokeWidth={1.5} />
-          <span className="text-lg">Scan or search a P-code to begin</span>
-        </div>
-      )}
     </div>
     </div>
   )
