@@ -24,7 +24,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { MediaUploader } from '@/components/shared/media'
+import { MediaInput } from '@/components/shared/media'
+import type { UploadResult } from '@/lib/media'
 import { useProductModels } from '@/hooks/use-product-models'
 import { useCreateKaitoriRequest, useLookupQuote, useAddKaitoriMedia } from '@/hooks/use-kaitori'
 import { kaitoriRequestSchema } from '@/validators/kaitori'
@@ -43,7 +44,7 @@ export default function KaitoriAssessPage() {
   const navigate = useNavigate()
   const [step, setStep] = useState<Step>('model')
   const [quotePrice, setQuotePrice] = useState<number | null>(null)
-  const [uploadedPhotos, setUploadedPhotos] = useState<string[]>([])
+  const [uploadedPhotos, setUploadedPhotos] = useState<UploadResult[]>([])
   const [createdId, setCreatedId] = useState<string | null>(null)
 
   const { data: productModels } = useProductModels()
@@ -101,8 +102,8 @@ export default function KaitoriAssessPage() {
     }, {
       onSuccess: async (request) => {
         // Upload any photos to the request
-        for (const url of uploadedPhotos) {
-          await addMediaMutation.mutateAsync({ kaitoriRequestId: request.id, fileUrl: url, role: 'other' })
+        for (const photo of uploadedPhotos) {
+          await addMediaMutation.mutateAsync({ kaitoriRequestId: request.id, fileUrl: photo.displayUrl, role: 'other' })
         }
         setCreatedId(request.id)
         toast.success('Quote submitted!')
@@ -333,20 +334,18 @@ export default function KaitoriAssessPage() {
                   Upload photos of your device to help us provide an accurate quote.
                   Include front, back, screen, and any damage photos.
                 </p>
-                <MediaUploader
+                <MediaInput
+                  accept="image"
                   bucket="kaitori-media"
-                  pathPrefix="temp-assessment"
-                  onUpload={(url) => setUploadedPhotos(prev => [...prev, url])}
+                  path="temp-assessment"
+                  onUpload={(result) => setUploadedPhotos((prev) => [...prev, result])}
+                  existingMedia={uploadedPhotos.map((r) => ({
+                    id: r.id,
+                    url: r.displayUrl,
+                    type: 'image' as const,
+                  }))}
+                  onRemove={(id) => setUploadedPhotos((prev) => prev.filter((r) => r.id !== id))}
                 />
-                {uploadedPhotos.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {uploadedPhotos.map((url, i) => (
-                      <div key={i} className="w-20 h-20 rounded border overflow-hidden">
-                        <img src={url} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
-                      </div>
-                    ))}
-                  </div>
-                )}
 
                 <FormField
                   control={form.control}
