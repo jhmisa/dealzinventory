@@ -6,6 +6,23 @@ import { formatPrice } from '@/lib/utils'
 import { getShowcaseItem, type ShowcaseItem } from '@/services/showcase'
 
 const TIMER_SECONDS = 3
+const DESIGN_W = 720
+const DESIGN_H = 1280
+
+function useWindowScale() {
+  const [scale, setScale] = useState(1)
+
+  useEffect(() => {
+    const update = () => {
+      setScale(Math.min(window.innerWidth / DESIGN_W, window.innerHeight / DESIGN_H))
+    }
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
+
+  return scale
+}
 
 export default function ShowcasePage() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null)
@@ -80,12 +97,19 @@ export default function ShowcasePage() {
     }
   }
 
+  const scale = useWindowScale()
+
   if (authenticated === null) return null
 
   if (!authenticated) {
     return (
-      <div className="flex items-center justify-center w-[720px] h-[1280px] bg-white">
-        <p className="text-lg text-muted-foreground">Please log in to use the showcase.</p>
+      <div className="w-screen h-screen overflow-hidden bg-black flex items-start justify-center">
+        <div
+          className="flex items-center justify-center w-[720px] h-[1280px] bg-white"
+          style={{ transform: `scale(${scale})`, transformOrigin: 'top center' }}
+        >
+          <p className="text-lg text-muted-foreground">Please log in to use the showcase.</p>
+        </div>
       </div>
     )
   }
@@ -94,7 +118,11 @@ export default function ShowcasePage() {
   const currentMedia = mediaItems[currentIndex]
 
   return (
-    <div className="[font-synthesis:none] flex overflow-clip w-[720px] h-[1280px] flex-col bg-white antialiased text-xs/4 relative">
+    <div className="w-screen h-screen overflow-hidden bg-black flex items-start justify-center">
+    <div
+      className="[font-synthesis:none] flex overflow-clip w-[720px] h-[1280px] flex-col bg-white antialiased text-xs/4 relative"
+      style={{ transform: `scale(${scale})`, transformOrigin: 'top center' }}
+    >
       {/* Media Viewer — 720x720 square */}
       <div className="w-[720px] h-[720px] flex items-center justify-center relative shrink-0 bg-[#1A1A1A]">
         {mediaMode === 'photos' && currentMedia ? (
@@ -242,6 +270,7 @@ export default function ShowcasePage() {
           <span className="text-lg">Scan or search a P-code to begin</span>
         </div>
       )}
+    </div>
     </div>
   )
 }
