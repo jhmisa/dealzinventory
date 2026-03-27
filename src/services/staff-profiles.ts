@@ -66,19 +66,42 @@ export async function updateStaffProfile(id: string, updates: StaffProfileUpdate
 }
 
 export async function inviteStaff(email: string, displayName: string, role: string) {
-  const { data: { session } } = await supabase.auth.getSession()
+  // Use refreshSession() instead of getSession() to ensure a fresh access token.
+  // getSession() returns the cached token which may be expired, causing the
+  // Supabase gateway to reject the request with 401 before our function runs.
+  const { data: { session } } = await supabase.auth.refreshSession()
   if (!session) throw new Error('Not authenticated')
 
-  const response = await supabase.functions.invoke('invite-staff', {
-    body: { email, display_name: displayName, role },
-  })
+  // Use fetch directly instead of supabase.functions.invoke() so we always
+  // get the actual response body. The SDK wraps non-2xx in a generic
+  // FunctionsHttpError that hides the real error message.
+  const res = await fetch(
+    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/invite-staff`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ email, display_name: displayName, role }),
+    }
+  )
 
-  // When function always returns 200, errors are in data.error
-  if (response.error) {
-    throw new Error(response.error.message ?? 'Unknown error')
+  let body: { error?: string; profile?: StaffProfile }
+  try {
+    body = await res.json()
+  } catch {
+    throw new Error(`Unexpected response (HTTP ${res.status})`)
   }
-  if (response.data?.error) {
-    throw new Error(response.data.error)
+
+  // Handle errors from our function ({"error":"..."}) or the gateway ({"message":"..."})
+  const errorMessage = body.error ?? (body as Record<string, unknown>).message as string | undefined
+  if (errorMessage) {
+    throw new Error(errorMessage)
   }
-  return response.data.profile as StaffProfile
+  if (!body.profile) {
+    throw new Error('No profile returned')
+  }
+  return body.profile
 }
