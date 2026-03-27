@@ -19,12 +19,18 @@ export async function loadFFmpeg(): Promise<FFmpeg> {
 
   if (!loadPromise) {
     loadPromise = (async () => {
-      const ffmpeg = new FFmpeg()
-      const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd'
-      const coreURL = await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript')
-      const wasmURL = await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm')
-      await ffmpeg.load({ coreURL, wasmURL })
-      ffmpegInstance = ffmpeg
+      try {
+        const ffmpeg = new FFmpeg()
+        const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd'
+        const coreURL = await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript')
+        const wasmURL = await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm')
+        await ffmpeg.load({ coreURL, wasmURL })
+        ffmpegInstance = ffmpeg
+      } catch (e) {
+        console.error('[video] FFmpeg load failed:', e)
+        loadPromise = null
+        throw e
+      }
     })()
   }
 
@@ -98,6 +104,9 @@ async function extractThumbnail(ffmpeg: FFmpeg, inputFile: string): Promise<Blob
     const data = await ffmpeg.readFile(outFile)
     if (typeof data === 'string') throw new Error('Unexpected string from readFile')
     return new Blob([data.buffer], { type: isWebP ? 'image/webp' : 'image/jpeg' })
+  } catch (err) {
+    console.error('[video] thumbnail extraction failed:', err)
+    throw err
   } finally {
     await safeDelete(ffmpeg, outFile)
   }
@@ -158,6 +167,9 @@ export async function processVideo(
       duration,
       format: 'mp4',
     }
+  } catch (err) {
+    console.error('[video] processVideo failed:', err)
+    throw err
   } finally {
     ffmpeg.off('progress', progressHandler)
     await safeDelete(ffmpeg, inputName)

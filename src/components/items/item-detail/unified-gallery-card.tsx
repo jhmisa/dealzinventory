@@ -285,7 +285,12 @@ export function UnifiedGalleryCard({ item, productMedia, itemMedia }: UnifiedGal
         },
       )
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error'
+      console.error('[video] handleVideoFile failed:', err)
+      const message = err instanceof Error
+        ? err.message
+        : typeof err === 'string'
+          ? err
+          : JSON.stringify(err) ?? 'Unknown error'
       toast.error(`Video processing failed: ${message}`)
     } finally {
       setVideoProcessing(false)
