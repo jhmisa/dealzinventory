@@ -60,9 +60,9 @@ export async function getItem(id: string) {
     .select(`
       *,
       suppliers(supplier_name, supplier_type),
-      product_models(*, categories(name, form_fields, description_fields), product_media(id, file_url, role, sort_order)),
+      product_models(*, categories(name, form_fields, description_fields), product_media(id, file_url, role, sort_order, media_type)),
       item_costs(id, description, amount, created_at),
-      item_media(id, file_url, description, sort_order, visible, created_at)
+      item_media(id, file_url, description, sort_order, visible, created_at, media_type, thumbnail_url)
     `)
     .eq('id', id)
     .single()

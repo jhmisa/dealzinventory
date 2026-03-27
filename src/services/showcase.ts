@@ -32,7 +32,7 @@ export async function getShowcaseItem(itemCode: string): Promise<ShowcaseItem | 
         categories(name, description_fields),
         product_media(id, file_url, media_type, sort_order)
       ),
-      item_media(id, file_url, sort_order, visible)
+      item_media(id, file_url, sort_order, visible, media_type, thumbnail_url)
     `)
     .eq('id', match.id)
     .single()
@@ -41,7 +41,7 @@ export async function getShowcaseItem(itemCode: string): Promise<ShowcaseItem | 
 
   const pm = data.product_models as Record<string, unknown> | null
   const productMedia = (pm?.product_media ?? []) as Array<{ id: string; file_url: string; media_type: string; sort_order: number }>
-  const itemMedia = (data.item_media ?? []) as Array<{ id: string; file_url: string; sort_order: number; visible: boolean }>
+  const itemMedia = (data.item_media ?? []) as Array<{ id: string; file_url: string; sort_order: number; visible: boolean; media_type: string }>
 
   // Build description from product model
   let description = ''
@@ -59,9 +59,13 @@ export async function getShowcaseItem(itemCode: string): Promise<ShowcaseItem | 
     .sort((a, b) => a.sort_order - b.sort_order)
     .map((m) => ({ id: m.id, url: m.file_url }))
 
-  // Also include visible item_media as photos (item_media has no media_type, treat as images)
   const itemPhotos = itemMedia
-    .filter((m) => m.visible)
+    .filter((m) => m.visible && m.media_type !== 'video')
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((m) => ({ id: m.id, url: m.file_url }))
+
+  const itemVideos = itemMedia
+    .filter((m) => m.visible && m.media_type === 'video')
     .sort((a, b) => a.sort_order - b.sort_order)
     .map((m) => ({ id: m.id, url: m.file_url }))
 
@@ -79,6 +83,6 @@ export async function getShowcaseItem(itemCode: string): Promise<ShowcaseItem | 
     condition_notes: data.condition_notes,
     description,
     photos: [...photos, ...itemPhotos],
-    videos,
+    videos: [...videos, ...itemVideos],
   }
 }
