@@ -389,13 +389,12 @@ export GITHUB_PAT=ghp_your_token_here
 ### Image Processing Standards
 All product/item photos stored in Supabase must follow these rules:
 
-- **Three sizes per image** (generated on upload):
-  - **Full**: 2048x2048px — for zoom/lightbox (customers inspect scratches/condition)
-  - **Display**: 1080x1080px — for product pages and galleries
+- **Two sizes per image** (generated on upload):
+  - **Display**: 1080x1080px — for product pages, galleries, and zoom
   - **Thumbnail**: 256x256px — for cards, lists, and grids
 - **Format**: WebP preferred, JPEG fallback
-- **Compression**: Full 85% quality, Display 82% quality, Thumbnail 80% quality
-- **Naming convention**: `{uuid}_full.webp`, `{uuid}_display.webp`, `{uuid}_thumb.webp`
+- **Compression**: Display 82% quality, Thumbnail 80% quality
+- **Naming convention**: `{uuid}_display.webp`, `{uuid}_thumb.webp`
 - **Processing pipeline**: Original → center crop to square → resize to each size → compress → upload all three
 - **Library**: Use `sharp` (server-side via Edge Function) or `browser-image-compression` (client-side)
 - **Applies to**: `photo_group_media`, `kaitori_request_media`
@@ -405,7 +404,6 @@ All product/item photos stored in Supabase must follow these rules:
 ```typescript
 // Image size constants
 const IMAGE_SIZES = {
-  full:      { width: 2048, height: 2048, quality: 0.85 },
   display:   { width: 1080, height: 1080, quality: 0.82 },
   thumbnail: { width: 256,  height: 256,  quality: 0.80 },
 } as const;
@@ -414,4 +412,4 @@ const IMAGE_SIZES = {
 **Usage in components:**
 - `ProductCard` / `ShopProductGrid` → use thumbnail (256px)
 - `ProductGallery` / `ProductDetail` → use display (1080px)
-- `ImageLightbox` / zoom view → use full (2048px)
+- `ImageLightbox` / zoom view → use display (1080px)
