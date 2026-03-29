@@ -30,7 +30,7 @@ import {
 import * as ordersService from '@/services/orders'
 import { printInvoice } from '@/components/orders/invoice-pdf'
 import { useAuth } from '@/hooks/use-auth'
-import { ORDER_STATUSES, ORDER_SOURCES, YAMATO_TIME_SLOTS } from '@/lib/constants'
+import { ORDER_STATUSES, ORDER_SOURCES, YAMATO_TIME_SLOTS, getPaymentMethodLabel } from '@/lib/constants'
 import { formatDateTime, formatPrice, cn, buildShortDescription } from '@/lib/utils'
 import { useState, useRef, useEffect } from 'react'
 import type { ShippingAddress } from '@/lib/address-types'
@@ -67,6 +67,8 @@ const ORDER_AUDIT_FIELD_LABELS: Record<string, string> = {
   shipping_address: 'Address',
   delivery_date: 'Delivery Date',
   delivery_time_code: 'Time Slot',
+  payment_method: 'Payment Method',
+  payment_method_code: 'Payment Code',
   notes: 'Notes',
   shipped_date: 'Shipped Date',
   tracking_number: 'Tracking Number',
@@ -536,6 +538,7 @@ export default function OrderDetailPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Payment</span><span>{getPaymentMethodLabel(order.payment_method)}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Quantity</span><span>{order.quantity}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Total</span><PriceDisplay amount={order.total_price} /></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Created</span><span>{formatDateTime(order.created_at)}</span></div>

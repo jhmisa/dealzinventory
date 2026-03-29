@@ -22,7 +22,7 @@ import { CustomerAuthContext, useCustomerAuthProvider } from '@/hooks/use-custom
 import { useOfferByCode, useClaimOffer, useOfferRealtimeSync } from '@/hooks/use-offers'
 import { ImageGallery } from '@/components/shared/image-gallery'
 import type { GalleryImage } from '@/components/shared/image-gallery'
-import { CONDITION_GRADES } from '@/lib/constants'
+import { CONDITION_GRADES, PAYMENT_METHODS } from '@/lib/constants'
 import { formatPrice, cn } from '@/lib/utils'
 import { serializeAddress } from '@/lib/address-types'
 import type { ShippingAddress } from '@/lib/address-types'
@@ -360,6 +360,7 @@ function OfferClaimInner() {
   const [selectedAddress, setSelectedAddress] = useState<{ address: ShippingAddress; careOf?: string | null } | null>(null)
   const [deliveryDate, setDeliveryDate] = useState<string | null>(null)
   const [deliveryTimeCode, setDeliveryTimeCode] = useState<string | null>(null)
+  const [paymentMethod, setPaymentMethod] = useState<string | null>(null)
   const [orderCreated, setOrderCreated] = useState<{ orderCode: string } | null>(null)
 
   // Subscribe to realtime changes so staff edits appear instantly
@@ -466,6 +467,7 @@ function OfferClaimInner() {
         shippingAddress: addressStr,
         deliveryDate: deliveryDate,
         deliveryTimeCode: deliveryTimeCode,
+        paymentMethod: paymentMethod ?? undefined,
       },
       {
         onSuccess: (data) => {
@@ -693,12 +695,42 @@ function OfferClaimInner() {
               onDeliveryTimeCodeChange={setDeliveryTimeCode}
             />
 
+            {/* Payment Method */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Payment Method</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {PAYMENT_METHODS.map((pm) => (
+                  <label
+                    key={pm.value}
+                    className={cn(
+                      'flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors',
+                      paymentMethod === pm.value
+                        ? 'border-primary bg-primary/5'
+                        : 'hover:bg-muted/50'
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="payment_method"
+                      value={pm.value}
+                      checked={paymentMethod === pm.value}
+                      onChange={() => setPaymentMethod(pm.value)}
+                      className="accent-primary"
+                    />
+                    <span className="text-sm font-medium">{pm.label}</span>
+                  </label>
+                ))}
+              </CardContent>
+            </Card>
+
             {/* Confirm Button */}
             <Button
               className="w-full"
               size="lg"
               onClick={handleConfirmOrder}
-              disabled={claimOffer.isPending || offerItems.length === 0 || !selectedAddress}
+              disabled={claimOffer.isPending || offerItems.length === 0 || !selectedAddress || !paymentMethod}
             >
               {claimOffer.isPending ? 'Confirming...' : `Confirm Order — ${formatPrice(total)}`}
             </Button>

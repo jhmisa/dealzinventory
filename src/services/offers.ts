@@ -378,6 +378,7 @@ interface ClaimOfferInput {
   shippingAddress: string
   deliveryDate?: string | null
   deliveryTimeCode?: string | null
+  paymentMethod?: string
 }
 
 export async function claimOffer(input: ClaimOfferInput) {
@@ -392,6 +393,7 @@ export async function claimOffer(input: ClaimOfferInput) {
       shipping_address: input.shippingAddress,
       delivery_date: input.deliveryDate,
       delivery_time_code: input.deliveryTimeCode,
+      payment_method: input.paymentMethod,
     },
   })
 

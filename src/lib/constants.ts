@@ -261,6 +261,22 @@ export function getAdjustmentTypeConfig(type: IntakeAdjustmentType) {
   return INTAKE_ADJUSTMENT_TYPES.find(t => t.value === type) ?? { value: type, label: type, color: 'bg-gray-100 text-gray-800 border-gray-300' }
 }
 
+// --- Payment Methods (Order) ---
+
+export type PaymentMethod = 'COD' | 'CREDIT_CARD' | 'BANK' | 'KONBINI' | 'CASH'
+
+export const PAYMENT_METHODS: { value: PaymentMethod; label: string; code: number }[] = [
+  { value: 'COD', label: 'Cash On Delivery (代引き)', code: 2 },
+  { value: 'CREDIT_CARD', label: 'Credit Card', code: 2 },
+  { value: 'BANK', label: 'Bank Transfer (振込)', code: 0 },
+  { value: 'KONBINI', label: 'Konbini (コンビニ)', code: 0 },
+  { value: 'CASH', label: 'Cash (現金)', code: 0 },
+]
+
+export function getPaymentMethodLabel(value: string | null | undefined): string {
+  return PAYMENT_METHODS.find(m => m.value === value)?.label ?? '—'
+}
+
 // --- Offers ---
 
 export const OFFER_STATUSES: { value: OfferStatus; label: string; color: string }[] = [

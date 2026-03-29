@@ -16,6 +16,7 @@ interface ClaimOfferInput {
   shipping_address: string
   delivery_date?: string | null
   delivery_time_code?: string | null
+  payment_method?: string
 }
 
 Deno.serve(async (req) => {
@@ -40,7 +41,16 @@ Deno.serve(async (req) => {
       shipping_address,
       delivery_date,
       delivery_time_code,
+      payment_method,
     } = body;
+
+    // Map payment method to numeric code
+    const PAYMENT_METHOD_CODES: Record<string, number> = {
+      COD: 2, CREDIT_CARD: 2, BANK: 0, KONBINI: 0, CASH: 0,
+    };
+    const payment_method_code = payment_method
+      ? (PAYMENT_METHOD_CODES[payment_method] ?? 0)
+      : null;
 
     if (!offer_id) {
       return jsonResponse({ error: 'offer_id is required' });
@@ -180,6 +190,8 @@ Deno.serve(async (req) => {
         total_price: totalPrice,
         delivery_date: delivery_date ?? null,
         delivery_time_code: delivery_time_code ?? null,
+        payment_method: payment_method ?? null,
+        payment_method_code: payment_method_code,
         notes: offer.notes || null,
         shipping_cost: 0,
         sell_group_id: null,

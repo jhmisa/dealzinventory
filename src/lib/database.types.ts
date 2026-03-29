@@ -1187,6 +1187,8 @@ export type Database = {
           order_status: Database["public"]["Enums"]["order_status"]
           packed_by: string | null
           packed_date: string | null
+          payment_method: string | null
+          payment_method_code: number | null
           quantity: number
           sell_group_id: string | null
           shipped_date: string | null
@@ -1208,6 +1210,8 @@ export type Database = {
           order_status?: Database["public"]["Enums"]["order_status"]
           packed_by?: string | null
           packed_date?: string | null
+          payment_method?: string | null
+          payment_method_code?: number | null
           quantity: number
           sell_group_id?: string | null
           shipped_date?: string | null
@@ -1229,6 +1233,8 @@ export type Database = {
           order_status?: Database["public"]["Enums"]["order_status"]
           packed_by?: string | null
           packed_date?: string | null
+          payment_method?: string | null
+          payment_method_code?: number | null
           quantity?: number
           sell_group_id?: string | null
           shipped_date?: string | null
@@ -1693,6 +1699,36 @@ export type Database = {
           },
         ]
       }
+      staff_profiles: {
+        Row: {
+          created_at: string
+          display_name: string
+          email: string
+          id: string
+          is_active: boolean
+          role: Database["public"]["Enums"]["staff_role"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_name: string
+          email: string
+          id: string
+          is_active?: boolean
+          role?: Database["public"]["Enums"]["staff_role"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string
+          email?: string
+          id?: string
+          is_active?: boolean
+          role?: Database["public"]["Enums"]["staff_role"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       suppliers: {
         Row: {
           contact_info: string | null
@@ -1762,6 +1798,7 @@ export type Database = {
           trigger_name: string
         }[]
       }
+      expire_pending_offers: { Args: never; Returns: undefined }
       generate_code: {
         Args: { prefix: string; seq_name: string }
         Returns: string
@@ -1820,6 +1857,7 @@ export type Database = {
       product_status: "DRAFT" | "ACTIVE"
       screen_condition: "GOOD" | "FAIR" | "POOR" | "CRACKED"
       source_type: "AUCTION" | "WHOLESALE" | "KAITORI"
+      staff_role: "ADMIN" | "VA" | "IT" | "LIVE_SELLER"
       supplier_type: "auction" | "wholesaler" | "individual_kaitori"
     }
     CompositeTypes: {
@@ -1999,7 +2037,10 @@ export const Constants = {
       product_status: ["DRAFT", "ACTIVE"],
       screen_condition: ["GOOD", "FAIR", "POOR", "CRACKED"],
       source_type: ["AUCTION", "WHOLESALE", "KAITORI"],
+      staff_role: ["ADMIN", "VA", "IT", "LIVE_SELLER"],
       supplier_type: ["auction", "wholesaler", "individual_kaitori"],
     },
   },
 } as const
+A new version of Supabase CLI is available: v2.84.2 (currently installed v2.75.0)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
