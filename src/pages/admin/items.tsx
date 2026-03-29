@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { PageHeader, SearchBar, DataTable, StatusBadge, GradeBadge, CodeDisplay, PriceDisplay, TableSkeleton } from '@/components/shared'
-import { useItems, useUpdateItem } from '@/hooks/use-items'
+import { useItems, useUpdateItem, useItemStatusCounts } from '@/hooks/use-items'
 import { useItemListColumnSettings } from '@/hooks/use-settings'
 import { usePersistedFilters } from '@/hooks/use-persisted-filters'
 import { useDebounce } from '@/hooks/use-debounce'
@@ -123,10 +123,18 @@ export default function ItemListPage() {
     return vis
   }, [columnSettings, statusTab])
 
-  // Fetch all items (no status filter) so we can compute tab counts
-  const { data: allItems, isLoading } = useItems({
+  const baseFilters = {
     search: debouncedSearch || undefined,
     grade: gradeFilter && gradeFilter !== 'all' ? gradeFilter : undefined,
+  }
+
+  // Server-side counts for tab badges (no status filter)
+  const { data: statusCounts = {} as Record<string, number> } = useItemStatusCounts(baseFilters)
+
+  // Fetch items filtered by active status tab
+  const { data: allItems, isLoading } = useItems({
+    ...baseFilters,
+    status: statusTab !== 'all' ? statusTab : undefined,
   })
 
   const items = (allItems ?? []) as ItemRow[]
@@ -135,8 +143,8 @@ export default function ItemListPage() {
   const categoryOptions = [...new Set(items.map(i => i.product_models?.categories?.name).filter(Boolean))].sort() as string[]
   const brandOptions = [...new Set(items.map(i => i.brand ?? i.product_models?.brand).filter(Boolean))].sort() as string[]
 
-  // Client-side filtering
-  const filtered = items.filter(item => {
+  // Client-side filtering for filters not passed to the server
+  const filteredItems = items.filter(item => {
     if (categoryFilter && categoryFilter !== 'all' && item.product_models?.categories?.name !== categoryFilter) return false
     if (brandFilter && brandFilter !== 'all' && (item.brand ?? item.product_models?.brand) !== brandFilter) return false
     if (debouncedDescSearch) {
@@ -152,17 +160,6 @@ export default function ItemListPage() {
     if (pt !== null && (item.selling_price == null || item.selling_price > pt)) return false
     return true
   })
-
-  // Compute counts per status from filtered items
-  const statusCounts: Record<string, number> = { all: filtered.length }
-  for (const item of filtered) {
-    statusCounts[item.item_status] = (statusCounts[item.item_status] ?? 0) + 1
-  }
-
-  // Filter by active tab
-  const filteredItems = statusTab === 'all'
-    ? filtered
-    : filtered.filter((i) => i.item_status === statusTab)
 
   const columns: ColumnDef<ItemRow>[] = [
     {

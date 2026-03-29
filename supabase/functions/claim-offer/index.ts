@@ -63,6 +63,25 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: `Offer is ${offer.offer_status.toLowerCase()}, cannot be claimed` });
     }
     if (new Date(offer.expires_at) < new Date()) {
+      // Auto-expire the offer and release items
+      await supabase
+        .from('offers')
+        .update({ offer_status: 'EXPIRED', updated_at: new Date().toISOString() })
+        .eq('id', offer_id)
+        .eq('offer_status', 'PENDING');
+
+      const itemIds = (offer.offer_items ?? [])
+        .map((oi: { item_id: string | null }) => oi.item_id)
+        .filter((id: string | null): id is string => !!id);
+
+      if (itemIds.length > 0) {
+        await supabase
+          .from('items')
+          .update({ item_status: 'AVAILABLE' })
+          .in('id', itemIds)
+          .eq('item_status', 'RESERVED');
+      }
+
       return jsonResponse({ error: 'Offer has expired' });
     }
 

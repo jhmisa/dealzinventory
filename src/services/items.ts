@@ -167,6 +167,66 @@ export async function getItemStats() {
   return stats
 }
 
+const ITEM_STATUS_VALUES = ['INTAKE', 'AVAILABLE', 'RESERVED', 'REPAIR', 'MISSING', 'SOLD'] as const
+
+export async function getItemStatusCounts(filters: Omit<ItemFilters, 'status'> = {}) {
+  const counts: Record<string, number> = {}
+
+  // Run count queries in parallel for each status + total
+  const promises = ITEM_STATUS_VALUES.map(async (status) => {
+    let query = supabase
+      .from('items')
+      .select('*', { head: true, count: 'exact' })
+      .eq('item_status', status)
+
+    if (filters.search) query = query.ilike('item_code', `%${filters.search}%`)
+    if (filters.grade) {
+      if (filters.grade === 'UNGRADED') {
+        query = query.is('condition_grade', null)
+      } else {
+        query = query.eq('condition_grade', filters.grade)
+      }
+    }
+    if (filters.source) query = query.eq('source_type', filters.source)
+    if (filters.supplierId) query = query.eq('supplier_id', filters.supplierId)
+
+    const { count, error } = await query
+    if (error) throw error
+    return { status, count: count ?? 0 }
+  })
+
+  // Also get total count
+  const totalPromise = (async () => {
+    let query = supabase
+      .from('items')
+      .select('*', { head: true, count: 'exact' })
+
+    if (filters.search) query = query.ilike('item_code', `%${filters.search}%`)
+    if (filters.grade) {
+      if (filters.grade === 'UNGRADED') {
+        query = query.is('condition_grade', null)
+      } else {
+        query = query.eq('condition_grade', filters.grade)
+      }
+    }
+    if (filters.source) query = query.eq('source_type', filters.source)
+    if (filters.supplierId) query = query.eq('supplier_id', filters.supplierId)
+
+    const { count, error } = await query
+    if (error) throw error
+    return count ?? 0
+  })()
+
+  const [results, total] = await Promise.all([Promise.all(promises), totalPromise])
+
+  for (const { status, count } of results) {
+    counts[status] = count
+  }
+  counts.all = total
+
+  return counts
+}
+
 // --- Item Costs ---
 
 export async function addItemCost(itemId: string, description: string, amount: number) {

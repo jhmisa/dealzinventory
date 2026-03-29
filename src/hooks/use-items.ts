@@ -41,6 +41,13 @@ export function useItemStats() {
   })
 }
 
+export function useItemStatusCounts(filters: Omit<ItemFilters, 'status'> = {}) {
+  return useQuery({
+    queryKey: [...queryKeys.items.all, 'status-counts', filters] as const,
+    queryFn: () => itemsService.getItemStatusCounts(filters),
+  })
+}
+
 export function useIntakeItems() {
   return useQuery({
     queryKey: queryKeys.items.intake(),

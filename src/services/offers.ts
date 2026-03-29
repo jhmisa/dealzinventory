@@ -306,7 +306,19 @@ export async function getOffers(filters: OfferFilters = {}) {
 
   const { data, error } = await query
   if (error) throw error
-  return data ?? []
+
+  const offers = data ?? []
+
+  // Eagerly expire any PENDING offers past their expiry (fire-and-forget)
+  const now = new Date()
+  for (const offer of offers) {
+    if (offer.offer_status === 'PENDING' && new Date(offer.expires_at) < now) {
+      expireOffer(offer.id).catch(console.error)
+      offer.offer_status = 'EXPIRED'
+    }
+  }
+
+  return offers
 }
 
 export async function getOfferByCode(code: string) {
@@ -327,6 +339,13 @@ export async function getOfferByCode(code: string) {
     .single()
 
   if (error) throw error
+
+  // Eagerly expire if PENDING and past expiry
+  if (data && data.offer_status === 'PENDING' && new Date(data.expires_at) < new Date()) {
+    await expireOffer(data.id)
+    data.offer_status = 'EXPIRED'
+  }
+
   return data
 }
 
@@ -393,6 +412,40 @@ export async function updateOffer(id: string, updates: { notes?: string }) {
 
   if (error) throw error
   return data
+}
+
+// --- Expire ---
+
+export async function expireOffer(offerId: string) {
+  // Only expire if still PENDING (guard against race with cron)
+  const { data: updated, error } = await supabase
+    .from('offers')
+    .update({
+      offer_status: 'EXPIRED' as Offer['offer_status'],
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', offerId)
+    .eq('offer_status', 'PENDING')
+    .select('id')
+
+  if (error) throw error
+  if (!updated || updated.length === 0) return // already expired/cancelled
+
+  // Release reserved items
+  const { data: offerItems } = await supabase
+    .from('offer_items')
+    .select('item_id')
+    .eq('offer_id', offerId)
+    .not('item_id', 'is', null)
+
+  const itemIds = (offerItems ?? []).map(oi => oi.item_id).filter((id): id is string => !!id)
+  if (itemIds.length > 0) {
+    await supabase
+      .from('items')
+      .update({ item_status: 'AVAILABLE' as Item['item_status'] })
+      .in('id', itemIds)
+      .eq('item_status', 'RESERVED')
+  }
 }
 
 // --- Cancel ---
