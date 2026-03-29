@@ -1,3 +1,6 @@
+-- Enable pg_cron extension
+create extension if not exists pg_cron with schema extensions;
+
 -- Auto-expire PENDING offers past their expires_at and release RESERVED items
 create or replace function expire_pending_offers()
 returns void
