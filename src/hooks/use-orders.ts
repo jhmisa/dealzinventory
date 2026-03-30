@@ -170,3 +170,37 @@ export function useCreateManualOrder() {
     },
   })
 }
+
+export function useConfirmedForInvoice() {
+  return useQuery({
+    queryKey: queryKeys.orders.list({ _type: 'invoice-unprinted' }),
+    queryFn: () => ordersService.getConfirmedOrdersForInvoice(),
+  })
+}
+
+export function useConfirmedForDempyo() {
+  return useQuery({
+    queryKey: queryKeys.orders.list({ _type: 'dempyo-unprinted' }),
+    queryFn: () => ordersService.getConfirmedOrdersForDempyo(),
+  })
+}
+
+export function useStampInvoicePrinted() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (orderIds: string[]) => ordersService.stampInvoicePrinted(orderIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all })
+    },
+  })
+}
+
+export function useStampDempyoPrinted() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (orderIds: string[]) => ordersService.stampDempyoPrinted(orderIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all })
+    },
+  })
+}

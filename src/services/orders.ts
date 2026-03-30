@@ -491,3 +491,72 @@ export async function getPackableOrders() {
   if (error) throw error
   return data ?? []
 }
+
+// --- Print Tracking ---
+
+export async function getConfirmedOrdersForInvoice() {
+  const { data, error } = await supabase
+    .from('orders')
+    .select(`
+      *,
+      customers(customer_code, last_name, first_name, email, phone),
+      sell_groups(sell_group_code, condition_grade, base_price,
+        product_models(brand, model_name, color, cpu, ram_gb, storage_gb)
+      ),
+      order_items(
+        id, item_id, description, quantity, unit_price, discount,
+        items(id, item_code, condition_grade, condition_notes, item_status,
+          cpu, ram_gb, storage_gb, screen_size, os_family, color,
+          product_models(brand, model_name, color, cpu, ram_gb, storage_gb, screen_size, os_family, short_description,
+            categories(description_fields),
+            product_media(file_url, role, sort_order)
+          )
+        )
+      )
+    `)
+    .eq('order_status', 'CONFIRMED')
+    .is('invoice_printed_at', null)
+    .order('delivery_date', { ascending: true, nullsFirst: false })
+
+  if (error) throw error
+  return data ?? []
+}
+
+export async function getConfirmedOrdersForDempyo() {
+  const { data, error } = await supabase
+    .from('orders')
+    .select(`
+      *,
+      customers(customer_code, last_name, first_name, email, phone),
+      order_items(
+        id, item_id, description, quantity, unit_price, discount,
+        items(id, item_code)
+      )
+    `)
+    .eq('order_status', 'CONFIRMED')
+    .is('dempyo_printed_at', null)
+    .order('delivery_date', { ascending: true, nullsFirst: false })
+
+  if (error) throw error
+  return data ?? []
+}
+
+export async function stampInvoicePrinted(orderIds: string[]) {
+  const now = new Date().toISOString()
+  const { error } = await supabase
+    .from('orders')
+    .update({ invoice_printed_at: now })
+    .in('id', orderIds)
+
+  if (error) throw error
+}
+
+export async function stampDempyoPrinted(orderIds: string[]) {
+  const now = new Date().toISOString()
+  const { error } = await supabase
+    .from('orders')
+    .update({ dempyo_printed_at: now })
+    .in('id', orderIds)
+
+  if (error) throw error
+}
