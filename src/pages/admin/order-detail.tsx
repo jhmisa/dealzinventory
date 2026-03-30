@@ -15,6 +15,7 @@ import {
   FormSkeleton,
 } from '@/components/shared'
 import { AddressDisplay } from '@/components/shared/address-display'
+import { AddressForm } from '@/components/shared/address-form'
 import {
   useOrder,
   useUpdateOrderStatus,
@@ -135,6 +136,11 @@ export default function OrderDetailPage() {
   const [customDesc, setCustomDesc] = useState('')
   const [customPrice, setCustomPrice] = useState(0)
   const [customQty, setCustomQty] = useState(1)
+  const [editOrderSource, setEditOrderSource] = useState('')
+  const [editPaymentMethod, setEditPaymentMethod] = useState('')
+  const [editDeliveryTimeCode, setEditDeliveryTimeCode] = useState('')
+  const [editDeliveryDate, setEditDeliveryDate] = useState('')
+  const [editShippingAddress, setEditShippingAddress] = useState<ShippingAddress | null>(null)
   const searchRef = useRef<HTMLDivElement>(null)
   const addLineItem = useAddOrderLineItem()
 
@@ -202,6 +208,11 @@ export default function OrderDetailPage() {
     setEditShippingCost(shippingCost)
     setEditTrackingNumber(trackingNumber ?? '')
     setEditDeliveryBoxCount(deliveryBoxCount)
+    setEditOrderSource(order.order_source)
+    setEditPaymentMethod(order.payment_method ?? 'COD')
+    setEditDeliveryTimeCode(deliveryTimeCode ?? '')
+    setEditDeliveryDate(deliveryDate ?? '')
+    setEditShippingAddress(shippingAddr)
     setIsEditing(true)
   }
 
@@ -238,8 +249,38 @@ export default function OrderDetailPage() {
       if (editDeliveryBoxCount !== deliveryBoxCount) {
         orderUpdates.delivery_box_count = editDeliveryBoxCount
       }
+      if (editOrderSource !== order.order_source) {
+        orderUpdates.order_source = editOrderSource
+      }
+      if (editPaymentMethod !== (order.payment_method ?? 'COD')) {
+        orderUpdates.payment_method = editPaymentMethod
+      }
+      if (editDeliveryTimeCode !== (deliveryTimeCode ?? '')) {
+        orderUpdates.delivery_time_code = editDeliveryTimeCode || null
+      }
+      if (editDeliveryDate !== (deliveryDate ?? '')) {
+        orderUpdates.delivery_date = editDeliveryDate || null
+      }
+      const currentAddrStr = order.shipping_address as string | null ?? null
+      const newAddrStr = editShippingAddress ? JSON.stringify(editShippingAddress) : null
+      if (newAddrStr !== currentAddrStr) {
+        orderUpdates.shipping_address = newAddrStr
+      }
       if (Object.keys(orderUpdates).length > 0) {
         await updateOrder.mutateAsync({ id: order.id, updates: orderUpdates })
+      }
+
+      // Handle credit card surcharge when payment method changes
+      const oldPayment = order.payment_method ?? 'COD'
+      if (editPaymentMethod !== oldPayment) {
+        if (editPaymentMethod === 'CREDIT_CARD' && oldPayment !== 'CREDIT_CARD') {
+          const rate = parseFloat(surchargeRate ?? '4')
+          await ordersService.addCreditCardSurcharge(order.id, rate)
+          queryClient.invalidateQueries({ queryKey: queryKeys.orders.detail(order.id) })
+        } else if (oldPayment === 'CREDIT_CARD' && editPaymentMethod !== 'CREDIT_CARD') {
+          await ordersService.removeCreditCardSurcharge(order.id)
+          queryClient.invalidateQueries({ queryKey: queryKeys.orders.detail(order.id) })
+        }
       }
 
       // Recalculate total
@@ -537,57 +578,37 @@ export default function OrderDetailPage() {
             <div className="flex justify-between"><span className="text-muted-foreground">Status</span>{statusCfg && <StatusBadge label={statusCfg.label} color={statusCfg.color} />}</div>
             <div className="flex justify-between items-center">
               <span className="text-muted-foreground">Source</span>
-              <Select
-                value={order.order_source}
-                onValueChange={(v) => {
-                  updateOrder.mutate(
-                    { id: order.id, updates: { order_source: v } },
-                    { onError: (err: Error) => toast.error(`Failed to update source: ${err.message}`) }
-                  )
-                }}
-              >
-                <SelectTrigger className="w-[140px] h-7 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ORDER_SOURCES.map((s) => (
-                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {isEditing ? (
+                <Select value={editOrderSource} onValueChange={setEditOrderSource}>
+                  <SelectTrigger className="w-[140px] h-7 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ORDER_SOURCES.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <span>{sourceCfg?.label ?? order.order_source}</span>
+              )}
             </div>
             <div className="flex justify-between items-center">
               <span className="text-muted-foreground">Payment</span>
-              <Select
-                value={order.payment_method ?? 'COD'}
-                onValueChange={async (v) => {
-                  const oldMethod = order.payment_method
-                  const newMethod = v
-                  try {
-                    await updateOrder.mutateAsync({ id: order.id, updates: { payment_method: v } })
-
-                    if (newMethod === 'CREDIT_CARD' && oldMethod !== 'CREDIT_CARD') {
-                      const rate = parseFloat(surchargeRate ?? '4')
-                      await ordersService.addCreditCardSurcharge(order.id, rate)
-                      queryClient.invalidateQueries({ queryKey: queryKeys.orders.detail(order.id) })
-                    } else if (oldMethod === 'CREDIT_CARD' && newMethod !== 'CREDIT_CARD') {
-                      await ordersService.removeCreditCardSurcharge(order.id)
-                      queryClient.invalidateQueries({ queryKey: queryKeys.orders.detail(order.id) })
-                    }
-                  } catch (err) {
-                    toast.error(err instanceof Error ? err.message : 'Failed to update payment method')
-                  }
-                }}
-              >
-                <SelectTrigger className="w-[140px] h-7 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PAYMENT_METHODS.map((m) => (
-                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {isEditing ? (
+                <Select value={editPaymentMethod} onValueChange={setEditPaymentMethod}>
+                  <SelectTrigger className="w-[140px] h-7 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_METHODS.map((m) => (
+                      <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <span>{getPaymentMethodLabel(order.payment_method ?? 'COD')}</span>
+              )}
             </div>
             <div className="flex justify-between"><span className="text-muted-foreground">Quantity</span><span>{order.quantity}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Total</span><PriceDisplay amount={order.total_price} /></div>
@@ -631,7 +652,9 @@ export default function OrderDetailPage() {
             )}
             <div className="pt-2 border-t">
               <p className="text-muted-foreground text-xs mb-1">Shipping Address</p>
-              {shippingAddr ? (
+              {isEditing ? (
+                <AddressForm value={editShippingAddress} onChange={setEditShippingAddress} />
+              ) : shippingAddr ? (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <p className="text-xs text-muted-foreground mb-0.5">Japanese</p>
@@ -658,31 +681,36 @@ export default function OrderDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
-            <div className="flex justify-between">
+            <div className="flex justify-between items-center">
               <span className="text-muted-foreground">Expected Delivery</span>
-              <span>{deliveryDate ?? '—'}</span>
+              {isEditing ? (
+                <Input
+                  type="date"
+                  className="w-[180px] h-7 text-sm"
+                  value={editDeliveryDate}
+                  onChange={(e) => setEditDeliveryDate(e.target.value)}
+                />
+              ) : (
+                <span>{deliveryDate ?? '—'}</span>
+              )}
             </div>
             <div className="flex justify-between items-center">
               <span className="text-muted-foreground">Time Slot</span>
-              <Select
-                value={deliveryTimeCode ?? 'none'}
-                onValueChange={(v) => {
-                  updateOrder.mutate(
-                    { id: order.id, updates: { delivery_time_code: v === 'none' ? null : v } },
-                    { onError: (err: Error) => toast.error(`Failed to update time slot: ${err.message}`) }
-                  )
-                }}
-              >
-                <SelectTrigger className="w-[180px] h-7 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">—</SelectItem>
-                  {YAMATO_TIME_SLOTS.map((s) => (
-                    <SelectItem key={s.code} value={s.code}>{s.label_en}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {isEditing ? (
+                <Select value={editDeliveryTimeCode || 'none'} onValueChange={(v) => setEditDeliveryTimeCode(v === 'none' ? '' : v)}>
+                  <SelectTrigger className="w-[180px] h-7 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">—</SelectItem>
+                    {YAMATO_TIME_SLOTS.map((s) => (
+                      <SelectItem key={s.code} value={s.code}>{s.label_en}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <span>{timeSlot?.label_en ?? '—'}</span>
+              )}
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Packed Date</span>
