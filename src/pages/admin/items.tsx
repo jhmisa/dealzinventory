@@ -217,6 +217,7 @@ export default function ItemListPage() {
       header: 'Description',
       size: 200,
       minSize: 100,
+      maxSize: 300,
       cell: ({ row }) => {
         const pm = row.original.product_models
         const { condition_notes } = row.original

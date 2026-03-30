@@ -64,7 +64,7 @@ export function DataTable<TData, TValue>({
   return (
     <div>
       <div className="rounded-md border">
-        <Table style={enableColumnResizing ? { width: table.getCenterTotalSize() } : undefined}>
+        <Table style={enableColumnResizing ? { width: '100%', tableLayout: 'fixed' } : undefined}>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
@@ -85,9 +85,10 @@ export function DataTable<TData, TValue>({
                         onMouseDown={header.getResizeHandler()}
                         onTouchStart={header.getResizeHandler()}
                         onClick={(e) => e.stopPropagation()}
-                        className={`absolute right-0 top-0 h-full w-1 cursor-col-resize select-none touch-none bg-transparent hover:bg-border ${
-                          header.column.getIsResizing() ? 'bg-primary' : ''
+                        className={`absolute right-0 top-0 h-full w-1 cursor-col-resize select-none touch-none hover:bg-border ${
+                          header.column.getIsResizing() ? 'bg-primary w-1' : ''
                         }`}
+                        style={{ padding: '0 4px', marginRight: '-4px' }}
                       />
                     )}
                   </TableHead>
@@ -106,7 +107,7 @@ export function DataTable<TData, TValue>({
                   {row.getVisibleCells().map((cell) => (
                     <TableCell
                       key={cell.id}
-                      style={enableColumnResizing ? { width: cell.column.getSize() } : undefined}
+                      style={enableColumnResizing ? { width: cell.column.getSize(), overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } : undefined}
                     >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
