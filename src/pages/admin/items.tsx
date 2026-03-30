@@ -225,7 +225,7 @@ export default function ItemListPage() {
           for (const key of descFields) {
             resolvedValues[key] = (row.original as Record<string, unknown>)[key] ?? (pm as Record<string, unknown> | null)?.[key]
           }
-          modelLine = buildShortDescription(resolvedValues, descFields) || '—'
+          modelLine = buildShortDescription(resolvedValues, descFields) || row.original.supplier_description || '—'
         } else {
           const { brand, model_name, cpu, ram_gb, storage_gb, screen_size } = row.original
           const modelName = brand && model_name
@@ -239,7 +239,7 @@ export default function ItemListPage() {
             storage_gb,
             screenVal ? `${screenVal}"` : null,
           ].filter(Boolean)
-          modelLine = parts.length > 0 ? parts.join(' / ') : '—'
+          modelLine = parts.length > 0 ? parts.join(' / ') : (row.original.supplier_description || '—')
         }
         if (!condition_notes) return modelLine
         return (
