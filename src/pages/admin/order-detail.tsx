@@ -31,7 +31,10 @@ import {
 import * as ordersService from '@/services/orders'
 import { printInvoice } from '@/components/orders/invoice-pdf'
 import { useAuth } from '@/hooks/use-auth'
-import { ORDER_STATUSES, ORDER_SOURCES, YAMATO_TIME_SLOTS, getPaymentMethodLabel } from '@/lib/constants'
+import { useSystemSetting } from '@/hooks/use-settings'
+import { useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '@/lib/query-keys'
+import { ORDER_STATUSES, ORDER_SOURCES, YAMATO_TIME_SLOTS, PAYMENT_METHODS, getPaymentMethodLabel } from '@/lib/constants'
 import { formatDateTime, formatPrice, cn, buildShortDescription } from '@/lib/utils'
 import { useState, useRef, useEffect } from 'react'
 import type { ShippingAddress } from '@/lib/address-types'
@@ -113,6 +116,8 @@ export default function OrderDetailPage() {
   const updateOrder = useUpdateOrder()
   const stampInvoice = useStampInvoicePrinted()
   const { data: auditLogs } = useOrderAuditLogs(id!)
+  const queryClient = useQueryClient()
+  const { data: surchargeRate } = useSystemSetting('credit_card_surcharge_pct')
 
   const [cancelOpen, setCancelOpen] = useState(false)
   const [advanceOpen, setAdvanceOpen] = useState(false)
@@ -551,7 +556,39 @@ export default function OrderDetailPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Payment</span><span>{getPaymentMethodLabel(order.payment_method)}</span></div>
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground">Payment</span>
+              <Select
+                value={order.payment_method ?? 'COD'}
+                onValueChange={async (v) => {
+                  const oldMethod = order.payment_method
+                  const newMethod = v
+                  try {
+                    await updateOrder.mutateAsync({ id: order.id, updates: { payment_method: v } })
+
+                    if (newMethod === 'CREDIT_CARD' && oldMethod !== 'CREDIT_CARD') {
+                      const rate = parseFloat(surchargeRate ?? '4')
+                      await ordersService.addCreditCardSurcharge(order.id, rate)
+                      queryClient.invalidateQueries({ queryKey: queryKeys.orders.detail(order.id) })
+                    } else if (oldMethod === 'CREDIT_CARD' && newMethod !== 'CREDIT_CARD') {
+                      await ordersService.removeCreditCardSurcharge(order.id)
+                      queryClient.invalidateQueries({ queryKey: queryKeys.orders.detail(order.id) })
+                    }
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : 'Failed to update payment method')
+                  }
+                }}
+              >
+                <SelectTrigger className="w-[140px] h-7 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAYMENT_METHODS.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex justify-between"><span className="text-muted-foreground">Quantity</span><span>{order.quantity}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Total</span><PriceDisplay amount={order.total_price} /></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Created</span><span>{formatDateTime(order.created_at)}</span></div>

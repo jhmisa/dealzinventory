@@ -560,3 +560,64 @@ export async function stampDempyoPrinted(orderIds: string[]) {
 
   if (error) throw error
 }
+
+// --- Credit Card Surcharge ---
+
+const CC_FEE_DESCRIPTION = 'Credit Card Fee'
+
+export async function addCreditCardSurcharge(orderId: string, surchargePercent: number) {
+  // First check if surcharge line item already exists
+  const { data: existing } = await supabase
+    .from('order_items')
+    .select('id')
+    .eq('order_id', orderId)
+    .eq('description', CC_FEE_DESCRIPTION)
+    .is('item_id', null)
+
+  if (existing && existing.length > 0) return // Already has surcharge
+
+  // Calculate surcharge from current line items (excluding existing fee if any)
+  const { data: items } = await supabase
+    .from('order_items')
+    .select('unit_price, quantity, discount, description')
+    .eq('order_id', orderId)
+
+  if (!items) return
+
+  const subtotal = items
+    .filter((i) => i.description !== CC_FEE_DESCRIPTION)
+    .reduce((sum, i) => sum + i.unit_price * i.quantity - i.discount, 0)
+
+  const feeAmount = Math.round(subtotal * surchargePercent / 100)
+  if (feeAmount <= 0) return
+
+  await supabase
+    .from('order_items')
+    .insert({
+      order_id: orderId,
+      item_id: null,
+      description: CC_FEE_DESCRIPTION,
+      quantity: 1,
+      unit_price: feeAmount,
+      discount: 0,
+    })
+
+  await recalculateOrderTotal(orderId)
+}
+
+export async function removeCreditCardSurcharge(orderId: string) {
+  const { data: feeItems } = await supabase
+    .from('order_items')
+    .select('id')
+    .eq('order_id', orderId)
+    .eq('description', CC_FEE_DESCRIPTION)
+    .is('item_id', null)
+
+  if (!feeItems || feeItems.length === 0) return
+
+  for (const fee of feeItems) {
+    await supabase.from('order_items').delete().eq('id', fee.id)
+  }
+
+  await recalculateOrderTotal(orderId)
+}
