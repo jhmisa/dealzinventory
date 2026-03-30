@@ -113,6 +113,7 @@ export function DataTable<TData, TValue>({
                   {row.getVisibleCells().map((cell) => (
                     <TableCell
                       key={cell.id}
+                      className={enableColumnResizing ? 'whitespace-normal' : ''}
                       style={enableColumnResizing ? { overflowWrap: 'break-word' } : undefined}
                     >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
