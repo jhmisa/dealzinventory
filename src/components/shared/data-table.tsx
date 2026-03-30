@@ -64,7 +64,7 @@ export function DataTable<TData, TValue>({
   return (
     <div>
       <div className="rounded-md border">
-        <Table style={enableColumnResizing ? { width: '100%', tableLayout: 'fixed' } : undefined}>
+        <Table style={enableColumnResizing ? { width: table.getCenterTotalSize() } : undefined}>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
@@ -72,7 +72,7 @@ export function DataTable<TData, TValue>({
                   <TableHead
                     key={header.id}
                     className={`relative ${header.column.getCanSort() ? 'cursor-pointer select-none' : ''}`}
-                    style={enableColumnResizing ? { width: header.getSize() } : undefined}
+                    style={enableColumnResizing ? { width: header.getSize(), maxWidth: header.getSize(), overflow: 'hidden' } : undefined}
                     onClick={header.column.getToggleSortingHandler()}
                   >
                     {header.isPlaceholder
@@ -113,7 +113,7 @@ export function DataTable<TData, TValue>({
                   {row.getVisibleCells().map((cell) => (
                     <TableCell
                       key={cell.id}
-                      style={enableColumnResizing ? { width: cell.column.getSize(), wordBreak: 'break-word' } : undefined}
+                      style={enableColumnResizing ? { width: cell.column.getSize(), maxWidth: cell.column.getSize(), overflow: 'hidden' } : undefined}
                     >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
