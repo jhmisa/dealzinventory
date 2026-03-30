@@ -210,14 +210,15 @@ export default function ItemListPage() {
     {
       accessorKey: 'item_code',
       header: 'P-Code',
+      size: 80,
       cell: ({ row }) => <CodeDisplay code={row.original.item_code} />,
     },
     {
       id: 'model',
       header: 'Description',
-      size: 200,
-      minSize: 100,
-      maxSize: 300,
+      size: 400,
+      minSize: 150,
+      maxSize: 800,
       cell: ({ row }) => {
         const pm = row.original.product_models
         const { condition_notes } = row.original
@@ -256,11 +257,13 @@ export default function ItemListPage() {
     {
       accessorKey: 'condition_grade',
       header: 'Grade',
+      size: 50,
       cell: ({ row }) => <GradeBadge grade={row.original.condition_grade as never} />,
     },
     {
       accessorKey: 'item_status',
       header: 'Status',
+      size: 70,
       cell: ({ row }) => {
         const config = ITEM_STATUSES.find((s) => s.value === row.original.item_status)
         return config ? <StatusBadge label={config.label} color={config.color} /> : row.original.item_status
@@ -269,17 +272,20 @@ export default function ItemListPage() {
     {
       id: 'supplier',
       header: 'Supplier',
+      size: 90,
       cell: ({ row }) => row.original.suppliers?.supplier_name ?? '—',
     },
     {
       accessorKey: 'purchase_price',
       header: 'Buy',
+      size: 65,
       cell: ({ row }) => <PriceDisplay amount={row.original.purchase_price} />,
     },
     {
       id: 'selling_price',
       accessorFn: (row) => row.selling_price,
       header: 'Sell',
+      size: 65,
       cell: ({ row }) => (
         <EditPriceCell
           itemId={row.original.id}
@@ -294,6 +300,7 @@ export default function ItemListPage() {
       id: 'discount',
       accessorFn: (row) => row.discount,
       header: 'Discount',
+      size: 65,
       cell: ({ row }) => (
         <EditPriceCell
           itemId={row.original.id}
@@ -307,11 +314,13 @@ export default function ItemListPage() {
     {
       accessorKey: 'created_at',
       header: 'Intake Date',
+      size: 75,
       cell: ({ row }) => formatDate(row.original.created_at),
     },
     {
       id: 'actions',
       header: 'Actions',
+      size: 40,
       cell: ({ row }) => {
         const pm = row.original.product_models
         const descFields = pm?.categories?.description_fields ?? []
