@@ -28,6 +28,8 @@ Deno.serve(async (req) => {
         return await handleLogin(supabase, body);
       case 'change_pin':
         return await handleChangePin(supabase, body);
+      case 'reset_pin':
+        return await handleResetPin(supabase, body);
       default:
         return jsonResponse({ error: `Unknown action: ${action}` });
     }
@@ -184,6 +186,43 @@ async function handleChangePin(supabase: ReturnType<typeof createClient>, body: 
 
   if (error) {
     return jsonResponse({ error: `Failed to update PIN: ${error.message}` });
+  }
+
+  return jsonResponse({ success: true });
+}
+
+// --- Reset PIN (admin, no current PIN required) ---
+async function handleResetPin(supabase: ReturnType<typeof createClient>, body: Record<string, unknown>) {
+  const { customer_id, new_pin } = body;
+
+  if (!customer_id || !new_pin) {
+    return jsonResponse({ error: 'customer_id and new_pin are required' });
+  }
+
+  if (!/^\d{6}$/.test(String(new_pin))) {
+    return jsonResponse({ error: 'PIN must be exactly 6 digits' });
+  }
+
+  // Verify customer exists
+  const { data: customer } = await supabase
+    .from('customers')
+    .select('id')
+    .eq('id', customer_id)
+    .maybeSingle();
+
+  if (!customer) {
+    return jsonResponse({ error: 'Customer not found' });
+  }
+
+  // Hash and update new PIN
+  const new_pin_hash = await hashPin(supabase, String(new_pin));
+  const { error } = await supabase
+    .from('customers')
+    .update({ pin_hash: new_pin_hash })
+    .eq('id', customer_id);
+
+  if (error) {
+    return jsonResponse({ error: `Failed to reset PIN: ${error.message}` });
   }
 
   return jsonResponse({ success: true });

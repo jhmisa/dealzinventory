@@ -63,6 +63,17 @@ export function useUpdateCustomer() {
   })
 }
 
+export function useResetCustomerPin() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ customerId, newPin }: { customerId: string; newPin: string }) =>
+      customersService.resetCustomerPin(customerId, newPin),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.customers.all })
+    },
+  })
+}
+
 export function useVerifyCustomerId() {
   const queryClient = useQueryClient()
   return useMutation({

@@ -24,7 +24,6 @@ import { ImageGallery } from '@/components/shared/image-gallery'
 import type { GalleryImage } from '@/components/shared/image-gallery'
 import { CONDITION_GRADES, PAYMENT_METHODS } from '@/lib/constants'
 import { formatPrice, cn } from '@/lib/utils'
-import { serializeAddress } from '@/lib/address-types'
 import type { ShippingAddress } from '@/lib/address-types'
 import type { Customer } from '@/lib/types'
 
@@ -456,9 +455,7 @@ function OfferClaimInner() {
       return
     }
 
-    const addressStr = customer
-      ? `${customer.last_name} ${customer.first_name ?? ''}\n${customer.email ?? ''}${customer.phone ? `\n${customer.phone}` : ''}\n${serializeAddress(selectedAddress.address)}`
-      : serializeAddress(selectedAddress.address)
+    const addressStr = JSON.stringify(selectedAddress.address)
 
     claimOffer.mutate(
       {

@@ -19,7 +19,6 @@ import {
 } from '@/components/ui/form'
 import { AddressForm } from '@/components/shared'
 import type { ShippingAddress } from '@/lib/address-types'
-import { serializeAddress } from '@/lib/address-types'
 import { useSellGroup } from '@/hooks/use-sell-groups'
 import { useSellGroupByCode } from '@/hooks/use-shop'
 import { useCreateOrder } from '@/hooks/use-orders'
@@ -124,7 +123,7 @@ export default function CheckoutPage() {
         customer_id: '00000000-0000-0000-0000-000000000000', // Placeholder — real flow uses customer-auth
         sell_group_id: sg!.id,
         order_source: sellGroupCode ? 'LIVE_SELLING' : 'SHOP',
-        shipping_address: `${values.last_name.toUpperCase()} ${(values.first_name ?? '').toUpperCase()}\n${values.email}${values.phone ? `\n${values.phone}` : ''}\n${serializeAddress(shippingAddress)}`,
+        shipping_address: JSON.stringify(shippingAddress),
         quantity: values.quantity,
         total_price: Number(sg!.base_price) * values.quantity,
       },

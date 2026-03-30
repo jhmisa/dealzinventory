@@ -225,6 +225,19 @@ export async function customerRegister(params: {
   return data as { customer: Customer; token: string }
 }
 
+export async function resetCustomerPin(customerId: string, newPin: string) {
+  const { data, error } = await supabase.functions.invoke('customer-auth', {
+    body: { action: 'reset_pin', customer_id: customerId, new_pin: newPin },
+  })
+
+  if (error) {
+    if (data?.error) throw new Error(data.error)
+    throw new Error(error.message ?? 'Failed to call customer-auth function')
+  }
+  if (data?.error) throw new Error(data.error)
+  return data
+}
+
 export async function customerChangePin(customerId: string, currentPin: string, newPin: string) {
   const { data, error } = await supabase.functions.invoke('customer-auth', {
     body: { action: 'change_pin', customer_id: customerId, current_pin: currentPin, new_pin: newPin },
