@@ -171,11 +171,8 @@ export function validateOrders(orders: DempyoOrder[]): DempyoValidationResult {
       continue
     }
 
-    // Skip with warning: missing payment method
-    if (!order.payment_method) {
-      skipped.push({ order, reason: 'Missing payment method' })
-      continue
-    }
+    // Default payment method to COD (matches Order Detail UI behavior)
+    const paymentMethod = order.payment_method ?? 'COD'
 
     // Warn (but include) if full address > 48 chars after removing spaces
     const fullAddr = buildFullJPAddress(addr)
@@ -218,7 +215,7 @@ function writeOrderRows(
 ): number {
   const addr = parseAddress(order.shipping_address) as ShippingAddressJP
   const customer = order.customers
-  const method = order.payment_method!
+  const method = order.payment_method ?? 'COD'
   const boxCount = order.delivery_box_count || 1
   const isMultiBox = boxCount > 1
   const isCod = isCODLike(method)
