@@ -74,8 +74,8 @@ function buildProductSummary(pm: ProductModelWithHeroImage): string {
   if (pm.model_name) parts.push(pm.model_name)
   const specBits: string[] = []
   if (pm.cpu) specBits.push(pm.cpu)
-  if (pm.ram_gb) specBits.push(`${pm.ram_gb}GB`)
-  if (pm.storage_gb) specBits.push(`${pm.storage_gb}GB`)
+  if (pm.ram_gb) specBits.push(String(pm.ram_gb))
+  if (pm.storage_gb) specBits.push(String(pm.storage_gb))
   if (pm.screen_size) specBits.push(`${pm.screen_size}″`)
   if (specBits.length > 0) parts.push(specBits.join(' / '))
   return parts.join(' ') || '—'
@@ -91,7 +91,7 @@ const FIELD_LABELS: Record<SpecField, string> = {
 }
 
 function formatSpecVal(field: SpecField, val: string | number): string {
-  if (field === 'ram_gb' || field === 'storage_gb') return `${val}GB`
+  if (field === 'ram_gb' || field === 'storage_gb') return String(val)
   if (field === 'screen_size') return `${val}″`
   return String(val)
 }

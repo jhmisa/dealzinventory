@@ -93,8 +93,8 @@ interface CreateBatchParams {
       brand?: string
       model_name?: string
       cpu?: string
-      ram_gb?: number
-      storage_gb?: number
+      ram_gb?: string
+      storage_gb?: string
       screen_size?: number
       serial_number?: string
     }
@@ -204,8 +204,8 @@ export async function parseInvoice(fileUrl: string, fileType: string, supplierTy
         brand?: string
         model_name?: string
         cpu?: string
-        ram_gb?: number
-        storage_gb?: number
+        ram_gb?: string
+        storage_gb?: string
         screen_size?: number
         serial_number?: string
       }

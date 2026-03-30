@@ -161,7 +161,7 @@ export default function ShopBrowsePage() {
           {products.map((sg) => {
             const pm = sg.product_models as {
               id: string; brand: string; model_name: string; color: string | null
-              cpu: string | null; ram_gb: number | null; storage_gb: number | null; os_family: string | null
+              cpu: string | null; ram_gb: string | null; storage_gb: string | null; os_family: string | null
               screen_size: number | null; short_description: string | null
               product_media?: { id: string; file_url: string; role: string; sort_order: number }[]
             } | null

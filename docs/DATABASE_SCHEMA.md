@@ -79,8 +79,8 @@ CREATE TABLE config_groups (
   id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   product_model_id  uuid NOT NULL REFERENCES product_models(id) ON DELETE RESTRICT,
   cpu               text,
-  ram_gb            integer,
-  storage_gb        integer,
+  ram_gb            text,
+  storage_gb        text,
   os_family         text,              -- 'Windows', 'macOS', 'iOS', 'Android'
   keyboard_layout   text,              -- 'JP', 'US', 'UK'
   has_touchscreen   boolean DEFAULT false,

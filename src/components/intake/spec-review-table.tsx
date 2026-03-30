@@ -25,8 +25,8 @@ const SPEC_COLUMNS: { key: SpecField; label: string; type: 'text' | 'number'; wi
   { key: 'brand', label: 'Brand', type: 'text', width: 'w-28' },
   { key: 'model_name', label: 'Model', type: 'text', width: 'w-32' },
   { key: 'cpu', label: 'CPU', type: 'text', width: 'w-28' },
-  { key: 'ram_gb', label: 'Memory (GB)', type: 'number', width: 'w-20' },
-  { key: 'storage_gb', label: 'Storage (GB)', type: 'number', width: 'w-24' },
+  { key: 'ram_gb', label: 'Memory', type: 'text', width: 'w-20' },
+  { key: 'storage_gb', label: 'Storage', type: 'text', width: 'w-24' },
   { key: 'screen_size', label: 'Screen (\u2033)', type: 'number', width: 'w-20' },
   { key: 'serial_number', label: 'Serial', type: 'text', width: 'w-32' },
 ]
@@ -43,8 +43,8 @@ function buildProductSummary(pm: ProductModelWithHeroImage | null): string {
   if (pm.model_name) parts.push(pm.model_name)
   const specBits: string[] = []
   if (pm.cpu) specBits.push(pm.cpu)
-  if (pm.ram_gb) specBits.push(`${pm.ram_gb}GB`)
-  if (pm.storage_gb) specBits.push(`${pm.storage_gb}GB`)
+  if (pm.ram_gb) specBits.push(String(pm.ram_gb))
+  if (pm.storage_gb) specBits.push(String(pm.storage_gb))
   if (pm.screen_size) specBits.push(`${pm.screen_size}\u2033`)
   if (specBits.length > 0) parts.push(specBits.join(' / '))
   return parts.join(' ') || '\u2014'

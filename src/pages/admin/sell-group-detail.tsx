@@ -85,7 +85,7 @@ export default function SellGroupDetailPage() {
   if (isLoading) return <FormSkeleton fields={6} />
   if (!sg) return <div className="text-center py-12 text-muted-foreground">Sell group not found.</div>
 
-  const pm = sg.product_models as { brand: string; model_name: string; color: string; cpu: string | null; ram_gb: number | null; storage_gb: number | null; os_family: string | null } | null
+  const pm = sg.product_models as { brand: string; model_name: string; color: string; cpu: string | null; ram_gb: string | null; storage_gb: string | null; os_family: string | null } | null
 
   const shareUrl = `${window.location.origin}/order/${sg.sell_group_code}`
 
@@ -164,7 +164,7 @@ export default function SellGroupDetailPage() {
           <CardContent className="space-y-2 text-sm">
             <div className="flex justify-between"><span className="text-muted-foreground">Code</span><CodeDisplay code={sg.sell_group_code} /></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Model</span><span>{pm ? `${pm.brand} ${pm.model_name}` : '—'}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Config</span><span>{pm ? `${pm.cpu ?? '?'} / ${pm.ram_gb ?? '?'}GB / ${pm.storage_gb ?? '?'}GB` : '—'}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Config</span><span>{pm ? `${pm.cpu ?? '?'} / ${pm.ram_gb ?? '?'} / ${pm.storage_gb ?? '?'}` : '—'}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Grade</span><GradeBadge grade={sg.condition_grade} /></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Price</span><PriceDisplay amount={sg.base_price} /></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Product</span><span>{pm ? `${pm.brand} ${pm.model_name}${pm.color ? ` (${pm.color})` : ''}` : '—'}</span></div>

@@ -11,6 +11,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
 import {
   Dialog,
   DialogContent,
@@ -41,8 +43,8 @@ type ItemRow = {
   brand: string | null
   model_name: string | null
   cpu: string | null
-  ram_gb: number | null
-  storage_gb: number | null
+  ram_gb: string | null
+  storage_gb: string | null
   screen_size: number | null
   suppliers: { supplier_name: string } | null
   product_models: { brand: string; model_name: string; color: string; short_description: string | null; screen_size: number | null; categories: { name: string; description_fields: string[] } | null } | null
@@ -133,6 +135,7 @@ export default function ItemListPage() {
   const conditionSearch = getParam('condition')
   const priceFrom = getParam('priceFrom')
   const priceTo = getParam('priceTo')
+  const noSellFilter = getParam('noSell')
 
   const setSearch = useCallback((v: string) => setParam('q', v), [setParam])
   const setStatusTab = useCallback((v: string) => setParam('status', v, 'all'), [setParam])
@@ -143,6 +146,7 @@ export default function ItemListPage() {
   const setConditionSearch = useCallback((v: string) => setParam('condition', v), [setParam])
   const setPriceFrom = useCallback((v: string) => setParam('priceFrom', v), [setParam])
   const setPriceTo = useCallback((v: string) => setParam('priceTo', v), [setParam])
+  const setNoSellFilter = useCallback((v: string) => setParam('noSell', v), [setParam])
 
   const debouncedSearch = useDebounce(search, 400)
   const debouncedDescSearch = useDebounce(descriptionSearch, 400)
@@ -185,6 +189,7 @@ export default function ItemListPage() {
 
   // Client-side filtering for filters not passed to the server
   const filteredItems = items.filter(item => {
+    if (noSellFilter === 'yes' && item.selling_price != null) return false
     if (categoryFilter && categoryFilter !== 'all' && item.product_models?.categories?.name !== categoryFilter) return false
     if (brandFilter && brandFilter !== 'all' && (item.brand ?? item.product_models?.brand) !== brandFilter) return false
     if (debouncedDescSearch) {
@@ -226,8 +231,8 @@ export default function ItemListPage() {
           const parts = [
             modelName,
             cpu,
-            ram_gb ? `${ram_gb}GB` : null,
-            storage_gb ? `${storage_gb}GB` : null,
+            ram_gb,
+            storage_gb,
             screenVal ? `${screenVal}"` : null,
           ].filter(Boolean)
           modelLine = parts.length > 0 ? parts.join(' / ') : '—'
@@ -266,6 +271,7 @@ export default function ItemListPage() {
     },
     {
       id: 'selling_price',
+      accessorFn: (row) => row.selling_price,
       header: 'Sell',
       cell: ({ row }) => (
         <EditPriceCell
@@ -279,6 +285,7 @@ export default function ItemListPage() {
     },
     {
       id: 'discount',
+      accessorFn: (row) => row.discount,
       header: 'Discount',
       cell: ({ row }) => (
         <EditPriceCell
@@ -446,6 +453,14 @@ export default function ItemListPage() {
           placeholder="¥ To"
           className="w-[110px]"
         />
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="no-sell-price"
+            checked={noSellFilter === 'yes'}
+            onCheckedChange={(checked) => setNoSellFilter(checked ? 'yes' : '')}
+          />
+          <Label htmlFor="no-sell-price" className="text-sm font-normal cursor-pointer">No Sell Price</Label>
+        </div>
       </div>
 
       {isLoading ? (

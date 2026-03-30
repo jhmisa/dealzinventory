@@ -26,9 +26,10 @@ interface ProductTemplateDiffDialogProps {
 const TEXT_FIELDS = [
   'brand', 'model_name', 'color', 'cpu', 'gpu', 'os_family',
   'carrier', 'keyboard_layout', 'form_factor', 'other_features',
+  'ram_gb', 'storage_gb',
 ] as const
 
-const NUM_FIELDS = ['ram_gb', 'storage_gb', 'year', 'screen_size'] as const
+const NUM_FIELDS = ['year', 'screen_size'] as const
 
 const BOOL_FIELDS = ['has_touchscreen', 'is_unlocked'] as const
 

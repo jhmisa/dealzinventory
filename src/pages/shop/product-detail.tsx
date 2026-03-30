@@ -45,7 +45,7 @@ export default function ShopProductDetailPage() {
   const first = sellGroups[0]
   const pm = first.product_models as {
     brand: string; model_name: string; color: string | null; short_description: string | null
-    cpu: string | null; ram_gb: number | null; storage_gb: number | null; os_family: string | null
+    cpu: string | null; ram_gb: string | null; storage_gb: string | null; os_family: string | null
     screen_size: number | null; chipset: string | null; ports: string | null
     categories?: { name: string; form_fields: string[] } | null
     product_media?: { id: string; file_url: string; role: string; sort_order: number }[]
@@ -159,8 +159,8 @@ export default function ShopProductDetailPage() {
               <Card>
                 <CardContent className="pt-6 space-y-2 text-sm">
                   {formFields.has('cpu') && pm?.cpu && <div className="flex justify-between"><span className="text-muted-foreground">{getSpecFieldLabel('cpu')}</span><span>{pm.cpu}</span></div>}
-                  {formFields.has('ram_gb') && pm?.ram_gb && <div className="flex justify-between"><span className="text-muted-foreground">{getSpecFieldLabel('ram_gb')}</span><span>{pm.ram_gb} GB</span></div>}
-                  {formFields.has('storage_gb') && pm?.storage_gb && <div className="flex justify-between"><span className="text-muted-foreground">{getSpecFieldLabel('storage_gb')}</span><span>{pm.storage_gb} GB</span></div>}
+                  {formFields.has('ram_gb') && pm?.ram_gb && <div className="flex justify-between"><span className="text-muted-foreground">{getSpecFieldLabel('ram_gb')}</span><span>{pm.ram_gb}</span></div>}
+                  {formFields.has('storage_gb') && pm?.storage_gb && <div className="flex justify-between"><span className="text-muted-foreground">{getSpecFieldLabel('storage_gb')}</span><span>{pm.storage_gb}</span></div>}
                   {formFields.has('os_family') && pm?.os_family && <div className="flex justify-between"><span className="text-muted-foreground">{getSpecFieldLabel('os_family')}</span><span>{pm.os_family}</span></div>}
                   {formFields.has('screen_size') && pm?.screen_size && <div className="flex justify-between"><span className="text-muted-foreground">{getSpecFieldLabel('screen_size')}</span><span>{pm.screen_size}"</span></div>}
                   {formFields.has('chipset') && pm?.chipset && <div className="flex justify-between"><span className="text-muted-foreground">{getSpecFieldLabel('chipset')}</span><span>{pm.chipset}</span></div>}

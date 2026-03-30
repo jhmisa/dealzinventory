@@ -585,10 +585,10 @@ function ProductDetailContent({
                   <SpecRow label={getSpecFieldLabel('keyboard_layout')} value={product.keyboard_layout} />
                 )}
                 {formFields.has('ram_gb') && (
-                  <SpecRow label={getSpecFieldLabel('ram_gb')} value={product.ram_gb ? `${product.ram_gb}GB` : null} />
+                  <SpecRow label={getSpecFieldLabel('ram_gb')} value={product.ram_gb} />
                 )}
                 {formFields.has('storage_gb') && (
-                  <SpecRow label={getSpecFieldLabel('storage_gb')} value={product.storage_gb ? `${product.storage_gb}GB` : null} />
+                  <SpecRow label={getSpecFieldLabel('storage_gb')} value={product.storage_gb} />
                 )}
                 {formFields.has('carrier') && (
                   <SpecRow label={getSpecFieldLabel('carrier')} value={product.carrier} />

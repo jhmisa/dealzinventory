@@ -11,8 +11,8 @@ interface ParsedSpecs {
   brand?: string;
   model_name?: string;
   cpu?: string;
-  ram_gb?: number;
-  storage_gb?: number;
+  ram_gb?: string;
+  storage_gb?: string;
   screen_size?: number;
   serial_number?: string;
 }
@@ -38,18 +38,18 @@ interface ParseInvoiceResponse {
 
 // ── Spec Parsing Helpers ────────────────────────────────────
 
-function parseRamGb(raw: string): number | undefined {
+function parseRamGb(raw: string): string | undefined {
   if (!raw) return undefined;
   const match = raw.match(/(\d+)\s*GB/i);
-  return match ? parseInt(match[1], 10) : undefined;
+  return match ? match[1] : undefined;
 }
 
-function parseStorageGb(raw: string): number | undefined {
+function parseStorageGb(raw: string): string | undefined {
   if (!raw) return undefined;
   const tbMatch = raw.match(/(\d+(?:\.\d+)?)\s*TB/i);
-  if (tbMatch) return Math.round(parseFloat(tbMatch[1]) * 1024);
+  if (tbMatch) return String(Math.round(parseFloat(tbMatch[1]) * 1024));
   const gbMatch = raw.match(/(\d+)\s*GB/i);
-  return gbMatch ? parseInt(gbMatch[1], 10) : undefined;
+  return gbMatch ? gbMatch[1] : undefined;
 }
 
 function parseScreenSize(raw: string): number | undefined {
@@ -571,8 +571,8 @@ Return ONLY valid JSON in this exact format:
         "brand": "Apple",
         "model_name": "MacBook Air",
         "cpu": "M1",
-        "ram_gb": 8,
-        "storage_gb": 256,
+        "ram_gb": "8",
+        "storage_gb": "256",
         "screen_size": 13.3,
         "serial_number": "C02X..."
       }
@@ -594,7 +594,7 @@ Rules:
 - invoice_date in YYYY-MM-DD format
 - invoice_total is the grand total in Yen
 - supplier_name is the issuing company/supplier name from the invoice header
-- For the specs object: extract brand, model_name, cpu, ram_gb (integer GB), storage_gb (integer GB), screen_size (decimal inches), and serial_number when visible. Omit fields you cannot determine.`;
+- For the specs object: extract brand, model_name, cpu, ram_gb (text string of GB value, e.g. "8"), storage_gb (text string of GB value, e.g. "256"), screen_size (decimal inches), and serial_number when visible. Omit fields you cannot determine.`;
 
 function detectProvider(apiEndpoint: string): 'anthropic' | 'openai' | 'google' | 'generic' {
   if (apiEndpoint.includes('anthropic.com')) return 'anthropic';

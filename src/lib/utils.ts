@@ -38,8 +38,8 @@ export function buildShortDescription(
     .map((key) => {
       const val = values[key]
       if (val == null || val === '' || val === false) return null
-      if (key === 'ram_gb' && val) return `${val}GB`
-      if (key === 'storage_gb' && val) return `${val}GB`
+      if (key === 'ram_gb' && val) return String(val)
+      if (key === 'storage_gb' && val) return String(val)
       if (key === 'screen_size' && val) return `${val}"`
       if (key === 'battery_health_pct' && val) return `Battery ${val}%`
       if (key === 'condition_notes' && val) return String(val)

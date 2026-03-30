@@ -43,7 +43,7 @@ type PriceRow = {
   body_condition: string
   purchase_price: number
   active: boolean
-  product_models: { brand: string; model_name: string; cpu: string | null; ram_gb: number | null; storage_gb: number | null } | null
+  product_models: { brand: string; model_name: string; cpu: string | null; ram_gb: string | null; storage_gb: string | null } | null
 }
 
 export default function KaitoriPriceListPage() {
@@ -109,7 +109,7 @@ export default function KaitoriPriceListPage() {
       cell: ({ row }) => {
         const pm = row.original.product_models
         if (!pm || (!pm.cpu && !pm.ram_gb && !pm.storage_gb)) return 'Any'
-        return `${pm.cpu ?? ''} / ${pm.ram_gb ?? '?'}GB / ${pm.storage_gb ?? '?'}GB`
+        return `${pm.cpu ?? ''} / ${pm.ram_gb ?? '?'} / ${pm.storage_gb ?? '?'}`
       },
     },
     {

@@ -220,8 +220,8 @@ export default function ReceivingReportDetailPage() {
                   } else {
                     config = [
                       item.cpu,
-                      item.ram_gb ? `${item.ram_gb}GB` : null,
-                      item.storage_gb ? `${item.storage_gb}GB` : null,
+                      item.ram_gb,
+                      item.storage_gb,
                     ].filter(Boolean).join(' / ') || '—'
                   }
                   return (

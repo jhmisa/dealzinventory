@@ -43,7 +43,7 @@ type SellGroupRow = {
   base_price: number
   active: boolean
   created_at: string
-  product_models: { brand: string; model_name: string; color: string; cpu: string | null; ram_gb: number | null; storage_gb: number | null; os_family: string | null } | null
+  product_models: { brand: string; model_name: string; color: string; cpu: string | null; ram_gb: string | null; storage_gb: string | null; os_family: string | null } | null
   sell_group_items: { count: number }[]
 }
 
@@ -66,7 +66,7 @@ const columns: ColumnDef<SellGroupRow>[] = [
     header: 'Config',
     cell: ({ row }) => {
       const pm = row.original.product_models
-      return pm && (pm.cpu || pm.ram_gb || pm.storage_gb) ? `${pm.cpu ?? '?'} / ${pm.ram_gb ?? '?'}GB / ${pm.storage_gb ?? '?'}GB` : '—'
+      return pm && (pm.cpu || pm.ram_gb || pm.storage_gb) ? `${pm.cpu ?? '?'} / ${pm.ram_gb ?? '?'} / ${pm.storage_gb ?? '?'}` : '—'
     },
   },
   {

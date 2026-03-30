@@ -31,8 +31,8 @@ interface OrderItemData {
     condition_notes: string | null
     item_status: string
     cpu: string | null
-    ram_gb: number | null
-    storage_gb: number | null
+    ram_gb: string | null
+    storage_gb: string | null
     screen_size: number | null
     os_family: string | null
     color: string | null
@@ -41,8 +41,8 @@ interface OrderItemData {
       model_name: string
       color: string | null
       cpu: string | null
-      ram_gb: number | null
-      storage_gb: number | null
+      ram_gb: string | null
+      storage_gb: string | null
       screen_size: number | null
       os_family: string | null
       short_description: string | null

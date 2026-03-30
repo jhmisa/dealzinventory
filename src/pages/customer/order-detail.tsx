@@ -27,8 +27,8 @@ type OrderItemRow = {
       model_name: string
       color: string | null
       cpu: string | null
-      ram_gb: number | null
-      storage_gb: number | null
+      ram_gb: string | null
+      storage_gb: string | null
       product_media: { file_url: string; role: string; sort_order: number }[]
     } | null
   } | null

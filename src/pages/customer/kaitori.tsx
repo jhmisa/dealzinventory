@@ -28,7 +28,7 @@ export default function CustomerKaitoriPage() {
       ) : (
         <div className="space-y-3">
           {requests.map((req) => {
-            const model = req.product_models as { brand: string; model_name: string; ram_gb: number | null; storage_gb: number | null } | null
+            const model = req.product_models as { brand: string; model_name: string; ram_gb: string | null; storage_gb: string | null } | null
 
             return (
               <div

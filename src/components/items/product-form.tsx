@@ -53,8 +53,8 @@ export function ProductForm({ product, loading = false, onSubmit, onCancel }: Pr
       other_features: product?.other_features ?? '',
       model_notes: product?.model_notes ?? '',
       cpu: product?.cpu ?? '',
-      ram_gb: product?.ram_gb ?? undefined,
-      storage_gb: product?.storage_gb ?? undefined,
+      ram_gb: product?.ram_gb ?? '',
+      storage_gb: product?.storage_gb ?? '',
       os_family: product?.os_family ?? '',
       gpu: product?.gpu ?? '',
       carrier: product?.carrier ?? '',
@@ -358,7 +358,7 @@ export function ProductForm({ product, loading = false, onSubmit, onCancel }: Pr
                   <FormItem>
                     <FormLabel>RAM (GB)</FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="8" {...field} />
+                      <Input placeholder="8" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -373,7 +373,7 @@ export function ProductForm({ product, loading = false, onSubmit, onCancel }: Pr
                   <FormItem>
                     <FormLabel>Storage (GB)</FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="256" {...field} />
+                      <Input placeholder="256" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

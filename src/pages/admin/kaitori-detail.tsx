@@ -91,7 +91,7 @@ export default function KaitoriDetailPage() {
 
   const status = kt.request_status as KaitoriStatus
   const statusCfg = getKaitoriStatusConfig(status)
-  const pm = kt.product_models as { id: string; brand: string; model_name: string; cpu: string | null; ram_gb: number | null; storage_gb: number | null; os_family: string | null } | null
+  const pm = kt.product_models as { id: string; brand: string; model_name: string; cpu: string | null; ram_gb: string | null; storage_gb: string | null; os_family: string | null } | null
   const customer = kt.customers as {
     id: string; last_name: string; first_name: string | null; email: string; phone: string | null
     customer_code: string; bank_name: string | null; bank_branch: string | null
@@ -261,7 +261,7 @@ export default function KaitoriDetailPage() {
           <CardContent className="space-y-2 text-sm">
             <div className="flex justify-between"><span className="text-muted-foreground">Code</span><CodeDisplay code={kt.kaitori_code} /></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Device</span><span>{pm ? `${pm.brand} ${pm.model_name}` : '—'}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Config</span><span>{pm ? `${pm.cpu ?? ''} / ${pm.ram_gb ?? '?'}GB / ${pm.storage_gb ?? '?'}GB` : '—'}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Config</span><span>{pm ? `${pm.cpu ?? ''} / ${pm.ram_gb ?? '?'} / ${pm.storage_gb ?? '?'}` : '—'}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Delivery</span><span>{deliveryLabel}</span></div>
             {kt.tracking_number && <div className="flex justify-between"><span className="text-muted-foreground">Tracking</span><span className="font-mono">{kt.tracking_number}</span></div>}
             <div className="flex justify-between"><span className="text-muted-foreground">Created</span><span>{formatDateTime(kt.created_at)}</span></div>

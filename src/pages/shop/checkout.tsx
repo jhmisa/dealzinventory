@@ -81,7 +81,7 @@ export default function CheckoutPage() {
 
   const pm = sg.product_models as {
     brand: string; model_name: string
-    cpu: string | null; ram_gb: number | null; storage_gb: number | null
+    cpu: string | null; ram_gb: string | null; storage_gb: string | null
   } | null
   const gradeInfo = CONDITION_GRADES.find(g => g.value === sg.condition_grade)
   const stockCount = (sg as { sell_group_items?: { count: number }[] }).sell_group_items?.[0]?.count ?? 0

@@ -182,7 +182,7 @@ function makeEmptyLine(): LineItemRow {
 
 function resolveSpecs(
   csvSpecs: ParsedSpecs | undefined,
-  productModel: { brand?: string | null; model_name?: string | null; cpu?: string | null; ram_gb?: number | null; storage_gb?: number | null; screen_size?: number | null } | null,
+  productModel: { brand?: string | null; model_name?: string | null; cpu?: string | null; ram_gb?: string | null; storage_gb?: string | null; screen_size?: number | null } | null,
 ): ResolvedSpecs {
   const pm = productModel ?? {}
   return {

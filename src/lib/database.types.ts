@@ -610,7 +610,7 @@ export type Database = {
           part_number: string | null
           product_id: string | null
           purchase_price: number | null
-          ram_gb: number | null
+          ram_gb: string | null
           screen_condition:
             | Database["public"]["Enums"]["screen_condition"]
             | null
@@ -618,7 +618,7 @@ export type Database = {
           selling_price: number | null
           source_type: Database["public"]["Enums"]["source_type"]
           specs_notes: string | null
-          storage_gb: number | null
+          storage_gb: string | null
           supplier_description: string | null
           supplier_id: string
           updated_at: string
@@ -669,7 +669,7 @@ export type Database = {
           part_number?: string | null
           product_id?: string | null
           purchase_price?: number | null
-          ram_gb?: number | null
+          ram_gb?: string | null
           screen_condition?:
             | Database["public"]["Enums"]["screen_condition"]
             | null
@@ -677,7 +677,7 @@ export type Database = {
           selling_price?: number | null
           source_type?: Database["public"]["Enums"]["source_type"]
           specs_notes?: string | null
-          storage_gb?: number | null
+          storage_gb?: string | null
           supplier_description?: string | null
           supplier_id: string
           updated_at?: string
@@ -728,7 +728,7 @@ export type Database = {
           part_number?: string | null
           product_id?: string | null
           purchase_price?: number | null
-          ram_gb?: number | null
+          ram_gb?: string | null
           screen_condition?:
             | Database["public"]["Enums"]["screen_condition"]
             | null
@@ -736,7 +736,7 @@ export type Database = {
           selling_price?: number | null
           source_type?: Database["public"]["Enums"]["source_type"]
           specs_notes?: string | null
-          storage_gb?: number | null
+          storage_gb?: string | null
           supplier_description?: string | null
           supplier_id?: string
           updated_at?: string
@@ -1375,11 +1375,11 @@ export type Database = {
           other_features: string | null
           part_number: string | null
           ports: string | null
-          ram_gb: number | null
+          ram_gb: string | null
           screen_size: number | null
           short_description: string | null
           status: Database["public"]["Enums"]["product_status"]
-          storage_gb: number | null
+          storage_gb: string | null
           supports_stylus: boolean | null
           updated_at: string
           verified_at: string | null
@@ -1416,11 +1416,11 @@ export type Database = {
           other_features?: string | null
           part_number?: string | null
           ports?: string | null
-          ram_gb?: number | null
+          ram_gb?: string | null
           screen_size?: number | null
           short_description?: string | null
           status?: Database["public"]["Enums"]["product_status"]
-          storage_gb?: number | null
+          storage_gb?: string | null
           supports_stylus?: boolean | null
           updated_at?: string
           verified_at?: string | null
@@ -1457,11 +1457,11 @@ export type Database = {
           other_features?: string | null
           part_number?: string | null
           ports?: string | null
-          ram_gb?: number | null
+          ram_gb?: string | null
           screen_size?: number | null
           short_description?: string | null
           status?: Database["public"]["Enums"]["product_status"]
-          storage_gb?: number | null
+          storage_gb?: string | null
           supports_stylus?: boolean | null
           updated_at?: string
           verified_at?: string | null

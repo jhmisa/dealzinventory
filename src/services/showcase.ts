@@ -48,7 +48,7 @@ export async function getShowcaseItem(itemCode: string): Promise<ShowcaseItem | 
   if (pm) {
     description = (pm.short_description as string) || ''
     if (!description) {
-      const parts = [pm.brand, pm.model_name, pm.cpu, pm.ram_gb ? `${pm.ram_gb}GB` : null, pm.storage_gb ? `${pm.storage_gb}GB` : null, pm.screen_size ? `${pm.screen_size}"` : null, pm.color].filter(Boolean)
+      const parts = [pm.brand, pm.model_name, pm.cpu, pm.ram_gb ?? null, pm.storage_gb ?? null, pm.screen_size ? `${pm.screen_size}"` : null, pm.color].filter(Boolean)
       description = parts.join(' ')
     }
   }

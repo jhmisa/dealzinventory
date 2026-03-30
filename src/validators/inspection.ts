@@ -46,8 +46,8 @@ export const inspectionSchema = z.object({
 
   // Spec correction fields (saved directly to item columns)
   cpu: z.string().optional().or(z.literal('')),
-  ram_gb: z.coerce.number().int().positive().nullable().optional(),
-  storage_gb: z.coerce.number().int().positive().nullable().optional(),
+  ram_gb: z.string().nullable().optional(),
+  storage_gb: z.string().nullable().optional(),
   os_family: z.string().optional().or(z.literal('')),
   screen_size: z.coerce.number().positive().nullable().optional(),
   keyboard_layout: z.string().optional().or(z.literal('')),

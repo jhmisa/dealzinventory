@@ -77,8 +77,8 @@ export interface ParsedSpecs {
   brand?: string
   model_name?: string
   cpu?: string
-  ram_gb?: number
-  storage_gb?: number
+  ram_gb?: string
+  storage_gb?: string
   screen_size?: number
   serial_number?: string
 }

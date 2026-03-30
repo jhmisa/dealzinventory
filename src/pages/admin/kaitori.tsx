@@ -18,7 +18,7 @@ type KaitoriRow = {
   delivery_method: string
   created_at: string
   customers: { last_name: string; first_name: string | null; customer_code: string } | null
-  product_models: { brand: string; model_name: string; cpu: string | null; ram_gb: number | null; storage_gb: number | null } | null
+  product_models: { brand: string; model_name: string; cpu: string | null; ram_gb: string | null; storage_gb: string | null } | null
 }
 
 const columns: ColumnDef<KaitoriRow>[] = [
@@ -49,7 +49,7 @@ const columns: ColumnDef<KaitoriRow>[] = [
     cell: ({ row }) => {
       const pm = row.original.product_models
       if (!pm) return '—'
-      return `${pm.cpu ?? ''} / ${pm.ram_gb ?? '?'}GB / ${pm.storage_gb ?? '?'}GB`
+      return `${pm.cpu ?? ''} / ${pm.ram_gb ?? '?'} / ${pm.storage_gb ?? '?'}`
     },
   },
   {
