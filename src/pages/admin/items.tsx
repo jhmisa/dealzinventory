@@ -214,7 +214,9 @@ export default function ItemListPage() {
     },
     {
       id: 'model',
-      header: 'Model',
+      header: 'Description',
+      size: 200,
+      minSize: 100,
       cell: ({ row }) => {
         const pm = row.original.product_models
         const { condition_notes } = row.original
@@ -474,6 +476,7 @@ export default function ItemListPage() {
           columns={columns}
           data={filteredItems}
           columnVisibility={columnVisibility}
+          enableColumnResizing
           onRowClick={(row) => navigate(`/admin/items/${row.id}`)}
         />
       )}

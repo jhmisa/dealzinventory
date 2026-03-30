@@ -3,6 +3,7 @@ import {
   type ColumnDef,
   type SortingState,
   type VisibilityState,
+  type ColumnResizeMode,
   flexRender,
   getCoreRowModel,
   getSortedRowModel,
@@ -33,6 +34,7 @@ interface DataTableProps<TData, TValue> {
   pageSize?: number
   onRowClick?: (row: TData) => void
   columnVisibility?: VisibilityState
+  enableColumnResizing?: boolean
 }
 
 export function DataTable<TData, TValue>({
@@ -41,8 +43,10 @@ export function DataTable<TData, TValue>({
   pageSize = 20,
   onRowClick,
   columnVisibility,
+  enableColumnResizing = false,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([])
+  const [columnResizeMode] = useState<ColumnResizeMode>('onChange')
 
   const table = useReactTable({
     data,
@@ -54,19 +58,21 @@ export function DataTable<TData, TValue>({
     autoResetPageIndex: false,
     state: { sorting, ...(columnVisibility ? { columnVisibility } : {}) },
     initialState: { pagination: { pageSize } },
+    ...(enableColumnResizing ? { columnResizeMode, enableColumnResizing: true } : {}),
   })
 
   return (
     <div>
       <div className="rounded-md border">
-        <Table>
+        <Table style={enableColumnResizing ? { width: table.getCenterTotalSize() } : undefined}>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
                   <TableHead
                     key={header.id}
-                    className={header.column.getCanSort() ? 'cursor-pointer select-none' : ''}
+                    className={`relative ${header.column.getCanSort() ? 'cursor-pointer select-none' : ''}`}
+                    style={enableColumnResizing ? { width: header.getSize() } : undefined}
                     onClick={header.column.getToggleSortingHandler()}
                   >
                     {header.isPlaceholder
@@ -74,6 +80,16 @@ export function DataTable<TData, TValue>({
                       : flexRender(header.column.columnDef.header, header.getContext())}
                     {header.column.getIsSorted() === 'asc' && ' ↑'}
                     {header.column.getIsSorted() === 'desc' && ' ↓'}
+                    {enableColumnResizing && header.column.getCanResize() && (
+                      <div
+                        onMouseDown={header.getResizeHandler()}
+                        onTouchStart={header.getResizeHandler()}
+                        onClick={(e) => e.stopPropagation()}
+                        className={`absolute right-0 top-0 h-full w-1 cursor-col-resize select-none touch-none bg-transparent hover:bg-border ${
+                          header.column.getIsResizing() ? 'bg-primary' : ''
+                        }`}
+                      />
+                    )}
                   </TableHead>
                 ))}
               </TableRow>
@@ -88,7 +104,10 @@ export function DataTable<TData, TValue>({
                   onClick={() => onRowClick?.(row.original)}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell
+                      key={cell.id}
+                      style={enableColumnResizing ? { width: cell.column.getSize() } : undefined}
+                    >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
