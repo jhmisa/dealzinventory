@@ -1,8 +1,38 @@
-import { Info } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Info, Save } from 'lucide-react'
+import { toast } from 'sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { PageHeader } from '@/components/shared'
+import { useSystemSetting, useUpdateSystemSetting } from '@/hooks/use-settings'
 
 export default function GeneralSettingsPage() {
+  const { data: surchargeValue, isLoading } = useSystemSetting('credit_card_surcharge_pct')
+  const updateSetting = useUpdateSystemSetting()
+  const [surcharge, setSurcharge] = useState('')
+
+  useEffect(() => {
+    if (surchargeValue !== undefined && surchargeValue !== null) {
+      setSurcharge(surchargeValue)
+    }
+  }, [surchargeValue])
+
+  const handleSaveSurcharge = () => {
+    const num = parseFloat(surcharge)
+    if (isNaN(num) || num < 0 || num > 100) {
+      toast.error('Surcharge must be between 0 and 100')
+      return
+    }
+    updateSetting.mutate(
+      { key: 'credit_card_surcharge_pct', value: surcharge },
+      {
+        onSuccess: () => toast.success('Surcharge updated'),
+        onError: (err) => toast.error(err.message),
+      },
+    )
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader title="General Settings" />
@@ -51,6 +81,41 @@ export default function GeneralSettingsPage() {
               <li>Save — changes take effect on the next edge function invocation (no redeploy needed)</li>
             </ol>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Info className="h-5 w-5 text-muted-foreground" />
+            <CardTitle>Credit Card Surcharge</CardTitle>
+          </div>
+          <CardDescription>
+            Percentage added as a line item to orders paid by credit card via Cash on Delivery.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-3">
+            <Input
+              type="number"
+              min={0}
+              max={100}
+              step={0.1}
+              className="w-24"
+              value={surcharge}
+              onChange={(e) => setSurcharge(e.target.value)}
+              disabled={isLoading}
+            />
+            <span className="text-sm text-muted-foreground">%</span>
+            <Button size="sm" onClick={handleSaveSurcharge} disabled={updateSetting.isPending}>
+              <Save className="h-4 w-4 mr-1" />
+              Save
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Currently: {surchargeValue ?? '4'}%. Applied when payment method is Credit Card.
+            This adds a visible "Credit Card Fee" line item to the order.
+          </p>
         </CardContent>
       </Card>
     </div>
