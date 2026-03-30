@@ -197,6 +197,50 @@ export function EditableSpecsCard({ item, productModel, locked }: EditableSpecsC
                       </div>
                     )
                   }
+                  if (field.key === 'battery_health_pct') {
+                    const batteryVal = form.watch('battery_health_pct')
+                    return (
+                      <div key={field.key} className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">{getSpecFieldLabel(field.key)}</Label>
+                        {batteryVal === -1 ? (
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              className="rounded-md bg-muted px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted/80"
+                              onClick={() => form.setValue('battery_health_pct', null, { shouldDirty: true })}
+                            >
+                              N/A
+                            </button>
+                            <span className="text-xs text-muted-foreground">Click to re-enter a value</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="number"
+                              min={0}
+                              max={100}
+                              {...form.register('battery_health_pct')}
+                              placeholder={
+                                productModel?.[field.key as keyof ProductModel] != null
+                                  ? String(productModel[field.key as keyof ProductModel])
+                                  : '—'
+                              }
+                              className="h-8 text-sm w-32"
+                            />
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">{field.suffix}</span>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => form.setValue('battery_health_pct', -1, { shouldDirty: true })}
+                            >
+                              N/A
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  }
                   return (
                     <div key={field.key} className="space-y-1">
                       <Label className="text-xs text-muted-foreground">{getSpecFieldLabel(field.key)}</Label>

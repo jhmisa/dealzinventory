@@ -61,7 +61,7 @@ export const itemSpecsSchema = z.object({
   is_unlocked: z.boolean().nullable().optional(),
   imei: z.string().optional().or(z.literal('')),
   imei2: z.string().optional().or(z.literal('')),
-  battery_health_pct: z.coerce.number().int().min(0).max(100).nullable().optional(),
+  battery_health_pct: z.coerce.number().int().min(-1).max(100).nullable().optional(),
   year: z.coerce.number().int().positive().nullable().optional(),
   other_features: z.string().optional().or(z.literal('')),
 })
