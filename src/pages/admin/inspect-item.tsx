@@ -445,7 +445,7 @@ export default function InspectItemPage() {
     values: item ? {
       condition_grade: item.condition_grade ?? undefined as unknown as InspectionFormValues['condition_grade'],
       item_status: (item.item_status === 'INTAKE' ? 'AVAILABLE' : item.item_status) as InspectionFormValues['item_status'],
-      product_id: '',
+      product_id: item.product_id ?? '',
       ac_adapter_status: item.ac_adapter_status ?? undefined,
       battery_health_pct: item.battery_health_pct ?? null,
       inspection_checklist: {
@@ -587,6 +587,22 @@ export default function InspectItemPage() {
   const watchedAcAdapter = form.watch('ac_adapter_status')
   const watchedBattery = form.watch('battery_health_pct')
   const watchedGrade = form.watch('condition_grade')
+
+  // Auto-fill functionality checks when grade is S (brand new)
+  const prevGradeRef = useRef(watchedGrade)
+  useEffect(() => {
+    const prevGrade = prevGradeRef.current
+    prevGradeRef.current = watchedGrade
+    if (watchedGrade === 'S' && prevGrade !== 'S') {
+      for (const check of funcChecks) {
+        form.setValue(
+          `inspection_checklist.${check.key}_status` as `inspection_checklist.${string}`,
+          'WORKING',
+        )
+      }
+      form.setValue('battery_health_pct', 100)
+    }
+  }, [watchedGrade, funcChecks, form])
 
   // Color mismatch detection
   const productColor = pm?.color ?? null
@@ -744,8 +760,7 @@ export default function InspectItemPage() {
             </div>
             <p className="text-sm text-muted-foreground ml-8">
               {pm ? `${pm.brand} ${pm.model_name}` : 'No product assigned'}{' '}
-              {(item.color ?? pm?.color) && `· ${item.color ?? pm?.color}`}{' '}
-              {deviceCategory && `· ${deviceCategory}`}
+              {(item.color ?? pm?.color) && `· ${item.color ?? pm?.color}`}
             </p>
             <div className="flex items-center ml-8 pt-1 gap-3 text-xs">
               <div className="flex items-center gap-1.5">
