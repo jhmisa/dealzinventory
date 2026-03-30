@@ -1178,9 +1178,12 @@ export type Database = {
         Row: {
           created_at: string
           customer_id: string
+          delivery_box_count: number
           delivery_date: string | null
           delivery_time_code: string | null
+          dempyo_printed_at: string | null
           id: string
+          invoice_printed_at: string | null
           notes: string | null
           order_code: string
           order_source: Database["public"]["Enums"]["order_source"]
@@ -1201,9 +1204,12 @@ export type Database = {
         Insert: {
           created_at?: string
           customer_id: string
+          delivery_box_count?: number
           delivery_date?: string | null
           delivery_time_code?: string | null
+          dempyo_printed_at?: string | null
           id?: string
+          invoice_printed_at?: string | null
           notes?: string | null
           order_code: string
           order_source: Database["public"]["Enums"]["order_source"]
@@ -1224,9 +1230,12 @@ export type Database = {
         Update: {
           created_at?: string
           customer_id?: string
+          delivery_box_count?: number
           delivery_date?: string | null
           delivery_time_code?: string | null
+          dempyo_printed_at?: string | null
           id?: string
+          invoice_printed_at?: string | null
           notes?: string | null
           order_code?: string
           order_source?: Database["public"]["Enums"]["order_source"]
@@ -1759,6 +1768,27 @@ export type Database = {
         }
         Relationships: []
       }
+      system_settings: {
+        Row: {
+          description: string | null
+          key: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          description?: string | null
+          key: string
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          description?: string | null
+          key?: string
+          updated_at?: string
+          value?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -2042,5 +2072,3 @@ export const Constants = {
     },
   },
 } as const
-A new version of Supabase CLI is available: v2.84.2 (currently installed v2.75.0)
-We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
