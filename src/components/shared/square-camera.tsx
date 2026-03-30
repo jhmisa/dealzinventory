@@ -17,9 +17,11 @@ export function SquareCamera({
   onCapture,
   onClose,
   maxDuration = VIDEO_SPECS.maxDurationSec,
-  facingMode: initialFacing = 'environment',
+  facingMode: initialFacing,
 }: SquareCameraProps) {
-  const [facing, setFacing] = useState(initialFacing)
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+  const defaultFacing = initialFacing ?? (isMobile ? 'environment' : 'user')
+  const [facing, setFacing] = useState(defaultFacing)
   const [recording, setRecording] = useState(false)
   const [recordingTime, setRecordingTime] = useState(0)
   const [hasStream, setHasStream] = useState(false)
@@ -56,6 +58,13 @@ export function SquareCamera({
       onClose()
     }
   }, [stopStream, onClose])
+
+  // Sync srcObject when <video> mounts (hasStream gates rendering)
+  useEffect(() => {
+    if (hasStream && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current
+    }
+  }, [hasStream])
 
   useEffect(() => {
     startStream(facing)
