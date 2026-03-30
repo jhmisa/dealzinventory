@@ -15,7 +15,7 @@ import {
   FormSkeleton,
 } from '@/components/shared'
 import { AddressDisplay } from '@/components/shared/address-display'
-import { AddressForm } from '@/components/shared/address-form'
+import { useCustomerAddresses } from '@/hooks/use-customer-addresses'
 import {
   useOrder,
   useUpdateOrderStatus,
@@ -119,6 +119,7 @@ export default function OrderDetailPage() {
   const { data: auditLogs } = useOrderAuditLogs(id!)
   const queryClient = useQueryClient()
   const { data: surchargeRate } = useSystemSetting('credit_card_surcharge_pct')
+  const { data: customerAddresses } = useCustomerAddresses(order?.customer_id ?? '')
 
   const [cancelOpen, setCancelOpen] = useState(false)
   const [advanceOpen, setAdvanceOpen] = useState(false)
@@ -140,7 +141,7 @@ export default function OrderDetailPage() {
   const [editPaymentMethod, setEditPaymentMethod] = useState('')
   const [editDeliveryTimeCode, setEditDeliveryTimeCode] = useState('')
   const [editDeliveryDate, setEditDeliveryDate] = useState('')
-  const [editShippingAddress, setEditShippingAddress] = useState<ShippingAddress | null>(null)
+  const [pickingAddress, setPickingAddress] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
   const addLineItem = useAddOrderLineItem()
 
@@ -212,7 +213,6 @@ export default function OrderDetailPage() {
     setEditPaymentMethod(order.payment_method ?? 'COD')
     setEditDeliveryTimeCode(deliveryTimeCode ?? '')
     setEditDeliveryDate(deliveryDate ?? '')
-    setEditShippingAddress(shippingAddr)
     setIsEditing(true)
   }
 
@@ -260,11 +260,6 @@ export default function OrderDetailPage() {
       }
       if (editDeliveryDate !== (deliveryDate ?? '')) {
         orderUpdates.delivery_date = editDeliveryDate || null
-      }
-      const currentAddrStr = order.shipping_address as string | null ?? null
-      const newAddrStr = editShippingAddress ? JSON.stringify(editShippingAddress) : null
-      if (newAddrStr !== currentAddrStr) {
-        orderUpdates.shipping_address = newAddrStr
       }
       if (Object.keys(orderUpdates).length > 0) {
         await updateOrder.mutateAsync({ id: order.id, updates: orderUpdates })
@@ -439,6 +434,41 @@ export default function OrderDetailPage() {
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to add item')
+    }
+  }
+
+  // Build address options from customer_addresses + legacy fallback
+  const addressOptions: { id: string; label: string; careOf?: string | null; address: ShippingAddress }[] = []
+  if (customerAddresses) {
+    for (const addr of customerAddresses) {
+      addressOptions.push({
+        id: addr.id,
+        label: addr.label,
+        careOf: addr.care_of,
+        address: addr.address as unknown as ShippingAddress,
+      })
+    }
+  }
+  if (addressOptions.length === 0 && customer) {
+    const legacyRaw = (customer as Record<string, unknown>).shipping_address
+    if (legacyRaw) {
+      let legacyAddr: ShippingAddress | null = null
+      try {
+        legacyAddr = typeof legacyRaw === 'string' ? JSON.parse(legacyRaw) : legacyRaw as unknown as ShippingAddress
+      } catch { /* skip */ }
+      if (legacyAddr) {
+        addressOptions.push({ id: '__legacy__', label: 'Primary Address', careOf: null, address: legacyAddr })
+      }
+    }
+  }
+
+  async function handlePickAddress(addr: ShippingAddress) {
+    try {
+      await updateOrder.mutateAsync({ id: order.id, updates: { shipping_address: JSON.stringify(addr) } })
+      setPickingAddress(false)
+      toast.success('Shipping address updated')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update address')
     }
   }
 
@@ -651,9 +681,42 @@ export default function OrderDetailPage() {
               <p className="text-muted-foreground">—</p>
             )}
             <div className="pt-2 border-t">
-              <p className="text-muted-foreground text-xs mb-1">Shipping Address</p>
-              {isEditing ? (
-                <AddressForm value={editShippingAddress} onChange={setEditShippingAddress} />
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-muted-foreground text-xs">Shipping Address</p>
+                {canEdit && customer && addressOptions.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setPickingAddress(!pickingAddress)}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    title="Change shipping address"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+              {pickingAddress ? (
+                <div className="space-y-2">
+                  {addressOptions.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      className="w-full text-left p-2 rounded-md border hover:bg-accent/50 transition-colors"
+                      onClick={() => handlePickAddress(option.address)}
+                      disabled={updateOrder.isPending}
+                    >
+                      <p className="font-medium text-xs">{option.label}</p>
+                      {option.careOf && (
+                        <p className="text-xs text-muted-foreground">C/O {option.careOf}</p>
+                      )}
+                      <div className="mt-1">
+                        <AddressDisplay address={option.address} format="jp" />
+                      </div>
+                    </button>
+                  ))}
+                  <Button variant="ghost" size="sm" className="w-full" onClick={() => setPickingAddress(false)}>
+                    Cancel
+                  </Button>
+                </div>
               ) : shippingAddr ? (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
