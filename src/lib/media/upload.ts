@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { processImage } from './process-image'
-import { processVideo } from './process-video'
+import { tryProcessVideo } from './process-video'
 import { getImageFormat } from './detect-format'
 
 export interface UploadResult {
@@ -69,7 +69,7 @@ async function uploadVideo(
   path: string,
   onProgress?: (progress: number) => void,
 ): Promise<UploadResult> {
-  const processed = await processVideo(file, onProgress)
+  const processed = await tryProcessVideo(file, onProgress)
   const { extension: imgExt } = getImageFormat()
 
   const ext = processed.format
