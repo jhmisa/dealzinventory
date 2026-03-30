@@ -112,7 +112,7 @@ export const PRODUCT_STATUSES: { value: ProductStatus; label: string; color: str
 export const AC_ADAPTER_STATUSES: { value: AcAdapterStatus; label: string }[] = [
   { value: 'CORRECT', label: 'Correct' },
   { value: 'INCORRECT', label: 'Incorrect' },
-  { value: 'MISSING', label: 'Missing' },
+  { value: 'MISSING', label: 'No AC' },
 ]
 
 export const ORDER_STATUSES: { value: OrderStatus; label: string; color: string }[] = [

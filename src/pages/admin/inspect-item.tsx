@@ -925,6 +925,7 @@ export default function InspectItemPage() {
                     </span>
                     <Input
                       type={field.type === 'number' ? 'number' : 'text'}
+                      step={field.key === 'screen_size' ? '0.1' : undefined}
                       placeholder={currentVal != null ? String(currentVal) : '--'}
                       className={cn(
                         'h-8 text-xs',
