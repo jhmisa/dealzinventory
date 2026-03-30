@@ -1,6 +1,6 @@
 import { useNavigate, Link } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Plus, Copy, X } from 'lucide-react'
+import { Plus, Copy, X, Printer, FileSpreadsheet } from 'lucide-react'
 import { toast } from 'sonner'
 import { PageHeader, SearchBar, DataTable, StatusBadge, CodeDisplay, PriceDisplay, TableSkeleton } from '@/components/shared'
 import { Button } from '@/components/ui/button'
@@ -11,11 +11,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useOrders } from '@/hooks/use-orders'
+import { useOrders, useConfirmedForInvoice, useConfirmedForDempyo, useStampInvoicePrinted, useStampDempyoPrinted } from '@/hooks/use-orders'
 import { usePersistedFilters } from '@/hooks/use-persisted-filters'
 import { useOffers, useCancelOffer } from '@/hooks/use-offers'
 import { ORDER_STATUSES, ORDER_SOURCES, OFFER_STATUSES } from '@/lib/constants'
 import { formatDateTime, formatPrice, cn } from '@/lib/utils'
+import { printBatchInvoices } from '@/components/orders/batch-invoice-print'
+import { validateOrders, generateDempyoXlsx, downloadBlob, generateDempyoFilename } from '@/lib/yamato'
 
 type OrderRow = {
   id: string
@@ -35,6 +37,9 @@ type OrderRow = {
     product_models: { brand: string; model_name: string } | null
   } | null
   order_items: { count: number }[]
+  invoice_printed_at: string | null
+  dempyo_printed_at: string | null
+  delivery_box_count: number
 }
 
 const STATUS_TABS = [
@@ -123,6 +128,23 @@ const columns: ColumnDef<OrderRow>[] = [
     },
   },
   {
+    id: 'print_status',
+    header: 'Printed',
+    cell: ({ row }) => {
+      const order = row.original
+      return (
+        <div className="flex items-center gap-2 text-xs">
+          <span title="Invoice" className={order.invoice_printed_at ? 'text-green-600' : 'text-muted-foreground'}>
+            {order.invoice_printed_at ? '\u2713 Inv' : '\u2014 Inv'}
+          </span>
+          <span title="Dempyo" className={order.dempyo_printed_at ? 'text-green-600' : 'text-muted-foreground'}>
+            {order.dempyo_printed_at ? '\u2713 \u4f1d\u7968' : '\u2014 \u4f1d\u7968'}
+          </span>
+        </div>
+      )
+    },
+  },
+  {
     accessorKey: 'created_at',
     header: 'Created',
     cell: ({ row }) => <span className="text-xs text-muted-foreground">{formatDateTime(row.original.created_at)}</span>,
@@ -166,6 +188,48 @@ export default function OrderListPage() {
   })
 
   const cancelOffer = useCancelOffer()
+
+  const { data: invoiceOrders } = useConfirmedForInvoice()
+  const { data: dempyoOrders } = useConfirmedForDempyo()
+  const stampInvoice = useStampInvoicePrinted()
+  const stampDempyo = useStampDempyoPrinted()
+
+  const invoiceCount = invoiceOrders?.length ?? 0
+  const dempyoCount = dempyoOrders?.length ?? 0
+
+  const handleBatchInvoice = () => {
+    if (!invoiceOrders || invoiceOrders.length === 0) return
+    printBatchInvoices(invoiceOrders, '')
+    const ids = invoiceOrders.map((o) => o.id)
+    stampInvoice.mutate(ids, {
+      onSuccess: () => toast.success(`Marked ${ids.length} invoices as printed`),
+      onError: (err) => toast.error(err.message),
+    })
+  }
+
+  const handleBatchDempyo = async () => {
+    if (!dempyoOrders || dempyoOrders.length === 0) return
+    const { valid, skipped, warnings } = validateOrders(dempyoOrders)
+    if (skipped.length > 0) {
+      for (const s of skipped) toast.warning(`${s.order.order_code}: ${s.reason}`)
+    }
+    for (const w of warnings) toast.warning(`${w.order.order_code}: ${w.message}`)
+    if (valid.length === 0) {
+      toast.error('No valid orders for dempyo generation')
+      return
+    }
+    try {
+      const blob = await generateDempyoXlsx(valid)
+      downloadBlob(blob, generateDempyoFilename())
+      const ids = valid.map((o) => o.id)
+      stampDempyo.mutate(ids, {
+        onSuccess: () => toast.success(`Dempyo generated for ${ids.length} orders`),
+        onError: (err) => toast.error(err.message),
+      })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to generate dempyo')
+    }
+  }
 
   const orders = (allOrders ?? []) as OrderRow[]
   const offers = (allOffers ?? []) as OfferRow[]
@@ -399,6 +463,18 @@ export default function OrderListPage() {
                 ))}
               </SelectContent>
             </Select>
+            {statusTab === 'CONFIRMED' && (
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" disabled={invoiceCount === 0} onClick={handleBatchInvoice}>
+                  <Printer className="h-4 w-4 mr-1" />
+                  Print Invoices ({invoiceCount})
+                </Button>
+                <Button variant="outline" size="sm" disabled={dempyoCount === 0} onClick={handleBatchDempyo}>
+                  <FileSpreadsheet className="h-4 w-4 mr-1" />
+                  Print Dempyo ({dempyoCount})
+                </Button>
+              </div>
+            )}
           </div>
 
           {isLoading ? (
