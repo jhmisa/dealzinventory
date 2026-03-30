@@ -52,6 +52,10 @@ export function MediaInput({
   const [uploading, setUploading] = useState<UploadingItem[]>([])
   const [cameraMode, setCameraMode] = useState<'photo' | 'video' | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const videoCameraInputRef = useRef<HTMLInputElement>(null)
+
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
 
   const totalCount = existingMedia.length + uploading.length
   const atLimit = maxFiles != null && totalCount >= maxFiles
@@ -121,13 +125,21 @@ export function MediaInput({
       {!atLimit && !cameraMode && (
         <div className="flex flex-wrap gap-2">
           {showPhotoBtn && (
-            <Button variant="outline" onClick={() => setCameraMode('photo')} className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => isMobile ? cameraInputRef.current?.click() : setCameraMode('photo')}
+              className="gap-2"
+            >
               <Camera className="h-4 w-4" />
               Take Photo
             </Button>
           )}
           {showVideoBtn && (
-            <Button variant="outline" onClick={() => setCameraMode('video')} className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => isMobile ? videoCameraInputRef.current?.click() : setCameraMode('video')}
+              className="gap-2"
+            >
               <Video className="h-4 w-4" />
               Record Video
             </Button>
@@ -147,6 +159,32 @@ export function MediaInput({
               e.target.value = ''
             }}
           />
+          {isMobile && showPhotoBtn && (
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                handleFiles(e.target.files)
+                e.target.value = ''
+              }}
+            />
+          )}
+          {isMobile && showVideoBtn && (
+            <input
+              ref={videoCameraInputRef}
+              type="file"
+              accept="video/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                handleFiles(e.target.files)
+                e.target.value = ''
+              }}
+            />
+          )}
         </div>
       )}
 
