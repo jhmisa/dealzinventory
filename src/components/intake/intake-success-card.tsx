@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { CodeDisplay } from '@/components/shared'
 import { formatPrice } from '@/lib/utils'
+import { printItemLabels } from '@/components/items/label-print'
 
 interface IntakeSuccessCardProps {
   receiptId: string
@@ -60,7 +61,7 @@ export function IntakeSuccessCard({
             <Button asChild variant="outline">
               <Link to={`/admin/receiving-reports/${receiptId}`}>View Receipt</Link>
             </Button>
-            <Button variant="outline" onClick={() => window.print()}>
+            <Button variant="outline" onClick={() => printItemLabels(createdItems.map(i => ({ item_code: i.item_code })))}>
               Print QR Labels
             </Button>
             <Button asChild variant="outline">

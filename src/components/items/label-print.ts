@@ -1,6 +1,6 @@
 import QRCode from 'qrcode'
 
-interface LabelData {
+export interface LabelData {
   item_code: string
   description?: string
 }
@@ -23,44 +23,43 @@ export async function printItemLabel({ item_code, description }: LabelData): Pro
     height: 1.25in;
     display: flex;
     flex-direction: row;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
     padding: 4px 8px;
     font-family: Arial, Helvetica, sans-serif;
+    overflow: hidden;
   }
   .text-col {
     flex: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 2px;
     min-width: 0;
-  }
-  .desc {
     font-size: 8px;
     line-height: 1.2;
     overflow: hidden;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
+    padding-right: 4px;
+    padding-top: 2px;
+  }
+  .right-col {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
   }
   .code {
-    font-size: 11px;
+    font-size: 22px;
     font-weight: bold;
     letter-spacing: 0.5px;
+    white-space: nowrap;
   }
-  .qr { flex-shrink: 0; }
-  .qr img { width: 0.85in; height: 0.85in; }
+  .qr img { width: 0.6in; height: 0.6in; }
 </style>
 </head>
 <body>
-  <div class="text-col">
-    ${description ? `<div class="desc">${escapeHtml(description)}</div>` : ''}
+  ${description ? `<div class="text-col">${escapeHtml(description)}</div>` : ''}
+  <div class="right-col">
     <div class="code">${escapeHtml(item_code)}</div>
-  </div>
-  <div class="qr">
-    <img src="${qrDataUrl}" alt="QR" />
+    <div class="qr">
+      <img src="${qrDataUrl}" alt="QR" />
+    </div>
   </div>
 </body>
 </html>`
@@ -83,10 +82,22 @@ export async function printItemLabel({ item_code, description }: LabelData): Pro
   iframeDoc.write(html)
   iframeDoc.close()
 
-  setTimeout(() => {
-    iframe.contentWindow?.print()
-    setTimeout(() => iframe.remove(), 1000)
-  }, 250)
+  return new Promise<void>((resolve) => {
+    setTimeout(() => {
+      iframe.contentWindow?.print()
+      setTimeout(() => {
+        iframe.remove()
+        resolve()
+      }, 1000)
+    }, 250)
+  })
+}
+
+export async function printItemLabels(items: LabelData[]): Promise<void> {
+  for (const item of items) {
+    await printItemLabel(item)
+    await new Promise(r => setTimeout(r, 500))
+  }
 }
 
 function escapeHtml(str: string): string {
