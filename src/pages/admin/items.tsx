@@ -1,7 +1,7 @@
-import { useRef, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Plus, Printer, QrCode } from 'lucide-react'
+import { Plus, Printer, QrCode, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -11,6 +11,13 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import { PageHeader, SearchBar, DataTable, StatusBadge, GradeBadge, CodeDisplay, PriceDisplay, TableSkeleton } from '@/components/shared'
 import { useItems, useUpdateItem, useItemStatusCounts } from '@/hooks/use-items'
 import { useItemListColumnSettings } from '@/hooks/use-settings'
@@ -46,35 +53,68 @@ const STATUS_TABS = [
   ...ITEM_STATUSES.map((s) => ({ value: s.value, label: s.label })),
 ]
 
-function InlinePriceCell({
+function EditPriceCell({
   itemId,
+  itemCode,
   field,
   value,
   updateItem,
 }: {
   itemId: string
+  itemCode: string
   field: 'selling_price' | 'discount'
   value: number | null
   updateItem: ReturnType<typeof useUpdateItem>
 }) {
-  const inputRef = useRef<HTMLInputElement>(null)
+  const [open, setOpen] = useState(false)
+  const [inputValue, setInputValue] = useState('')
+  const label = field === 'selling_price' ? 'Selling Price' : 'Discount'
+
+  const handleOpen = () => {
+    setInputValue(value != null ? String(value) : '')
+    setOpen(true)
+  }
+
   const handleSave = () => {
-    const raw = inputRef.current?.value ?? ''
-    const parsed = raw === '' ? null : Number(raw)
-    if (parsed === value) return
+    const parsed = inputValue === '' ? null : Number(inputValue)
+    if (parsed === value) { setOpen(false); return }
     if (parsed !== null && isNaN(parsed)) return
     updateItem.mutate({ id: itemId, updates: { [field]: parsed } })
+    setOpen(false)
   }
+
   return (
-    <Input
-      ref={inputRef}
-      type="number"
-      defaultValue={value ?? ''}
-      className="w-[90px] h-7 text-sm"
-      onClick={(e) => e.stopPropagation()}
-      onKeyDown={(e) => { if (e.key === 'Enter') { e.currentTarget.blur() } }}
-      onBlur={handleSave}
-    />
+    <>
+      <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+        <PriceDisplay amount={value} />
+        <button
+          onClick={handleOpen}
+          className="text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded hover:bg-muted"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-[360px]" onClick={(e) => e.stopPropagation()}>
+          <DialogHeader>
+            <DialogTitle>Edit {label}</DialogTitle>
+            <p className="text-sm text-muted-foreground">{itemCode}</p>
+          </DialogHeader>
+          <Input
+            type="number"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            placeholder={`Enter ${label.toLowerCase()}`}
+            autoFocus
+            onKeyDown={(e) => { if (e.key === 'Enter') handleSave() }}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button onClick={handleSave}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
@@ -228,8 +268,9 @@ export default function ItemListPage() {
       id: 'selling_price',
       header: 'Sell',
       cell: ({ row }) => (
-        <InlinePriceCell
+        <EditPriceCell
           itemId={row.original.id}
+          itemCode={row.original.item_code}
           field="selling_price"
           value={row.original.selling_price}
           updateItem={updateItem}
@@ -240,8 +281,9 @@ export default function ItemListPage() {
       id: 'discount',
       header: 'Discount',
       cell: ({ row }) => (
-        <InlinePriceCell
+        <EditPriceCell
           itemId={row.original.id}
+          itemCode={row.original.item_code}
           field="discount"
           value={row.original.discount}
           updateItem={updateItem}
