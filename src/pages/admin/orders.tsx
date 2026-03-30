@@ -189,8 +189,8 @@ export default function OrderListPage() {
 
   const cancelOffer = useCancelOffer()
 
-  const { data: invoiceOrders } = useConfirmedForInvoice()
-  const { data: dempyoOrders } = useConfirmedForDempyo()
+  const { data: invoiceOrders } = useConfirmedForInvoice(statusTab === 'CONFIRMED')
+  const { data: dempyoOrders } = useConfirmedForDempyo(statusTab === 'CONFIRMED')
   const stampInvoice = useStampInvoicePrinted()
   const stampDempyo = useStampDempyoPrinted()
 

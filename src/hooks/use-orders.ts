@@ -171,17 +171,19 @@ export function useCreateManualOrder() {
   })
 }
 
-export function useConfirmedForInvoice() {
+export function useConfirmedForInvoice(enabled = true) {
   return useQuery({
     queryKey: queryKeys.orders.list({ _type: 'invoice-unprinted' }),
     queryFn: () => ordersService.getConfirmedOrdersForInvoice(),
+    enabled,
   })
 }
 
-export function useConfirmedForDempyo() {
+export function useConfirmedForDempyo(enabled = true) {
   return useQuery({
     queryKey: queryKeys.orders.list({ _type: 'dempyo-unprinted' }),
     queryFn: () => ordersService.getConfirmedOrdersForDempyo(),
+    enabled,
   })
 }
 

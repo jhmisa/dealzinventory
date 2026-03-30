@@ -591,7 +591,7 @@ export async function addCreditCardSurcharge(orderId: string, surchargePercent: 
   const feeAmount = Math.round(subtotal * surchargePercent / 100)
   if (feeAmount <= 0) return
 
-  await supabase
+  const { error: insertError } = await supabase
     .from('order_items')
     .insert({
       order_id: orderId,
@@ -601,6 +601,7 @@ export async function addCreditCardSurcharge(orderId: string, surchargePercent: 
       unit_price: feeAmount,
       discount: 0,
     })
+  if (insertError) throw insertError
 
   await recalculateOrderTotal(orderId)
 }
@@ -615,9 +616,12 @@ export async function removeCreditCardSurcharge(orderId: string) {
 
   if (!feeItems || feeItems.length === 0) return
 
-  for (const fee of feeItems) {
-    await supabase.from('order_items').delete().eq('id', fee.id)
-  }
+  const feeIds = feeItems.map(f => f.id)
+  const { error: deleteError } = await supabase
+    .from('order_items')
+    .delete()
+    .in('id', feeIds)
+  if (deleteError) throw deleteError
 
   await recalculateOrderTotal(orderId)
 }
