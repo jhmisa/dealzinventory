@@ -221,7 +221,11 @@ export default function ItemListPage() {
         const descFields = pm?.categories?.description_fields
         let modelLine: string
         if (descFields && descFields.length > 0) {
-          modelLine = buildShortDescription(row.original, descFields) || '—'
+          const resolvedValues: Record<string, unknown> = {}
+          for (const key of descFields) {
+            resolvedValues[key] = (row.original as Record<string, unknown>)[key] ?? (pm as Record<string, unknown> | null)?.[key]
+          }
+          modelLine = buildShortDescription(resolvedValues, descFields) || '—'
         } else {
           const { brand, model_name, cpu, ram_gb, storage_gb, screen_size } = row.original
           const modelName = brand && model_name
