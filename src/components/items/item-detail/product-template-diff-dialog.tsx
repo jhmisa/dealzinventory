@@ -166,7 +166,7 @@ export function ProductTemplateDiffDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
+      <DialogContent className="max-w-lg max-h-[85vh] !grid-rows-none flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle>Apply Product Template</DialogTitle>
         </DialogHeader>
@@ -174,7 +174,7 @@ export function ProductTemplateDiffDialog({
         {fetching ? (
           <div className="py-8 text-center text-sm text-muted-foreground">Loading template...</div>
         ) : (
-          <div className="space-y-4 flex-1 min-h-0">
+          <div className="space-y-4 flex-1 min-h-0 flex flex-col">
             {/* Product hero image + name */}
             <div className="flex items-start gap-4">
               {heroImageUrl ? (
@@ -198,7 +198,7 @@ export function ProductTemplateDiffDialog({
               </div>
             </div>
 
-            <ScrollArea className="max-h-full flex-1">
+            <ScrollArea className="flex-1 min-h-0">
               <div className="space-y-4 pr-3">
                 {/* Conflicts section */}
                 {conflicts.length > 0 && (
