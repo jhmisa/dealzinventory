@@ -8,8 +8,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { AlertTriangle, PackageCheck } from 'lucide-react'
+import { AlertTriangle, ArrowRight, PackageCheck, Sparkles } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { getSpecFieldLabel } from '@/lib/constants'
 import type { Item, ProductModel } from '@/lib/types'
@@ -166,116 +165,124 @@ export function ProductTemplateDiffDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[85vh] !grid-rows-none flex flex-col overflow-hidden">
-        <DialogHeader>
-          <DialogTitle>Apply Product Template</DialogTitle>
-        </DialogHeader>
-
-        {fetching ? (
-          <div className="py-8 text-center text-sm text-muted-foreground">Loading template...</div>
-        ) : (
-          <div className="space-y-4 flex-1 min-h-0 flex flex-col">
-            {/* Product hero image + name */}
-            <div className="flex items-start gap-4">
+      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col overflow-hidden !grid-rows-none p-0">
+        {/* Header with product info */}
+        <div className="px-6 pt-6 pb-4 border-b bg-muted/30 shrink-0">
+          <DialogHeader className="mb-0">
+            <DialogTitle className="text-base">Apply Product Template</DialogTitle>
+          </DialogHeader>
+          {!fetching && product && (
+            <div className="flex items-center gap-3 mt-3">
               {heroImageUrl ? (
                 <img
                   src={heroImageUrl}
                   alt={productLabel}
-                  className="w-24 h-24 rounded-lg object-cover border bg-muted shrink-0"
+                  className="w-12 h-12 rounded-md object-cover border bg-muted shrink-0"
                 />
               ) : (
-                <div className="w-24 h-24 rounded-lg border bg-muted flex items-center justify-center shrink-0">
-                  <PackageCheck className="h-8 w-8 text-muted-foreground" />
+                <div className="w-12 h-12 rounded-md border bg-muted flex items-center justify-center shrink-0">
+                  <PackageCheck className="h-5 w-5 text-muted-foreground" />
                 </div>
               )}
               <div className="min-w-0">
-                <p className="font-medium text-sm">{productLabel}</p>
+                <p className="font-medium text-sm leading-tight">{productLabel}</p>
                 {item.supplier_description && (
-                  <p className="text-xs text-muted-foreground mt-1 line-clamp-3">
+                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
                     Supplier: &quot;{item.supplier_description}&quot;
                   </p>
                 )}
               </div>
             </div>
+          )}
+        </div>
 
-            <ScrollArea className="flex-1 min-h-0">
-              <div className="space-y-4 pr-3">
-                {/* Conflicts section */}
-                {conflicts.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-1.5 text-amber-600">
-                      <AlertTriangle className="h-4 w-4" />
-                      <span className="text-xs font-medium uppercase tracking-wide">
-                        Different values — check to overwrite
-                      </span>
-                    </div>
-                    {conflicts.map((d) => (
-                      <label
-                        key={d.key}
-                        className="flex items-start gap-3 rounded-md border p-3 cursor-pointer hover:bg-muted/50 transition-colors"
-                      >
-                        <Checkbox
-                          checked={checkedFields.has(d.key)}
-                          onCheckedChange={() => toggleField(d.key)}
-                          className="mt-0.5"
-                        />
-                        <div className="flex-1 min-w-0 text-sm">
-                          <span className="font-medium">{d.label}</span>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-muted-foreground line-through">{d.currentValue}</span>
-                            <span className="text-muted-foreground">→</span>
-                            <span className="font-medium">{d.templateValue}</span>
-                          </div>
+        {/* Scrollable content */}
+        {fetching ? (
+          <div className="py-12 text-center text-sm text-muted-foreground">Loading template...</div>
+        ) : (
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
+            {/* Conflicts section */}
+            {conflicts.length > 0 && (
+              <div className="mb-5">
+                <div className="flex items-center gap-1.5 text-amber-600 mb-2.5">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  <span className="text-xs font-semibold uppercase tracking-wider">
+                    Conflicts — check to overwrite
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {conflicts.map((d) => (
+                    <label
+                      key={d.key}
+                      className="flex items-start gap-2.5 rounded-md border border-amber-200 bg-amber-50/50 dark:border-amber-900/40 dark:bg-amber-950/20 p-2.5 cursor-pointer hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors"
+                    >
+                      <Checkbox
+                        checked={checkedFields.has(d.key)}
+                        onCheckedChange={() => toggleField(d.key)}
+                        className="mt-0.5 shrink-0"
+                      />
+                      <div className="min-w-0 text-sm leading-snug">
+                        <span className="font-medium text-xs text-muted-foreground">{d.label}</span>
+                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                          <span className="text-muted-foreground line-through text-xs">{d.currentValue}</span>
+                          <ArrowRight className="h-3 w-3 text-muted-foreground/60 shrink-0" />
+                          <span className="font-medium text-xs">{d.templateValue}</span>
                         </div>
-                      </label>
-                    ))}
-                  </div>
-                )}
-
-                {/* Fills section */}
-                {fills.length > 0 && (
-                  <div className="space-y-2">
-                    <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Empty fields — will be filled
-                    </span>
-                    {fills.map((d) => (
-                      <label
-                        key={d.key}
-                        className="flex items-start gap-3 rounded-md border p-3 cursor-pointer hover:bg-muted/50 transition-colors"
-                      >
-                        <Checkbox
-                          checked={checkedFields.has(d.key)}
-                          onCheckedChange={() => toggleField(d.key)}
-                          className="mt-0.5"
-                        />
-                        <div className="flex-1 min-w-0 text-sm">
-                          <span className="font-medium">{d.label}</span>
-                          <div className="mt-1">
-                            <span className="font-medium">{d.templateValue}</span>
-                          </div>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                )}
-
-                {/* No diffs */}
-                {diffs.length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-4">
-                    No spec changes — the template matches current values.
-                  </p>
-                )}
+                      </div>
+                    </label>
+                  ))}
+                </div>
               </div>
-            </ScrollArea>
+            )}
+
+            {/* Fills section */}
+            {fills.length > 0 && (
+              <div>
+                <div className="flex items-center gap-1.5 text-muted-foreground mb-2.5">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span className="text-xs font-semibold uppercase tracking-wider">
+                    New values
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {fills.map((d) => (
+                    <label
+                      key={d.key}
+                      className="flex items-start gap-2.5 rounded-md border p-2.5 cursor-pointer hover:bg-muted/50 transition-colors"
+                    >
+                      <Checkbox
+                        checked={checkedFields.has(d.key)}
+                        onCheckedChange={() => toggleField(d.key)}
+                        className="mt-0.5 shrink-0"
+                      />
+                      <div className="min-w-0 text-sm leading-snug">
+                        <span className="font-medium text-xs text-muted-foreground">{d.label}</span>
+                        <div className="mt-0.5">
+                          <span className="font-medium text-xs">{d.templateValue}</span>
+                        </div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* No diffs */}
+            {diffs.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                No spec changes — the template matches current values.
+              </p>
+            )}
           </div>
         )}
 
-        <DialogFooter>
+        {/* Footer — always visible */}
+        <DialogFooter className="px-6 py-4 border-t bg-muted/30 shrink-0">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
             Cancel
           </Button>
           <Button onClick={handleApply} disabled={loading || fetching}>
-            {loading ? 'Applying...' : 'Apply Template'}
+            {loading ? 'Applying...' : `Apply Template${checkedFields.size > 0 ? ` (${checkedFields.size})` : ''}`}
           </Button>
         </DialogFooter>
       </DialogContent>
