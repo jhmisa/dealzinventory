@@ -123,6 +123,7 @@ export const queryKeys = {
   settings: {
     all: ['settings'] as const,
     itemListColumns: () => [...queryKeys.settings.all, 'item-list-columns'] as const,
+    system: (key: string) => [...queryKeys.settings.all, 'system', key] as const,
   },
   postalCodes: {
     all: ['postal-codes'] as const,
