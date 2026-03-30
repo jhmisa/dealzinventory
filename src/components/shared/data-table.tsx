@@ -85,11 +85,17 @@ export function DataTable<TData, TValue>({
                         onMouseDown={header.getResizeHandler()}
                         onTouchStart={header.getResizeHandler()}
                         onClick={(e) => e.stopPropagation()}
-                        className={`absolute right-0 top-0 h-full w-1 cursor-col-resize select-none touch-none hover:bg-border ${
-                          header.column.getIsResizing() ? 'bg-primary w-1' : ''
-                        }`}
-                        style={{ padding: '0 4px', marginRight: '-4px' }}
-                      />
+                        className="absolute right-0 top-0 h-full cursor-col-resize select-none touch-none group/resize"
+                        style={{ width: '12px', marginRight: '-6px', zIndex: 1 }}
+                      >
+                        <div
+                          className={`mx-auto h-full w-[2px] transition-colors ${
+                            header.column.getIsResizing()
+                              ? 'bg-primary'
+                              : 'bg-border/40 group-hover/resize:bg-border group-hover/resize:w-[3px]'
+                          }`}
+                        />
+                      </div>
                     )}
                   </TableHead>
                 ))}
@@ -107,7 +113,7 @@ export function DataTable<TData, TValue>({
                   {row.getVisibleCells().map((cell) => (
                     <TableCell
                       key={cell.id}
-                      style={enableColumnResizing ? { width: cell.column.getSize(), overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } : undefined}
+                      style={enableColumnResizing ? { width: cell.column.getSize(), wordBreak: 'break-word' } : undefined}
                     >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
