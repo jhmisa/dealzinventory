@@ -26,6 +26,7 @@ import {
   useCancelOrder,
   useAvailableItems,
   useAddOrderLineItem,
+  useStampInvoicePrinted,
 } from '@/hooks/use-orders'
 import * as ordersService from '@/services/orders'
 import { printInvoice } from '@/components/orders/invoice-pdf'
@@ -110,6 +111,7 @@ export default function OrderDetailPage() {
   const removeLineItem = useRemoveOrderLineItem()
   const recalcTotal = useRecalculateOrderTotal()
   const updateOrder = useUpdateOrder()
+  const stampInvoice = useStampInvoicePrinted()
   const { data: auditLogs } = useOrderAuditLogs(id!)
 
   const [cancelOpen, setCancelOpen] = useState(false)
@@ -118,6 +120,7 @@ export default function OrderDetailPage() {
   const [editingItems, setEditingItems] = useState<Record<string, EditingItem>>({})
   const [editShippingCost, setEditShippingCost] = useState(0)
   const [editTrackingNumber, setEditTrackingNumber] = useState('')
+  const [editDeliveryBoxCount, setEditDeliveryBoxCount] = useState(1)
   const [showAuditLog, setShowAuditLog] = useState(false)
   const [removeConfirmId, setRemoveConfirmId] = useState<string | null>(null)
   const [addItemSearch, setAddItemSearch] = useState('')
@@ -176,6 +179,9 @@ export default function OrderDetailPage() {
   const trackingNumber = (order as Record<string, unknown>).tracking_number as string | null
   const packedDate = (order as Record<string, unknown>).packed_date as string | null
   const packedBy = (order as Record<string, unknown>).packed_by as string | null
+  const deliveryBoxCount = ((order as Record<string, unknown>).delivery_box_count as number) ?? 1
+  const invoicePrintedAt = (order as Record<string, unknown>).invoice_printed_at as string | null
+  const dempyoPrintedAt = (order as Record<string, unknown>).dempyo_printed_at as string | null
   const timeSlot = YAMATO_TIME_SLOTS.find(s => s.code === deliveryTimeCode)
 
   // Compute totals from line items
@@ -190,6 +196,7 @@ export default function OrderDetailPage() {
     setEditingItems(items)
     setEditShippingCost(shippingCost)
     setEditTrackingNumber(trackingNumber ?? '')
+    setEditDeliveryBoxCount(deliveryBoxCount)
     setIsEditing(true)
   }
 
@@ -222,6 +229,9 @@ export default function OrderDetailPage() {
       }
       if (editTrackingNumber !== (trackingNumber ?? '')) {
         orderUpdates.tracking_number = editTrackingNumber || null
+      }
+      if (editDeliveryBoxCount !== deliveryBoxCount) {
+        orderUpdates.delivery_box_count = editDeliveryBoxCount
       }
       if (Object.keys(orderUpdates).length > 0) {
         await updateOrder.mutateAsync({ id: order.id, updates: orderUpdates })
@@ -432,7 +442,10 @@ export default function OrderDetailPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => printInvoice({ order: order as Parameters<typeof printInvoice>[0]['order'], salesAgent: displayName ?? '' })}
+                  onClick={() => {
+                    printInvoice({ order: order as Parameters<typeof printInvoice>[0]['order'], salesAgent: displayName ?? '' })
+                    stampInvoice.mutate([order.id])
+                  }}
                 >
                   <Printer className="h-4 w-4 mr-1" />
                   Print Invoice
@@ -542,6 +555,18 @@ export default function OrderDetailPage() {
             <div className="flex justify-between"><span className="text-muted-foreground">Quantity</span><span>{order.quantity}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Total</span><PriceDisplay amount={order.total_price} /></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Created</span><span>{formatDateTime(order.created_at)}</span></div>
+            {invoicePrintedAt && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Invoice Printed</span>
+                <span className="text-sm">{formatDateTime(invoicePrintedAt)}</span>
+              </div>
+            )}
+            {dempyoPrintedAt && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Dempyo Printed</span>
+                <span className="text-sm">{formatDateTime(dempyoPrintedAt)}</span>
+              </div>
+            )}
             {orderNotes && (
               <div className="pt-2 border-t">
                 <p className="text-muted-foreground text-xs mb-1">Notes</p>
@@ -647,6 +672,21 @@ export default function OrderDetailPage() {
                 />
               ) : (
                 <span>{trackingNumber ?? '—'}</span>
+              )}
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground">Delivery Boxes</span>
+              {isEditing ? (
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  className="w-20 text-right border rounded px-2 py-1 text-sm"
+                  value={editDeliveryBoxCount}
+                  onChange={(e) => setEditDeliveryBoxCount(parseInt(e.target.value) || 1)}
+                />
+              ) : (
+                <span>{deliveryBoxCount}</span>
               )}
             </div>
             {sg && (
