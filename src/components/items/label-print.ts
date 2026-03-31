@@ -30,9 +30,10 @@ export async function printItemLabel({ item_code, description }: LabelData): Pro
   .text-col {
     flex: 1;
     min-width: 0;
-    font-size: 8px;
-    line-height: 1.2;
+    font-size: 10px;
+    line-height: 1.3;
     overflow: hidden;
+    word-break: break-word;
     padding-right: 4px;
     padding-top: 2px;
   }
@@ -135,9 +136,10 @@ export async function printItemLabels(items: LabelData[]): Promise<void> {
   .text-col {
     flex: 1;
     min-width: 0;
-    font-size: 8px;
-    line-height: 1.2;
+    font-size: 10px;
+    line-height: 1.3;
     overflow: hidden;
+    word-break: break-word;
     padding-right: 4px;
     padding-top: 2px;
   }

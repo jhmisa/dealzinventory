@@ -97,29 +97,10 @@ export default function ReceivingReportDetailPage() {
             onClick={() => {
               if (!items) return
               printItemLabels(
-                items.map((item: Item) => {
-                  const pm = item.product_models
-                  const descFields = pm?.categories?.description_fields
-                  let desc: string | undefined
-                  if (item.brand && item.model_name) {
-                    const parts = [item.brand, item.model_name]
-                    if (descFields && descFields.length > 0) {
-                      const resolved: Record<string, unknown> = {}
-                      for (const key of descFields) {
-                        resolved[key] = (item as Record<string, unknown>)[key] ?? (pm as Record<string, unknown> | null)?.[key]
-                      }
-                      const config = buildShortDescription(resolved, descFields)
-                      if (config) parts.push(config)
-                    } else {
-                      const config = [item.cpu, item.ram_gb, item.storage_gb].filter(Boolean).join('/')
-                      if (config) parts.push(config)
-                    }
-                    desc = parts.join(' ')
-                  } else {
-                    desc = item.supplier_description || undefined
-                  }
-                  return { item_code: item.item_code, description: desc }
-                })
+                items.map((item: Item) => ({
+                  item_code: item.item_code,
+                  description: item.supplier_description || undefined,
+                }))
               )
             }}
           >
