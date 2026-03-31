@@ -256,7 +256,7 @@ export default function BulkIntakePage() {
     totalCost: number
     pCodeRangeStart: string
     pCodeRangeEnd: string
-    items: Array<{ id: string; item_code: string }>
+    items: Array<{ id: string; item_code: string; description?: string }>
   } | null>(null)
 
   // Persist draft to sessionStorage
@@ -446,7 +446,14 @@ export default function BulkIntakePage() {
         totalCost: result.total_cost,
         pCodeRangeStart: result.p_code_range_start,
         pCodeRangeEnd: result.p_code_range_end,
-        items: result.items,
+        items: result.items.map((item) => {
+          const lineItem = lineItems[item.line_number - 1]
+          return {
+            id: item.id,
+            item_code: item.item_code,
+            description: lineItem?.product_description,
+          }
+        }),
       })
       setStep('success')
       setConfirmDialogOpen(false)

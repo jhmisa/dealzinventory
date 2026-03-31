@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, Download, Plus, ChevronDown, ChevronRight, FileImage } from 'lucide-react'
+import { ArrowLeft, Download, Plus, ChevronDown, ChevronRight, FileImage, Printer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -13,6 +13,7 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
 import { generateReceiptPdf } from '@/components/intake/receipt-pdf'
+import { printItemLabels } from '@/components/items/label-print'
 import { useIntakeReceipt, useReceiptItems, useReceiptAdjustments } from '@/hooks/use-intake-receipts'
 import { getInvoiceSignedUrl } from '@/services/intake-receipts'
 import { formatDate, formatDateTime, formatPrice, buildShortDescription } from '@/lib/utils'
@@ -89,7 +90,42 @@ export default function ReceivingReportDetailPage() {
           title={receipt.receipt_code}
           description="Receiving Report Detail"
         />
-        <div className="ml-auto">
+        <div className="ml-auto flex gap-2">
+          <Button
+            variant="outline"
+            disabled={!items || items.length === 0}
+            onClick={() => {
+              if (!items) return
+              printItemLabels(
+                items.map((item: Item) => {
+                  const pm = item.product_models
+                  const descFields = pm?.categories?.description_fields
+                  let desc: string | undefined
+                  if (item.brand && item.model_name) {
+                    const parts = [item.brand, item.model_name]
+                    if (descFields && descFields.length > 0) {
+                      const resolved: Record<string, unknown> = {}
+                      for (const key of descFields) {
+                        resolved[key] = (item as Record<string, unknown>)[key] ?? (pm as Record<string, unknown> | null)?.[key]
+                      }
+                      const config = buildShortDescription(resolved, descFields)
+                      if (config) parts.push(config)
+                    } else {
+                      const config = [item.cpu, item.ram_gb, item.storage_gb].filter(Boolean).join('/')
+                      if (config) parts.push(config)
+                    }
+                    desc = parts.join(' ')
+                  } else {
+                    desc = item.supplier_description || undefined
+                  }
+                  return { item_code: item.item_code, description: desc }
+                })
+              )
+            }}
+          >
+            <Printer className="h-4 w-4 mr-2" />
+            Print QR Labels
+          </Button>
           <Button variant="outline" onClick={handleDownloadPdf}>
             <Download className="h-4 w-4 mr-2" />
             Download PDF

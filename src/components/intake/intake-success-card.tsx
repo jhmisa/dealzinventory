@@ -14,7 +14,7 @@ interface IntakeSuccessCardProps {
   totalCost: number
   pCodeRangeStart: string
   pCodeRangeEnd: string
-  createdItems: Array<{ id: string; item_code: string }>
+  createdItems: Array<{ id: string; item_code: string; description?: string }>
   onReset: () => void
 }
 
@@ -61,7 +61,7 @@ export function IntakeSuccessCard({
             <Button asChild variant="outline">
               <Link to={`/admin/receiving-reports/${receiptId}`}>View Receipt</Link>
             </Button>
-            <Button variant="outline" onClick={() => printItemLabels(createdItems.map(i => ({ item_code: i.item_code })))}>
+            <Button variant="outline" onClick={() => printItemLabels(createdItems.map(i => ({ item_code: i.item_code, description: i.description })))}>
               Print QR Labels
             </Button>
             <Button asChild variant="outline">
