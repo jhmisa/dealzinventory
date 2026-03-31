@@ -95,10 +95,10 @@ export function ProductPicker({ value, onSelect, products, initialSearch, onCrea
           <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[280px] p-0" align="start">
+      <PopoverContent className="w-[420px] p-0" align="start">
         <Command>
           <CommandInput value={search} onValueChange={setSearch} placeholder="Search products..." className="h-8 text-xs" />
-          <CommandList className="max-h-[250px]">
+          <CommandList className="max-h-[350px]">
             <CommandEmpty>
               <div className="py-2 text-center">
                 <p className="text-sm text-muted-foreground">No products found.</p>
@@ -137,7 +137,7 @@ export function ProductPicker({ value, onSelect, products, initialSearch, onCrea
               {products.map((product) => (
                 <CommandItem
                   key={product.id}
-                  value={`${product.brand} ${product.model_name} ${product.short_description ?? ''} ${product.color}`}
+                  value={`${product.brand} ${product.model_name} ${product.short_description ?? ''} ${product.color} ${product.cpu ?? ''} ${product.ram_gb ?? ''} ${product.storage_gb ?? ''}`}
                   onSelect={() => {
                     onSelect(product.id)
                     setOpen(false)
@@ -162,12 +162,26 @@ export function ProductPicker({ value, onSelect, products, initialSearch, onCrea
                       </div>
                     )}
                     <div className="min-w-0">
-                      <div className="text-xs font-medium truncate">
+                      <div className="text-xs font-medium">
                         {product.brand} {product.model_name}
                       </div>
-                      <div className="text-xs text-muted-foreground truncate">
+                      <div className="text-xs text-muted-foreground">
                         {product.short_description || product.color}
                       </div>
+                      {(() => {
+                        const specs = [
+                          product.cpu,
+                          product.ram_gb ? `${product.ram_gb}GB` : null,
+                          product.storage_gb ? `${product.storage_gb}GB` : null,
+                          product.screen_size ? `${product.screen_size}"` : null,
+                          product.short_description ? product.color : null,
+                        ].filter(Boolean)
+                        return specs.length > 0 ? (
+                          <div className="text-[11px] text-muted-foreground/70">
+                            {specs.join(' · ')}
+                          </div>
+                        ) : null
+                      })()}
                     </div>
                   </div>
                 </CommandItem>
