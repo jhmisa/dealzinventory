@@ -3,6 +3,23 @@ import { fetchFile, toBlobURL } from '@ffmpeg/util'
 import { VIDEO_SPECS } from './config'
 import { getImageFormat } from './detect-format'
 
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`Timeout: ${label} exceeded ${ms}ms`)), ms),
+    ),
+  ])
+}
+
+function isIOSSafari(): boolean {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent
+  const isIOS = /iPad|iPhone|iPod/.test(ua) ||
+    (ua.includes('Macintosh') && navigator.maxTouchPoints > 1)
+  return isIOS
+}
+
 export interface ProcessedVideo {
   video: Blob
   thumbnail: Blob
@@ -22,9 +39,15 @@ export async function loadFFmpeg(): Promise<FFmpeg> {
       try {
         const ffmpeg = new FFmpeg()
         const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd'
-        const coreURL = await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript')
-        const wasmURL = await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm')
-        await ffmpeg.load({ coreURL, wasmURL })
+        const coreURL = await withTimeout(
+          toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+          15_000, 'FFmpeg core.js fetch',
+        )
+        const wasmURL = await withTimeout(
+          toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+          15_000, 'FFmpeg core.wasm fetch',
+        )
+        await withTimeout(ffmpeg.load({ coreURL, wasmURL }), 15_000, 'FFmpeg load')
         ffmpegInstance = ffmpeg
       } catch (e) {
         console.error('[video] FFmpeg load failed:', e)
@@ -194,12 +217,16 @@ async function processVideoCanvas(
 
     const stream = (canvas as HTMLCanvasElement & { captureStream(fps: number): MediaStream }).captureStream(30)
 
-    // Pick best available codec
-    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
-      ? 'video/webm;codecs=vp9'
-      : MediaRecorder.isTypeSupported('video/webm')
-        ? 'video/webm'
-        : (() => { throw new Error('No suitable MediaRecorder MIME type for canvas fallback') })()
+    // Pick best available codec — try MP4 first for Safari compatibility
+    const mimeType = MediaRecorder.isTypeSupported('video/mp4;codecs=avc1')
+      ? 'video/mp4;codecs=avc1'
+      : MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+        ? 'video/webm;codecs=vp9'
+        : MediaRecorder.isTypeSupported('video/webm')
+          ? 'video/webm'
+          : MediaRecorder.isTypeSupported('video/mp4')
+            ? 'video/mp4'
+            : (() => { throw new Error('No suitable MediaRecorder MIME type for canvas fallback') })()
 
     const recorder = new MediaRecorder(stream, {
       mimeType,
@@ -259,7 +286,7 @@ async function processVideoCanvas(
       thumbnail,
       id,
       duration: effectiveDuration,
-      format: 'webm',
+      format: mimeType.includes('mp4') ? 'mp4' : 'webm',
     }
   } finally {
     video.pause()
@@ -268,15 +295,43 @@ async function processVideoCanvas(
   }
 }
 
+function createPlaceholderThumbnail(): Blob {
+  const canvas = document.createElement('canvas')
+  canvas.width = 256
+  canvas.height = 256
+  const ctx = canvas.getContext('2d')!
+  ctx.fillStyle = '#1a1a2e'
+  ctx.fillRect(0, 0, 256, 256)
+  // Draw play icon
+  ctx.fillStyle = '#ffffff'
+  ctx.beginPath()
+  ctx.moveTo(96, 64)
+  ctx.lineTo(96, 192)
+  ctx.lineTo(192, 128)
+  ctx.closePath()
+  ctx.fill()
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.8)
+  const binary = atob(dataUrl.split(',')[1])
+  const arr = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i)
+  return new Blob([arr], { type: 'image/jpeg' })
+}
+
 export async function tryProcessVideo(
   file: File | Blob,
   onProgress?: (progress: number) => void,
 ): Promise<ProcessedVideo> {
-  // Tier 1: FFmpeg WASM
-  try {
-    return await processVideo(file, onProgress)
-  } catch (err) {
-    console.warn('[video] FFmpeg processing failed, trying canvas fallback:', err)
+  const ios = isIOSSafari()
+
+  // Tier 1: FFmpeg WASM (skip on iOS — hangs with HEVC/WASM limits)
+  if (!ios) {
+    try {
+      return await processVideo(file, onProgress)
+    } catch (err) {
+      console.warn('[video] FFmpeg processing failed, trying canvas fallback:', err)
+    }
+  } else {
+    console.log('[video] iOS detected, skipping FFmpeg WASM tier')
   }
 
   // Tier 2: Canvas + MediaRecorder
@@ -287,7 +342,16 @@ export async function tryProcessVideo(
   }
 
   // Tier 3: Raw upload
-  const thumbnail = await extractThumbnailFromVideo(file)
+  let thumbnail: Blob
+  try {
+    thumbnail = await withTimeout(
+      extractThumbnailFromVideo(file),
+      10_000, 'Tier 3 thumbnail extraction',
+    )
+  } catch (err) {
+    console.warn('[video] Thumbnail extraction failed, using placeholder:', err)
+    thumbnail = createPlaceholderThumbnail()
+  }
   const ext = file instanceof File ? (file.name.split('.').pop() ?? 'mp4') : 'mp4'
   return {
     video: file instanceof Blob ? file : new Blob([file]),
@@ -321,16 +385,19 @@ export async function processVideo(
 
     const vf = `scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height}`
 
-    const exitCode = await ffmpeg.exec([
-      '-i', inputName,
-      '-an',
-      '-vf', vf,
-      '-c:v', codec,
-      '-crf', String(crf),
-      '-t', String(maxDurationSec),
-      '-movflags', '+faststart',
-      outputName,
-    ])
+    const exitCode = await withTimeout(
+      ffmpeg.exec([
+        '-i', inputName,
+        '-an',
+        '-vf', vf,
+        '-c:v', codec,
+        '-crf', String(crf),
+        '-t', String(maxDurationSec),
+        '-movflags', '+faststart',
+        outputName,
+      ]),
+      60_000, 'FFmpeg exec',
+    )
 
     if (exitCode !== 0) {
       throw new Error(`FFmpeg exited with code ${exitCode}`)

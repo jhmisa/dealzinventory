@@ -410,7 +410,8 @@ export function UnifiedGalleryCard({ item, productMedia, itemMedia }: UnifiedGal
     }
     recorder.onstop = () => {
       const blob = new Blob(chunksRef.current, { type: mimeType })
-      const file = new File([blob], `recording_${Date.now()}.webm`, { type: mimeType })
+      const ext = mimeType.includes('webm') ? 'webm' : 'mp4'
+      const file = new File([blob], `recording_${Date.now()}.${ext}`, { type: mimeType })
       closeVideoCamera()
       handleVideoFile(file)
     }
