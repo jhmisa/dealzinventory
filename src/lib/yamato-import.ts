@@ -75,12 +75,10 @@ function normalizeTrackingNumber(raw: string): string | null {
  * Yamato CSVs are typically Shift-JIS encoded.
  */
 export function parseYamatoTrackingCsv(buffer: ArrayBuffer): YamatoParseResult {
-  // Try Shift-JIS first, fall back to UTF-8
-  let text: string
-  try {
+  // Try UTF-8 first; if it contains replacement chars (garbled), fall back to Shift-JIS
+  let text = new TextDecoder('utf-8').decode(buffer)
+  if (text.includes('\uFFFD')) {
     text = new TextDecoder('shift-jis').decode(buffer)
-  } catch {
-    text = new TextDecoder('utf-8').decode(buffer)
   }
 
   const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0)
