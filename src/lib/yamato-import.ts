@@ -94,7 +94,7 @@ export function parseYamatoTrackingCsv(buffer: ArrayBuffer): YamatoParseResult {
 
     const rawTracking = fields[3] ?? ''
     const rawPCode = (fields[27] ?? '').trim()
-    const rawOrderCode = (fields[29] ?? '').trim()
+    const rawOrderCode = (fields[28] ?? '').trim()
 
     const trackingNumber = normalizeTrackingNumber(rawTracking)
     if (!trackingNumber) {
