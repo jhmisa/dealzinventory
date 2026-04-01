@@ -35,7 +35,8 @@ const STATUS_MAP: Record<string, string> = {
 
 const ISSUE_STATUSES = new Set(['FAILED_ATTEMPT', 'HELD_AT_DEPOT', 'INVESTIGATING', 'RETURNED'])
 
-const YAMATO_URL = 'https://toi.kuronekoyamato.co.jp/cgi-bin/tneko'
+const YAMATO_PROXY_URL = Deno.env.get('YAMATO_PROXY_URL') ?? ''
+const YAMATO_PROXY_KEY = Deno.env.get('YAMATO_PROXY_KEY') ?? ''
 
 /**
  * Parse the Yamato tracking HTML response.
@@ -121,17 +122,31 @@ Deno.serve(async (req) => {
       formParams.set(key, orders[i].tracking_number);
     }
 
-    // POST to Yamato
+    // Fetch via Vercel proxy (Yamato's TLS requires RSA ciphers unsupported by Deno/rustls)
+    if (!YAMATO_PROXY_URL) {
+      return jsonResponse({ error: 'YAMATO_PROXY_URL not configured' });
+    }
+
     let html: string;
     try {
-      const yamatoRes = await fetch(YAMATO_URL, {
+      const proxyRes = await fetch(YAMATO_PROXY_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: formParams.toString(),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': YAMATO_PROXY_KEY,
+        },
+        body: JSON.stringify({ formBody: formParams.toString() }),
       });
-      html = await yamatoRes.text();
+
+      if (!proxyRes.ok) {
+        const errData = await proxyRes.json().catch(() => ({}));
+        return jsonResponse({ error: `Proxy error: ${(errData as Record<string, string>).error ?? proxyRes.statusText}` });
+      }
+
+      const proxyData = await proxyRes.json() as { html: string };
+      html = proxyData.html;
     } catch (fetchErr) {
-      const message = fetchErr instanceof Error ? fetchErr.message : 'Failed to reach Yamato';
+      const message = fetchErr instanceof Error ? fetchErr.message : 'Failed to reach proxy';
       return jsonResponse({ error: `Yamato fetch failed: ${message}` });
     }
 
