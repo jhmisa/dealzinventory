@@ -21,12 +21,14 @@ interface TrackingResult {
 }
 
 // Map Japanese Yamato status text → our status enum
+// Ordered longest-first so substring matches (e.g. 発送 vs 発送済み) prefer the longer key
 const STATUS_MAP: Record<string, string> = {
   '荷物受付': 'ACCEPTED',
   '発送済み': 'IN_TRANSIT',
+  '発送': 'IN_TRANSIT',
   '輸送中': 'IN_TRANSIT',
-  '配達中': 'OUT_FOR_DELIVERY',
   '配達完了': 'DELIVERED',
+  '配達中': 'OUT_FOR_DELIVERY',
   '持戻': 'FAILED_ATTEMPT',
   '保管中': 'HELD_AT_DEPOT',
   '調査中': 'INVESTIGATING',
@@ -82,10 +84,15 @@ function parseYamatoResponse(html: string, trackingNumbers: string[]): Map<strin
       }
     }
 
-    // Fallback: search for known status keywords in the block
+    // Fallback: search for known status keywords in the block.
+    // Use the LAST occurrence by position in the HTML (most recent event)
+    // rather than iterating the map in insertion order.
     if (!lastStatus) {
+      let lastIndex = -1
       for (const [jpStatus, enStatus] of Object.entries(STATUS_MAP)) {
-        if (block.includes(jpStatus)) {
+        const idx = block.lastIndexOf(jpStatus)
+        if (idx > lastIndex) {
+          lastIndex = idx
           lastStatus = enStatus
         }
       }
