@@ -646,6 +646,11 @@ export async function checkYamatoTracking(orderId: string, trackingNumber: strin
 
   if (error) throw error
   if (data?.error) throw new Error(data.error)
+  // Check per-order errors in results array
+  const results = data?.results as Array<{ error?: string; yamato_status?: string | null }> | undefined
+  if (results?.length === 1 && results[0].error && !results[0].yamato_status) {
+    throw new Error(results[0].error)
+  }
   return data
 }
 

@@ -50,19 +50,24 @@ function parseYamatoResponse(html: string, trackingNumbers: string[]): Map<strin
   const results = new Map<string, string | null>()
 
   for (const tn of trackingNumbers) {
-    // Find the section for this tracking number
-    const tnIndex = html.indexOf(tn)
+    // Yamato displays tracking numbers with hyphens (e.g. "3803-3191-3824")
+    // so search for both the raw number and the hyphenated format
+    const hyphenated = tn.replace(/(\d{4})(\d{4})(\d{4})/, '$1-$2-$3')
+    let tnIndex = html.indexOf(hyphenated)
+    const searchLen = tnIndex !== -1 ? hyphenated.length : tn.length
+    if (tnIndex === -1) {
+      tnIndex = html.indexOf(tn)
+    }
     if (tnIndex === -1) {
       results.set(tn, null)
       continue
     }
 
-    // Scope: from the tracking number to the next tracking number or end
-    // Look for the next 12-digit number pattern (another tracking number section)
+    // Scope: from the tracking number to the next tracking-invoice-block or end
     const afterTn = html.substring(tnIndex)
-    const nextTnMatch = afterTn.substring(tn.length).search(/\d{12}/)
-    const block = nextTnMatch !== -1
-      ? afterTn.substring(0, tn.length + nextTnMatch)
+    const nextBlockMatch = afterTn.substring(searchLen).search(/tracking-invoice-block-title/)
+    const block = nextBlockMatch !== -1
+      ? afterTn.substring(0, searchLen + nextBlockMatch)
       : afterTn
 
     // Extract all <div class="item">STATUS</div> entries
