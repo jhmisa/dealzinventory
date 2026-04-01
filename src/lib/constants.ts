@@ -132,7 +132,7 @@ export const ORDER_SOURCES: { value: OrderSource; label: string }[] = [
   { value: 'YOUTUBE', label: 'YouTube' },
 ]
 
-export const YAMATO_TRACKING_URL = 'https://toi.kuronekoyamato.co.jp/cgi-bin/tneko'
+export const YAMATO_TRACKING_URL = 'https://member.kms.kuronekoyamato.co.jp/parcel/detail'
 
 export type YamatoDeliveryStatus = 'ACCEPTED' | 'IN_TRANSIT' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'FAILED_ATTEMPT' | 'HELD_AT_DEPOT' | 'INVESTIGATING' | 'RETURNED'
 

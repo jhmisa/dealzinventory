@@ -811,7 +811,7 @@ export default function OrderDetailPage() {
                 />
               ) : trackingNumber ? (
                 <a
-                  href={`${YAMATO_TRACKING_URL}?number00=1&number01=${trackingNumber}`}
+                  href={`${YAMATO_TRACKING_URL}?pno=${trackingNumber}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-blue-600 hover:underline inline-flex items-center gap-1"

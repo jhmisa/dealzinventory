@@ -39,52 +39,48 @@ const YAMATO_URL = 'https://toi.kuronekoyamato.co.jp/cgi-bin/tneko'
 
 /**
  * Parse the Yamato tracking HTML response.
- * The response contains PRINT_N() JS functions with swd.writeln() calls.
- * Each tracking number gets its own PRINT_N block (N = 01..10).
- * Status rows are in <td> cells within the writeln lines.
+ * The CGI response contains semantic HTML with tracking events:
+ *   <div class="item">STATUS</div>
+ *   <div class="date">MM月DD日 HH:MM</div>
+ * We extract all <div class="item"> entries per tracking number
+ * and take the LAST one as the current status.
  */
 function parseYamatoResponse(html: string, trackingNumbers: string[]): Map<string, string | null> {
   const results = new Map<string, string | null>()
 
-  for (let i = 0; i < trackingNumbers.length; i++) {
-    const tn = trackingNumbers[i]
-    const blockIndex = String(i + 1).padStart(2, '0')
-
-    // Find the PRINT_N function block
-    const funcName = `PRINT_${blockIndex}`
-    const funcStart = html.indexOf(`function ${funcName}`)
-    if (funcStart === -1) {
+  for (const tn of trackingNumbers) {
+    // Find the section for this tracking number
+    const tnIndex = html.indexOf(tn)
+    if (tnIndex === -1) {
       results.set(tn, null)
       continue
     }
 
-    // Find end of function (next function or end of script)
-    const nextFuncPattern = /function PRINT_\d{2}/g
-    nextFuncPattern.lastIndex = funcStart + 1
-    const nextMatch = nextFuncPattern.exec(html)
-    const funcEnd = nextMatch ? nextMatch.index : html.length
-    const block = html.substring(funcStart, funcEnd)
+    // Scope: from the tracking number to the next tracking number or end
+    // Look for the next 12-digit number pattern (another tracking number section)
+    const afterTn = html.substring(tnIndex)
+    const nextTnMatch = afterTn.substring(tn.length).search(/\d{12}/)
+    const block = nextTnMatch !== -1
+      ? afterTn.substring(0, tn.length + nextTnMatch)
+      : afterTn
 
-    // Extract status from the tracking detail rows
-    // Look for status text in <td> cells within swd.writeln lines
-    // The status is typically in the first <td> of each tracking event row
-    const statusPattern = /swd\.writeln\([^)]*<td[^>]*>([^<]+)<\/td>/g
+    // Extract all <div class="item">STATUS</div> entries
+    const itemPattern = /<div\s+class="item">\s*([^<]+?)\s*<\/div>/g
     let lastStatus: string | null = null
     let match: RegExpExecArray | null
 
-    while ((match = statusPattern.exec(block)) !== null) {
-      const cellText = match[1].trim()
-      if (STATUS_MAP[cellText]) {
-        lastStatus = STATUS_MAP[cellText]
+    while ((match = itemPattern.exec(block)) !== null) {
+      const statusText = match[1].trim()
+      if (STATUS_MAP[statusText]) {
+        lastStatus = STATUS_MAP[statusText]
       }
     }
 
-    // If no match with first pattern, try a broader approach
+    // Fallback: search for known status keywords in the block
     if (!lastStatus) {
-      // Look for known status keywords anywhere in the block
       for (const [jpStatus, enStatus] of Object.entries(STATUS_MAP)) {
         if (block.includes(jpStatus)) {
-          lastStatus = enStatus // Keep overwriting — last match is most recent
+          lastStatus = enStatus
         }
       }
     }
