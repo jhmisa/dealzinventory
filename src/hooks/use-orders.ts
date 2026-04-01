@@ -207,6 +207,24 @@ export function useStampDempyoPrinted() {
   })
 }
 
+export function useCheckYamatoTracking() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ orderId, trackingNumber }: { orderId: string; trackingNumber: string }) =>
+      ordersService.checkYamatoTracking(orderId, trackingNumber),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all })
+    },
+  })
+}
+
+export function useDeliveryIssueOrders() {
+  return useQuery({
+    queryKey: queryKeys.orders.list({ _type: 'delivery-issues' }),
+    queryFn: () => ordersService.getDeliveryIssueOrders(),
+  })
+}
+
 export function useBulkApplyTracking() {
   const queryClient = useQueryClient()
   return useMutation({

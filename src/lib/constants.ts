@@ -132,6 +132,26 @@ export const ORDER_SOURCES: { value: OrderSource; label: string }[] = [
   { value: 'YOUTUBE', label: 'YouTube' },
 ]
 
+export const YAMATO_TRACKING_URL = 'https://toi.kuronekoyamato.co.jp/cgi-bin/tneko'
+
+export type YamatoDeliveryStatus = 'ACCEPTED' | 'IN_TRANSIT' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'FAILED_ATTEMPT' | 'HELD_AT_DEPOT' | 'INVESTIGATING' | 'RETURNED'
+
+export const YAMATO_DELIVERY_STATUSES: Record<YamatoDeliveryStatus, { label: string; label_en: string; color: string }> = {
+  ACCEPTED:         { label: '受付済',   label_en: 'Accepted',          color: 'bg-gray-100 text-gray-800 border-gray-300' },
+  IN_TRANSIT:       { label: '輸送中',   label_en: 'In Transit',        color: 'bg-blue-100 text-blue-800 border-blue-300' },
+  OUT_FOR_DELIVERY: { label: '配達中',   label_en: 'Out for Delivery',  color: 'bg-blue-100 text-blue-800 border-blue-300' },
+  DELIVERED:        { label: '配達完了', label_en: 'Delivered',          color: 'bg-green-100 text-green-800 border-green-300' },
+  FAILED_ATTEMPT:   { label: '持戻',     label_en: 'Failed Attempt',    color: 'bg-orange-100 text-orange-800 border-orange-300' },
+  HELD_AT_DEPOT:    { label: '保管中',   label_en: 'Held at Depot',     color: 'bg-orange-100 text-orange-800 border-orange-300' },
+  INVESTIGATING:    { label: '調査中',   label_en: 'Investigating',     color: 'bg-red-100 text-red-800 border-red-300' },
+  RETURNED:         { label: '返品',     label_en: 'Returned',          color: 'bg-red-100 text-red-800 border-red-300' },
+} as const
+
+export function getYamatoStatusConfig(status: string | null | undefined) {
+  if (!status) return null
+  return YAMATO_DELIVERY_STATUSES[status as YamatoDeliveryStatus] ?? null
+}
+
 export const YAMATO_TIME_SLOTS = [
   { code: '01', label: '午前中 (9:00AM–12:00PM)', label_en: 'Morning (9AM–12PM)' },
   { code: '14', label: '14:00–16:00 (2:00PM–4:00PM)', label_en: '2PM–4PM' },

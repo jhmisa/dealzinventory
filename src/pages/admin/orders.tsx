@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Plus, Copy, X, Printer, FileSpreadsheet, Upload } from 'lucide-react'
+import { Plus, Copy, X, Printer, FileSpreadsheet, Upload, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { PageHeader, SearchBar, DataTable, StatusBadge, CodeDisplay, PriceDisplay, TableSkeleton } from '@/components/shared'
 import { Button } from '@/components/ui/button'
@@ -15,7 +15,7 @@ import {
 import { useOrders, useConfirmedForInvoice, useConfirmedForDempyo, useStampInvoicePrinted, useStampDempyoPrinted } from '@/hooks/use-orders'
 import { usePersistedFilters } from '@/hooks/use-persisted-filters'
 import { useOffers, useCancelOffer } from '@/hooks/use-offers'
-import { ORDER_STATUSES, ORDER_SOURCES, OFFER_STATUSES } from '@/lib/constants'
+import { ORDER_STATUSES, ORDER_SOURCES, OFFER_STATUSES, getYamatoStatusConfig } from '@/lib/constants'
 import { formatDateTime, formatPrice, cn } from '@/lib/utils'
 import { printBatchInvoices } from '@/components/orders/batch-invoice-print'
 import { validateOrders, generateDempyoXlsx, downloadBlob, generateDempyoFilename } from '@/lib/yamato'
@@ -42,6 +42,8 @@ type OrderRow = {
   invoice_printed_at: string | null
   dempyo_printed_at: string | null
   delivery_box_count: number
+  yamato_status: string | null
+  delivery_issue_flag: boolean
 }
 
 const STATUS_TABS = [
@@ -105,7 +107,20 @@ const columns: ColumnDef<OrderRow>[] = [
     header: 'Status',
     cell: ({ row }) => {
       const cfg = ORDER_STATUSES.find(s => s.value === row.original.order_status)
-      return cfg ? <StatusBadge label={cfg.label} color={cfg.color} /> : row.original.order_status
+      const yamatoStatusCfg = row.original.order_status === 'SHIPPED' ? getYamatoStatusConfig(row.original.yamato_status) : null
+      return (
+        <div className="flex items-center gap-1.5">
+          {row.original.delivery_issue_flag && (
+            <AlertTriangle className="h-3.5 w-3.5 text-orange-500 shrink-0" title="Delivery issue" />
+          )}
+          <div>
+            {cfg ? <StatusBadge label={cfg.label} color={cfg.color} /> : row.original.order_status}
+            {yamatoStatusCfg && (
+              <p className="text-[10px] text-muted-foreground mt-0.5">{yamatoStatusCfg.label_en}</p>
+            )}
+          </div>
+        </div>
+      )
     },
   },
   {
@@ -196,6 +211,7 @@ export default function OrderListPage() {
   const stampInvoice = useStampInvoicePrinted()
   const stampDempyo = useStampDempyoPrinted()
   const [trackingImportOpen, setTrackingImportOpen] = useState(false)
+  const [showDeliveryIssuesOnly, setShowDeliveryIssuesOnly] = useState(false)
 
   const invoiceCount = invoiceOrders?.length ?? 0
   const dempyoCount = dempyoOrders?.length ?? 0
@@ -251,10 +267,17 @@ export default function OrderListPage() {
     offerStatusCounts[offer.offer_status] = (offerStatusCounts[offer.offer_status] ?? 0) + 1
   }
 
+  // Delivery issue count
+  const deliveryIssueCount = orders.filter((o) => o.delivery_issue_flag && o.order_status === 'SHIPPED').length
+
   // Filter by active tab
-  const filteredOrders = statusTab === 'all'
+  let filteredOrders = statusTab === 'all'
     ? orders
     : orders.filter((o) => o.order_status === statusTab)
+
+  if (showDeliveryIssuesOnly) {
+    filteredOrders = filteredOrders.filter((o) => o.delivery_issue_flag)
+  }
 
   const filteredOffers = statusTab === 'all'
     ? offers
@@ -479,10 +502,23 @@ export default function OrderListPage() {
               </div>
             )}
             {(statusTab === 'PACKED' || statusTab === 'SHIPPED') && (
-              <Button variant="outline" size="sm" onClick={() => setTrackingImportOpen(true)}>
-                <Upload className="h-4 w-4 mr-1" />
-                Import Tracking
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => setTrackingImportOpen(true)}>
+                  <Upload className="h-4 w-4 mr-1" />
+                  Import Tracking
+                </Button>
+                {statusTab === 'SHIPPED' && deliveryIssueCount > 0 && (
+                  <Button
+                    variant={showDeliveryIssuesOnly ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setShowDeliveryIssuesOnly(!showDeliveryIssuesOnly)}
+                    className={showDeliveryIssuesOnly ? '' : 'border-orange-300 text-orange-700 hover:bg-orange-50'}
+                  >
+                    <AlertTriangle className="h-4 w-4 mr-1" />
+                    Delivery Issues ({deliveryIssueCount})
+                  </Button>
+                )}
+              </div>
             )}
           </div>
 

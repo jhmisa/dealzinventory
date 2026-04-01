@@ -637,6 +637,34 @@ export async function bulkApplyTracking(
   return { updated, skipped }
 }
 
+// --- Yamato Tracking ---
+
+export async function checkYamatoTracking(orderId: string, trackingNumber: string) {
+  const { data, error } = await supabase.functions.invoke('yamato-tracking', {
+    body: { orders: [{ order_id: orderId, tracking_number: trackingNumber }] },
+  })
+
+  if (error) throw error
+  if (data?.error) throw new Error(data.error)
+  return data
+}
+
+export async function getDeliveryIssueOrders() {
+  const { data, error } = await supabase
+    .from('orders')
+    .select(`
+      *,
+      customers(customer_code, last_name, first_name, email, phone),
+      order_items(count)
+    `)
+    .eq('delivery_issue_flag', true)
+    .eq('order_status', 'SHIPPED')
+    .order('yamato_last_checked_at', { ascending: true })
+
+  if (error) throw error
+  return data ?? []
+}
+
 // --- Credit Card Surcharge ---
 
 const CC_FEE_DESCRIPTION = 'Credit Card Fee'

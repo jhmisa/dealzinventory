@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Check, Circle, Package, Pencil, X, Plus, History, Truck, Search, Loader2, Printer } from 'lucide-react'
+import { ArrowLeft, Check, Circle, Package, Pencil, X, Plus, History, Truck, Search, Loader2, Printer, RefreshCw, AlertTriangle, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,6 +28,7 @@ import {
   useAvailableItems,
   useAddOrderLineItem,
   useStampInvoicePrinted,
+  useCheckYamatoTracking,
 } from '@/hooks/use-orders'
 import * as ordersService from '@/services/orders'
 import { printInvoice } from '@/components/orders/invoice-pdf'
@@ -35,10 +36,21 @@ import { useAuth } from '@/hooks/use-auth'
 import { useSystemSetting } from '@/hooks/use-settings'
 import { useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/query-keys'
-import { ORDER_STATUSES, ORDER_SOURCES, YAMATO_TIME_SLOTS, PAYMENT_METHODS, getPaymentMethodLabel } from '@/lib/constants'
+import { ORDER_STATUSES, ORDER_SOURCES, YAMATO_TIME_SLOTS, YAMATO_TRACKING_URL, PAYMENT_METHODS, getPaymentMethodLabel, getYamatoStatusConfig } from '@/lib/constants'
 import { formatDateTime, formatPrice, cn, buildShortDescription } from '@/lib/utils'
 import { useState, useRef, useEffect } from 'react'
 import type { ShippingAddress } from '@/lib/address-types'
+
+function formatRelativeTime(isoString: string): string {
+  const diff = Date.now() - new Date(isoString).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins} min ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
 
 const STATUS_FLOW = ['PENDING', 'CONFIRMED', 'PACKED', 'SHIPPED', 'DELIVERED'] as const
 const EDITABLE_STATUSES = ['PENDING', 'CONFIRMED', 'PACKED']
@@ -144,6 +156,7 @@ export default function OrderDetailPage() {
   const [pickingAddress, setPickingAddress] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
   const addLineItem = useAddOrderLineItem()
+  const checkTracking = useCheckYamatoTracking()
 
   // Debounce search
   useEffect(() => {
@@ -194,6 +207,9 @@ export default function OrderDetailPage() {
   const deliveryBoxCount = ((order as Record<string, unknown>).delivery_box_count as number) ?? 1
   const invoicePrintedAt = (order as Record<string, unknown>).invoice_printed_at as string | null
   const dempyoPrintedAt = (order as Record<string, unknown>).dempyo_printed_at as string | null
+  const yamatoStatus = (order as Record<string, unknown>).yamato_status as string | null
+  const yamatoLastChecked = (order as Record<string, unknown>).yamato_last_checked_at as string | null
+  const deliveryIssueFlag = (order as Record<string, unknown>).delivery_issue_flag as boolean
   const timeSlot = YAMATO_TIME_SLOTS.find(s => s.code === deliveryTimeCode)
 
   // Compute totals from line items
@@ -793,10 +809,79 @@ export default function OrderDetailPage() {
                   onChange={(e) => setEditTrackingNumber(e.target.value)}
                   placeholder="e.g. 1234-5678-9012"
                 />
+              ) : trackingNumber ? (
+                <a
+                  href={`${YAMATO_TRACKING_URL}?number00=1&number01=${trackingNumber}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline inline-flex items-center gap-1"
+                >
+                  {trackingNumber}
+                  <ExternalLink className="h-3 w-3" />
+                </a>
               ) : (
-                <span>{trackingNumber ?? '—'}</span>
+                <span>—</span>
               )}
             </div>
+            {/* Yamato Tracking Status */}
+            {order.order_status === 'SHIPPED' && trackingNumber && (
+              <>
+                {deliveryIssueFlag && (
+                  <div className="flex items-start gap-2 rounded-md border border-orange-300 bg-orange-50 p-2 text-sm">
+                    <AlertTriangle className="h-4 w-4 text-orange-600 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="font-medium text-orange-800">
+                        Delivery issue: {getYamatoStatusConfig(yamatoStatus)?.label_en ?? yamatoStatus}
+                      </p>
+                      <p className="text-orange-700 text-xs">Follow up with customer.</p>
+                    </div>
+                  </div>
+                )}
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Yamato Status</span>
+                  <div className="flex items-center gap-2">
+                    {yamatoStatus ? (
+                      <StatusBadge
+                        label={`${getYamatoStatusConfig(yamatoStatus)?.label_en ?? yamatoStatus} (${getYamatoStatusConfig(yamatoStatus)?.label ?? ''})`}
+                        color={getYamatoStatusConfig(yamatoStatus)?.color ?? 'bg-gray-100 text-gray-800 border-gray-300'}
+                      />
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Not checked yet</span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Last Checked</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {yamatoLastChecked ? formatRelativeTime(yamatoLastChecked) : 'Never'}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs"
+                      disabled={checkTracking.isPending}
+                      onClick={() => {
+                        checkTracking.mutate(
+                          { orderId: order.id, trackingNumber },
+                          {
+                            onSuccess: () => toast.success('Tracking status updated'),
+                            onError: (err) => toast.error(err.message),
+                          }
+                        )
+                      }}
+                    >
+                      {checkTracking.isPending ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-3 w-3" />
+                      )}
+                      <span className="ml-1">Check Now</span>
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
             <div className="flex justify-between items-center">
               <span className="text-muted-foreground">Delivery Boxes</span>
               {isEditing ? (

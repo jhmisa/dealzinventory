@@ -1200,6 +1200,9 @@ export type Database = {
           total_price: number
           tracking_number: string | null
           updated_at: string
+          yamato_last_checked_at: string | null
+          yamato_status: string | null
+          delivery_issue_flag: boolean
         }
         Insert: {
           created_at?: string
@@ -1226,6 +1229,9 @@ export type Database = {
           total_price: number
           tracking_number?: string | null
           updated_at?: string
+          yamato_last_checked_at?: string | null
+          yamato_status?: string | null
+          delivery_issue_flag?: boolean
         }
         Update: {
           created_at?: string
@@ -1252,6 +1258,9 @@ export type Database = {
           total_price?: number
           tracking_number?: string | null
           updated_at?: string
+          yamato_last_checked_at?: string | null
+          yamato_status?: string | null
+          delivery_issue_flag?: boolean
         }
         Relationships: [
           {
