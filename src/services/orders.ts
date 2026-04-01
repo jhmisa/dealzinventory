@@ -561,6 +561,82 @@ export async function stampDempyoPrinted(orderIds: string[]) {
   if (error) throw error
 }
 
+// --- Yamato Tracking Import ---
+
+export interface TrackingImportResult {
+  updated: string[]
+  skipped: { orderCode: string; reason: string }[]
+}
+
+export async function bulkApplyTracking(
+  updates: { orderCode: string; trackingNumber: string }[],
+  autoAdvance: boolean,
+): Promise<TrackingImportResult> {
+  const orderCodes = updates.map((u) => u.orderCode)
+  const { data: orders, error } = await supabase
+    .from('orders')
+    .select('id, order_code, order_status, tracking_number')
+    .in('order_code', orderCodes)
+
+  if (error) throw error
+
+  const orderMap = new Map((orders ?? []).map((o) => [o.order_code, o]))
+  const updated: string[] = []
+  const skipped: TrackingImportResult['skipped'] = []
+
+  for (const { orderCode, trackingNumber } of updates) {
+    const order = orderMap.get(orderCode)
+    if (!order) {
+      skipped.push({ orderCode, reason: 'Order not found' })
+      continue
+    }
+
+    if (order.order_status === 'CANCELLED' || order.order_status === 'DELIVERED') {
+      skipped.push({ orderCode, reason: `Order is ${order.order_status}` })
+      continue
+    }
+
+    // Same tracking already applied — no-op
+    if (order.tracking_number === trackingNumber) {
+      skipped.push({ orderCode, reason: 'Already applied' })
+      continue
+    }
+
+    const updateFields: Record<string, unknown> = { tracking_number: trackingNumber }
+
+    // Auto-advance to SHIPPED if not already shipped
+    const shouldAdvance =
+      autoAdvance &&
+      order.order_status !== 'SHIPPED' &&
+      order.order_status !== 'DELIVERED' &&
+      order.order_status !== 'CANCELLED'
+
+    if (shouldAdvance) {
+      updateFields.order_status = 'SHIPPED'
+      updateFields.shipped_date = new Date().toISOString()
+    }
+
+    const { error: updateErr } = await supabase
+      .from('orders')
+      .update(updateFields)
+      .eq('id', order.id)
+
+    if (updateErr) {
+      skipped.push({ orderCode, reason: updateErr.message })
+      continue
+    }
+
+    // Mark items as SOLD when advancing to SHIPPED
+    if (shouldAdvance) {
+      await markOrderItemsSold(order.id)
+    }
+
+    updated.push(orderCode)
+  }
+
+  return { updated, skipped }
+}
+
 // --- Credit Card Surcharge ---
 
 const CC_FEE_DESCRIPTION = 'Credit Card Fee'

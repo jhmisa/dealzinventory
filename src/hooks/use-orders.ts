@@ -206,3 +206,17 @@ export function useStampDempyoPrinted() {
     },
   })
 }
+
+export function useBulkApplyTracking() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (params: {
+      updates: { orderCode: string; trackingNumber: string }[]
+      autoAdvance: boolean
+    }) => ordersService.bulkApplyTracking(params.updates, params.autoAdvance),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.items.all })
+    },
+  })
+}

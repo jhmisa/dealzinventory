@@ -1,6 +1,7 @@
+import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Plus, Copy, X, Printer, FileSpreadsheet } from 'lucide-react'
+import { Plus, Copy, X, Printer, FileSpreadsheet, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { PageHeader, SearchBar, DataTable, StatusBadge, CodeDisplay, PriceDisplay, TableSkeleton } from '@/components/shared'
 import { Button } from '@/components/ui/button'
@@ -18,6 +19,7 @@ import { ORDER_STATUSES, ORDER_SOURCES, OFFER_STATUSES } from '@/lib/constants'
 import { formatDateTime, formatPrice, cn } from '@/lib/utils'
 import { printBatchInvoices } from '@/components/orders/batch-invoice-print'
 import { validateOrders, generateDempyoXlsx, downloadBlob, generateDempyoFilename } from '@/lib/yamato'
+import { YamatoTrackingImportDialog } from '@/components/orders/yamato-tracking-import-dialog'
 
 type OrderRow = {
   id: string
@@ -193,6 +195,7 @@ export default function OrderListPage() {
   const { data: dempyoOrders } = useConfirmedForDempyo(statusTab === 'CONFIRMED')
   const stampInvoice = useStampInvoicePrinted()
   const stampDempyo = useStampDempyoPrinted()
+  const [trackingImportOpen, setTrackingImportOpen] = useState(false)
 
   const invoiceCount = invoiceOrders?.length ?? 0
   const dempyoCount = dempyoOrders?.length ?? 0
@@ -475,6 +478,12 @@ export default function OrderListPage() {
                 </Button>
               </div>
             )}
+            {(statusTab === 'PACKED' || statusTab === 'SHIPPED') && (
+              <Button variant="outline" size="sm" onClick={() => setTrackingImportOpen(true)}>
+                <Upload className="h-4 w-4 mr-1" />
+                Import Tracking
+              </Button>
+            )}
           </div>
 
           {isLoading ? (
@@ -545,6 +554,10 @@ export default function OrderListPage() {
           )}
         </>
       )}
+      <YamatoTrackingImportDialog
+        open={trackingImportOpen}
+        onOpenChange={setTrackingImportOpen}
+      />
     </div>
   )
 }
