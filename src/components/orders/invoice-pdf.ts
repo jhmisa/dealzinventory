@@ -337,7 +337,8 @@ function buildInvoiceHtml(order: InvoiceOrder, salesAgent: string): string {
   .items-table th:nth-child(5),
   .items-table th:nth-child(6) { text-align: right; }
   .items-table th:nth-child(3) { text-align: center; }
-  .col-item { width: 60px; }
+  .col-item { width: 80px; }
+  .items-table td:first-child { font-size: 16pt; font-weight: bold; }
   .col-qty { width: 40px; }
   .col-unit, .col-disc, .col-price { width: 70px; }
 
