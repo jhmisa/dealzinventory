@@ -265,17 +265,12 @@ export default function OrderDetailPage() {
         await updateOrder.mutateAsync({ id: order.id, updates: orderUpdates })
       }
 
-      // Handle credit card surcharge when payment method changes
-      const oldPayment = order.payment_method ?? 'COD'
-      if (editPaymentMethod !== oldPayment) {
-        if (editPaymentMethod === 'CREDIT_CARD' && oldPayment !== 'CREDIT_CARD') {
-          const rate = parseFloat(surchargeRate ?? '4')
-          await ordersService.addCreditCardSurcharge(order.id, rate)
-          queryClient.invalidateQueries({ queryKey: queryKeys.orders.detail(order.id) })
-        } else if (oldPayment === 'CREDIT_CARD' && editPaymentMethod !== 'CREDIT_CARD') {
-          await ordersService.removeCreditCardSurcharge(order.id)
-          queryClient.invalidateQueries({ queryKey: queryKeys.orders.detail(order.id) })
-        }
+      // Ensure correct credit card surcharge state (idempotent)
+      if (editPaymentMethod === 'CREDIT_CARD') {
+        const rate = parseFloat(surchargeRate ?? '4')
+        await ordersService.addCreditCardSurcharge(order.id, rate)
+      } else {
+        await ordersService.removeCreditCardSurcharge(order.id)
       }
 
       // Recalculate total
@@ -883,19 +878,21 @@ export default function OrderDetailPage() {
                     <div>
                       {item ? (() => {
                         const pm = item.product_models as Record<string, unknown> | null
-                        const descFields = (pm?.categories as Record<string, unknown> | null)?.description_fields as string[] | undefined
-                        let shortDesc: string | undefined
-                        if (descFields && descFields.length > 0) {
-                          const resolved: Record<string, unknown> = {}
-                          for (const key of descFields) {
-                            resolved[key] = (item as Record<string, unknown>)[key] ?? (pm as Record<string, unknown> | null)?.[key]
+                        const shortDesc = (pm?.short_description as string) || (() => {
+                          const descFields = (pm?.categories as Record<string, unknown> | null)?.description_fields as string[] | undefined
+                          if (descFields && descFields.length > 0) {
+                            const resolved: Record<string, unknown> = {}
+                            for (const key of descFields) {
+                              resolved[key] = (item as Record<string, unknown>)[key] ?? (pm as Record<string, unknown> | null)?.[key]
+                            }
+                            return buildShortDescription(resolved, descFields) || undefined
                           }
-                          shortDesc = buildShortDescription(resolved, descFields) || undefined
-                        }
+                          return undefined
+                        })()
                         return (
                           <div>
                             <div className="flex items-center gap-2">
-                              <CodeDisplay code={item.item_code} />
+                              <CodeDisplay code={item.item_code} className="text-[28px]" />
                               <GradeBadge grade={item.condition_grade} />
                               <span className="text-sm text-muted-foreground truncate">{shortDesc || oi.description}</span>
                             </div>

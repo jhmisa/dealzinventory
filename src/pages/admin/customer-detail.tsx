@@ -92,7 +92,11 @@ export default function CustomerDetailPage() {
     setEditFirstName(customer.first_name ?? '')
     setEditEmail(customer.email ?? '')
     setEditPhone(customer.phone ?? '')
-    setEditAddress(customer.shipping_address as ShippingAddress | null)
+    setEditAddress(
+      typeof customer.shipping_address === 'string'
+        ? JSON.parse(customer.shipping_address) as ShippingAddress
+        : customer.shipping_address as ShippingAddress | null
+    )
     setEditIsSeller(customer.is_seller ?? false)
     setEditBankName(customer.bank_name ?? '')
     setEditBankBranch(customer.bank_branch ?? '')
