@@ -218,6 +218,16 @@ export function useCheckYamatoTracking() {
   })
 }
 
+export function useRefreshAllYamatoStatuses() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => ordersService.refreshAllYamatoStatuses(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all })
+    },
+  })
+}
+
 export function useDeliveryIssueOrders() {
   return useQuery({
     queryKey: queryKeys.orders.list({ _type: 'delivery-issues' }),

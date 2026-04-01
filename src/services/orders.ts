@@ -654,6 +654,49 @@ export async function checkYamatoTracking(orderId: string, trackingNumber: strin
   return data
 }
 
+export async function refreshAllYamatoStatuses() {
+  // Fetch all SHIPPED orders that have a tracking number
+  const { data: orders, error: fetchError } = await supabase
+    .from('orders')
+    .select('id, order_code, tracking_number')
+    .eq('order_status', 'SHIPPED')
+    .not('tracking_number', 'is', null)
+
+  if (fetchError) throw fetchError
+  if (!orders || orders.length === 0) return { total: 0, updated: 0, errors: 0 }
+
+  // Edge function accepts max 10 per request — batch accordingly
+  const BATCH_SIZE = 10
+  let updated = 0
+  let errors = 0
+
+  for (let i = 0; i < orders.length; i += BATCH_SIZE) {
+    const batch = orders.slice(i, i + BATCH_SIZE).map((o) => ({
+      order_id: o.id,
+      tracking_number: o.tracking_number!,
+    }))
+
+    const { data, error } = await supabase.functions.invoke('yamato-tracking', {
+      body: { orders: batch },
+    })
+
+    if (error) {
+      errors += batch.length
+      continue
+    }
+
+    const results = data?.results as Array<{ error?: string }> | undefined
+    if (results) {
+      for (const r of results) {
+        if (r.error) errors++
+        else updated++
+      }
+    }
+  }
+
+  return { total: orders.length, updated, errors }
+}
+
 export async function getDeliveryIssueOrders() {
   const { data, error } = await supabase
     .from('orders')

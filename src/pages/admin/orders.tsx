@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Plus, Copy, X, Printer, FileSpreadsheet, Upload, AlertTriangle } from 'lucide-react'
+import { Plus, Copy, X, Printer, FileSpreadsheet, Upload, AlertTriangle, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { PageHeader, SearchBar, DataTable, StatusBadge, CodeDisplay, PriceDisplay, TableSkeleton } from '@/components/shared'
 import { Button } from '@/components/ui/button'
@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useOrders, useConfirmedForInvoice, useConfirmedForDempyo, useStampInvoicePrinted, useStampDempyoPrinted } from '@/hooks/use-orders'
+import { useOrders, useConfirmedForInvoice, useConfirmedForDempyo, useStampInvoicePrinted, useStampDempyoPrinted, useRefreshAllYamatoStatuses } from '@/hooks/use-orders'
 import { usePersistedFilters } from '@/hooks/use-persisted-filters'
 import { useOffers, useCancelOffer } from '@/hooks/use-offers'
 import { ORDER_STATUSES, ORDER_SOURCES, OFFER_STATUSES, getYamatoStatusConfig } from '@/lib/constants'
@@ -212,6 +212,7 @@ export default function OrderListPage() {
   const stampDempyo = useStampDempyoPrinted()
   const [trackingImportOpen, setTrackingImportOpen] = useState(false)
   const [showDeliveryIssuesOnly, setShowDeliveryIssuesOnly] = useState(false)
+  const refreshYamato = useRefreshAllYamatoStatuses()
 
   const invoiceCount = invoiceOrders?.length ?? 0
   const dempyoCount = dempyoOrders?.length ?? 0
@@ -506,6 +507,28 @@ export default function OrderListPage() {
                 <Button variant="outline" size="sm" onClick={() => setTrackingImportOpen(true)}>
                   <Upload className="h-4 w-4 mr-1" />
                   Import Tracking
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={refreshYamato.isPending}
+                  onClick={() => {
+                    refreshYamato.mutate(undefined, {
+                      onSuccess: (result) => {
+                        if (result.total === 0) {
+                          toast.info('No shipped orders with tracking numbers to refresh')
+                        } else {
+                          toast.success(`Refreshed ${result.updated}/${result.total} orders${result.errors > 0 ? ` (${result.errors} errors)` : ''}`)
+                        }
+                      },
+                      onError: (err) => {
+                        toast.error(`Failed to refresh Yamato statuses: ${err.message}`)
+                      },
+                    })
+                  }}
+                >
+                  <RefreshCw className={cn('h-4 w-4 mr-1', refreshYamato.isPending && 'animate-spin')} />
+                  {refreshYamato.isPending ? 'Refreshing...' : 'Refresh Yamato'}
                 </Button>
                 {statusTab === 'SHIPPED' && deliveryIssueCount > 0 && (
                   <Button
