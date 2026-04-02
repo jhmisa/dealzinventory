@@ -283,7 +283,7 @@ export function getAdjustmentTypeConfig(type: IntakeAdjustmentType) {
 
 // --- Payment Methods (Order) ---
 
-export type PaymentMethod = 'COD' | 'CREDIT_CARD' | 'BANK' | 'KONBINI' | 'CASH'
+export type PaymentMethod = 'COD' | 'CREDIT_CARD' | 'BANK' | 'KONBINI' | 'CASH' | 'PAYPAL'
 
 export const PAYMENT_METHODS: { value: PaymentMethod; label: string; code: number }[] = [
   { value: 'COD', label: 'Cash On Delivery (代引き)', code: 2 },
@@ -291,7 +291,14 @@ export const PAYMENT_METHODS: { value: PaymentMethod; label: string; code: numbe
   { value: 'BANK', label: 'Bank Transfer (振込)', code: 0 },
   { value: 'KONBINI', label: 'Konbini (コンビニ)', code: 0 },
   { value: 'CASH', label: 'Cash (現金)', code: 0 },
+  { value: 'PAYPAL', label: 'PayPal', code: 0 },
 ]
+
+export const REQUIRES_PAYMENT_CONFIRMATION: PaymentMethod[] = ['KONBINI', 'PAYPAL', 'BANK']
+
+export function requiresPaymentConfirmation(method: string | null | undefined): boolean {
+  return REQUIRES_PAYMENT_CONFIRMATION.includes(method as PaymentMethod)
+}
 
 export function getPaymentMethodLabel(value: string | null | undefined): string {
   return PAYMENT_METHODS.find(m => m.value === value)?.label ?? '—'

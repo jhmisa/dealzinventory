@@ -1180,6 +1180,7 @@ export type Database = {
           customer_id: string
           delivery_box_count: number
           delivery_date: string | null
+          delivery_issue_flag: boolean
           delivery_time_code: string | null
           dempyo_printed_at: string | null
           id: string
@@ -1202,13 +1203,13 @@ export type Database = {
           updated_at: string
           yamato_last_checked_at: string | null
           yamato_status: string | null
-          delivery_issue_flag: boolean
         }
         Insert: {
           created_at?: string
           customer_id: string
           delivery_box_count?: number
           delivery_date?: string | null
+          delivery_issue_flag?: boolean
           delivery_time_code?: string | null
           dempyo_printed_at?: string | null
           id?: string
@@ -1231,13 +1232,13 @@ export type Database = {
           updated_at?: string
           yamato_last_checked_at?: string | null
           yamato_status?: string | null
-          delivery_issue_flag?: boolean
         }
         Update: {
           created_at?: string
           customer_id?: string
           delivery_box_count?: number
           delivery_date?: string | null
+          delivery_issue_flag?: boolean
           delivery_time_code?: string | null
           dempyo_printed_at?: string | null
           id?: string
@@ -1260,7 +1261,6 @@ export type Database = {
           updated_at?: string
           yamato_last_checked_at?: string | null
           yamato_status?: string | null
-          delivery_issue_flag?: boolean
         }
         Relationships: [
           {
@@ -1275,6 +1275,44 @@ export type Database = {
             columns: ["sell_group_id"]
             isOneToOne: false
             referencedRelation: "sell_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_confirmations: {
+        Row: {
+          amount: number
+          confirmed_by: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          order_id: string
+          screenshot_url: string
+        }
+        Insert: {
+          amount: number
+          confirmed_by?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          order_id: string
+          screenshot_url: string
+        }
+        Update: {
+          amount?: number
+          confirmed_by?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          order_id?: string
+          screenshot_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_confirmations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
         ]
@@ -1808,6 +1846,7 @@ export type Database = {
         Args: { pin_hash: string; pin_text: string }
         Returns: boolean
       }
+      check_yamato_tracking: { Args: never; Returns: undefined }
       create_intake_batch: {
         Args: {
           p_date_received: string
@@ -2081,3 +2120,5 @@ export const Constants = {
     },
   },
 } as const
+A new version of Supabase CLI is available: v2.84.2 (currently installed v2.75.0)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli

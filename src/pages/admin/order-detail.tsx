@@ -36,10 +36,12 @@ import { useAuth } from '@/hooks/use-auth'
 import { useSystemSetting } from '@/hooks/use-settings'
 import { useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/query-keys'
-import { ORDER_STATUSES, ORDER_SOURCES, YAMATO_TIME_SLOTS, YAMATO_TRACKING_URL, PAYMENT_METHODS, getPaymentMethodLabel, getYamatoStatusConfig } from '@/lib/constants'
+import { ORDER_STATUSES, ORDER_SOURCES, YAMATO_TIME_SLOTS, YAMATO_TRACKING_URL, PAYMENT_METHODS, getPaymentMethodLabel, getYamatoStatusConfig, requiresPaymentConfirmation } from '@/lib/constants'
 import { formatDateTime, formatPrice, cn, buildShortDescription } from '@/lib/utils'
 import { useState, useRef, useEffect } from 'react'
 import type { ShippingAddress } from '@/lib/address-types'
+import { usePaymentConfirmations } from '@/hooks/use-payment-confirmations'
+import { PaymentConfirmationSection } from '@/components/orders/payment-confirmation-section'
 
 function formatRelativeTime(isoString: string): string {
   const diff = Date.now() - new Date(isoString).getTime()
@@ -132,6 +134,7 @@ export default function OrderDetailPage() {
   const queryClient = useQueryClient()
   const { data: surchargeRate } = useSystemSetting('credit_card_surcharge_pct')
   const { data: customerAddresses } = useCustomerAddresses(order?.customer_id ?? '')
+  const { data: paymentConfirmations = [] } = usePaymentConfirmations(id!)
 
   const [cancelOpen, setCancelOpen] = useState(false)
   const [advanceOpen, setAdvanceOpen] = useState(false)
@@ -194,6 +197,9 @@ export default function OrderDetailPage() {
   const nextStatus = getNextStatus(order.order_status)
   const canCancel = order.order_status !== 'SHIPPED' && order.order_status !== 'DELIVERED' && order.order_status !== 'CANCELLED'
   const canEdit = EDITABLE_STATUSES.includes(order.order_status)
+  const needsPaymentProof = requiresPaymentConfirmation(order.payment_method) && order.order_status === 'PENDING'
+  const confirmedPaymentTotal = paymentConfirmations.reduce((sum, c) => sum + c.amount, 0)
+  const paymentProofMissing = needsPaymentProof && confirmedPaymentTotal === 0
 
   const shippingAddr = parseShippingAddress(order.shipping_address as string | null)
   const deliveryDate = (order as Record<string, unknown>).delivery_date as string | null
@@ -341,6 +347,12 @@ export default function OrderDetailPage() {
 
   function handleAdvance() {
     if (!nextStatus) return
+
+    // Safety check: block PENDING → CONFIRMED without payment proof for pre-pay methods
+    if (paymentProofMissing) {
+      toast.error('Upload payment proof before confirming this order')
+      return
+    }
 
     const updates: Record<string, unknown> = {}
     // Auto-set packed_date when advancing to PACKED
@@ -539,9 +551,14 @@ export default function OrderDetailPage() {
                 </Button>
               )}
               {!isEditing && nextStatus && order.order_status !== 'CANCELLED' && (
-                <Button size="sm" onClick={() => setAdvanceOpen(true)}>
-                  Advance to {getNextStatusLabel(nextStatus)}
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" onClick={() => setAdvanceOpen(true)} disabled={paymentProofMissing}>
+                    Advance to {getNextStatusLabel(nextStatus)}
+                  </Button>
+                  {paymentProofMissing && (
+                    <span className="text-xs text-amber-600">Upload payment proof before confirming</span>
+                  )}
+                </div>
               )}
               {!isEditing && canCancel && (
                 <Button variant="destructive" size="sm" onClick={() => setCancelOpen(true)}>
@@ -909,6 +926,11 @@ export default function OrderDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Payment Confirmation Section — for pre-pay methods */}
+      {requiresPaymentConfirmation(order.payment_method) && (
+        <PaymentConfirmationSection orderId={order.id} orderTotal={order.total_price} />
+      )}
 
       {/* Order Items — Line Items Table */}
       <Card>

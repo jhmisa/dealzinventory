@@ -72,6 +72,9 @@ export type OfferUpdate = Tables['offers']['Update']
 export type OfferItem = Tables['offer_items']['Row']
 export type OfferItemInsert = Tables['offer_items']['Insert']
 
+export type PaymentConfirmation = Tables['payment_confirmations']['Row']
+export type PaymentConfirmationInsert = Tables['payment_confirmations']['Insert']
+
 
 export interface ParsedSpecs {
   brand?: string

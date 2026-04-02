@@ -131,6 +131,10 @@ export const queryKeys = {
     reverse: (prefectureJa: string, cityJa: string, townJa: string) =>
       ['postal-codes', 'reverse', prefectureJa, cityJa, townJa] as const,
   },
+  paymentConfirmations: {
+    all: ['payment-confirmations'] as const,
+    forOrder: (orderId: string) => ['payment-confirmations', orderId] as const,
+  },
   staffProfiles: {
     all: ['staff-profiles'] as const,
     lists: () => [...queryKeys.staffProfiles.all, 'list'] as const,
