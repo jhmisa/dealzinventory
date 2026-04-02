@@ -507,12 +507,12 @@ function buildInvoiceHtml(order: InvoiceOrder, salesAgent: string): string {
           <td class="value">${formatYen(subtotal - totalDiscount)}</td>
         </tr>
         <tr>
-          <td class="label">SHIPPING</td>
-          <td class="value">${formatYen(shippingCost)}</td>
+          <td class="label" style="font-size:11px; color:#888; padding-top:0;">incl. tax (10%)</td>
+          <td class="value" style="font-size:11px; color:#888; padding-top:0;">(${formatYen(charges)})</td>
         </tr>
         <tr>
-          <td class="label">CHARGES</td>
-          <td class="value">${formatYen(charges)}</td>
+          <td class="label">SHIPPING</td>
+          <td class="value">${formatYen(shippingCost)}</td>
         </tr>
         <tr class="total-row">
           <td>TOTAL</td>
