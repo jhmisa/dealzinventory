@@ -21,84 +21,93 @@ interface TrackingResult {
 }
 
 // Map Japanese Yamato status text → our status enum
-// Ordered longest-first so substring matches (e.g. 発送 vs 発送済み) prefer the longer key
-const STATUS_MAP: Record<string, string> = {
-  '荷物受付': 'ACCEPTED',
-  '発送済み': 'IN_TRANSIT',
-  '発送': 'IN_TRANSIT',
-  '輸送中': 'IN_TRANSIT',
-  '配達完了': 'DELIVERED',
-  '配達中': 'OUT_FOR_DELIVERY',
-  '持戻': 'FAILED_ATTEMPT',
-  '保管中': 'HELD_AT_DEPOT',
-  '調査中': 'INVESTIGATING',
-  '返品': 'RETURNED',
-}
+// Ordered longest-first so substring matching prefers longer keys (e.g. 発送済み over 発送)
+const STATUS_ENTRIES: [string, string][] = [
+  ['配達日・時間帯指定（保管中）', 'SCHEDULED_DELIVERY'],
+  ['配達担当店保管中', 'HELD_AT_DEPOT'],
+  ['荷物受付', 'ACCEPTED'],
+  ['発送済み', 'IN_TRANSIT'],
+  ['輸送中', 'IN_TRANSIT'],
+  ['配達完了', 'DELIVERED'],
+  ['配達中', 'OUT_FOR_DELIVERY'],
+  ['持戻', 'FAILED_ATTEMPT'],
+  ['保管中', 'HELD_AT_DEPOT'],
+  ['調査中', 'INVESTIGATING'],
+  ['返品', 'RETURNED'],
+  ['発送', 'IN_TRANSIT'],
+]
 
-const ISSUE_STATUSES = new Set(['FAILED_ATTEMPT', 'HELD_AT_DEPOT', 'INVESTIGATING', 'RETURNED'])
+const ISSUE_STATUSES = new Set(['FAILED_ATTEMPT', 'INVESTIGATING', 'RETURNED'])
 
 const YAMATO_PROXY_URL = Deno.env.get('YAMATO_PROXY_URL') ?? ''
 const YAMATO_PROXY_KEY = Deno.env.get('YAMATO_PROXY_KEY') ?? ''
 
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 /**
- * Parse the Yamato tracking HTML response.
- * The CGI response contains semantic HTML with tracking events:
- *   <div class="item">STATUS</div>
- *   <div class="date">MM月DD日 HH:MM</div>
- * We extract all <div class="item"> entries per tracking number
- * and take the LAST one as the current status.
+ * Match extracted Japanese status text against STATUS_ENTRIES.
+ * Checks longest keys first (STATUS_ENTRIES is pre-sorted longest-first)
+ * using substring matching to handle compound statuses like
+ * 配達日・時間帯指定（保管中）.
+ */
+function matchStatus(statusText: string): string | null {
+  for (const [jp, en] of STATUS_ENTRIES) {
+    if (statusText.includes(jp)) {
+      return en
+    }
+  }
+  return null
+}
+
+/**
+ * Parse the Yamato tracking CGI response.
+ *
+ * The response is JavaScript (swd.writeln() calls) containing a summary table
+ * with one row per tracking number. Each row has this structure:
+ *
+ *   swd.writeln('<td><font size="4"><b>3803-3182-3605<br></b></font></td>');
+ *   swd.writeln(' <td><font size="3">03/31<br></font></td>');     // date
+ *   swd.writeln(' <td><font size="3">発送済み<br></font></td>');  // status
+ *
+ * We extract the status cell text from the same row as the tracking number.
  */
 function parseYamatoResponse(html: string, trackingNumbers: string[]): Map<string, string | null> {
   const results = new Map<string, string | null>()
 
   for (const tn of trackingNumbers) {
-    // Yamato displays tracking numbers with hyphens (e.g. "3803-3191-3824")
-    // so search for both the raw number and the hyphenated format
     const hyphenated = tn.replace(/(\d{4})(\d{4})(\d{4})/, '$1-$2-$3')
-    let tnIndex = html.indexOf(hyphenated)
-    const searchLen = tnIndex !== -1 ? hyphenated.length : tn.length
-    if (tnIndex === -1) {
-      tnIndex = html.indexOf(tn)
-    }
-    if (tnIndex === -1) {
-      results.set(tn, null)
-      continue
-    }
 
-    // Scope: from the tracking number to the next tracking-invoice-block or end
-    const afterTn = html.substring(tnIndex)
-    const nextBlockMatch = afterTn.substring(searchLen).search(/tracking-invoice-block-title/)
-    const block = nextBlockMatch !== -1
-      ? afterTn.substring(0, searchLen + nextBlockMatch)
-      : afterTn
+    // Match the summary table row: TN cell → date cell → status cell
+    // Actual format: swd.writeln(' <td><font size="4"><b>XXXX-XXXX-XXXX<br></b></font></td>');
+    const rowPattern = new RegExp(
+      escapeRegExp(hyphenated) +
+      String.raw`<br><\/b><\/font><\/td>'\);\s*` +
+      String.raw`swd\.writeln\('\s*<td><font size="3">[^<]*<br><\/font><\/td>'\);\s*` +
+      String.raw`swd\.writeln\('\s*<td><font size="3">([^<]+)<br><\/font><\/td>`,
+      's'
+    )
 
-    // Extract all <div class="item">STATUS</div> entries
-    const itemPattern = /<div\s+class="item">\s*([^<]+?)\s*<\/div>/g
-    let lastStatus: string | null = null
-    let match: RegExpExecArray | null
-
-    while ((match = itemPattern.exec(block)) !== null) {
+    const match = rowPattern.exec(html)
+    if (match) {
       const statusText = match[1].trim()
-      if (STATUS_MAP[statusText]) {
-        lastStatus = STATUS_MAP[statusText]
-      }
-    }
+      results.set(tn, matchStatus(statusText))
+    } else {
+      // Fallback: search for the tracking number and nearby status keywords
+      const tnIndex = html.indexOf(hyphenated) !== -1
+        ? html.indexOf(hyphenated)
+        : html.indexOf(tn)
 
-    // Fallback: search for known status keywords in the block.
-    // Use the LAST occurrence by position in the HTML (most recent event)
-    // rather than iterating the map in insertion order.
-    if (!lastStatus) {
-      let lastIndex = -1
-      for (const [jpStatus, enStatus] of Object.entries(STATUS_MAP)) {
-        const idx = block.lastIndexOf(jpStatus)
-        if (idx > lastIndex) {
-          lastIndex = idx
-          lastStatus = enStatus
-        }
+      if (tnIndex === -1) {
+        results.set(tn, null)
+        continue
       }
-    }
 
-    results.set(tn, lastStatus)
+      // Look in a narrow window after the tracking number (500 chars)
+      const window = html.substring(tnIndex, tnIndex + 500)
+      results.set(tn, matchStatus(window))
+    }
   }
 
   return results

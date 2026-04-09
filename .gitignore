@@ -39,3 +39,9 @@ supabase/.temp/
 
 # Moat task system
 .moat/
+
+# Local debugging / screenshot artifacts
+.playwright-mcp/
+Screenshots/
+/invoice-before.png
+/invoice-after.png
