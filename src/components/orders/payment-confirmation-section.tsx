@@ -14,7 +14,7 @@ interface PaymentConfirmationSectionProps {
 }
 
 export function PaymentConfirmationSection({ orderId, orderTotal }: PaymentConfirmationSectionProps) {
-  const { data: confirmations = [], isLoading } = usePaymentConfirmations(orderId)
+  const { data: confirmations = [], isLoading, error: loadError } = usePaymentConfirmations(orderId)
   const createMutation = useCreatePaymentConfirmation()
   const deleteMutation = useDeletePaymentConfirmation()
 
@@ -103,6 +103,10 @@ export function PaymentConfirmationSection({ orderId, orderTotal }: PaymentConfi
         {/* Existing confirmations */}
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Loading...</p>
+        ) : loadError ? (
+          <p className="text-sm text-destructive">
+            Failed to load confirmations: {loadError instanceof Error ? loadError.message : 'Unknown error'}
+          </p>
         ) : confirmations.length > 0 ? (
           <div className="space-y-2">
             {confirmations.map((c) => {
