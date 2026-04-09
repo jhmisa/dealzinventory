@@ -294,34 +294,49 @@ export default function OrderListPage() {
       cell: ({ row }) => <CodeDisplay code={row.original.offer_code} />,
     },
     {
-      accessorKey: 'fb_name',
-      header: 'FB Name',
-      cell: ({ row }) => <span className="font-medium">{row.original.fb_name}</span>,
-    },
-    {
-      id: 'claimed_by',
-      header: 'Claimed By',
+      id: 'details',
+      header: 'Details',
       cell: ({ row }) => {
         const c = row.original.customers
         const ord = row.original.orders
-        if (!c) return <span className="text-xs text-muted-foreground">—</span>
-        const fullName = `${c.last_name} ${c.first_name ?? ''}`.trim()
+        const fullName = c ? `${c.last_name} ${c.first_name ?? ''}`.trim() : null
+        const contactParts = [c?.email, c?.phone].filter(Boolean) as string[]
         return (
-          <div onClick={(e) => e.stopPropagation()} className="text-sm leading-tight">
-            <Link
-              to={`/admin/customers/${c.id}`}
-              className="font-medium text-primary hover:underline"
-            >
-              {fullName}
-            </Link>
-            <div className="text-xs text-muted-foreground">
-              {c.customer_code}
-              {ord && <> · <Link to={`/admin/orders/${ord.id}`} className="hover:underline">{ord.order_code}</Link></>}
+          <div onClick={(e) => e.stopPropagation()} className="text-xs leading-snug space-y-0.5 max-w-[260px]">
+            <div>
+              <span className="text-muted-foreground">FB Name: </span>
+              <span className="font-medium">{row.original.fb_name}</span>
             </div>
-            {(c.email || c.phone) && (
-              <div className="text-xs text-muted-foreground truncate max-w-[180px]">
-                {c.email ?? c.phone}
-              </div>
+            {c && (
+              <>
+                <div>
+                  <span className="text-muted-foreground">Customer ID: </span>
+                  <span className="font-mono">{c.customer_code}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Name: </span>
+                  <Link
+                    to={`/admin/customers/${c.id}`}
+                    className="font-medium text-primary hover:underline"
+                  >
+                    {fullName}
+                  </Link>
+                </div>
+                {contactParts.length > 0 && (
+                  <div className="truncate">
+                    <span className="text-muted-foreground">Contact: </span>
+                    <span>{contactParts.join(' / ')}</span>
+                  </div>
+                )}
+                {ord && (
+                  <div>
+                    <span className="text-muted-foreground">Order: </span>
+                    <Link to={`/admin/orders/${ord.id}`} className="font-mono text-primary hover:underline">
+                      {ord.order_code}
+                    </Link>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )
