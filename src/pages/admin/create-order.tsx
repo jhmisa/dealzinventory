@@ -7,6 +7,7 @@ import { ShippingStep } from '@/components/orders/shipping-step'
 import { OrderLineItems } from '@/components/orders/order-line-items'
 import type { OrderLineItem } from '@/components/orders/order-line-items'
 import { useCreateManualOrder } from '@/hooks/use-orders'
+import { getEarliestDeliveryDate } from '@/lib/delivery-date'
 import { toast } from 'sonner'
 import type { Customer } from '@/lib/types'
 import type { ShippingAddress } from '@/lib/address-types'
@@ -21,12 +22,8 @@ export default function CreateOrderPage() {
   // Section 2: Shipping
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(null)
   const [careOf, setCareOf] = useState<string | null>(null)
-  // Default delivery date to tomorrow
-  const tomorrow = new Date()
-  tomorrow.setDate(tomorrow.getDate() + 1)
-  const [deliveryDate, setDeliveryDate] = useState<string | null>(
-    tomorrow.toISOString().split('T')[0]
-  )
+  // Default delivery date to earliest allowed (respects 4PM JST cutoff + Mon–Fri processing)
+  const [deliveryDate, setDeliveryDate] = useState<string | null>(getEarliestDeliveryDate())
   const [deliveryTimeCode, setDeliveryTimeCode] = useState<string | null>(null)
 
   // Section 3: Order

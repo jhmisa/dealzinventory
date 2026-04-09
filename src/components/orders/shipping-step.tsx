@@ -15,7 +15,9 @@ import { AddressForm } from '@/components/shared/address-form'
 import { AddressDisplay } from '@/components/shared/address-display'
 import { useCustomerAddresses, useCreateCustomerAddress } from '@/hooks/use-customer-addresses'
 import { YAMATO_TIME_SLOTS } from '@/lib/constants'
+import { getEarliestDeliveryDate } from '@/lib/delivery-date'
 import { Plus, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 import type { ShippingAddress } from '@/lib/address-types'
 import type { Customer } from '@/lib/types'
 
@@ -85,10 +87,8 @@ export function ShippingStep({
     }
   }
 
-  // Tomorrow's date in YYYY-MM-DD format
-  const tomorrow = new Date()
-  tomorrow.setDate(tomorrow.getDate() + 1)
-  const minDate = tomorrow.toISOString().split('T')[0]
+  // Earliest selectable delivery date, respecting the 4PM JST cutoff and Mon–Fri processing.
+  const minDate = getEarliestDeliveryDate()
 
   const handleAddressSelect = (id: string) => {
     setSelectedAddressId(id)
@@ -101,20 +101,24 @@ export function ShippingStep({
   const handleSaveNewAddress = async () => {
     if (!newAddress || !newLabel) return
 
-    const saved = await createAddress.mutateAsync({
-      customer_id: customer.id,
-      label: newLabel,
-      care_of: newCareOf || null,
-      address: newAddress as unknown as Record<string, unknown>,
-      is_default: addressOptions.length === 0,
-    })
+    try {
+      const saved = await createAddress.mutateAsync({
+        customer_id: customer.id,
+        label: newLabel,
+        care_of: newCareOf || null,
+        address: newAddress as unknown as Record<string, unknown>,
+        is_default: addressOptions.length === 0,
+      })
 
-    onAddressSelect(newAddress, newCareOf || null)
-    setSelectedAddressId(saved.id)
-    setShowNewForm(false)
-    setNewLabel('')
-    setNewCareOf('')
-    setNewAddress(null)
+      onAddressSelect(newAddress, newCareOf || null)
+      setSelectedAddressId(saved.id)
+      setShowNewForm(false)
+      setNewLabel('')
+      setNewCareOf('')
+      setNewAddress(null)
+    } catch (err) {
+      toast.error('Failed to save address. Please try again.')
+    }
   }
 
   if (isLoading) {
@@ -234,7 +238,7 @@ export function ShippingStep({
                 <Input
                   type="date"
                   min={minDate}
-                  value={deliveryDate ?? minDate}
+                  value={(deliveryDate && deliveryDate >= minDate) ? deliveryDate : minDate}
                   onChange={(e) => {
                     const val = e.target.value
                     // Prevent selecting a date before minDate
@@ -245,7 +249,9 @@ export function ShippingStep({
                     }
                   }}
                 />
-                <p className="text-xs text-muted-foreground">Earliest delivery is tomorrow</p>
+                <p className="text-xs text-muted-foreground">
+                  Orders placed after 4PM JST or on weekends ship the next business day
+                </p>
               </div>
               <div className="space-y-1.5">
                 <Label className="text-sm">Delivery Time</Label>
