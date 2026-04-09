@@ -180,6 +180,49 @@ export default function ShowcasePage() {
             </span>
           </div>
         )}
+
+        {/* Product Info Overlay — bottom of media area */}
+        {currentItem && (
+          <div className="absolute bottom-0 left-0 right-0 pt-28 pb-7 px-8 bg-gradient-to-t from-black/90 via-black/60 to-transparent pointer-events-none">
+            <div className="flex items-end gap-7">
+              {/* Left: code + price + rank */}
+              <div className="flex flex-col shrink-0 min-w-0">
+                <span className="tracking-[0.02em] text-white font-bold text-[36px]/[40px] drop-shadow-md">
+                  {currentItem.item_code}
+                </span>
+                <span className="tracking-[-0.03em] text-white font-extrabold text-[72px]/[72px] mt-1 drop-shadow-lg">
+                  {price != null ? formatPrice(price) : '—'}
+                </span>
+                {currentItem.condition_grade && (
+                  <div className="flex items-center self-start rounded-md py-1.5 px-3 bg-white/20 backdrop-blur-sm mt-3 border border-white/25">
+                    <span className="text-white font-semibold text-[18px]/[22px]">
+                      Rank {currentItem.condition_grade}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Right: description + condition */}
+              <div className="flex flex-col grow min-w-0 gap-2.5 pb-2">
+                {currentItem.description && (
+                  <p className="text-white/95 font-medium text-[30px]/[36px] line-clamp-3 drop-shadow">
+                    {currentItem.description}
+                  </p>
+                )}
+                {currentItem.condition_notes && (
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-white/60 text-[14px]/[16px] font-semibold uppercase tracking-[0.12em]">
+                      Condition
+                    </span>
+                    <span className="text-white/85 text-[22px]/[28px] line-clamp-2 drop-shadow">
+                      {currentItem.condition_notes}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Controls Row — full width */}
@@ -230,45 +273,9 @@ export default function ShowcasePage() {
 
       {/* Bottom Half — split into left (product info) and right (camera) */}
       <div className="flex grow shrink basis-0 overflow-hidden">
-        {/* Left column — product info */}
+        {/* Left column — empty state only (product info is now overlaid on the media area) */}
         <div className="w-[360px] shrink-0 flex flex-col">
-          {/* Product Info */}
-          {currentItem ? (
-            <div className="flex flex-col grow shrink basis-0 pt-4 gap-2.5 px-5 overflow-hidden">
-              <span className="tracking-[0.02em] text-[#09090B] font-bold text-[48px]/[52px]">
-                {currentItem.item_code}
-              </span>
-
-              <span className="tracking-[-0.03em] text-[#09090B] font-extrabold text-[80px]/[80px]">
-                {price != null ? formatPrice(price) : '—'}
-              </span>
-
-              {currentItem.condition_grade && (
-                <div className="flex items-center self-start rounded-md py-2 px-4 bg-[#18181B]">
-                  <span className="text-white font-semibold text-base/5">
-                    Rank {currentItem.condition_grade}
-                  </span>
-                </div>
-              )}
-
-              {currentItem.description && (
-                <p className="pt-1 text-[#52525B] text-[45px]/[52px]">
-                  {currentItem.description}
-                </p>
-              )}
-
-              {currentItem.condition_notes && (
-                <div className="flex flex-col gap-2">
-                  <span className="text-[#09090B] font-semibold text-[40px]/[48px]">
-                    Condition
-                  </span>
-                  <span className="text-[#52525B] text-[45px]/[52px]">
-                    {currentItem.condition_notes}
-                  </span>
-                </div>
-              )}
-            </div>
-          ) : (
+          {!currentItem && (
             <div className="flex flex-col items-center justify-center grow shrink basis-0 text-[#A1A1AA] gap-3">
               <Search className="h-10 w-10" strokeWidth={1.5} />
               <span className="text-base">Scan or search a P-code to begin</span>
