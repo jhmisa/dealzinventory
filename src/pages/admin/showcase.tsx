@@ -139,6 +139,7 @@ export default function ShowcasePage() {
             src={currentMedia.url}
             autoPlay
             muted
+            loop={mediaCount === 1}
             onEnded={handleVideoEnded}
             className="w-full h-full object-contain"
           />
