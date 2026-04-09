@@ -257,26 +257,22 @@ export default function ItemDetailPage() {
         )
       })()}
 
-      {/* Short description + selling price banner */}
-      {(description || item.selling_price != null) && (
+      {/* Category + selling price meta strip */}
+      {(pm?.categories?.name || item.selling_price != null) && (
         <Card>
-          <CardContent className="py-3 px-4 flex items-center justify-between gap-4">
+          <CardContent className="py-2 px-4 flex items-center justify-between gap-4">
             <div className="min-w-0">
-              <div className="flex items-baseline gap-2">
-                <CodeDisplay code={item.item_code} className="text-xs text-muted-foreground shrink-0" />
-                <p className="text-base font-medium truncate">{description ?? '—'}</p>
-              </div>
-              {pm?.categories?.name && (
-                <Badge variant="secondary" className="mt-1 text-xs">
+              {pm?.categories?.name ? (
+                <Badge variant="secondary" className="text-xs">
                   {pm.categories.name}
                 </Badge>
-              )}
+              ) : null}
             </div>
-            <div className="text-right shrink-0">
-              <p className="text-xs text-muted-foreground">Selling Price</p>
-              <p className="text-2xl font-bold tracking-tight">
+            <div className="flex items-baseline gap-2 shrink-0">
+              <span className="text-xs text-muted-foreground">Selling Price</span>
+              <span className="text-2xl font-bold tracking-tight">
                 {item.selling_price != null ? formatPrice(item.selling_price) : '—'}
-              </p>
+              </span>
             </div>
           </CardContent>
         </Card>
