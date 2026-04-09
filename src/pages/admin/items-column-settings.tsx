@@ -21,6 +21,7 @@ const COLUMN_OPTIONS = [
   { id: 'purchase_price', label: 'Buy Price' },
   { id: 'selling_price', label: 'Sell Price' },
   { id: 'discount', label: 'Discount' },
+  { id: 'sold_to', label: 'Sold To' },
   { id: 'created_at', label: 'Intake Date' },
 ] as const
 

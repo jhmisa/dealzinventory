@@ -291,7 +291,9 @@ export async function getOffers(filters: OfferFilters = {}) {
     .from('offers')
     .select(`
       *,
-      offer_items(id, item_id, description, unit_price, quantity)
+      offer_items(id, item_id, description, unit_price, quantity),
+      customers(id, customer_code, first_name, last_name, email, phone),
+      orders(id, order_code)
     `)
     .order('created_at', { ascending: false })
 
@@ -333,7 +335,9 @@ export async function getOfferByCode(code: string) {
             product_media(id, file_url, role, sort_order, media_type)
           )
         )
-      )
+      ),
+      customers(id, customer_code, first_name, last_name, email, phone),
+      orders(id, order_code)
     `)
     .eq('offer_code', code)
     .single()

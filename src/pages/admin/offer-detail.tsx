@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft, Copy, X, Plus, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useState } from 'react'
@@ -211,6 +211,65 @@ export default function OfferDetailPage() {
           </div>
         }
       />
+
+      {/* Claimed By */}
+      {offer.customers && (() => {
+        const c = offer.customers as {
+          id: string
+          customer_code: string
+          first_name: string | null
+          last_name: string
+          email: string | null
+          phone: string | null
+        }
+        const ord = offer.orders as { id: string; order_code: string } | null
+        const fullName = `${c.last_name} ${c.first_name ?? ''}`.trim()
+        return (
+          <Card className="border-green-300 bg-green-50/40">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-green-900">Claimed By</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground">Customer</p>
+                  <Link
+                    to={`/admin/customers/${c.id}`}
+                    className="text-sm font-semibold text-primary hover:underline"
+                  >
+                    {fullName}
+                  </Link>
+                  <p className="text-xs text-muted-foreground font-mono">{c.customer_code}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Email</p>
+                  <p className="text-sm">{c.email ?? '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Phone</p>
+                  <p className="text-sm">{c.phone ?? '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Order</p>
+                  {ord ? (
+                    <Link
+                      to={`/admin/orders/${ord.id}`}
+                      className="text-sm font-mono text-primary hover:underline"
+                    >
+                      {ord.order_code}
+                    </Link>
+                  ) : (
+                    <p className="text-sm">—</p>
+                  )}
+                  {offer.claimed_at && (
+                    <p className="text-xs text-muted-foreground">{formatDateTime(offer.claimed_at)}</p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )
+      })()}
 
       {/* Info Section */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

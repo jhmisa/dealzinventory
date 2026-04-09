@@ -24,7 +24,12 @@ export async function getItems(filters: ItemFilters = {}) {
     .select(`
       *,
       suppliers(supplier_name),
-      product_models(*, categories(name, description_fields))
+      product_models(*, categories(name, description_fields)),
+      order_items(
+        orders(id, order_code, order_status,
+          customers(id, customer_code, first_name, last_name, email, phone)
+        )
+      )
     `)
     .order('created_at', { ascending: false })
 
@@ -62,7 +67,12 @@ export async function getItem(id: string) {
       suppliers(supplier_name, supplier_type),
       product_models(*, categories(name, form_fields, description_fields), product_media(id, file_url, role, sort_order, media_type)),
       item_costs(id, description, amount, created_at),
-      item_media(id, file_url, description, sort_order, visible, created_at, media_type, thumbnail_url)
+      item_media(id, file_url, description, sort_order, visible, created_at, media_type, thumbnail_url),
+      order_items(
+        orders(id, order_code, order_status,
+          customers(id, customer_code, first_name, last_name, email, phone)
+        )
+      )
     `)
     .eq('id', id)
     .single()

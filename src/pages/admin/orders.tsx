@@ -179,6 +179,8 @@ type OfferRow = {
   expires_at: string
   created_at: string
   offer_items: { id: string; item_id: string | null; description: string; unit_price: number; quantity: number }[]
+  customers: { id: string; customer_code: string; first_name: string | null; last_name: string; email: string | null; phone: string | null } | null
+  orders: { id: string; order_code: string } | null
 }
 
 export default function OrderListPage() {
@@ -295,6 +297,35 @@ export default function OrderListPage() {
       accessorKey: 'fb_name',
       header: 'FB Name',
       cell: ({ row }) => <span className="font-medium">{row.original.fb_name}</span>,
+    },
+    {
+      id: 'claimed_by',
+      header: 'Claimed By',
+      cell: ({ row }) => {
+        const c = row.original.customers
+        const ord = row.original.orders
+        if (!c) return <span className="text-xs text-muted-foreground">—</span>
+        const fullName = `${c.last_name} ${c.first_name ?? ''}`.trim()
+        return (
+          <div onClick={(e) => e.stopPropagation()} className="text-sm leading-tight">
+            <Link
+              to={`/admin/customers/${c.id}`}
+              className="font-medium text-primary hover:underline"
+            >
+              {fullName}
+            </Link>
+            <div className="text-xs text-muted-foreground">
+              {c.customer_code}
+              {ord && <> · <Link to={`/admin/orders/${ord.id}`} className="hover:underline">{ord.order_code}</Link></>}
+            </div>
+            {(c.email || c.phone) && (
+              <div className="text-xs text-muted-foreground truncate max-w-[180px]">
+                {c.email ?? c.phone}
+              </div>
+            )}
+          </div>
+        )
+      },
     },
     {
       id: 'items',

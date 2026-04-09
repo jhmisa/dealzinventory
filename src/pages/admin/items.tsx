@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
 import { Plus, Printer, QrCode, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -28,6 +28,7 @@ import { useDebounce } from '@/hooks/use-debounce'
 import { ITEM_STATUSES, CONDITION_GRADES } from '@/lib/constants'
 import { formatDate, cn, buildShortDescription } from '@/lib/utils'
 import { printItemLabel } from '@/components/items/label-print'
+import { resolveSoldTo } from '@/lib/item-sale'
 
 type ItemRow = {
   id: string
@@ -48,6 +49,14 @@ type ItemRow = {
   screen_size: number | null
   suppliers: { supplier_name: string } | null
   product_models: { brand: string; model_name: string; color: string; short_description: string | null; screen_size: number | null; categories: { name: string; description_fields: string[] } | null } | null
+  order_items?: Array<{
+    orders: {
+      id: string
+      order_code: string
+      order_status: string
+      customers: { id: string; customer_code: string; first_name: string | null; last_name: string; email: string | null; phone: string | null } | null
+    } | null
+  }>
 }
 
 const STATUS_TABS = [
@@ -155,7 +164,7 @@ export default function ItemListPage() {
   const { data: columnSettings } = useItemListColumnSettings()
 
   // Build VisibilityState from settings for the active tab
-  const ALL_COLUMN_IDS = ['item_code', 'model', 'condition_grade', 'item_status', 'supplier', 'purchase_price', 'selling_price', 'discount', 'created_at', 'actions']
+  const ALL_COLUMN_IDS = ['item_code', 'model', 'condition_grade', 'item_status', 'supplier', 'purchase_price', 'selling_price', 'discount', 'sold_to', 'created_at', 'actions']
   const columnVisibility = useMemo(() => {
     if (!columnSettings) return {}
     const setting = columnSettings.find((s) => s.status_tab === statusTab)
@@ -310,6 +319,32 @@ export default function ItemListPage() {
           updateItem={updateItem}
         />
       ),
+    },
+    {
+      id: 'sold_to',
+      header: 'Sold To',
+      size: 180,
+      cell: ({ row }) => {
+        const soldTo = resolveSoldTo(row.original.order_items)
+        if (!soldTo) return <span className="text-xs text-muted-foreground">—</span>
+        const fullName = `${soldTo.customer.last_name} ${soldTo.customer.first_name ?? ''}`.trim()
+        return (
+          <div onClick={(e) => e.stopPropagation()} className="text-sm leading-tight">
+            <Link
+              to={`/admin/customers/${soldTo.customer.id}`}
+              className="font-medium text-primary hover:underline"
+            >
+              {fullName}
+            </Link>
+            <div className="text-xs text-muted-foreground">
+              {soldTo.customer.customer_code} ·{' '}
+              <Link to={`/admin/orders/${soldTo.orderId}`} className="hover:underline">
+                {soldTo.orderCode}
+              </Link>
+            </div>
+          </div>
+        )
+      },
     },
     {
       accessorKey: 'created_at',

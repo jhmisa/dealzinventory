@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft, ClipboardEdit, Lock, Printer, QrCode, Send, Unlock } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Button } from '@/components/ui/button'
@@ -19,6 +19,7 @@ import { ITEM_STATUSES } from '@/lib/constants'
 import { useActiveOfferForItem, useCancelOffer } from '@/hooks/use-offers'
 import { CreateOfferDialog } from '@/components/offers'
 import { formatPrice, buildShortDescription } from '@/lib/utils'
+import { resolveSoldTo } from '@/lib/item-sale'
 import { printItemLabel } from '@/components/items/label-print'
 import { toast } from 'sonner'
 import type { Item, ProductModel, ProductMedia, Supplier, ItemCost, ItemMedia } from '@/lib/types'
@@ -70,6 +71,9 @@ export default function ItemDetailPage() {
   const isReserved = item.item_status === 'RESERVED'
   const isSold = item.item_status === 'SOLD'
   const isLocked = isSold || (isReserved && !unlocked)
+
+  // Sold-to customer (if the item is in a CONFIRMED-or-later order)
+  const soldTo = resolveSoldTo((item as unknown as { order_items?: unknown }).order_items)
 
   return (
     <div className="space-y-6">
@@ -160,6 +164,47 @@ export default function ItemDetailPage() {
             This item has been sold. Editing is permanently locked.
           </span>
         </div>
+      )}
+
+      {/* Sold-to customer card */}
+      {soldTo && (
+        <Card className="border-green-300 bg-green-50/40">
+          <CardContent className="py-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+              <div>
+                <p className="text-xs text-muted-foreground">Invoice</p>
+                <Link
+                  to={`/admin/orders/${soldTo.orderId}`}
+                  className="text-sm font-mono font-semibold text-primary hover:underline"
+                >
+                  {soldTo.orderCode}
+                </Link>
+                <p className="text-xs text-muted-foreground">{soldTo.orderStatus}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Customer</p>
+                <Link
+                  to={`/admin/customers/${soldTo.customer.id}`}
+                  className="text-sm font-semibold text-primary hover:underline"
+                >
+                  {`${soldTo.customer.last_name} ${soldTo.customer.first_name ?? ''}`.trim()}
+                </Link>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Customer ID</p>
+                <p className="text-sm font-mono">{soldTo.customer.customer_code}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Email</p>
+                <p className="text-sm truncate">{soldTo.customer.email ?? '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Phone</p>
+                <p className="text-sm">{soldTo.customer.phone ?? '—'}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Collapsible QR code */}
