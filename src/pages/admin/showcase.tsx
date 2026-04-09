@@ -183,38 +183,40 @@ export default function ShowcasePage() {
 
         {/* Product Info Overlay — bottom of media area */}
         {currentItem && (
-          <div className="absolute bottom-0 left-0 right-0 pt-28 pb-7 px-8 bg-gradient-to-t from-black/90 via-black/60 to-transparent pointer-events-none">
-            <div className="flex items-end gap-7">
-              {/* Left: code + price + rank */}
+          <div className="absolute bottom-0 left-0 right-0 pt-20 pb-5 px-8 bg-gradient-to-t from-black/90 via-black/55 to-transparent pointer-events-none">
+            <div className="flex items-end gap-6">
+              {/* Left: code + rank (inline) then price */}
               <div className="flex flex-col shrink-0 min-w-0">
-                <span className="tracking-[0.02em] text-white font-bold text-[36px]/[40px] drop-shadow-md">
-                  {currentItem.item_code}
-                </span>
-                <span className="tracking-[-0.03em] text-white font-extrabold text-[72px]/[72px] mt-1 drop-shadow-lg">
+                <div className="flex items-center gap-2.5">
+                  <span className="tracking-[0.02em] text-white font-bold text-[26px]/[30px] drop-shadow-md">
+                    {currentItem.item_code}
+                  </span>
+                  {currentItem.condition_grade && (
+                    <div className="flex items-center rounded-md py-0.5 px-2 bg-white/20 backdrop-blur-sm border border-white/25">
+                      <span className="text-white font-semibold text-[14px]/[18px]">
+                        Rank {currentItem.condition_grade}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <span className="tracking-[-0.03em] text-white font-extrabold text-[72px]/[72px] mt-0.5 drop-shadow-lg">
                   {price != null ? formatPrice(price) : '—'}
                 </span>
-                {currentItem.condition_grade && (
-                  <div className="flex items-center self-start rounded-md py-1.5 px-3 bg-white/20 backdrop-blur-sm mt-3 border border-white/25">
-                    <span className="text-white font-semibold text-[18px]/[22px]">
-                      Rank {currentItem.condition_grade}
-                    </span>
-                  </div>
-                )}
               </div>
 
               {/* Right: description + condition */}
-              <div className="flex flex-col grow min-w-0 gap-2.5 pb-2">
+              <div className="flex flex-col grow min-w-0 gap-1.5 pb-1.5">
                 {currentItem.description && (
-                  <p className="text-white/95 font-medium text-[30px]/[36px] line-clamp-3 drop-shadow">
+                  <p className="text-white/95 font-medium text-[20px]/[26px] line-clamp-3 drop-shadow">
                     {currentItem.description}
                   </p>
                 )}
                 {currentItem.condition_notes && (
                   <div className="flex flex-col gap-0.5">
-                    <span className="text-white/60 text-[14px]/[16px] font-semibold uppercase tracking-[0.12em]">
+                    <span className="text-white/60 text-[11px]/[14px] font-semibold uppercase tracking-[0.12em]">
                       Condition
                     </span>
-                    <span className="text-white/85 text-[22px]/[28px] line-clamp-2 drop-shadow">
+                    <span className="text-white/85 text-[15px]/[20px] line-clamp-2 drop-shadow">
                       {currentItem.condition_notes}
                     </span>
                   </div>
