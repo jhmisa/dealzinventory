@@ -302,7 +302,7 @@ export default function OrderListPage() {
         const fullName = c ? `${c.last_name} ${c.first_name ?? ''}`.trim() : null
         const contactParts = [c?.email, c?.phone].filter(Boolean) as string[]
         return (
-          <div onClick={(e) => e.stopPropagation()} className="text-xs leading-snug space-y-0.5 max-w-[260px]">
+          <div onClick={(e) => e.stopPropagation()} className="text-xs leading-snug space-y-0.5 min-w-[240px]">
             <div>
               <span className="text-muted-foreground">FB Name: </span>
               <span className="font-medium">{row.original.fb_name}</span>
@@ -323,7 +323,7 @@ export default function OrderListPage() {
                   </Link>
                 </div>
                 {contactParts.length > 0 && (
-                  <div className="truncate">
+                  <div className="whitespace-normal break-words">
                     <span className="text-muted-foreground">Contact: </span>
                     <span>{contactParts.join(' / ')}</span>
                   </div>
