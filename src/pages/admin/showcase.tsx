@@ -205,18 +205,18 @@ export default function ShowcasePage() {
               </div>
 
               {/* Right: description + condition */}
-              <div className="flex flex-col grow min-w-0 gap-1.5 pb-1.5">
+              <div className="flex flex-col grow min-w-0 gap-1 pb-1.5">
                 {currentItem.description && (
-                  <p className="text-white/95 font-medium text-[20px]/[26px] line-clamp-3 drop-shadow">
+                  <p className="text-white/95 font-medium text-[15px]/[20px] line-clamp-3 drop-shadow">
                     {currentItem.description}
                   </p>
                 )}
                 {currentItem.condition_notes && (
                   <div className="flex flex-col gap-0.5">
-                    <span className="text-white/60 text-[11px]/[14px] font-semibold uppercase tracking-[0.12em]">
+                    <span className="text-white/60 text-[9px]/[12px] font-semibold uppercase tracking-[0.12em]">
                       Condition
                     </span>
-                    <span className="text-white/85 text-[15px]/[20px] line-clamp-2 drop-shadow">
+                    <span className="text-white/85 text-[12px]/[16px] line-clamp-2 drop-shadow">
                       {currentItem.condition_notes}
                     </span>
                   </div>
