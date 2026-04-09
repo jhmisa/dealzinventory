@@ -201,10 +201,8 @@ export default function OrderListPage() {
     source: sourceFilter === 'all' ? undefined : sourceFilter,
   })
 
-  // Fetch offers
-  const { data: allOffers, isLoading: offersLoading } = useOffers({
-    search: mainTab === 'offers' ? search || undefined : undefined,
-  })
+  // Fetch offers (search is applied client-side so it can span joined fields)
+  const { data: allOffers, isLoading: offersLoading } = useOffers({})
 
   const cancelOffer = useCancelOffer()
 
@@ -264,9 +262,32 @@ export default function OrderListPage() {
     statusCounts[order.order_status] = (statusCounts[order.order_status] ?? 0) + 1
   }
 
-  // Compute offer counts per status
-  const offerStatusCounts: Record<string, number> = { all: offers.length }
-  for (const offer of offers) {
+  // Client-side search across offer code, FB name, customer (name/code/email/phone), and order code
+  const offerSearchQuery = mainTab === 'offers' ? search.trim().toLowerCase() : ''
+  const searchedOffers = offerSearchQuery
+    ? offers.filter((o) => {
+        const c = o.customers
+        const haystack = [
+          o.offer_code,
+          o.fb_name,
+          c?.customer_code,
+          c?.first_name,
+          c?.last_name,
+          c ? `${c.last_name} ${c.first_name ?? ''}`.trim() : null,
+          c?.email,
+          c?.phone,
+          o.orders?.order_code,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+        return haystack.includes(offerSearchQuery)
+      })
+    : offers
+
+  // Compute offer counts per status (reflects current search)
+  const offerStatusCounts: Record<string, number> = { all: searchedOffers.length }
+  for (const offer of searchedOffers) {
     offerStatusCounts[offer.offer_status] = (offerStatusCounts[offer.offer_status] ?? 0) + 1
   }
 
@@ -283,8 +304,8 @@ export default function OrderListPage() {
   }
 
   const filteredOffers = statusTab === 'all'
-    ? offers
-    : offers.filter((o) => o.offer_status === statusTab)
+    ? searchedOffers
+    : searchedOffers.filter((o) => o.offer_status === statusTab)
 
   // Offers table columns
   const offerColumns: ColumnDef<OfferRow>[] = [
@@ -643,7 +664,7 @@ export default function OrderListPage() {
             <SearchBar
               value={search}
               onChange={setSearch}
-              placeholder="Search by offer code or FB name..."
+              placeholder="Search by offer code, FB name, customer, contact, or order code..."
               className="flex-1 min-w-[300px]"
             />
           </div>
