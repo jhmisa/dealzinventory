@@ -5,7 +5,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { PageHeader, FormSkeleton, StatusBadge, GradeBadge, CodeDisplay } from '@/components/shared'
+import { FormSkeleton, StatusBadge, GradeBadge, CodeDisplay } from '@/components/shared'
 import { useItem } from '@/hooks/use-items'
 import {
   SupplierDescriptionBanner,
@@ -78,38 +78,51 @@ export default function ItemDetailPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/admin/items')} aria-label="Back to items">
+      <div className="flex items-start gap-4">
+        <Button variant="ghost" size="icon" onClick={() => navigate('/admin/items')} aria-label="Back to items" className="mt-1">
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <PageHeader
-          title={item.item_code}
-          description={description}
-          actions={
-            <div className="flex items-center gap-2">
-              {statusConfig && <StatusBadge label={statusConfig.label} color={statusConfig.color} />}
-              <GradeBadge grade={item.condition_grade} />
-              <Button variant="ghost" size="icon" onClick={() => setShowQr(!showQr)} title="Toggle QR code">
-                <QrCode className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="icon" onClick={() => printItemLabel({ item_code: item.item_code, description })} title="Print label">
-                <Printer className="h-4 w-4" />
-              </Button>
-              {item.item_status === 'AVAILABLE' && (
-                <Button variant="outline" onClick={() => setShowOfferDialog(true)}>
-                  <Send className="h-4 w-4 mr-2" />
-                  Create Offer
-                </Button>
-              )}
-              {item.item_status === 'INTAKE' && (
-                <Button onClick={() => navigate(`/admin/inspection/${item.id}`)}>
-                  <ClipboardEdit className="h-4 w-4 mr-2" />
-                  Inspect
-                </Button>
-              )}
+        <div className="flex-1 flex items-start justify-between gap-4">
+          <div className="min-w-0 space-y-1.5">
+            <h1 className="text-2xl font-bold tracking-tight">{item.item_code}</h1>
+            {pm?.categories?.name && (
+              <Badge variant="secondary" className="text-xs">
+                {pm.categories.name}
+              </Badge>
+            )}
+            {description && (
+              <p className="text-muted-foreground">{description}</p>
+            )}
+            <div className="flex items-baseline gap-2 pt-1">
+              <span className="text-xs text-muted-foreground">Selling Price</span>
+              <span className="text-2xl font-bold tracking-tight">
+                {item.selling_price != null ? formatPrice(item.selling_price) : '—'}
+              </span>
             </div>
-          }
-        />
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {statusConfig && <StatusBadge label={statusConfig.label} color={statusConfig.color} />}
+            <GradeBadge grade={item.condition_grade} />
+            <Button variant="ghost" size="icon" onClick={() => setShowQr(!showQr)} title="Toggle QR code">
+              <QrCode className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="icon" onClick={() => printItemLabel({ item_code: item.item_code, description })} title="Print label">
+              <Printer className="h-4 w-4" />
+            </Button>
+            {item.item_status === 'AVAILABLE' && (
+              <Button variant="outline" onClick={() => setShowOfferDialog(true)}>
+                <Send className="h-4 w-4 mr-2" />
+                Create Offer
+              </Button>
+            )}
+            {item.item_status === 'INTAKE' && (
+              <Button onClick={() => navigate(`/admin/inspection/${item.id}`)}>
+                <ClipboardEdit className="h-4 w-4 mr-2" />
+                Inspect
+              </Button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Lock banner for RESERVED items */}
@@ -256,27 +269,6 @@ export default function ItemDetailPage() {
           </div>
         )
       })()}
-
-      {/* Category + selling price meta strip */}
-      {(pm?.categories?.name || item.selling_price != null) && (
-        <Card>
-          <CardContent className="py-2 px-4 flex items-center justify-between gap-4">
-            <div className="min-w-0">
-              {pm?.categories?.name ? (
-                <Badge variant="secondary" className="text-xs">
-                  {pm.categories.name}
-                </Badge>
-              ) : null}
-            </div>
-            <div className="flex items-baseline gap-2 shrink-0">
-              <span className="text-xs text-muted-foreground">Selling Price</span>
-              <span className="text-2xl font-bold tracking-tight">
-                {item.selling_price != null ? formatPrice(item.selling_price) : '—'}
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Supplier description banner */}
       <SupplierDescriptionBanner description={item.supplier_description} />
