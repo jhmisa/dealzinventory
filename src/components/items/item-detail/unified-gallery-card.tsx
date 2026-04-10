@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
-import { GripVertical, Eye, EyeOff, X, Plus, Upload, Camera, Video, Loader2, CircleDot, Square } from 'lucide-react'
+import { GripVertical, Eye, EyeOff, X, Plus, Upload, Camera, Video, Loader2, CircleDot, Square, Download } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   DndContext,
@@ -481,6 +481,40 @@ export function UnifiedGalleryCard({ item, productMedia, itemMedia }: UnifiedGal
 
   const firstVisibleId = photos.find((p) => p.visible)?.id
 
+  const [downloading, setDownloading] = useState<'photos' | 'videos' | null>(null)
+
+  async function handleDownloadAll(type: 'photos' | 'videos') {
+    const items = type === 'photos' ? imagePhotos : videoPhotos
+    if (items.length === 0) return
+
+    setDownloading(type)
+    try {
+      for (let i = 0; i < items.length; i++) {
+        const media = items[i]
+        const response = await fetch(media.url)
+        const blob = await response.blob()
+        const ext = type === 'videos'
+          ? (media.url.match(/\.(mp4|webm|mov)/) ?? [, 'mp4'])[1]
+          : (media.url.match(/\.(webp|jpg|jpeg|png)/) ?? [, 'webp'])[1]
+        const filename = `${item.item_code}_${type === 'photos' ? 'photo' : 'video'}_${i + 1}.${ext}`
+
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = filename
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      }
+      toast.success(`Downloaded ${items.length} ${type}`)
+    } catch {
+      toast.error(`Failed to download ${type}`)
+    } finally {
+      setDownloading(null)
+    }
+  }
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -547,6 +581,37 @@ export function UnifiedGalleryCard({ item, productMedia, itemMedia }: UnifiedGal
             )}
           </TabsContent>
         </Tabs>
+
+        {(imagePhotos.length > 0 || videoPhotos.length > 0) && (
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={imagePhotos.length === 0 || downloading === 'photos'}
+              onClick={() => handleDownloadAll('photos')}
+            >
+              {downloading === 'photos' ? (
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+              ) : (
+                <Download className="h-3 w-3 mr-1" />
+              )}
+              Download All Photos
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={videoPhotos.length === 0 || downloading === 'videos'}
+              onClick={() => handleDownloadAll('videos')}
+            >
+              {downloading === 'videos' ? (
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+              ) : (
+                <Download className="h-3 w-3 mr-1" />
+              )}
+              Download All Videos
+            </Button>
+          </div>
+        )}
 
         {showUploader && (
           <div className="space-y-4">
