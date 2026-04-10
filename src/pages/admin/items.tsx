@@ -274,6 +274,25 @@ export default function ItemListPage() {
               <div className="flex items-center gap-2">
                 <CodeDisplay code={r.item_code} />
                 <GradeBadge grade={r.condition_grade as never} />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  title="Copy item info"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    const text = [
+                      r.item_code,
+                      modelLine !== '—' ? modelLine : '',
+                      r.condition_grade ? `Rank ${r.condition_grade}` : '',
+                      r.selling_price != null ? formatPrice(r.selling_price) : '',
+                    ].filter(Boolean).join(' ')
+                    navigator.clipboard.writeText(text)
+                    toast.success('Copied to clipboard')
+                  }}
+                >
+                  <Copy className="h-3 w-3" />
+                </Button>
               </div>
               <div className="text-sm text-muted-foreground">{modelLine}</div>
               {r.condition_notes && (
@@ -364,43 +383,8 @@ export default function ItemListPage() {
     {
       accessorKey: 'created_at',
       header: 'Intake Date',
-      size: 100,
-      cell: ({ row }) => {
-        const r = row.original
-        const pm = r.product_models
-        const descFields = pm?.categories?.description_fields ?? []
-        const resolvedValues: Record<string, unknown> = {}
-        for (const key of descFields) {
-          resolvedValues[key] = (r as Record<string, unknown>)[key] ?? (pm as Record<string, unknown> | null)?.[key]
-        }
-        const desc = descFields.length > 0
-          ? buildShortDescription(resolvedValues, descFields)
-          : (r.brand && r.model_name ? `${r.brand} ${r.model_name}` : pm ? `${pm.brand} ${pm.model_name}` : '')
-        return (
-          <div className="flex items-center gap-1">
-            <span>{formatDate(r.created_at)}</span>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              title="Copy item info"
-              onClick={(e) => {
-                e.stopPropagation()
-                const text = [
-                  r.item_code,
-                  desc || '',
-                  r.condition_grade ? `Rank ${r.condition_grade}` : '',
-                  r.selling_price != null ? formatPrice(r.selling_price) : '',
-                ].filter(Boolean).join(' ')
-                navigator.clipboard.writeText(text)
-                toast.success('Copied to clipboard')
-              }}
-            >
-              <Copy className="h-3 w-3" />
-            </Button>
-          </div>
-        )
-      },
+      size: 75,
+      cell: ({ row }) => formatDate(row.original.created_at),
     },
     {
       id: 'actions',
