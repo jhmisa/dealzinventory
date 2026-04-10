@@ -257,11 +257,9 @@ export default function ItemListPage() {
           modelLine = parts.length > 0 ? parts.join(' / ') : (r.supplier_description || '—')
         }
 
-        // Get thumbnail from product_media (first image sorted by sort_order)
-        const media = pm?.product_media ?? []
-        const thumb = media
-          .filter(m => m.role === 'photo')
-          .sort((a, b) => a.sort_order - b.sort_order)[0]
+        // Get thumbnail from product_media (hero first, then any by sort_order)
+        const media = (pm?.product_media ?? []).sort((a, b) => a.sort_order - b.sort_order)
+        const thumb = media.find(m => m.role === 'hero') ?? media[0]
 
         return (
           <div className="flex items-center gap-3">
@@ -277,9 +275,9 @@ export default function ItemListPage() {
                 <CodeDisplay code={r.item_code} />
                 <GradeBadge grade={r.condition_grade as never} />
               </div>
-              <div className="text-sm text-muted-foreground truncate">{modelLine}</div>
+              <div className="text-sm text-muted-foreground">{modelLine}</div>
               {r.condition_notes && (
-                <div className="text-xs text-muted-foreground truncate">{r.condition_notes}</div>
+                <div className="text-xs text-muted-foreground">{r.condition_notes}</div>
               )}
             </div>
           </div>
