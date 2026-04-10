@@ -24,7 +24,7 @@ export async function getItems(filters: ItemFilters = {}) {
     .select(`
       *,
       suppliers(supplier_name),
-      product_models(*, categories(name, description_fields)),
+      product_models(*, categories(name, description_fields), product_media(file_url, role, sort_order)),
       order_items(
         orders(id, order_code, order_status,
           customers(id, customer_code, first_name, last_name, email, phone)

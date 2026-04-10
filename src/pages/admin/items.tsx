@@ -49,7 +49,8 @@ type ItemRow = {
   storage_gb: string | null
   screen_size: number | null
   suppliers: { supplier_name: string } | null
-  product_models: { brand: string; model_name: string; color: string; short_description: string | null; screen_size: number | null; categories: { name: string; description_fields: string[] } | null } | null
+  supplier_description: string | null
+  product_models: { brand: string; model_name: string; color: string; short_description: string | null; screen_size: number | null; categories: { name: string; description_fields: string[] } | null; product_media?: { file_url: string; role: string; sort_order: number }[] } | null
   order_items?: Array<{
     orders: {
       id: string
@@ -165,14 +166,20 @@ export default function ItemListPage() {
   const { data: columnSettings } = useItemListColumnSettings()
 
   // Build VisibilityState from settings for the active tab
-  const ALL_COLUMN_IDS = ['item_code', 'model', 'condition_grade', 'item_status', 'supplier', 'purchase_price', 'selling_price', 'discount', 'sold_to', 'created_at', 'actions']
+  const ALL_COLUMN_IDS = ['item_summary', 'item_status', 'supplier', 'purchase_price', 'selling_price', 'discount', 'sold_to', 'created_at', 'actions']
   const columnVisibility = useMemo(() => {
     if (!columnSettings) return {}
     const setting = columnSettings.find((s) => s.status_tab === statusTab)
     if (!setting) return {}
+    const saved = setting.visible_columns
     const vis: Record<string, boolean> = {}
     for (const id of ALL_COLUMN_IDS) {
-      vis[id] = setting.visible_columns.includes(id)
+      if (id === 'item_summary') {
+        // Migrate from old separate columns: show if any of the old ones were visible, or if not yet saved
+        vis[id] = saved.includes('item_summary') || saved.includes('item_code') || saved.includes('model') || saved.includes('condition_grade')
+      } else {
+        vis[id] = saved.includes(id)
+      }
     }
     return vis
   }, [columnSettings, statusTab])
@@ -218,30 +225,24 @@ export default function ItemListPage() {
 
   const columns: ColumnDef<ItemRow>[] = [
     {
-      accessorKey: 'item_code',
-      header: 'P-Code',
-      size: 80,
-      cell: ({ row }) => <CodeDisplay code={row.original.item_code} />,
-    },
-    {
-      id: 'model',
-      header: 'Description',
-      size: 400,
-      minSize: 150,
-      maxSize: 800,
+      id: 'item_summary',
+      header: 'Item',
+      size: 480,
+      minSize: 200,
+      maxSize: 900,
       cell: ({ row }) => {
-        const pm = row.original.product_models
-        const { condition_notes } = row.original
+        const r = row.original
+        const pm = r.product_models
         const descFields = pm?.categories?.description_fields
         let modelLine: string
         if (descFields && descFields.length > 0) {
           const resolvedValues: Record<string, unknown> = {}
           for (const key of descFields) {
-            resolvedValues[key] = (row.original as Record<string, unknown>)[key] ?? (pm as Record<string, unknown> | null)?.[key]
+            resolvedValues[key] = (r as Record<string, unknown>)[key] ?? (pm as Record<string, unknown> | null)?.[key]
           }
-          modelLine = buildShortDescription(resolvedValues, descFields) || row.original.supplier_description || '—'
+          modelLine = buildShortDescription(resolvedValues, descFields) || r.supplier_description || '—'
         } else {
-          const { brand, model_name, cpu, ram_gb, storage_gb, screen_size } = row.original
+          const { brand, model_name, cpu, ram_gb, storage_gb, screen_size } = r
           const modelName = brand && model_name
             ? `${brand} ${model_name}`
             : pm ? `${pm.brand} ${pm.model_name}` : null
@@ -253,22 +254,37 @@ export default function ItemListPage() {
             storage_gb,
             screenVal ? `${screenVal}"` : null,
           ].filter(Boolean)
-          modelLine = parts.length > 0 ? parts.join(' / ') : (row.original.supplier_description || '—')
+          modelLine = parts.length > 0 ? parts.join(' / ') : (r.supplier_description || '—')
         }
-        if (!condition_notes) return modelLine
+
+        // Get thumbnail from product_media (first image sorted by sort_order)
+        const media = pm?.product_media ?? []
+        const thumb = media
+          .filter(m => m.role === 'photo')
+          .sort((a, b) => a.sort_order - b.sort_order)[0]
+
         return (
-          <div>
-            <div>{modelLine}</div>
-            <div className="text-xs text-muted-foreground">{condition_notes}</div>
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded border bg-muted flex-shrink-0 overflow-hidden">
+              {thumb ? (
+                <img src={thumb.file_url} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <div className="h-full w-full flex items-center justify-center text-muted-foreground text-xs">—</div>
+              )}
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <CodeDisplay code={r.item_code} />
+                <GradeBadge grade={r.condition_grade as never} />
+              </div>
+              <div className="text-sm text-muted-foreground truncate">{modelLine}</div>
+              {r.condition_notes && (
+                <div className="text-xs text-muted-foreground truncate">{r.condition_notes}</div>
+              )}
+            </div>
           </div>
         )
       },
-    },
-    {
-      accessorKey: 'condition_grade',
-      header: 'Grade',
-      size: 50,
-      cell: ({ row }) => <GradeBadge grade={row.original.condition_grade as never} />,
     },
     {
       accessorKey: 'item_status',
