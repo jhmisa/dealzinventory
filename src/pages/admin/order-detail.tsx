@@ -147,7 +147,7 @@ export default function OrderDetailPage() {
   const [revertOpen, setRevertOpen] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [editingItems, setEditingItems] = useState<Record<string, EditingItem>>({})
-  const [editShippingCost, setEditShippingCost] = useState(0)
+  const [editShippingCost, setEditShippingCost] = useState(1000)
   const [editTrackingNumber, setEditTrackingNumber] = useState('')
   const [editDeliveryBoxCount, setEditDeliveryBoxCount] = useState(1)
   const [showAuditLog, setShowAuditLog] = useState(false)

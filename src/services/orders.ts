@@ -728,7 +728,13 @@ export async function addCreditCardSurcharge(orderId: string, surchargePercent: 
 
   if (existing && existing.length > 0) return // Already has surcharge
 
-  // Calculate surcharge from current line items (excluding existing fee if any)
+  // Calculate surcharge from current line items + shipping (excluding existing fee)
+  const { data: order } = await supabase
+    .from('orders')
+    .select('shipping_cost')
+    .eq('id', orderId)
+    .single()
+
   const { data: items } = await supabase
     .from('order_items')
     .select('unit_price, quantity, discount, description')
@@ -739,8 +745,10 @@ export async function addCreditCardSurcharge(orderId: string, surchargePercent: 
   const subtotal = items
     .filter((i) => i.description !== CC_FEE_DESCRIPTION)
     .reduce((sum, i) => sum + i.unit_price * i.quantity - i.discount, 0)
+  const shippingCost = (order as Record<string, unknown>)?.shipping_cost as number ?? 0
+  const total = subtotal + shippingCost
 
-  const feeAmount = Math.round(subtotal * surchargePercent / 100)
+  const feeAmount = Math.round(total * surchargePercent / 100)
   if (feeAmount <= 0) return
 
   const { error: insertError } = await supabase

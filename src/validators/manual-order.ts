@@ -20,7 +20,7 @@ export const manualOrderSchema = z.object({
   delivery_date: z.string().nullable().optional(),
   delivery_time_code: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
-  shipping_cost: z.coerce.number().int().nonnegative('Delivery fee must be ≥ 0').default(0),
+  shipping_cost: z.coerce.number().int().nonnegative('Delivery fee must be ≥ 0').default(1000),
   items: z.array(orderLineItemSchema).min(1, 'At least 1 item is required'),
 })
 

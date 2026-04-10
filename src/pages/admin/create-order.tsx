@@ -28,7 +28,7 @@ export default function CreateOrderPage() {
 
   // Section 3: Order
   const [lineItems, setLineItems] = useState<OrderLineItem[]>([])
-  const [shippingCost, setShippingCost] = useState(0)
+  const [shippingCost, setShippingCost] = useState(1000)
   const [orderSource, setOrderSource] = useState<string>('SHOP')
   const [notes, setNotes] = useState('')
 
