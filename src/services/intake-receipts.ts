@@ -124,6 +124,45 @@ export async function createIntakeBatch(params: CreateBatchParams) {
   }
 }
 
+// --- Accessory Intake Batch ---
+
+interface CreateAccessoryBatchParams {
+  supplier_id: string
+  date_received: string
+  invoice_file_url?: string
+  supplier_contact_snapshot?: string
+  notes?: string
+  line_items: Array<{
+    accessory_id?: string
+    name?: string
+    brand?: string
+    category_id?: string
+    selling_price?: number
+    quantity: number
+    unit_cost: number
+  }>
+}
+
+export async function createAccessoryIntakeBatch(params: CreateAccessoryBatchParams) {
+  const { data, error } = await supabase.rpc('create_accessory_intake_batch', {
+    p_supplier_id: params.supplier_id,
+    p_date_received: params.date_received,
+    p_invoice_file_url: params.invoice_file_url ?? '',
+    p_supplier_contact_snapshot: params.supplier_contact_snapshot ?? '',
+    p_notes: params.notes ?? '',
+    p_line_items: params.line_items as unknown as Json,
+  })
+
+  if (error) throw error
+  return data as {
+    receipt_id: string
+    receipt_code: string
+    total_items: number
+    total_cost: number
+    entries: Array<{ accessory_id: string; quantity: number; unit_cost: number }>
+  }
+}
+
 export async function generateAdjustmentCode(): Promise<string> {
   const { data, error } = await supabase.rpc('generate_code', {
     prefix: 'ADJ',

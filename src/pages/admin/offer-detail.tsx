@@ -406,7 +406,7 @@ export default function OfferDetailPage() {
               <Input
                 value={addCode}
                 onChange={(e) => setAddCode(e.target.value)}
-                placeholder="Enter P-code or G-code (e.g. P000100)"
+                placeholder="Enter P-code, G-code, or A-code"
                 onKeyDown={(e) => e.key === 'Enter' && handleAddByCode()}
               />
               <Button onClick={handleAddByCode} disabled={addingCode || !addCode.trim()}>

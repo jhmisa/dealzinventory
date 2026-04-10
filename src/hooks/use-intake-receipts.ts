@@ -74,3 +74,15 @@ export function useUploadInvoiceFile() {
     mutationFn: (file: File) => receiptService.uploadInvoiceFile(file),
   })
 }
+
+export function useCreateAccessoryIntakeBatch() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: receiptService.createAccessoryIntakeBatch,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.intakeReceipts.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.accessories.all })
+    },
+  })
+}
+

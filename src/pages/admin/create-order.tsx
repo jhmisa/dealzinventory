@@ -58,6 +58,7 @@ export default function CreateOrderPage() {
         shipping_cost: shippingCost,
         items: lineItems.map((li) => ({
           item_id: li.item_id,
+          accessory_id: li.accessory_id ?? null,
           description: li.description,
           quantity: li.quantity,
           unit_price: li.unit_price,

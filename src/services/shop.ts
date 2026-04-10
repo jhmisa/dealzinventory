@@ -97,6 +97,18 @@ export async function getProductDetail(productModelId: string) {
   return data ?? []
 }
 
+// Check global shop enabled toggle
+export async function getShopEnabled(): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('system_settings')
+    .select('value')
+    .eq('key', 'shop_enabled')
+    .single()
+
+  if (error) return true // Default to enabled
+  return data.value !== 'false'
+}
+
 // Get unique brands from active sell groups (for filter dropdown)
 export async function getShopBrands() {
   const { data, error } = await supabase

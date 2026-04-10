@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/query-keys'
 import * as shopService from '@/services/shop'
+import * as accessoriesService from '@/services/accessories'
 
 interface ShopFilters {
   search?: string
@@ -38,5 +39,19 @@ export function useShopBrands() {
   return useQuery({
     queryKey: queryKeys.shop.brands(),
     queryFn: () => shopService.getShopBrands(),
+  })
+}
+
+export function useShopEnabled() {
+  return useQuery({
+    queryKey: queryKeys.shop.enabled(),
+    queryFn: () => shopService.getShopEnabled(),
+  })
+}
+
+export function useShopAccessories(filters: { search?: string; categoryId?: string; sort?: string } = {}) {
+  return useQuery({
+    queryKey: queryKeys.shop.accessories(filters),
+    queryFn: () => accessoriesService.getShopAccessories(filters),
   })
 }

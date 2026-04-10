@@ -32,12 +32,12 @@ import {
 import { useSuppliers } from '@/hooks/use-suppliers'
 import { useProductModelsWithHeroImage } from '@/hooks/use-product-models'
 import { useActiveAiConfiguration } from '@/hooks/use-ai-configurations'
-import { useCreateIntakeBatch, useUploadInvoiceFile, useParseInvoice } from '@/hooks/use-intake-receipts'
+import { useCreateIntakeBatch, useUploadInvoiceFile, useParseInvoice, useCreateAccessoryIntakeBatch } from '@/hooks/use-intake-receipts'
 import { getInvoiceSignedUrl } from '@/services/intake-receipts'
 import { batchMatchProducts } from '@/services/product-models'
 import { autoMatchSingle } from '@/lib/product-matcher'
 import { SOURCE_TYPES } from '@/lib/constants'
-import type { SourceType } from '@/lib/types'
+import type { SourceType, Supplier } from '@/lib/types'
 
 type IntakeMode = 'upload' | 'manual'
 
@@ -332,8 +332,80 @@ export default function BulkIntakePage() {
     }
   }
 
-  const supplierName = suppliers?.find(s => s.id === supplierId)?.supplier_name ?? ''
+  const createAccessoryBatchMutation = useCreateAccessoryIntakeBatch()
+
+  const selectedSupplier = suppliers?.find(s => s.id === supplierId) as (Supplier | undefined)
+  const supplierName = selectedSupplier?.supplier_name ?? ''
+  const isAccessorySupplier = selectedSupplier?.supplier_type === 'accessory'
   const isProcessing = uploadMutation.isPending || parseMutation.isPending
+
+  // Accessory intake line items state
+  const [accessoryLineItems, setAccessoryLineItems] = useState<Array<{
+    id: string
+    name: string
+    brand: string
+    quantity: number
+    unit_cost: number
+    selling_price: number
+    accessory_id?: string
+  }>>([])
+
+  const [accessorySuccessData, setAccessorySuccessData] = useState<{
+    receiptCode: string
+    totalItems: number
+    totalCost: number
+  } | null>(null)
+
+  function addAccessoryLineItem() {
+    setAccessoryLineItems(prev => [...prev, {
+      id: crypto.randomUUID(),
+      name: '',
+      brand: '',
+      quantity: 1,
+      unit_cost: 0,
+      selling_price: 0,
+    }])
+  }
+
+  function updateAccessoryLineItem(id: string, field: string, value: string | number) {
+    setAccessoryLineItems(prev => prev.map(item =>
+      item.id === id ? { ...item, [field]: value } : item
+    ))
+  }
+
+  function deleteAccessoryLineItem(id: string) {
+    setAccessoryLineItems(prev => prev.filter(item => item.id !== id))
+  }
+
+  async function handleCreateAccessories() {
+    if (!supplierId || accessoryLineItems.length === 0) return
+    try {
+      const result = await createAccessoryBatchMutation.mutateAsync({
+        supplier_id: supplierId,
+        date_received: dateReceived,
+        invoice_file_url: invoiceFileUrl || undefined,
+        supplier_contact_snapshot: selectedSupplier?.contact_info ?? undefined,
+        notes: notes || undefined,
+        line_items: accessoryLineItems.map(item => ({
+          accessory_id: item.accessory_id || undefined,
+          name: item.name,
+          brand: item.brand || undefined,
+          quantity: item.quantity,
+          unit_cost: item.unit_cost,
+          selling_price: item.selling_price,
+        })),
+      })
+      setAccessorySuccessData({
+        receiptCode: result.receipt_code,
+        totalItems: result.total_items,
+        totalCost: result.total_cost,
+      })
+      setStep('success')
+      toast.success(`${result.total_items} accessory units stocked — ${result.receipt_code}`)
+    } catch (err) {
+      toast.error(`Failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
+    }
+  }
 
   // File upload + AI parsing
   const handleFileSelected = useCallback(async (file: File) => {
@@ -484,7 +556,18 @@ export default function BulkIntakePage() {
       toast.error('Select a supplier first')
       return
     }
-    setLineItems([makeEmptyLine()])
+    if (isAccessorySupplier) {
+      setAccessoryLineItems([{
+        id: crypto.randomUUID(),
+        name: '',
+        brand: '',
+        quantity: 1,
+        unit_cost: 0,
+        selling_price: 0,
+      }])
+    } else {
+      setLineItems([makeEmptyLine()])
+    }
     setStep('verify')
   }
 
@@ -560,8 +643,8 @@ export default function BulkIntakePage() {
         </div>
       )}
 
-      {/* STEP 2: Verify */}
-      {step === 'verify' && (
+      {/* STEP 2: Verify (P-code items only, not accessories) */}
+      {step === 'verify' && !isAccessorySupplier && (
         <div className="space-y-4">
           <IntakeSharedFields
             supplierId={supplierId} setSupplierId={setSupplierId}
@@ -616,8 +699,8 @@ export default function BulkIntakePage() {
         </div>
       )}
 
-      {/* STEP 3: Review Specs */}
-      {step === 'review-specs' && (
+      {/* STEP 3: Review Specs (P-code only) */}
+      {step === 'review-specs' && !isAccessorySupplier && (
         <div className="space-y-4">
           <SpecReviewTable
             items={lineItems}
@@ -639,8 +722,8 @@ export default function BulkIntakePage() {
         </div>
       )}
 
-      {/* STEP 4: Confirm */}
-      {step === 'confirm' && (
+      {/* STEP 4: Confirm (P-code only) */}
+      {step === 'confirm' && !isAccessorySupplier && (
         <div className="space-y-4">
           <IntakeReviewCard
             supplierName={supplierName}
@@ -673,6 +756,105 @@ export default function BulkIntakePage() {
         </div>
       )}
 
+      {/* ACCESSORY INTAKE: Verify + Confirm (shown when supplier type is 'accessory') */}
+      {isAccessorySupplier && step === 'verify' && (
+        <div className="space-y-4">
+          <IntakeSharedFields
+            supplierId={supplierId} setSupplierId={setSupplierId}
+            sourceType={sourceType} setSourceType={setSourceType}
+            dateReceived={dateReceived} setDateReceived={setDateReceived}
+            notes={notes} setNotes={setNotes}
+            suppliers={suppliers}
+            extractedMeta={extractedMeta}
+            selectedSupplierName={supplierName}
+          />
+
+          <Card>
+            <CardContent className="pt-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold">Accessory Line Items</h3>
+                <Button variant="outline" size="sm" onClick={addAccessoryLineItem}>
+                  Add Item
+                </Button>
+              </div>
+
+              {accessoryLineItems.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No items added. Click "Add Item" to start.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {accessoryLineItems.map((item, idx) => (
+                    <div key={item.id} className="grid grid-cols-[1fr_1fr_80px_100px_100px_40px] gap-2 items-end">
+                      <div>
+                        {idx === 0 && <Label className="text-xs">Name *</Label>}
+                        <Input
+                          value={item.name}
+                          onChange={(e) => updateAccessoryLineItem(item.id, 'name', e.target.value)}
+                          placeholder="USB-C Cable"
+                        />
+                      </div>
+                      <div>
+                        {idx === 0 && <Label className="text-xs">Brand</Label>}
+                        <Input
+                          value={item.brand}
+                          onChange={(e) => updateAccessoryLineItem(item.id, 'brand', e.target.value)}
+                          placeholder="Anker"
+                        />
+                      </div>
+                      <div>
+                        {idx === 0 && <Label className="text-xs">Qty *</Label>}
+                        <Input
+                          type="number" min={1}
+                          value={item.quantity}
+                          onChange={(e) => updateAccessoryLineItem(item.id, 'quantity', Number(e.target.value) || 1)}
+                        />
+                      </div>
+                      <div>
+                        {idx === 0 && <Label className="text-xs">Unit Cost</Label>}
+                        <Input
+                          type="number" min={0}
+                          value={item.unit_cost}
+                          onChange={(e) => updateAccessoryLineItem(item.id, 'unit_cost', Number(e.target.value) || 0)}
+                        />
+                      </div>
+                      <div>
+                        {idx === 0 && <Label className="text-xs">Sell Price</Label>}
+                        <Input
+                          type="number" min={0}
+                          value={item.selling_price}
+                          onChange={(e) => updateAccessoryLineItem(item.id, 'selling_price', Number(e.target.value) || 0)}
+                        />
+                      </div>
+                      <div>
+                        {idx === 0 && <Label className="text-xs">&nbsp;</Label>}
+                        <Button
+                          variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-destructive"
+                          onClick={() => deleteAccessoryLineItem(item.id)}
+                        >×</Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="flex items-center justify-between">
+            <Button variant="outline" onClick={handleReset}>Clear & Start Over</Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setStep('upload')}>Back</Button>
+              <Button
+                onClick={handleCreateAccessories}
+                disabled={createAccessoryBatchMutation.isPending || accessoryLineItems.length === 0}
+              >
+                {createAccessoryBatchMutation.isPending ? 'Creating...' : 'Create Stock Entries'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* STEP 5: Success */}
       {step === 'success' && successData && (
         <IntakeSuccessCard
@@ -685,6 +867,29 @@ export default function BulkIntakePage() {
           createdItems={successData.items}
           onReset={handleReset}
         />
+      )}
+
+      {/* Accessory Success */}
+      {step === 'success' && accessorySuccessData && (
+        <Card>
+          <CardContent className="pt-6 space-y-4 text-center">
+            <div className="mx-auto w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
+              <span className="text-2xl">✓</span>
+            </div>
+            <h2 className="text-xl font-bold">Accessory Intake Complete</h2>
+            <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto text-sm">
+              <div>
+                <p className="text-muted-foreground">Receipt Code</p>
+                <p className="font-mono font-semibold">{accessorySuccessData.receiptCode}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Total Units</p>
+                <p className="font-semibold">{accessorySuccessData.totalItems}</p>
+              </div>
+            </div>
+            <Button onClick={handleReset} variant="outline">Start Another Intake</Button>
+          </CardContent>
+        </Card>
       )}
     </div>
   )

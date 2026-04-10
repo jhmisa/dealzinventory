@@ -70,13 +70,16 @@ export async function getOrder(id: string) {
         product_models(brand, model_name, color, cpu, ram_gb, storage_gb)
       ),
       order_items(
-        id, item_id, description, quantity, unit_price, discount, packed_at, packed_by,
+        id, item_id, accessory_id, description, quantity, unit_price, discount, packed_at, packed_by,
         items(id, item_code, condition_grade, condition_notes, item_status,
           cpu, ram_gb, storage_gb, screen_size, os_family, color,
           product_models(brand, model_name, color, cpu, ram_gb, storage_gb, screen_size, os_family, short_description,
             categories(description_fields),
             product_media(file_url, role, sort_order)
           )
+        ),
+        accessories(id, accessory_code, name, brand, selling_price,
+          accessory_media(file_url, sort_order)
         )
       )
     `)
@@ -125,18 +128,19 @@ export async function updateOrderStatus(id: string, status: string) {
 }
 
 export async function cancelOrder(orderId: string) {
-  // Get all inventory items in this order
+  // Get all line items in this order
   const { data: orderItems } = await supabase
     .from('order_items')
-    .select('item_id')
+    .select('item_id, accessory_id, quantity')
     .eq('order_id', orderId)
-    .not('item_id', 'is', null)
 
   // Update order status to CANCELLED
   const order = await updateOrder(orderId, { order_status: 'CANCELLED' as Order['order_status'] })
 
   // Revert all inventory items to AVAILABLE
-  const itemIds = (orderItems ?? []).map((oi) => oi.item_id).filter((id): id is string => !!id)
+  const itemIds = (orderItems ?? [])
+    .map((oi) => oi.item_id)
+    .filter((id): id is string => !!id)
   if (itemIds.length > 0) {
     await supabase
       .from('items')
@@ -144,8 +148,18 @@ export async function cancelOrder(orderId: string) {
       .in('id', itemIds)
   }
 
+  // Restore accessory stock
+  const accessoryItems = (orderItems ?? []).filter(
+    (oi) => oi.accessory_id !== null
+  )
+  for (const oi of accessoryItems) {
+    await supabase.rpc('increment_accessory_stock', {
+      p_accessory_id: oi.accessory_id!,
+      p_quantity: oi.quantity,
+    })
+  }
+
   // NULL out item_ids on cancelled order's items to free the unique index for re-use
-  // (can't delete rows due to audit log FK trigger)
   if (itemIds.length > 0) {
     await supabase
       .from('order_items')
@@ -284,6 +298,7 @@ interface ManualOrderInput {
   shipping_cost: number
   items: {
     item_id: string | null
+    accessory_id?: string | null
     description: string
     quantity: number
     unit_price: number
@@ -324,6 +339,7 @@ export async function createManualOrder(input: ManualOrderInput) {
   const orderItems = input.items.map((item) => ({
     order_id: (order as Order).id,
     item_id: item.item_id,
+    accessory_id: item.accessory_id ?? null,
     description: item.description,
     quantity: item.quantity,
     unit_price: item.unit_price,
@@ -352,6 +368,18 @@ export async function createManualOrder(input: ManualOrderInput) {
       .from('items')
       .update({ item_status: 'RESERVED' as Item['item_status'] })
       .in('id', inventoryItemIds)
+  }
+
+  // Decrement accessory stock
+  const accessoryLineItems = input.items.filter((item) => item.accessory_id)
+  for (const item of accessoryLineItems) {
+    const { data: newQty } = await supabase.rpc('decrement_accessory_stock', {
+      p_accessory_id: item.accessory_id!,
+      p_quantity: item.quantity,
+    })
+    if (newQty === null) {
+      throw new Error(`Insufficient stock for accessory. Please refresh and try again.`)
+    }
   }
 
   return order as Order
@@ -480,8 +508,9 @@ export async function getPackableOrders() {
         product_models(brand, model_name)
       ),
       order_items(
-        id, packed_at, description, item_id,
-        items(id, item_code)
+        id, packed_at, description, item_id, accessory_id, quantity,
+        items(id, item_code),
+        accessories(id, accessory_code, name)
       )
     `)
     .eq('order_status', 'CONFIRMED')

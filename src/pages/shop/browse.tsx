@@ -20,9 +20,10 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet'
 import { Label } from '@/components/ui/label'
-import { useShopProducts, useShopBrands } from '@/hooks/use-shop'
+import { useShopProducts, useShopBrands, useShopEnabled, useShopAccessories } from '@/hooks/use-shop'
 import { CONDITION_GRADES } from '@/lib/constants'
 import { formatPrice, cn } from '@/lib/utils'
+import type { Accessory, AccessoryMedia } from '@/lib/types'
 
 type SortOption = 'newest' | 'price_asc' | 'price_desc'
 
@@ -35,6 +36,8 @@ export default function ShopBrowsePage() {
   const [grade, setGrade] = useState<string>('all')
   const [sort, setSort] = useState<SortOption>('newest')
 
+  const { data: shopEnabled } = useShopEnabled()
+
   const { data: products, isLoading } = useShopProducts({
     search: search || undefined,
     brand: brand === 'all' ? undefined : brand,
@@ -42,7 +45,21 @@ export default function ShopBrowsePage() {
     sort,
   })
 
+  const { data: shopAccessories } = useShopAccessories({
+    search: search || undefined,
+    sort,
+  })
+
   const { data: brands } = useShopBrands()
+
+  if (shopEnabled === false) {
+    return (
+      <div className="text-center py-24">
+        <h1 className="text-3xl font-bold">Shop</h1>
+        <p className="text-muted-foreground mt-2">Shop is currently unavailable. Please check back later.</p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -158,6 +175,51 @@ export default function ShopBrowsePage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {/* Accessory Cards */}
+          {(shopAccessories ?? []).map((acc: Accessory & { categories: { name: string } | null; accessory_media: AccessoryMedia[] }) => {
+            const media = acc.accessory_media ?? []
+            const heroImg = media.sort((a, b) => a.sort_order - b.sort_order)[0]
+            return (
+              <Card
+                key={`acc-${acc.id}`}
+                className="group cursor-pointer overflow-hidden transition-all hover:shadow-lg hover:-translate-y-0.5"
+                onClick={() => navigate(`/shop/accessory/${acc.id}`)}
+              >
+                <div className="aspect-square bg-muted relative overflow-hidden">
+                  {heroImg ? (
+                    <img
+                      src={heroImg.file_url}
+                      alt={acc.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Image className="h-16 w-16 text-muted-foreground/30" />
+                    </div>
+                  )}
+                  <Badge variant="outline" className="absolute top-2 right-2 text-xs bg-blue-50 text-blue-700 border-blue-300">
+                    Accessory
+                  </Badge>
+                </div>
+                <CardContent className="p-4 space-y-1.5">
+                  <h3 className="font-semibold text-sm line-clamp-1">
+                    {acc.brand ? `${acc.brand} ${acc.name}` : acc.name}
+                  </h3>
+                  <p className="text-xs text-muted-foreground line-clamp-1">
+                    {acc.description ?? ''}
+                  </p>
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-lg font-bold">{formatPrice(Number(acc.selling_price))}</span>
+                    <span className="text-xs text-green-600 dark:text-green-400">
+                      {acc.stock_quantity} in stock
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
+
+          {/* Sell Group Cards */}
           {products.map((sg) => {
             const pm = sg.product_models as {
               id: string; brand: string; model_name: string; color: string | null

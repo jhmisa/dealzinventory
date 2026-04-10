@@ -1,16 +1,21 @@
 import { useState, useEffect } from 'react'
-import { Info, Save } from 'lucide-react'
+import { Info, Save, Store } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 import { PageHeader } from '@/components/shared'
 import { useSystemSetting, useUpdateSystemSetting } from '@/hooks/use-settings'
 
 export default function GeneralSettingsPage() {
   const { data: surchargeValue, isLoading } = useSystemSetting('credit_card_surcharge_pct')
+  const { data: shopEnabledValue, isLoading: shopLoading } = useSystemSetting('shop_enabled')
   const updateSetting = useUpdateSystemSetting()
   const [surcharge, setSurcharge] = useState('')
+
+  const shopEnabled = shopEnabledValue !== 'false'
 
   useEffect(() => {
     if (surchargeValue !== undefined && surchargeValue !== null) {
@@ -36,6 +41,36 @@ export default function GeneralSettingsPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="General Settings" />
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Store className="h-5 w-5 text-muted-foreground" />
+            <CardTitle>Public Shop</CardTitle>
+          </div>
+          <CardDescription>
+            Enable or disable the public-facing shop. When disabled, customers see a maintenance message.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-3">
+            <Switch
+              checked={shopEnabled}
+              disabled={shopLoading}
+              onCheckedChange={(checked) => {
+                updateSetting.mutate(
+                  { key: 'shop_enabled', value: checked ? 'true' : 'false' },
+                  {
+                    onSuccess: () => toast.success(checked ? 'Shop enabled' : 'Shop disabled'),
+                    onError: (err) => toast.error(err.message),
+                  },
+                )
+              }}
+            />
+            <Label>{shopEnabled ? 'Shop is live' : 'Shop is disabled'}</Label>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

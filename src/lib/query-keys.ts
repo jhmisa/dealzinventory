@@ -61,6 +61,8 @@ export const queryKeys = {
     productDetail: (productModelId: string) => [...queryKeys.shop.all, 'detail', productModelId] as const,
     sellGroupByCode: (code: string) => [...queryKeys.shop.all, 'code', code] as const,
     brands: () => [...queryKeys.shop.all, 'brands'] as const,
+    enabled: () => [...queryKeys.shop.all, 'enabled'] as const,
+    accessories: (filters: Record<string, unknown>) => [...queryKeys.shop.all, 'accessories', filters] as const,
   },
   kaitori: {
     all: ['kaitori'] as const,
@@ -124,6 +126,16 @@ export const queryKeys = {
     all: ['settings'] as const,
     itemListColumns: () => [...queryKeys.settings.all, 'item-list-columns'] as const,
     system: (key: string) => [...queryKeys.settings.all, 'system', key] as const,
+  },
+  accessories: {
+    all: ['accessories'] as const,
+    lists: () => [...queryKeys.accessories.all, 'list'] as const,
+    list: (filters: Record<string, unknown>) => [...queryKeys.accessories.lists(), filters] as const,
+    details: () => [...queryKeys.accessories.all, 'detail'] as const,
+    detail: (id: string) => [...queryKeys.accessories.details(), id] as const,
+    byCode: (code: string) => [...queryKeys.accessories.all, 'code', code] as const,
+    media: (id: string) => [...queryKeys.accessories.all, 'media', id] as const,
+    stockHistory: (id: string) => [...queryKeys.accessories.all, 'stock-history', id] as const,
   },
   postalCodes: {
     all: ['postal-codes'] as const,

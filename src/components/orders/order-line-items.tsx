@@ -21,13 +21,16 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { useAvailableItems } from '@/hooks/use-orders'
+import { useAvailableAccessories } from '@/hooks/use-accessories'
 import { ORDER_SOURCES } from '@/lib/constants'
 import { formatPrice } from '@/lib/utils'
-import { Search, Plus, Loader2, X, Package } from 'lucide-react'
+import { Search, Plus, Loader2, X, Package, Cable } from 'lucide-react'
 
 export interface OrderLineItem {
   id: string
   item_id: string | null
+  accessory_id?: string | null
+  accessory_code?: string | null
   item_code: string | null
   description: string
   condition_grade: string | null
@@ -66,6 +69,7 @@ export function OrderLineItems({
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [showDropdown, setShowDropdown] = useState(false)
+  const [searchMode, setSearchMode] = useState<'items' | 'accessories'>('items')
   const searchRef = useRef<HTMLDivElement>(null)
 
   // Debounce search input
@@ -85,8 +89,12 @@ export function OrderLineItems({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const { data, isLoading } = useAvailableItems({ search: debouncedQuery })
+  const { data, isLoading } = useAvailableItems({ search: searchMode === 'items' ? debouncedQuery : '' })
   const searchResults = data?.items ?? []
+
+  const { data: accessoryResults, isLoading: accessoryLoading } = useAvailableAccessories(
+    searchMode === 'accessories' ? debouncedQuery : ''
+  )
 
   const addedItemIds = new Set(
     lineItems.filter((li) => li.item_id).map((li) => li.item_id)
@@ -109,6 +117,26 @@ export function OrderLineItems({
       discount: 0,
     }
 
+    onLineItemsChange([...lineItems, newLine])
+    setSearchQuery('')
+    setDebouncedQuery('')
+    setShowDropdown(false)
+  }
+
+  const handleSelectAccessory = (acc: { id: string; accessory_code: string; name: string; brand: string | null; selling_price: number }) => {
+    const description = acc.brand ? `${acc.brand} ${acc.name}` : acc.name
+    const newLine: OrderLineItem = {
+      id: crypto.randomUUID(),
+      item_id: null,
+      accessory_id: acc.id,
+      accessory_code: acc.accessory_code,
+      item_code: null,
+      description,
+      condition_grade: null,
+      quantity: 1,
+      unit_price: acc.selling_price ?? 0,
+      discount: 0,
+    }
     onLineItemsChange([...lineItems, newLine])
     setSearchQuery('')
     setDebouncedQuery('')
@@ -182,12 +210,34 @@ export function OrderLineItems({
           </div>
         </div>
 
+        {/* Search Mode Toggle */}
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant={searchMode === 'items' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => { setSearchMode('items'); setSearchQuery(''); setDebouncedQuery('') }}
+          >
+            <Package className="h-4 w-4 mr-1" />
+            Items
+          </Button>
+          <Button
+            type="button"
+            variant={searchMode === 'accessories' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => { setSearchMode('accessories'); setSearchQuery(''); setDebouncedQuery('') }}
+          >
+            <Cable className="h-4 w-4 mr-1" />
+            Accessories
+          </Button>
+        </div>
+
         {/* Search + Add Custom */}
         <div className="flex items-center gap-3">
           <div ref={searchRef} className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search P-code or product name..."
+              placeholder={searchMode === 'items' ? 'Search P-code or product name...' : 'Search A-code or accessory name...'}
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value)
@@ -199,8 +249,8 @@ export function OrderLineItems({
               className="pl-9"
             />
 
-            {/* Search Dropdown */}
-            {showDropdown && debouncedQuery && (
+            {/* Search Dropdown — Items */}
+            {showDropdown && debouncedQuery && searchMode === 'items' && (
               <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg max-h-64 overflow-y-auto">
                 {isLoading ? (
                   <div className="flex items-center justify-center py-4">
@@ -250,6 +300,47 @@ export function OrderLineItems({
                 )}
               </div>
             )}
+
+            {/* Search Dropdown — Accessories */}
+            {showDropdown && debouncedQuery && searchMode === 'accessories' && (
+              <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg max-h-64 overflow-y-auto">
+                {accessoryLoading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    <span className="text-sm text-muted-foreground">Searching...</span>
+                  </div>
+                ) : !accessoryResults || accessoryResults.length === 0 ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Cable className="h-4 w-4 mr-2 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">No accessories found</span>
+                  </div>
+                ) : (
+                  accessoryResults.map((acc) => (
+                    <button
+                      key={acc.id}
+                      type="button"
+                      onClick={() => handleSelectAccessory(acc)}
+                      className="w-full text-left px-3 py-2 text-sm flex items-center justify-between gap-2 hover:bg-accent cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-mono text-xs text-muted-foreground shrink-0">
+                          {acc.accessory_code}
+                        </span>
+                        <span className="truncate">
+                          {acc.brand ? `${acc.brand} ${acc.name}` : acc.name}
+                        </span>
+                        <Badge variant="outline" className="text-xs shrink-0">
+                          {acc.stock_quantity} in stock
+                        </Badge>
+                      </div>
+                      <span className="text-muted-foreground shrink-0">
+                        {formatPrice(acc.selling_price ?? 0)}
+                      </span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
           </div>
 
           <Button
@@ -291,15 +382,20 @@ export function OrderLineItems({
 
                       {/* Description */}
                       <TableCell>
-                        {isInventory ? (
+                        {isInventory || li.accessory_id ? (
                           <div>
                             <span className="font-mono text-xs text-muted-foreground mr-2">
-                              {li.item_code}
+                              {li.item_code ?? li.accessory_code ?? ''}
                             </span>
                             <span className="text-sm font-medium">{li.description}</span>
                             {li.condition_grade && (
                               <Badge variant="outline" className="text-xs ml-2">
                                 {li.condition_grade}
+                              </Badge>
+                            )}
+                            {li.accessory_id && (
+                              <Badge variant="outline" className="text-xs ml-2 text-blue-600 border-blue-300">
+                                Accessory
                               </Badge>
                             )}
                           </div>
@@ -317,7 +413,7 @@ export function OrderLineItems({
 
                       {/* Qty */}
                       <TableCell className="text-center">
-                        {isInventory ? (
+                        {isInventory && !li.accessory_id ? (
                           <span className="text-sm">1</span>
                         ) : (
                           <Input

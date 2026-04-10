@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { Package, Check, X, Camera, Keyboard, PackageCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -21,7 +21,10 @@ type PackingItem = {
   packed_at: string | null
   description: string | null
   item_id: string | null
+  accessory_id: string | null
+  quantity: number
   items: { id: string; item_code: string } | null
+  accessories: { id: string; accessory_code: string; name: string } | null
 }
 
 export default function PackingStationPage() {
@@ -37,6 +40,20 @@ export default function PackingStationPage() {
 
   const selectedOrder = orders?.find(o => o.id === selectedOrderId)
   const orderItems = (selectedOrder?.order_items ?? []) as PackingItem[]
+
+  // Auto-pack accessory items when order is selected
+  useEffect(() => {
+    if (!selectedOrder || !session?.user?.id) return
+    const unpackedAccessories = orderItems.filter(oi => oi.accessory_id && !oi.packed_at)
+    for (const oi of unpackedAccessories) {
+      packMutation.mutate(
+        { orderItemId: oi.id, packedBy: session.user.id },
+        { onError: () => {} }, // Silently ignore — UI will update via refetch
+      )
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedOrderId])
+
   const packedCount = orderItems.filter(i => i.packed_at).length
   const totalCount = orderItems.length
   const allPacked = totalCount > 0 && packedCount === totalCount
@@ -215,8 +232,11 @@ export default function PackingStationPage() {
                 {orderItems.map((oi) => {
                   const isPacked = !!oi.packed_at
                   const isInventoryItem = !!oi.item_id
+                  const isAccessory = !!oi.accessory_id
                   const displayLabel = isInventoryItem
                     ? oi.items?.item_code ?? '—'
+                    : isAccessory
+                    ? `[${oi.accessories?.accessory_code}] ${oi.accessories?.name ?? oi.description}${oi.quantity > 1 ? ` ×${oi.quantity}` : ''}`
                     : oi.description ?? 'Custom item'
 
                   return (
@@ -240,6 +260,15 @@ export default function PackingStationPage() {
                               <span className="text-sm text-muted-foreground">{oi.description}</span>
                             )}
                           </div>
+                        ) : isAccessory ? (
+                          <div className="flex items-center gap-2">
+                            <CodeDisplay code={oi.accessories?.accessory_code ?? '—'} />
+                            <span className="text-sm font-medium">
+                              {oi.accessories?.name ?? oi.description}
+                              {oi.quantity > 1 && <span className="text-muted-foreground"> ×{oi.quantity}</span>}
+                            </span>
+                            <span className="text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">(accessory)</span>
+                          </div>
                         ) : (
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium">{oi.description ?? 'Custom item'}</span>
@@ -249,10 +278,13 @@ export default function PackingStationPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         {isPacked ? (
-                          <StatusBadge label="Packed" color="bg-green-100 text-green-800 border-green-300" />
+                          <StatusBadge
+                            label={isAccessory ? 'Auto-confirmed' : 'Packed'}
+                            color={isAccessory ? 'bg-blue-100 text-blue-800 border-blue-300' : 'bg-green-100 text-green-800 border-green-300'}
+                          />
                         ) : (
                           <>
-                            {!isInventoryItem && (
+                            {!isInventoryItem && !isAccessory && (
                               <Button
                                 variant="outline"
                                 size="sm"

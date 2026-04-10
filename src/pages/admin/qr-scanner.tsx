@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { PageHeader, ManualCodeInput } from '@/components/shared'
 import { QRScannerCamera } from '@/components/shared/media'
 import * as itemsService from '@/services/items'
+import * as accessoriesService from '@/services/accessories'
 
 type Mode = 'camera' | 'manual'
 
@@ -20,11 +21,18 @@ export default function QRScannerPage() {
     processingRef.current = true
     setIsLookingUp(true)
 
+    const trimmed = code.trim().toUpperCase()
+
     try {
-      const item = await itemsService.getItemByCode(code.trim().toUpperCase())
-      navigate(`/admin/items/${item.id}`)
+      if (trimmed.startsWith('A')) {
+        const accessory = await accessoriesService.getAccessoryByCode(trimmed)
+        navigate(`/admin/accessories/${accessory.id}`)
+      } else {
+        const item = await itemsService.getItemByCode(trimmed)
+        navigate(`/admin/items/${item.id}`)
+      }
     } catch {
-      toast.error(`Item not found: ${code}`)
+      toast.error(`Not found: ${code}`)
       processingRef.current = false
       setIsLookingUp(false)
     }
@@ -38,7 +46,7 @@ export default function QRScannerPage() {
         </Button>
         <PageHeader
           title="Scan QR Code"
-          description="Scan a P-code QR sticker or enter the code manually."
+          description="Scan a P-code or A-code QR sticker, or enter the code manually."
         />
       </div>
 

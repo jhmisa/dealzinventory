@@ -102,7 +102,16 @@ export const SUPPLIER_TYPES: { value: SupplierType; label: string }[] = [
   { value: 'auction', label: 'Auction House' },
   { value: 'wholesaler', label: 'Wholesaler' },
   { value: 'individual_kaitori', label: 'Individual (Kaitori)' },
+  { value: 'accessory' as SupplierType, label: 'Accessory Supplier' },
 ]
+
+export const ACCESSORY_ADJUSTMENT_REASONS = [
+  { value: 'DEFECTIVE', label: 'Defective' },
+  { value: 'RETURNED_TO_SUPPLIER', label: 'Returned to Supplier' },
+  { value: 'DAMAGED', label: 'Damaged' },
+  { value: 'WRITE_OFF', label: 'Write-off' },
+  { value: 'CORRECTION', label: 'Correction' },
+] as const
 
 export const PRODUCT_STATUSES: { value: ProductStatus; label: string; color: string }[] = [
   { value: 'DRAFT', label: 'Draft', color: 'bg-gray-100 text-gray-800 border-gray-300' },

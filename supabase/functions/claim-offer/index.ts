@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
     // 1. Fetch offer and validate
     const { data: offer, error: offerError } = await supabase
       .from('offers')
-      .select('*, offer_items(id, item_id, description, unit_price, quantity)')
+      .select('*, offer_items(id, item_id, accessory_id, description, unit_price, quantity)')
       .eq('id', offer_id)
       .single();
 
@@ -168,7 +168,7 @@ Deno.serve(async (req) => {
 
     // 4. Calculate totals
     const offerItems = (offer.offer_items ?? []) as {
-      id: string; item_id: string | null; description: string; unit_price: number; quantity: number
+      id: string; item_id: string | null; accessory_id: string | null; description: string; unit_price: number; quantity: number
     }[];
 
     const quantity = offerItems.reduce((sum, oi) => sum + oi.quantity, 0);
@@ -207,6 +207,7 @@ Deno.serve(async (req) => {
     const orderItems = offerItems.map((oi) => ({
       order_id: order.id,
       item_id: oi.item_id,
+      accessory_id: oi.accessory_id,
       description: oi.description,
       quantity: oi.quantity,
       unit_price: Number(oi.unit_price),
@@ -221,6 +222,21 @@ Deno.serve(async (req) => {
       // Rollback order
       await supabase.from('orders').delete().eq('id', order.id);
       return jsonResponse({ error: `Failed to create order items: ${itemsError.message}` });
+    }
+
+    // 6b. Decrement accessory stock for accessory items
+    const accessoryOfferItems = offerItems.filter(oi => oi.accessory_id);
+    for (const oi of accessoryOfferItems) {
+      const { data: newQty, error: stockError } = await supabase.rpc('decrement_accessory_stock', {
+        p_accessory_id: oi.accessory_id!,
+        p_quantity: oi.quantity,
+      });
+      if (stockError || newQty === null) {
+        // Rollback order
+        await supabase.from('order_items').delete().eq('order_id', order.id);
+        await supabase.from('orders').delete().eq('id', order.id);
+        return jsonResponse({ error: `Insufficient stock for accessory: ${oi.description}` });
+      }
     }
 
     // 7. Update offer → CLAIMED

@@ -65,6 +65,9 @@ const StaffManagementPage = lazy(() => import('@/pages/admin/staff-management'))
 const ForgotPasswordPage = lazy(() => import('@/pages/admin/forgot-password'))
 const AuthCallbackPage = lazy(() => import('@/pages/admin/auth-callback'))
 const SetPasswordPage = lazy(() => import('@/pages/admin/set-password'))
+const AccessoryListPage = lazy(() => import('@/pages/admin/accessories'))
+const AccessoryDetailPage = lazy(() => import('@/pages/admin/accessory-detail'))
+const ShopAccessoryDetailPage = lazy(() => import('@/pages/shop/accessory-detail'))
 
 function lazyElement(Component: React.LazyExoticComponent<ComponentType>) {
   return (
@@ -128,6 +131,8 @@ export const router = createBrowserRouter([
           { path: 'products/:id', element: lazyElement(ProductDetailPage) },
           { path: 'products/:id/media-studio', element: lazyElement(MediaStudioPage) },
           { path: 'categories', element: lazyElement(CategoriesPage) },
+          { path: 'accessories', element: lazyElement(AccessoryListPage) },
+          { path: 'accessories/:id', element: lazyElement(AccessoryDetailPage) },
           { path: 'sell-groups', element: lazyElement(SellGroupListPage) },
           { path: 'sell-groups/:id', element: lazyElement(SellGroupDetailPage) },
           { path: 'orders', element: lazyElement(OrderListPage) },
@@ -162,6 +167,7 @@ export const router = createBrowserRouter([
       { index: true, element: lazyElement(ShopBrowsePage) },
       { path: 'product/:id', element: lazyElement(ShopProductDetailPage) },
       { path: 'checkout/:sellGroupId', element: lazyElement(CheckoutPage) },
+      { path: 'accessory/:id', element: lazyElement(ShopAccessoryDetailPage) },
     ],
   },
   {

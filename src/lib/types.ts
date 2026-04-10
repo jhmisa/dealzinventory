@@ -75,6 +75,88 @@ export type OfferItemInsert = Tables['offer_items']['Insert']
 export type PaymentConfirmation = Tables['payment_confirmations']['Row']
 export type PaymentConfirmationInsert = Tables['payment_confirmations']['Insert']
 
+// Accessory types — manually defined until DB types are regenerated
+export interface Accessory {
+  id: string
+  accessory_code: string
+  name: string
+  description: string | null
+  brand: string | null
+  category_id: string | null
+  selling_price: number
+  stock_quantity: number
+  low_stock_threshold: number
+  shop_visible: boolean
+  active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface AccessoryInsert {
+  accessory_code: string
+  name: string
+  description?: string | null
+  brand?: string | null
+  category_id?: string | null
+  selling_price: number
+  stock_quantity?: number
+  low_stock_threshold?: number
+  shop_visible?: boolean
+  active?: boolean
+}
+
+export interface AccessoryUpdate {
+  name?: string
+  description?: string | null
+  brand?: string | null
+  category_id?: string | null
+  selling_price?: number
+  low_stock_threshold?: number
+  shop_visible?: boolean
+  active?: boolean
+}
+
+export interface AccessoryMedia {
+  id: string
+  accessory_id: string
+  file_url: string
+  media_type: string
+  sort_order: number
+  created_at: string
+}
+
+export interface AccessoryStockEntry {
+  id: string
+  accessory_id: string
+  supplier_id: string | null
+  receipt_id: string | null
+  quantity: number
+  unit_cost: number
+  total_cost: number
+  notes: string | null
+  received_at: string
+  created_by: string | null
+  created_at: string
+}
+
+export interface AccessoryStockAdjustment {
+  id: string
+  accessory_id: string
+  quantity: number
+  reason: AccessoryAdjustmentReason
+  supplier_id: string | null
+  notes: string | null
+  created_by: string | null
+  created_at: string
+}
+
+export type AccessoryAdjustmentReason = 'DEFECTIVE' | 'RETURNED_TO_SUPPLIER' | 'DAMAGED' | 'WRITE_OFF' | 'CORRECTION'
+
+export type AccessoryWithRelations = Accessory & {
+  categories?: { name: string } | null
+  accessory_media?: AccessoryMedia[]
+}
+
 
 export interface ParsedSpecs {
   brand?: string

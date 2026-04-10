@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/form'
 import { ShippingStep } from '@/components/orders/shipping-step'
 import { CustomerAuthContext, useCustomerAuthProvider } from '@/hooks/use-customer-auth'
-import { useOfferByCode, useClaimOffer, useOfferRealtimeSync } from '@/hooks/use-offers'
+import { useOfferByCode, useClaimOffer, useOfferRealtimeSync, useAddItemByCode } from '@/hooks/use-offers'
 import { ImageGallery } from '@/components/shared/image-gallery'
 import type { GalleryImage } from '@/components/shared/image-gallery'
 import { CONDITION_GRADES, PAYMENT_METHODS } from '@/lib/constants'
@@ -351,6 +351,7 @@ function OfferClaimInner() {
   const { offerCode } = useParams<{ offerCode: string }>()
   const { data: offer, isLoading, error } = useOfferByCode(offerCode ?? '')
   const claimOffer = useClaimOffer()
+  const addItemByCode = useAddItemByCode()
 
   const authState = useCustomerAuthProvider()
   const { customer, isAuthenticated, isLoading: authLoading, login, register, logout } = authState
@@ -361,6 +362,8 @@ function OfferClaimInner() {
   const [deliveryTimeCode, setDeliveryTimeCode] = useState<string | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<string | null>(null)
   const [orderCreated, setOrderCreated] = useState<{ orderCode: string } | null>(null)
+  const [addACode, setAddACode] = useState('')
+  const [addingACode, setAddingACode] = useState(false)
 
   // Subscribe to realtime changes so staff edits appear instantly
   useOfferRealtimeSync(offer?.id)
@@ -597,6 +600,64 @@ function OfferClaimInner() {
 
           </CardContent>
         </Card>
+
+        {/* Add Accessory by A-code */}
+        {offer.offer_status === 'PENDING' && (
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-sm text-muted-foreground mb-2">Add an accessory by entering its A-code:</p>
+              <div className="flex gap-2">
+                <Input
+                  value={addACode}
+                  onChange={(e) => setAddACode(e.target.value)}
+                  placeholder="A000001"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && addACode.trim()) {
+                      setAddingACode(true)
+                      addItemByCode.mutate(
+                        { offerId: offer.id, code: addACode.trim() },
+                        {
+                          onSuccess: () => {
+                            toast.success(`Added ${addACode.trim()}`)
+                            setAddACode('')
+                            setAddingACode(false)
+                          },
+                          onError: (err) => {
+                            toast.error(err.message)
+                            setAddingACode(false)
+                          },
+                        },
+                      )
+                    }
+                  }}
+                />
+                <Button
+                  size="sm"
+                  disabled={addingACode || !addACode.trim()}
+                  onClick={() => {
+                    setAddingACode(true)
+                    addItemByCode.mutate(
+                      { offerId: offer.id, code: addACode.trim() },
+                      {
+                        onSuccess: () => {
+                          toast.success(`Added ${addACode.trim()}`)
+                          setAddACode('')
+                          setAddingACode(false)
+                        },
+                        onError: (err) => {
+                          toast.error(err.message)
+                          setAddingACode(false)
+                        },
+                      },
+                    )
+                  }}
+                >
+                  {addingACode ? 'Adding...' : 'Add'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Staff Notes */}
         {offer.notes && (

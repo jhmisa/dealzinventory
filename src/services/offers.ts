@@ -276,7 +276,96 @@ export async function addItemByCode(offerId: string, code: string) {
     return added
   }
 
-  throw new Error(`Invalid code format. Use P-code (e.g., P000100) or G-code (e.g., G000001)`)
+  if (trimmedCode.startsWith('A')) {
+    // A-code: lookup accessory
+    const { data: accessory, error } = await supabase
+      .from('accessories')
+      .select('id, accessory_code, name, brand, selling_price, stock_quantity, active')
+      .eq('accessory_code', trimmedCode)
+      .single()
+
+    if (error || !accessory) throw new Error(`Accessory ${trimmedCode} not found`)
+    if (!accessory.active) throw new Error(`Accessory ${trimmedCode} is inactive`)
+    if (accessory.stock_quantity <= 0) throw new Error(`Accessory ${trimmedCode} is out of stock`)
+
+    const description = accessory.brand
+      ? `${accessory.brand} ${accessory.name}`
+      : accessory.name
+
+    const { data: offerItem, error: insertError } = await supabase
+      .from('offer_items')
+      .insert({
+        offer_id: offerId,
+        item_id: null,
+        accessory_id: accessory.id,
+        description,
+        unit_price: accessory.selling_price ?? 0,
+        added_by: 'customer',
+      })
+      .select()
+      .single()
+
+    if (insertError) throw insertError
+
+    // Reset expiry
+    await supabase
+      .from('offers')
+      .update({
+        expires_at: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', offerId)
+
+    return offerItem
+  }
+
+  throw new Error(`Invalid code format. Use P-code (e.g., P000100), G-code (e.g., G000001), or A-code (e.g., A000001)`)
+}
+
+export async function addAccessoryToOffer(
+  offerId: string,
+  accessoryId: string,
+  addedBy: string = 'staff'
+) {
+  // Look up accessory
+  const { data: accessory, error: lookupError } = await supabase
+    .from('accessories')
+    .select('id, accessory_code, name, brand, selling_price, stock_quantity')
+    .eq('id', accessoryId)
+    .single()
+
+  if (lookupError || !accessory) throw new Error('Accessory not found')
+  if (accessory.stock_quantity <= 0) throw new Error('Accessory is out of stock')
+
+  const description = accessory.brand
+    ? `${accessory.brand} ${accessory.name}`
+    : accessory.name
+
+  const { data, error } = await supabase
+    .from('offer_items')
+    .insert({
+      offer_id: offerId,
+      item_id: null,
+      accessory_id: accessory.id,
+      description,
+      unit_price: accessory.selling_price ?? 0,
+      added_by: addedBy,
+    })
+    .select()
+    .single()
+
+  if (error) throw error
+
+  // Reset expiry
+  await supabase
+    .from('offers')
+    .update({
+      expires_at: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', offerId)
+
+  return data
 }
 
 // --- Queries ---

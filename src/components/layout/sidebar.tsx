@@ -22,6 +22,7 @@ import {
   Columns3,
   Settings,
   MonitorPlay,
+  Cable,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import {
@@ -77,6 +78,7 @@ const navSections: NavSection[] = [
     items: [
       { title: 'Products', href: '/admin/products', icon: Box },
       { title: 'Categories', href: '/admin/categories', icon: Tags },
+      { title: 'Accessories', href: '/admin/accessories', icon: Cable },
       { title: 'Showcase', action: 'showcase', icon: MonitorPlay },
     ],
   },
