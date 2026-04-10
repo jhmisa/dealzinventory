@@ -113,7 +113,7 @@ export default function ItemDetailPage() {
                   description ?? '',
                   `Rank ${item.condition_grade}`,
                   item.selling_price != null ? formatPrice(item.selling_price) : '',
-                ].filter(Boolean).join(' ')
+                ].filter(Boolean).join(' | ')
                 navigator.clipboard.writeText(lines)
                 toast.success('Copied to clipboard')
               }}

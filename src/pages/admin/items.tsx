@@ -300,7 +300,7 @@ export default function ItemListPage() {
                       modelLine !== '—' ? modelLine : '',
                       r.condition_grade ? `Rank ${r.condition_grade}` : '',
                       r.selling_price != null ? formatPrice(r.selling_price) : '',
-                    ].filter(Boolean).join(' ')
+                    ].filter(Boolean).join(' | ')
                     navigator.clipboard.writeText(text)
                     toast.success('Copied to clipboard')
                   }}
