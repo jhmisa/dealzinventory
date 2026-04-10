@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, ClipboardEdit, Lock, Printer, QrCode, Send, Unlock } from 'lucide-react'
+import { ArrowLeft, ClipboardEdit, Copy, Lock, Printer, QrCode, Send, Unlock } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -103,6 +103,23 @@ export default function ItemDetailPage() {
           <div className="flex items-center gap-2 shrink-0">
             {statusConfig && <StatusBadge label={statusConfig.label} color={statusConfig.color} />}
             <GradeBadge grade={item.condition_grade} />
+            <Button
+              variant="ghost"
+              size="icon"
+              title="Copy item info"
+              onClick={() => {
+                const lines = [
+                  item.item_code,
+                  description ?? '',
+                  `Rank ${item.condition_grade}`,
+                  item.selling_price != null ? formatPrice(item.selling_price) : '',
+                ].filter(Boolean).join(' ')
+                navigator.clipboard.writeText(lines)
+                toast.success('Copied to clipboard')
+              }}
+            >
+              <Copy className="h-4 w-4" />
+            </Button>
             <Button variant="ghost" size="icon" onClick={() => setShowQr(!showQr)} title="Toggle QR code">
               <QrCode className="h-4 w-4" />
             </Button>
