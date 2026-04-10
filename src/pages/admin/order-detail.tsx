@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Check, Circle, Package, Pencil, X, Plus, History, Truck, Search, Loader2, Printer, RefreshCw, AlertTriangle, ExternalLink } from 'lucide-react'
+import { ArrowLeft, Check, Circle, Package, Pencil, X, Plus, History, Truck, Search, Loader2, Printer, RefreshCw, AlertTriangle, ExternalLink, Undo2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -61,6 +61,12 @@ function getNextStatus(current: string): string | null {
   const idx = STATUS_FLOW.indexOf(current as typeof STATUS_FLOW[number])
   if (idx === -1 || idx >= STATUS_FLOW.length - 1) return null
   return STATUS_FLOW[idx + 1]
+}
+
+function getPrevStatus(current: string): string | null {
+  const idx = STATUS_FLOW.indexOf(current as typeof STATUS_FLOW[number])
+  if (idx <= 0) return null
+  return STATUS_FLOW[idx - 1]
 }
 
 function getNextStatusLabel(status: string | null): string {
@@ -138,6 +144,7 @@ export default function OrderDetailPage() {
 
   const [cancelOpen, setCancelOpen] = useState(false)
   const [advanceOpen, setAdvanceOpen] = useState(false)
+  const [revertOpen, setRevertOpen] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [editingItems, setEditingItems] = useState<Record<string, EditingItem>>({})
   const [editShippingCost, setEditShippingCost] = useState(0)
@@ -195,6 +202,7 @@ export default function OrderDetailPage() {
   const statusCfg = ORDER_STATUSES.find(s => s.value === order.order_status)
   const sourceCfg = ORDER_SOURCES.find(s => s.value === order.order_source)
   const nextStatus = getNextStatus(order.order_status)
+  const prevStatus = getPrevStatus(order.order_status)
   const canCancel = order.order_status !== 'SHIPPED' && order.order_status !== 'DELIVERED' && order.order_status !== 'CANCELLED'
   const canEdit = EDITABLE_STATUSES.includes(order.order_status)
   const needsPaymentProof = requiresPaymentConfirmation(order.payment_method) && order.order_status === 'PENDING'
@@ -535,6 +543,12 @@ export default function OrderDetailPage() {
                   <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)}>
                     Cancel
                   </Button>
+                  {prevStatus && (
+                    <Button variant="outline" size="sm" onClick={() => setRevertOpen(true)}>
+                      <Undo2 className="h-4 w-4 mr-1" />
+                      Revert to {getNextStatusLabel(prevStatus)}
+                    </Button>
+                  )}
                 </>
               )}
               {!isEditing && (
@@ -1342,6 +1356,28 @@ export default function OrderDetailPage() {
         onConfirm={() => removeConfirmId && handleRemoveItem(removeConfirmId)}
         isLoading={removeLineItem.isPending}
         variant="destructive"
+      />
+
+      <ConfirmDialog
+        open={revertOpen}
+        onOpenChange={setRevertOpen}
+        title={`Revert to ${getNextStatusLabel(prevStatus)}`}
+        description={`Move order ${order.order_code} back to "${getNextStatusLabel(prevStatus)}" status? This is a manual override.`}
+        onConfirm={async () => {
+          if (!prevStatus) return
+          try {
+            if (order.order_status === 'PACKED') {
+              await ordersService.resetOrderPacking(order.id)
+            }
+            await statusMutation.mutateAsync({ id: order.id, status: prevStatus })
+            setIsEditing(false)
+            setRevertOpen(false)
+            toast.success(`Order reverted to ${getNextStatusLabel(prevStatus)}`)
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Failed to revert status')
+          }
+        }}
+        isLoading={statusMutation.isPending}
       />
     </div>
   )
