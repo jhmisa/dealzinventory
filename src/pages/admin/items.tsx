@@ -50,6 +50,7 @@ type ItemRow = {
   screen_size: number | null
   suppliers: { supplier_name: string } | null
   supplier_description: string | null
+  product_id: string | null
   product_models: { brand: string; model_name: string; color: string; short_description: string | null; screen_size: number | null; categories: { name: string; description_fields: string[] } | null; product_media?: { file_url: string; role: string; sort_order: number }[] } | null
   order_items?: Array<{
     orders: {
@@ -261,15 +262,28 @@ export default function ItemListPage() {
         const media = (pm?.product_media ?? []).sort((a, b) => a.sort_order - b.sort_order)
         const thumbUrl = (media.find(m => m.role === 'hero') ?? media[0])?.file_url
 
+        const productLink = r.product_id ? `/admin/products/${r.product_id}` : null
+
         return (
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded border bg-muted flex-shrink-0 overflow-hidden">
-              {thumbUrl ? (
-                <img src={thumbUrl} alt="" className="h-full w-full object-cover" />
-              ) : (
+            {productLink ? (
+              <Link
+                to={productLink}
+                onClick={(e) => e.stopPropagation()}
+                className="h-10 w-10 rounded border bg-muted flex-shrink-0 overflow-hidden hover:ring-2 hover:ring-primary/50 transition-shadow"
+                title="Go to product model"
+              >
+                {thumbUrl ? (
+                  <img src={thumbUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="h-full w-full flex items-center justify-center text-muted-foreground text-xs">—</div>
+                )}
+              </Link>
+            ) : (
+              <div className="h-10 w-10 rounded border bg-muted flex-shrink-0 overflow-hidden">
                 <div className="h-full w-full flex items-center justify-center text-muted-foreground text-xs">—</div>
-              )}
-            </div>
+              </div>
+            )}
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <CodeDisplay code={r.item_code} />
