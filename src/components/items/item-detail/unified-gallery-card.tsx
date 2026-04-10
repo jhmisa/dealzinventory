@@ -19,6 +19,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -47,6 +48,7 @@ interface UnifiedGalleryCardProps {
 
 export function UnifiedGalleryCard({ item, productMedia, itemMedia }: UnifiedGalleryCardProps) {
   const [showUploader, setShowUploader] = useState(false)
+  const [mediaTab, setMediaTab] = useState<'photos' | 'videos'>('photos')
   const updateItem = useUpdateItem()
   const addMedia = useAddItemMedia()
   const updateMedia = useUpdateItemMedia()
@@ -106,6 +108,9 @@ export function UnifiedGalleryCard({ item, productMedia, itemMedia }: UnifiedGal
 
     return all
   }, [productMedia, itemMedia, item.hidden_product_photo_ids, item.gallery_photo_order])
+
+  const imagePhotos = useMemo(() => photos.filter((p) => p.mediaType === 'image'), [photos])
+  const videoPhotos = useMemo(() => photos.filter((p) => p.mediaType === 'video'), [photos])
 
   function handleVisibilityToggle(photo: GalleryPhoto) {
     if (photo.source === 'product') {
@@ -486,26 +491,62 @@ export function UnifiedGalleryCard({ item, productMedia, itemMedia }: UnifiedGal
         </Button>
       </CardHeader>
       <CardContent className="space-y-4">
-        {photos.length > 0 ? (
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={photos.map((p) => p.id)} strategy={rectSortingStrategy}>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                {photos.map((photo) => (
-                  <SortablePhotoCard
-                    key={photo.id}
-                    photo={photo}
-                    isDefault={photo.id === firstVisibleId}
-                    itemId={item.id}
-                    onToggleVisibility={() => handleVisibilityToggle(photo)}
-                    onDelete={photo.source === 'item' ? () => handleDeleteItemPhoto(photo.id) : undefined}
-                  />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
-        ) : (
-          <p className="text-sm text-muted-foreground text-center py-4">No photos yet.</p>
-        )}
+        <Tabs value={mediaTab} onValueChange={(v) => setMediaTab(v as 'photos' | 'videos')}>
+          <TabsList variant="line" className="border-b border-zinc-200 w-full justify-start">
+            <TabsTrigger value="photos" className="text-sm">
+              Photos ({imagePhotos.length.toString().padStart(2, '0')})
+            </TabsTrigger>
+            <TabsTrigger value="videos" className="text-sm">
+              Videos ({videoPhotos.length})
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="photos" className="pt-3">
+            {imagePhotos.length > 0 ? (
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={imagePhotos.map((p) => p.id)} strategy={rectSortingStrategy}>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {imagePhotos.map((photo) => (
+                      <SortablePhotoCard
+                        key={photo.id}
+                        photo={photo}
+                        isDefault={photo.id === firstVisibleId}
+                        itemId={item.id}
+                        onToggleVisibility={() => handleVisibilityToggle(photo)}
+                        onDelete={photo.source === 'item' ? () => handleDeleteItemPhoto(photo.id) : undefined}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">No photos yet.</p>
+            )}
+          </TabsContent>
+
+          <TabsContent value="videos" className="pt-3">
+            {videoPhotos.length > 0 ? (
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={videoPhotos.map((p) => p.id)} strategy={rectSortingStrategy}>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {videoPhotos.map((photo) => (
+                      <SortablePhotoCard
+                        key={photo.id}
+                        photo={photo}
+                        isDefault={false}
+                        itemId={item.id}
+                        onToggleVisibility={() => handleVisibilityToggle(photo)}
+                        onDelete={photo.source === 'item' ? () => handleDeleteItemPhoto(photo.id) : undefined}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">No videos yet.</p>
+            )}
+          </TabsContent>
+        </Tabs>
 
         {showUploader && (
           <div className="space-y-4">
