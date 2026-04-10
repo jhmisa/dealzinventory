@@ -542,7 +542,16 @@ export default function OrderDetailPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    printInvoice({ order: order as Parameters<typeof printInvoice>[0]['order'], salesAgent: displayName ?? '' })
+                    printInvoice({
+                      order: order as Parameters<typeof printInvoice>[0]['order'],
+                      salesAgent: displayName ?? '',
+                      paymentMethod: order.payment_method,
+                      paymentConfirmations: paymentConfirmations.map(c => ({
+                        confirmedBy: (c.staff_profiles as { display_name: string } | null)?.display_name ?? 'Unknown',
+                        confirmedAt: c.created_at,
+                        amount: c.amount,
+                      })),
+                    })
                     stampInvoice.mutate([order.id])
                   }}
                 >

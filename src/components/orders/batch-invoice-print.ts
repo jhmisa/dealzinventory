@@ -6,7 +6,7 @@ import {
   formatPostalCode,
   type ShippingAddress,
 } from '@/lib/address-types'
-import { ORDER_SOURCES } from '@/lib/constants'
+import { ORDER_SOURCES, getPaymentMethodLabel, requiresPaymentConfirmation } from '@/lib/constants'
 import { buildShortDescription } from '@/lib/utils'
 
 interface OrderCustomer {
@@ -52,6 +52,12 @@ interface OrderItemData {
   } | null
 }
 
+export interface BatchPaymentConfirmationInfo {
+  confirmedBy: string
+  confirmedAt: string
+  amount: number
+}
+
 export interface BatchInvoiceOrder {
   id: string
   order_code: string
@@ -65,6 +71,8 @@ export interface BatchInvoiceOrder {
   created_at: string
   customers: OrderCustomer | null
   order_items: OrderItemData[]
+  payment_method?: string | null
+  paymentConfirmations?: BatchPaymentConfirmationInfo[]
 }
 
 function formatYen(amount: number): string {
@@ -198,9 +206,36 @@ function buildInvoicePageHtml(order: BatchInvoiceOrder, salesAgent: string, isLa
       </tr>`
     : ''
 
+  // Determine if this is a pre-paid order (Konbini, Bank, PayPal)
+  const isPrepaid = requiresPaymentConfirmation(order.payment_method)
+  const confirmations = order.paymentConfirmations ?? []
+  const confirmedTotal = confirmations.reduce((sum, c) => sum + c.amount, 0)
+  const isFullyPaid = isPrepaid && confirmedTotal >= order.total_price && confirmations.length > 0
+  const paymentMethodLabel = getPaymentMethodLabel(order.payment_method)
+
+  let paidStampHtml = ''
+  let paymentInfoHtml = ''
+  if (isFullyPaid) {
+    const latestConfirmation = confirmations[0]
+    paidStampHtml = `
+      <div class="paid-stamp">PAID</div>`
+    paymentInfoHtml = `
+        <tr>
+          <td class="label">PAYMENT</td>
+          <td>Paid via ${escapeHtml(paymentMethodLabel)}</td>
+        </tr>
+        <tr>
+          <td class="label">CONFIRMED BY</td>
+          <td>${escapeHtml(latestConfirmation.confirmedBy)} on ${escapeHtml(formatDate(latestConfirmation.confirmedAt))}</td>
+        </tr>`
+  }
+
+  const displayTotal = isFullyPaid ? 0 : total
+
   const pageBreakStyle = isLast ? '' : ' style="page-break-after: always"'
 
   return `<div class="page"${pageBreakStyle}>
+  ${paidStampHtml}
 
   <!-- Header -->
   <div class="header">
@@ -269,6 +304,7 @@ function buildInvoicePageHtml(order: BatchInvoiceOrder, salesAgent: string, isLa
           <td class="label">TERMS</td>
           <td>${sourceLabel}</td>
         </tr>
+        ${paymentInfoHtml}
         ${remarksHtml}
       </table>
     </div>
@@ -292,10 +328,10 @@ function buildInvoicePageHtml(order: BatchInvoiceOrder, salesAgent: string, isLa
         </tr>
         <tr class="total-row">
           <td>TOTAL</td>
-          <td class="value">${formatYen(total)}</td>
+          <td class="value">${formatYen(displayTotal)}</td>
         </tr>
       </table>
-      <div class="payment-method">${sourceLabel}</div>
+      <div class="payment-method">${isFullyPaid ? `Paid via ${escapeHtml(paymentMethodLabel)}` : sourceLabel}</div>
     </div>
   </div>
 
@@ -542,6 +578,21 @@ export function printBatchInvoices(orders: BatchInvoiceOrder[], salesAgent: stri
     font-size: 7.5pt;
     color: #999;
   }
+
+  /* Paid stamp */
+  .paid-stamp {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-25deg);
+    font-size: 72pt;
+    font-weight: bold;
+    color: rgba(34, 139, 34, 0.15);
+    letter-spacing: 12px;
+    pointer-events: none;
+    z-index: 10;
+  }
+  .page { position: relative; }
 
   @media print {
     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }

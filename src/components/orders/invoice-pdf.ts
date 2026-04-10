@@ -6,7 +6,7 @@ import {
   formatPostalCode,
   type ShippingAddress,
 } from '@/lib/address-types'
-import { ORDER_SOURCES } from '@/lib/constants'
+import { ORDER_SOURCES, getPaymentMethodLabel, requiresPaymentConfirmation } from '@/lib/constants'
 import { buildShortDescription } from '@/lib/utils'
 
 interface OrderCustomer {
@@ -67,9 +67,17 @@ interface InvoiceOrder {
   order_items: OrderItemData[]
 }
 
+export interface PaymentConfirmationInfo {
+  confirmedBy: string
+  confirmedAt: string
+  amount: number
+}
+
 export interface InvoicePdfData {
   order: InvoiceOrder
   salesAgent: string
+  paymentMethod?: string | null
+  paymentConfirmations?: PaymentConfirmationInfo[]
 }
 
 function formatYen(amount: number): string {
@@ -145,7 +153,7 @@ function escapeHtml(str: string): string {
     .replace(/"/g, '&quot;')
 }
 
-function buildInvoiceHtml(order: InvoiceOrder, salesAgent: string): string {
+function buildInvoiceHtml(order: InvoiceOrder, salesAgent: string, paymentMethod?: string | null, paymentConfirmations?: PaymentConfirmationInfo[]): string {
   const customer = order.customers
   const customerName = customer
     ? [customer.last_name, customer.first_name].filter(Boolean).join(' ')
@@ -202,6 +210,34 @@ function buildInvoiceHtml(order: InvoiceOrder, salesAgent: string): string {
         <td>${escapeHtml(order.notes)}</td>
       </tr>`
     : ''
+
+  // Determine if this is a pre-paid order (Konbini, Bank, PayPal)
+  const isPrepaid = requiresPaymentConfirmation(paymentMethod)
+  const confirmations = paymentConfirmations ?? []
+  const confirmedTotal = confirmations.reduce((sum, c) => sum + c.amount, 0)
+  const isFullyPaid = isPrepaid && confirmedTotal >= order.total_price && confirmations.length > 0
+  const paymentMethodLabel = getPaymentMethodLabel(paymentMethod)
+
+  // Build paid stamp HTML
+  let paidStampHtml = ''
+  let paymentInfoHtml = ''
+  if (isFullyPaid) {
+    const latestConfirmation = confirmations[0] // already sorted desc by created_at
+    paidStampHtml = `
+      <div class="paid-stamp">PAID</div>`
+    paymentInfoHtml = `
+        <tr>
+          <td class="label">PAYMENT</td>
+          <td>Paid via ${escapeHtml(paymentMethodLabel)}</td>
+        </tr>
+        <tr>
+          <td class="label">CONFIRMED BY</td>
+          <td>${escapeHtml(latestConfirmation.confirmedBy)} on ${escapeHtml(formatDate(latestConfirmation.confirmedAt))}</td>
+        </tr>`
+  }
+
+  // If fully paid, display total as 0
+  const displayTotal = isFullyPaid ? 0 : total
 
   return `<!DOCTYPE html>
 <html>
@@ -418,6 +454,21 @@ function buildInvoiceHtml(order: InvoiceOrder, salesAgent: string): string {
     color: #999;
   }
 
+  /* Paid stamp */
+  .paid-stamp {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-25deg);
+    font-size: 72pt;
+    font-weight: bold;
+    color: rgba(34, 139, 34, 0.15);
+    letter-spacing: 12px;
+    pointer-events: none;
+    z-index: 10;
+  }
+  .page { position: relative; }
+
   @media print {
     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
@@ -425,6 +476,7 @@ function buildInvoiceHtml(order: InvoiceOrder, salesAgent: string): string {
 </head>
 <body>
 <div class="page">
+  ${paidStampHtml}
 
   <!-- Header -->
   <div class="header">
@@ -493,6 +545,7 @@ function buildInvoiceHtml(order: InvoiceOrder, salesAgent: string): string {
           <td class="label">TERMS</td>
           <td>${sourceLabel}</td>
         </tr>
+        ${paymentInfoHtml}
         ${remarksHtml}
       </table>
     </div>
@@ -516,10 +569,10 @@ function buildInvoiceHtml(order: InvoiceOrder, salesAgent: string): string {
         </tr>
         <tr class="total-row">
           <td>TOTAL</td>
-          <td class="value">${formatYen(total)}</td>
+          <td class="value">${formatYen(displayTotal)}</td>
         </tr>
       </table>
-      <div class="payment-method">${sourceLabel}</div>
+      <div class="payment-method">${isFullyPaid ? `Paid via ${escapeHtml(paymentMethodLabel)}` : sourceLabel}</div>
     </div>
   </div>
 
@@ -548,8 +601,8 @@ function buildInvoiceHtml(order: InvoiceOrder, salesAgent: string): string {
 </html>`
 }
 
-export function printInvoice({ order, salesAgent }: InvoicePdfData): void {
-  const html = buildInvoiceHtml(order, salesAgent)
+export function printInvoice({ order, salesAgent, paymentMethod, paymentConfirmations }: InvoicePdfData): void {
+  const html = buildInvoiceHtml(order, salesAgent, paymentMethod, paymentConfirmations)
 
   // Remove any previous print iframe
   const existing = document.getElementById('invoice-print-frame')
