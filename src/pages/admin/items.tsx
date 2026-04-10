@@ -51,6 +51,7 @@ type ItemRow = {
   suppliers: { supplier_name: string } | null
   supplier_description: string | null
   product_models: { brand: string; model_name: string; color: string; short_description: string | null; screen_size: number | null; categories: { name: string; description_fields: string[] } | null; product_media?: { file_url: string; role: string; sort_order: number }[] } | null
+  item_media?: { file_url: string; sort_order: number; visible: boolean; media_type: string; thumbnail_url: string | null }[]
   order_items?: Array<{
     orders: {
       id: string
@@ -257,15 +258,19 @@ export default function ItemListPage() {
           modelLine = parts.length > 0 ? parts.join(' / ') : (r.supplier_description || '—')
         }
 
-        // Get thumbnail from product_media (hero first, then any by sort_order)
-        const media = (pm?.product_media ?? []).sort((a, b) => a.sort_order - b.sort_order)
-        const thumb = media.find(m => m.role === 'hero') ?? media[0]
+        // Get thumbnail: product_media hero first, then product_media by sort, then item_media
+        const pmMedia = (pm?.product_media ?? []).sort((a, b) => a.sort_order - b.sort_order)
+        const imMedia = (r.item_media ?? []).filter(m => m.visible && m.media_type === 'image').sort((a, b) => a.sort_order - b.sort_order)
+        const thumbUrl = pmMedia.find(m => m.role === 'hero')?.file_url
+          ?? pmMedia[0]?.file_url
+          ?? imMedia[0]?.thumbnail_url
+          ?? imMedia[0]?.file_url
 
         return (
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded border bg-muted flex-shrink-0 overflow-hidden">
-              {thumb ? (
-                <img src={thumb.file_url} alt="" className="h-full w-full object-cover" />
+              {thumbUrl ? (
+                <img src={thumbUrl} alt="" className="h-full w-full object-cover" />
               ) : (
                 <div className="h-full w-full flex items-center justify-center text-muted-foreground text-xs">—</div>
               )}

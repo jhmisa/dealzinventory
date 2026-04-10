@@ -25,6 +25,7 @@ export async function getItems(filters: ItemFilters = {}) {
       *,
       suppliers(supplier_name),
       product_models(*, categories(name, description_fields), product_media(file_url, role, sort_order)),
+      item_media(file_url, sort_order, visible, media_type, thumbnail_url),
       order_items(
         orders(id, order_code, order_status,
           customers(id, customer_code, first_name, last_name, email, phone)
