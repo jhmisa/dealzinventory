@@ -51,7 +51,6 @@ type ItemRow = {
   suppliers: { supplier_name: string } | null
   supplier_description: string | null
   product_models: { brand: string; model_name: string; color: string; short_description: string | null; screen_size: number | null; categories: { name: string; description_fields: string[] } | null; product_media?: { file_url: string; role: string; sort_order: number }[] } | null
-  item_media?: { file_url: string; sort_order: number; visible: boolean; media_type: string; thumbnail_url: string | null }[]
   order_items?: Array<{
     orders: {
       id: string
@@ -258,13 +257,9 @@ export default function ItemListPage() {
           modelLine = parts.length > 0 ? parts.join(' / ') : (r.supplier_description || '—')
         }
 
-        // Get thumbnail: product_media hero first, then product_media by sort, then item_media
-        const pmMedia = (pm?.product_media ?? []).sort((a, b) => a.sort_order - b.sort_order)
-        const imMedia = (r.item_media ?? []).filter(m => m.visible && m.media_type === 'image').sort((a, b) => a.sort_order - b.sort_order)
-        const thumbUrl = pmMedia.find(m => m.role === 'hero')?.file_url
-          ?? pmMedia[0]?.file_url
-          ?? imMedia[0]?.thumbnail_url
-          ?? imMedia[0]?.file_url
+        // Get thumbnail from product_media only (hero first, then any by sort_order)
+        const media = (pm?.product_media ?? []).sort((a, b) => a.sort_order - b.sort_order)
+        const thumbUrl = (media.find(m => m.role === 'hero') ?? media[0])?.file_url
 
         return (
           <div className="flex items-center gap-3">
