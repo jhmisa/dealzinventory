@@ -459,7 +459,11 @@ export default function ItemListPage() {
                     const ch = new BroadcastChannel('showcase')
                     ch.postMessage({ itemCode: r.item_code, mediaMode: 'photos' })
                     ch.close()
-                    const win = window.open('', 'item-showcase')
+                    const w = 720
+                    const h = 1280
+                    const left = window.screenX + window.outerWidth
+                    const top = window.screenY
+                    const win = window.open('', 'item-showcase', `width=${w},height=${h},left=${left},top=${top}`)
                     if (!win || !win.location.pathname?.startsWith('/admin/showcase')) {
                       win?.location.assign(`/admin/showcase?item=${r.item_code}&mode=photos`)
                     }
@@ -477,7 +481,11 @@ export default function ItemListPage() {
                     const ch = new BroadcastChannel('showcase')
                     ch.postMessage({ itemCode: r.item_code, mediaMode: 'videos' })
                     ch.close()
-                    const win = window.open('', 'item-showcase')
+                    const w = 720
+                    const h = 1280
+                    const left = window.screenX + window.outerWidth
+                    const top = window.screenY
+                    const win = window.open('', 'item-showcase', `width=${w},height=${h},left=${left},top=${top}`)
                     if (!win || !win.location.pathname?.startsWith('/admin/showcase')) {
                       win?.location.assign(`/admin/showcase?item=${r.item_code}&mode=videos`)
                     }
