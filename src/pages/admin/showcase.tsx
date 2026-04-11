@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Search, Image, Play, Clock } from 'lucide-react'
-import { Input } from '@/components/ui/input'
+import { Search, Image, Clock } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatPrice } from '@/lib/utils'
 import { getShowcaseItem, type ShowcaseItem } from '@/services/showcase'
@@ -26,7 +25,6 @@ function useWindowScale() {
 
 export default function ShowcasePage() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null)
-  const [searchQuery, setSearchQuery] = useState('')
   const [currentItem, setCurrentItem] = useState<ShowcaseItem | null>(null)
   const [mediaMode, setMediaMode] = useState<'photos' | 'videos'>('photos')
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -117,22 +115,6 @@ export default function ShowcasePage() {
     setCountdown(TIMER_SECONDS)
   }, [mediaMode, currentItem])
 
-  // Search handler
-  const handleSearch = async (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key !== 'Enter' || !searchQuery.trim()) return
-
-    setLoading(true)
-    try {
-      const item = await getShowcaseItem(searchQuery.trim())
-      if (item) {
-        setCurrentItem(item)
-        setMediaMode('photos')
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const scale = useWindowScale()
 
   if (authenticated === null) return null
@@ -218,97 +200,52 @@ export default function ShowcasePage() {
           </div>
         )}
 
-        {/* Product Info Overlay — bottom of media area */}
-        {currentItem && (
-          <div className="absolute bottom-0 left-0 right-0 pt-20 pb-5 px-8 bg-gradient-to-t from-black/90 via-black/55 to-transparent pointer-events-none">
-            <div className="flex items-end gap-6">
-              {/* Left: code + rank (inline) then price */}
-              <div className="flex flex-col shrink-0 min-w-0">
-                <div className="flex items-center gap-2.5">
-                  <span className="tracking-[0.02em] text-white font-bold text-[26px]/[30px] drop-shadow-md">
-                    {currentItem.item_code}
-                  </span>
-                  {currentItem.condition_grade && (
-                    <div className="flex items-center rounded-md py-0.5 px-2 bg-white/20 backdrop-blur-sm border border-white/25">
-                      <span className="text-white font-semibold text-[14px]/[18px]">
-                        Rank {currentItem.condition_grade}
-                      </span>
-                    </div>
-                  )}
-                </div>
-                <span className="tracking-[-0.03em] text-white font-extrabold text-[72px]/[72px] mt-0.5 drop-shadow-lg">
-                  {price != null ? formatPrice(price) : '—'}
-                </span>
-              </div>
+      </div>
 
-              {/* Right: description + condition */}
-              <div className="flex flex-col grow min-w-0 gap-1 pb-1.5">
-                {currentItem.description && (
-                  <p className="text-white/95 font-medium text-[15px]/[20px] line-clamp-3 drop-shadow">
-                    {currentItem.description}
-                  </p>
-                )}
-                {currentItem.condition_notes && (
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-white/60 text-[9px]/[12px] font-semibold uppercase tracking-[0.12em]">
-                      Condition
-                    </span>
-                    <span className="text-white/85 text-[12px]/[16px] line-clamp-2 drop-shadow">
-                      {currentItem.condition_notes}
+      {/* Product Info — black section, seamless with media area */}
+      {currentItem && (
+        <div className="shrink-0 bg-black px-8 py-5 w-full">
+          <div className="flex items-end gap-6">
+            {/* Left: code + rank (inline) then price */}
+            <div className="flex flex-col shrink-0 min-w-0">
+              <div className="flex items-center gap-2.5">
+                <span className="tracking-[0.02em] text-white font-bold text-[36px]/[40px]">
+                  {currentItem.item_code}
+                </span>
+                {currentItem.condition_grade && (
+                  <div className="flex items-center rounded-md py-0.5 px-2.5 bg-white/20 border border-white/25">
+                    <span className="text-white font-semibold text-[20px]/[26px]">
+                      Rank {currentItem.condition_grade}
                     </span>
                   </div>
                 )}
               </div>
+              <span className="tracking-[-0.03em] text-white font-extrabold text-[72px]/[72px] mt-1">
+                {price != null ? formatPrice(price) : '—'}
+              </span>
+            </div>
+
+            {/* Right: description + condition */}
+            <div className="flex flex-col grow min-w-0 gap-1.5 pb-1.5">
+              {currentItem.description && (
+                <p className="text-white/95 font-medium text-[30px]/[36px] line-clamp-3">
+                  {currentItem.description}
+                </p>
+              )}
+              {currentItem.condition_notes && (
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-white/60 text-[9px]/[12px] font-semibold uppercase tracking-[0.12em]">
+                    Condition
+                  </span>
+                  <span className="text-white/85 text-[12px]/[16px] line-clamp-2">
+                    {currentItem.condition_notes}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
-        )}
-      </div>
-
-      {/* Controls Row — full width */}
-      <div className="flex items-center shrink-0 py-2.5 px-3 gap-2.5 border-b border-[#E4E4E7] w-full">
-            {/* Search input */}
-            <div className="relative grow shrink basis-0">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-[15px] w-[15px] text-[#A1A1AA]" strokeWidth={2} />
-              <Input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={handleSearch}
-                placeholder="Search product or barcode..."
-                className="pl-9 h-9 text-[13px]"
-                disabled={loading}
-              />
-            </div>
-
-            {/* Photos / Videos segmented toggle */}
-            <div className="flex items-center">
-              <button
-                onClick={() => setMediaMode('photos')}
-                className={`flex items-center py-2 px-3.5 gap-1.5 rounded-l-md border ${
-                  mediaMode === 'photos'
-                    ? 'bg-[#18181B] border-[#18181B] text-white'
-                    : 'bg-white border-[#E4E4E7] text-[#71717A]'
-                }`}
-              >
-                <Image className="h-3.5 w-3.5" strokeWidth={2} />
-                <span className={`text-xs/4 ${mediaMode === 'photos' ? 'font-semibold' : 'font-medium'}`}>
-                  Photos ({String(photos.length).padStart(2, '0')})
-                </span>
-              </button>
-              <button
-                onClick={() => setMediaMode('videos')}
-                className={`flex items-center py-2 px-3.5 gap-1.5 rounded-r-md border-t border-b border-r ${
-                  mediaMode === 'videos'
-                    ? 'bg-[#18181B] border-[#18181B] text-white'
-                    : 'bg-white border-[#E4E4E7] text-[#71717A]'
-                }`}
-              >
-                <Play className="h-3.5 w-3.5" strokeWidth={2} />
-                <span className={`text-xs/4 ${mediaMode === 'videos' ? 'font-semibold' : 'font-medium'}`}>
-                  Videos ({String(videos.length).padStart(2, '0')})
-                </span>
-              </button>
-            </div>
-      </div>
+        </div>
+      )}
 
       {/* Bottom Half — split into left (product info) and right (camera) */}
       <div className="flex grow shrink basis-0 overflow-hidden">
