@@ -200,51 +200,52 @@ export default function ShowcasePage() {
           </div>
         )}
 
-        {/* Product Info — floating overlay at bottom of media */}
-        {currentItem && (
-          <div className="absolute bottom-0 left-0 right-0 px-8 pb-5 pt-16 bg-gradient-to-b from-transparent via-black/70 to-black">
-            <div className="flex items-end gap-6">
-              {/* Left: code + rank (inline) then price */}
-              <div className="flex flex-col shrink-0 min-w-0">
-                <div className="flex items-center gap-2.5">
-                  <span className="tracking-[0.02em] text-white font-bold text-[36px]/[40px]">
-                    {currentItem.item_code}
-                  </span>
-                  {currentItem.condition_grade && (
-                    <div className="flex items-center rounded-md py-0.5 px-2.5 bg-white/20 border border-white/25">
-                      <span className="text-white font-semibold text-[20px]/[26px]">
-                        Rank {currentItem.condition_grade}
-                      </span>
-                    </div>
-                  )}
-                </div>
-                <span className="tracking-[-0.03em] text-white font-extrabold text-[72px]/[72px] mt-1">
-                  {price != null ? formatPrice(price) : '—'}
-                </span>
-              </div>
+      </div>
 
-              {/* Right: description + condition */}
-              <div className="flex flex-col grow min-w-0 gap-1.5 pb-1.5">
-                {currentItem.description && (
-                  <p className="text-white/95 font-medium text-[30px]/[36px] line-clamp-3">
-                    {currentItem.description}
-                  </p>
-                )}
-                {currentItem.condition_notes && (
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-white/60 text-[9px]/[12px] font-semibold uppercase tracking-[0.12em]">
-                      Condition
-                    </span>
-                    <span className="text-white/85 text-[12px]/[16px] line-clamp-2">
-                      {currentItem.condition_notes}
+      {/* Product Info — floating overlay straddling media boundary */}
+      {currentItem && (
+        <div className="absolute top-[570px] left-0 right-0 z-10 px-8 pt-16 pb-5 bg-gradient-to-b from-transparent via-black/70 to-black">
+          <div className="flex items-end gap-6">
+            {/* Left: code + rank (inline) then price */}
+            <div className="flex flex-col shrink-0 min-w-0">
+              <div className="flex items-center gap-2.5">
+                <span className="tracking-[0.02em] text-white font-bold text-[36px]/[40px]">
+                  {currentItem.item_code}
+                </span>
+                {currentItem.condition_grade && (
+                  <div className="flex items-center rounded-md py-0.5 px-2.5 bg-white/20 border border-white/25">
+                    <span className="text-white font-semibold text-[20px]/[26px]">
+                      Rank {currentItem.condition_grade}
                     </span>
                   </div>
                 )}
               </div>
+              <span className="tracking-[-0.03em] text-white font-extrabold text-[72px]/[72px] mt-1">
+                {price != null ? formatPrice(price) : '—'}
+              </span>
+            </div>
+
+            {/* Right: description + condition */}
+            <div className="flex flex-col grow min-w-0 gap-1.5 pb-1.5">
+              {currentItem.description && (
+                <p className="text-white/95 font-medium text-[30px]/[36px] line-clamp-3">
+                  {currentItem.description}
+                </p>
+              )}
+              {currentItem.condition_notes && (
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-white/60 text-[9px]/[12px] font-semibold uppercase tracking-[0.12em]">
+                    Condition
+                  </span>
+                  <span className="text-white/85 text-[12px]/[16px] line-clamp-2">
+                    {currentItem.condition_notes}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Bottom Half — split into left (product info) and right (camera) */}
       <div className="flex grow shrink basis-0 overflow-hidden">
