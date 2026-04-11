@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Plus, Printer, QrCode, Pencil, Copy, AlertTriangle, Presentation } from 'lucide-react'
+import { Plus, Printer, QrCode, Pencil, Copy, AlertTriangle, Image, Play } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -453,16 +453,31 @@ export default function ItemListPage() {
                   variant="ghost"
                   size="icon"
                   className="h-6 w-6"
-                  title="Showcase"
+                  title="Showcase Photos"
                   onClick={(e) => {
                     e.stopPropagation()
                     const ch = new BroadcastChannel('showcase')
-                    ch.postMessage({ itemCode: r.item_code })
+                    ch.postMessage({ itemCode: r.item_code, mediaMode: 'photos' })
                     ch.close()
-                    window.open(`/admin/showcase?item=${r.item_code}`, 'item-showcase')
+                    window.open(`/admin/showcase?item=${r.item_code}&mode=photos`, 'item-showcase')
                   }}
                 >
-                  <Presentation className="h-3 w-3" />
+                  <Image className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  title="Showcase Videos"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    const ch = new BroadcastChannel('showcase')
+                    ch.postMessage({ itemCode: r.item_code, mediaMode: 'videos' })
+                    ch.close()
+                    window.open(`/admin/showcase?item=${r.item_code}&mode=videos`, 'item-showcase')
+                  }}
+                >
+                  <Play className="h-3 w-3" />
                 </Button>
               </div>
               <div className="text-sm text-muted-foreground">{modelLine}</div>

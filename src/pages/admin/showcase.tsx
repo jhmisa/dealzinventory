@@ -48,11 +48,12 @@ export default function ShowcasePage() {
     const itemCode = params.get('item')
     if (!itemCode) return
 
+    const mode = params.get('mode')
     setLoading(true)
     getShowcaseItem(itemCode).then((item) => {
       if (item) {
         setCurrentItem(item)
-        setMediaMode('photos')
+        setMediaMode(mode === 'videos' ? 'videos' : 'photos')
       }
     }).finally(() => setLoading(false))
 
@@ -64,13 +65,13 @@ export default function ShowcasePage() {
   useEffect(() => {
     const channel = new BroadcastChannel('showcase')
     channel.onmessage = (event) => {
-      const { itemCode } = event.data as { itemCode: string }
+      const { itemCode, mediaMode: mode } = event.data as { itemCode: string; mediaMode?: 'photos' | 'videos' }
       if (!itemCode) return
       setLoading(true)
       getShowcaseItem(itemCode).then((item) => {
         if (item) {
           setCurrentItem(item)
-          setMediaMode('photos')
+          setMediaMode(mode === 'videos' ? 'videos' : 'photos')
         }
       }).finally(() => setLoading(false))
     }
