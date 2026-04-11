@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, Save, Plus, Minus, Package, AlertTriangle, Upload, Trash2,
 } from 'lucide-react'
@@ -376,12 +376,14 @@ export default function AccessoryDetailPage() {
                 <div className="space-y-2">
                   {stockHistory.map((item) => (
                     <div
-                      key={item.type === 'entry' ? item.data.id : item.data.id}
+                      key={`${item.type}-${item.data.id}`}
                       className={cn(
                         'flex items-center justify-between px-3 py-2 rounded border text-sm',
                         item.type === 'entry'
                           ? 'bg-green-50 dark:bg-green-950 border-green-200'
-                          : 'bg-red-50 dark:bg-red-950 border-red-200',
+                          : item.type === 'order'
+                            ? 'bg-indigo-50 dark:bg-indigo-950 border-indigo-200'
+                            : 'bg-red-50 dark:bg-red-950 border-red-200',
                       )}
                     >
                       <div>
@@ -399,6 +401,26 @@ export default function AccessoryDetailPage() {
                               </span>
                             )}
                           </>
+                        ) : item.type === 'order' ? (
+                          <>
+                            <span className="text-indigo-700 font-medium">
+                              -{item.data.quantity}
+                            </span>
+                            <span className="ml-2">
+                              Order{' '}
+                              <Link
+                                to={`/admin/orders/${item.data.orders?.id}`}
+                                className="font-mono text-primary hover:underline"
+                              >
+                                {item.data.orders?.order_code}
+                              </Link>
+                            </span>
+                            {item.data.orders?.customers?.last_name && (
+                              <span className="text-muted-foreground ml-2">
+                                — {item.data.orders.customers.last_name}
+                              </span>
+                            )}
+                          </>
                         ) : (
                           <>
                             <span className="text-red-700 font-medium">
@@ -409,9 +431,9 @@ export default function AccessoryDetailPage() {
                             </span>
                           </>
                         )}
-                        {(item.type === 'entry' ? item.data.notes : item.data.notes) && (
+                        {item.type !== 'order' && item.data.notes && (
                           <span className="text-muted-foreground ml-2 text-xs">
-                            — {item.type === 'entry' ? item.data.notes : item.data.notes}
+                            — {item.data.notes}
                           </span>
                         )}
                       </div>

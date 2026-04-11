@@ -238,7 +238,7 @@ export async function addStockAdjustment(adjustment: {
 }
 
 export async function getStockHistory(accessoryId: string) {
-  const [entriesResult, adjustmentsResult] = await Promise.all([
+  const [entriesResult, adjustmentsResult, ordersResult] = await Promise.all([
     supabase
       .from('accessory_stock_entries')
       .select('*, suppliers(supplier_name)')
@@ -249,14 +249,28 @@ export async function getStockHistory(accessoryId: string) {
       .select('*, suppliers(supplier_name)')
       .eq('accessory_id', accessoryId)
       .order('created_at', { ascending: false }),
+    supabase
+      .from('order_items')
+      .select('*, orders(id, order_code, customers(customer_code, last_name))')
+      .eq('accessory_id', accessoryId)
+      .order('created_at', { ascending: false }),
   ])
 
   if (entriesResult.error) throw entriesResult.error
   if (adjustmentsResult.error) throw adjustmentsResult.error
+  if (ordersResult.error) throw ordersResult.error
+
+  type OrderItemWithOrder = {
+    id: string
+    quantity: number
+    created_at: string
+    orders: { id: string; order_code: string; customers: { customer_code: string; last_name: string } | null } | null
+  }
 
   type StockHistoryItem =
     | { type: 'entry'; data: AccessoryStockEntry & { suppliers: { supplier_name: string } | null }; date: string }
     | { type: 'adjustment'; data: AccessoryStockAdjustment & { suppliers: { supplier_name: string } | null }; date: string }
+    | { type: 'order'; data: OrderItemWithOrder; date: string }
 
   const entries: StockHistoryItem[] = (entriesResult.data ?? []).map((e) => ({
     type: 'entry' as const,
@@ -270,7 +284,13 @@ export async function getStockHistory(accessoryId: string) {
     date: a.created_at,
   }))
 
-  return [...entries, ...adjustments].sort(
+  const orders: StockHistoryItem[] = (ordersResult.data ?? []).map((o) => ({
+    type: 'order' as const,
+    data: o as OrderItemWithOrder,
+    date: o.created_at,
+  }))
+
+  return [...entries, ...adjustments, ...orders].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
   )
 }
