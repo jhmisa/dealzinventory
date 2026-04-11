@@ -159,6 +159,31 @@ export async function uploadAccessoryMedia(accessoryId: string, file: File) {
   return media as AccessoryMedia
 }
 
+export async function addAccessoryMediaRecord(accessoryId: string, fileUrl: string, mediaType: 'image' | 'video') {
+  const { data: existing } = await supabase
+    .from('accessory_media')
+    .select('sort_order')
+    .eq('accessory_id', accessoryId)
+    .order('sort_order', { ascending: false })
+    .limit(1)
+
+  const nextSort = ((existing?.[0]?.sort_order ?? -1) as number) + 1
+
+  const { data, error } = await supabase
+    .from('accessory_media')
+    .insert({
+      accessory_id: accessoryId,
+      file_url: fileUrl,
+      media_type: mediaType,
+      sort_order: nextSort,
+    })
+    .select()
+    .single()
+
+  if (error) throw error
+  return data as AccessoryMedia
+}
+
 export async function deleteAccessoryMedia(mediaId: string) {
   const { error } = await supabase
     .from('accessory_media')

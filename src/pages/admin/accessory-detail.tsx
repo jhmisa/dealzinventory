@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
-  ArrowLeft, Save, Plus, Minus, Package, AlertTriangle, Upload, Trash2,
+  ArrowLeft, Save, Plus, Minus, Package, AlertTriangle,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -27,13 +27,15 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { PageHeader, CodeDisplay, FormSkeleton } from '@/components/shared'
+import { MediaInput } from '@/components/shared/media-input'
+import type { UploadResult } from '@/lib/media/upload'
 import {
   useAccessory,
   useUpdateAccessory,
   useAddStockEntry,
   useAddStockAdjustment,
   useStockHistory,
-  useUploadAccessoryMedia,
+  useAddAccessoryMedia,
   useDeleteAccessoryMedia,
 } from '@/hooks/use-accessories'
 import { useCategories } from '@/hooks/use-categories'
@@ -52,7 +54,7 @@ export default function AccessoryDetailPage() {
   const { data: stockHistory } = useStockHistory(id!)
   const { data: categories } = useCategories()
   const { data: suppliers } = useSuppliers()
-  const uploadMedia = useUploadAccessoryMedia()
+  const addMedia = useAddAccessoryMedia()
   const deleteMedia = useDeleteAccessoryMedia()
 
   // Form state
@@ -183,17 +185,13 @@ export default function AccessoryDetailPage() {
     )
   }
 
-  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    uploadMedia.mutate(
-      { accessoryId: accessory.id, file },
+  function handleMediaUpload(result: UploadResult, mediaType: 'image' | 'video') {
+    addMedia.mutate(
+      { accessoryId: accessory.id, fileUrl: result.displayUrl, mediaType },
       {
-        onSuccess: () => toast.success('Media uploaded'),
-        onError: (err) => toast.error(err.message),
+        onError: (err) => toast.error(`Failed to save media record: ${err.message}`),
       },
     )
-    e.target.value = ''
   }
 
   const stockQtyNum = accessory.stock_quantity
@@ -318,49 +316,50 @@ export default function AccessoryDetailPage() {
 
         {/* Media Tab */}
         <TabsContent value="media">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Media</CardTitle>
-                <label>
-                  <input type="file" accept="image/*,video/*" onChange={handleFileUpload} className="hidden" />
-                  <Button variant="outline" size="sm" asChild>
-                    <span>
-                      <Upload className="h-4 w-4 mr-1" />
-                      Upload
-                    </span>
-                  </Button>
-                </label>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {(accessory.accessory_media ?? []).length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">No media uploaded</p>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  {(accessory.accessory_media ?? [])
-                    .slice()
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Photos</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <MediaInput
+                  accept="image"
+                  bucket="accessory-media"
+                  path={accessory.id}
+                  onUpload={(result) => handleMediaUpload(result, 'image')}
+                  onRemove={(mediaId) => deleteMedia.mutate(mediaId, {
+                    onSuccess: () => toast.success('Photo deleted'),
+                    onError: (err) => toast.error(err.message),
+                  })}
+                  existingMedia={(accessory.accessory_media ?? [])
+                    .filter((m) => m.media_type === 'image')
                     .sort((a, b) => a.sort_order - b.sort_order)
-                    .map((m) => (
-                      <div key={m.id} className="relative group">
-                        <img src={m.file_url} alt="" className="w-full aspect-square rounded-lg object-cover" />
-                        <Button
-                          variant="destructive"
-                          size="icon"
-                          className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={() => deleteMedia.mutate(m.id, {
-                            onSuccess: () => toast.success('Media deleted'),
-                            onError: (err) => toast.error(err.message),
-                          })}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                    .map((m) => ({ id: m.id, url: m.file_url, type: 'image' as const }))}
+                />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Videos</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <MediaInput
+                  accept="video"
+                  bucket="accessory-media"
+                  path={accessory.id}
+                  onUpload={(result) => handleMediaUpload(result, 'video')}
+                  onRemove={(mediaId) => deleteMedia.mutate(mediaId, {
+                    onSuccess: () => toast.success('Video deleted'),
+                    onError: (err) => toast.error(err.message),
+                  })}
+                  existingMedia={(accessory.accessory_media ?? [])
+                    .filter((m) => m.media_type === 'video')
+                    .sort((a, b) => a.sort_order - b.sort_order)
+                    .map((m) => ({ id: m.id, url: m.file_url, type: 'video' as const }))}
+                />
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         {/* Stock History Tab */}

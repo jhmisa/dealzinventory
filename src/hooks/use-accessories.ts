@@ -74,6 +74,17 @@ export function useUploadAccessoryMedia() {
   })
 }
 
+export function useAddAccessoryMedia() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (params: { accessoryId: string; fileUrl: string; mediaType: 'image' | 'video' }) =>
+      accessoriesService.addAccessoryMediaRecord(params.accessoryId, params.fileUrl, params.mediaType),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.accessories.all })
+    },
+  })
+}
+
 export function useDeleteAccessoryMedia() {
   const queryClient = useQueryClient()
   return useMutation({
