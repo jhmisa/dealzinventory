@@ -204,7 +204,7 @@ export default function ShowcasePage() {
 
       {/* Product Info — floating overlay straddling media boundary */}
       {currentItem && (
-        <div className="absolute top-[570px] left-0 right-0 z-10 px-8 pt-16 pb-5 bg-gradient-to-b from-transparent via-black/70 to-black">
+        <div className="absolute top-[570px] left-0 right-0 z-10 px-3 pt-10 pb-2 bg-gradient-to-b from-transparent via-black/70 to-black">
           <div className="flex items-end gap-6">
             {/* Left: code + rank (inline) then price */}
             <div className="flex flex-col shrink-0 min-w-0">
@@ -260,7 +260,7 @@ export default function ShowcasePage() {
         </div>
 
         {/* Right column — camera placeholder */}
-        <div className="w-[360px] shrink-0 bg-white" />
+        <div className="w-[360px] shrink-0 bg-black" />
       </div>
     </div>
     </div>
