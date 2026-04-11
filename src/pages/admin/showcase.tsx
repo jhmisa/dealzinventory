@@ -200,57 +200,56 @@ export default function ShowcasePage() {
           </div>
         )}
 
-      </div>
-
-      {/* Product Info — black section, seamless with media area */}
-      {currentItem && (
-        <div className="shrink-0 bg-gradient-to-b from-[#1A1A1A] to-black px-8 py-5 w-full">
-          <div className="flex items-end gap-6">
-            {/* Left: code + rank (inline) then price */}
-            <div className="flex flex-col shrink-0 min-w-0">
-              <div className="flex items-center gap-2.5">
-                <span className="tracking-[0.02em] text-white font-bold text-[36px]/[40px]">
-                  {currentItem.item_code}
+        {/* Product Info — floating overlay at bottom of media */}
+        {currentItem && (
+          <div className="absolute bottom-0 left-0 right-0 px-8 pb-5 pt-16 bg-gradient-to-b from-transparent via-black/70 to-black">
+            <div className="flex items-end gap-6">
+              {/* Left: code + rank (inline) then price */}
+              <div className="flex flex-col shrink-0 min-w-0">
+                <div className="flex items-center gap-2.5">
+                  <span className="tracking-[0.02em] text-white font-bold text-[36px]/[40px]">
+                    {currentItem.item_code}
+                  </span>
+                  {currentItem.condition_grade && (
+                    <div className="flex items-center rounded-md py-0.5 px-2.5 bg-white/20 border border-white/25">
+                      <span className="text-white font-semibold text-[20px]/[26px]">
+                        Rank {currentItem.condition_grade}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <span className="tracking-[-0.03em] text-white font-extrabold text-[72px]/[72px] mt-1">
+                  {price != null ? formatPrice(price) : '—'}
                 </span>
-                {currentItem.condition_grade && (
-                  <div className="flex items-center rounded-md py-0.5 px-2.5 bg-white/20 border border-white/25">
-                    <span className="text-white font-semibold text-[20px]/[26px]">
-                      Rank {currentItem.condition_grade}
+              </div>
+
+              {/* Right: description + condition */}
+              <div className="flex flex-col grow min-w-0 gap-1.5 pb-1.5">
+                {currentItem.description && (
+                  <p className="text-white/95 font-medium text-[30px]/[36px] line-clamp-3">
+                    {currentItem.description}
+                  </p>
+                )}
+                {currentItem.condition_notes && (
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-white/60 text-[9px]/[12px] font-semibold uppercase tracking-[0.12em]">
+                      Condition
+                    </span>
+                    <span className="text-white/85 text-[12px]/[16px] line-clamp-2">
+                      {currentItem.condition_notes}
                     </span>
                   </div>
                 )}
               </div>
-              <span className="tracking-[-0.03em] text-white font-extrabold text-[72px]/[72px] mt-1">
-                {price != null ? formatPrice(price) : '—'}
-              </span>
-            </div>
-
-            {/* Right: description + condition */}
-            <div className="flex flex-col grow min-w-0 gap-1.5 pb-1.5">
-              {currentItem.description && (
-                <p className="text-white/95 font-medium text-[30px]/[36px] line-clamp-3">
-                  {currentItem.description}
-                </p>
-              )}
-              {currentItem.condition_notes && (
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-white/60 text-[9px]/[12px] font-semibold uppercase tracking-[0.12em]">
-                    Condition
-                  </span>
-                  <span className="text-white/85 text-[12px]/[16px] line-clamp-2">
-                    {currentItem.condition_notes}
-                  </span>
-                </div>
-              )}
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Bottom Half — split into left (product info) and right (camera) */}
       <div className="flex grow shrink basis-0 overflow-hidden">
         {/* Left column — empty state only (product info is now overlaid on the media area) */}
-        <div className="w-[360px] shrink-0 flex flex-col">
+        <div className="w-[360px] shrink-0 flex flex-col bg-black">
           {!currentItem && (
             <div className="flex flex-col items-center justify-center grow shrink basis-0 text-[#A1A1AA] gap-3">
               <Search className="h-10 w-10" strokeWidth={1.5} />
