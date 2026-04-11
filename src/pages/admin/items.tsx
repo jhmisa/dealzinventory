@@ -1,8 +1,9 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Plus, Printer, QrCode, Pencil, Copy } from 'lucide-react'
+import { Plus, Printer, QrCode, Pencil, Copy, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import {
   Select,
   SelectContent,
@@ -13,6 +14,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import {
   Dialog,
   DialogContent,
@@ -22,6 +24,8 @@ import {
 } from '@/components/ui/dialog'
 import { PageHeader, SearchBar, DataTable, StatusBadge, GradeBadge, CodeDisplay, PriceDisplay, TableSkeleton } from '@/components/shared'
 import { useItems, useUpdateItem, useItemStatusCounts } from '@/hooks/use-items'
+import { useAccessories, useCreateAccessory } from '@/hooks/use-accessories'
+import { useCategories } from '@/hooks/use-categories'
 import { useItemListColumnSettings } from '@/hooks/use-settings'
 import { usePersistedFilters } from '@/hooks/use-persisted-filters'
 import { useDebounce } from '@/hooks/use-debounce'
@@ -30,6 +34,7 @@ import { formatDate, formatPrice, cn, buildShortDescription } from '@/lib/utils'
 import { toast } from 'sonner'
 import { printItemLabel } from '@/components/items/label-print'
 import { resolveSoldTo } from '@/lib/item-sale'
+import type { Accessory, AccessoryMedia } from '@/lib/types'
 
 type ItemRow = {
   id: string
@@ -62,9 +67,99 @@ type ItemRow = {
   }>
 }
 
+type AccessoryRow = Accessory & {
+  categories: { name: string } | null
+  accessory_media: AccessoryMedia[]
+}
+
+const INVENTORY_TABS = [
+  { value: 'items', label: 'Items' },
+  { value: 'accessories', label: 'Accessories' },
+] as const
+
 const STATUS_TABS = [
   { value: 'all', label: 'All' },
   ...ITEM_STATUSES.map((s) => ({ value: s.value, label: s.label })),
+]
+
+const accessoryColumns: ColumnDef<AccessoryRow>[] = [
+  {
+    accessorKey: 'accessory_code',
+    header: 'A-Code',
+    cell: ({ row }) => (
+      <span className="font-mono text-xs">{row.original.accessory_code}</span>
+    ),
+  },
+  {
+    accessorKey: 'name',
+    header: 'Name',
+    cell: ({ row }) => (
+      <div className="flex items-center gap-2">
+        {row.original.accessory_media?.[0] ? (
+          <img
+            src={row.original.accessory_media[0].file_url}
+            alt={row.original.name}
+            className="w-8 h-8 rounded object-cover"
+          />
+        ) : (
+          <div className="w-8 h-8 rounded bg-muted" />
+        )}
+        <span className="font-medium">{row.original.name}</span>
+      </div>
+    ),
+  },
+  {
+    accessorKey: 'brand',
+    header: 'Brand',
+    cell: ({ row }) => row.original.brand ?? '—',
+  },
+  {
+    accessorKey: 'categories',
+    header: 'Category',
+    cell: ({ row }) => row.original.categories?.name ?? '—',
+  },
+  {
+    accessorKey: 'selling_price',
+    header: 'Price',
+    cell: ({ row }) => formatPrice(Number(row.original.selling_price)),
+  },
+  {
+    accessorKey: 'stock_quantity',
+    header: 'Stock',
+    cell: ({ row }) => {
+      const qty = row.original.stock_quantity
+      const threshold = row.original.low_stock_threshold
+      if (qty === 0) {
+        return <Badge variant="destructive">0</Badge>
+      }
+      if (qty <= threshold) {
+        return (
+          <Badge variant="outline" className="text-yellow-700 border-yellow-400 bg-yellow-50">
+            <AlertTriangle className="h-3 w-3 mr-1" />{qty}
+          </Badge>
+        )
+      }
+      return <span>{qty}</span>
+    },
+  },
+  {
+    accessorKey: 'shop_visible',
+    header: 'Shop',
+    cell: ({ row }) => row.original.shop_visible ? (
+      <Badge variant="outline" className="text-green-700 border-green-400">Visible</Badge>
+    ) : (
+      <span className="text-muted-foreground text-xs">Hidden</span>
+    ),
+  },
+  {
+    accessorKey: 'active',
+    header: 'Status',
+    cell: ({ row }) => row.original.active ? (
+      <Badge variant="outline" className="text-green-700 border-green-400">Active</Badge>
+    ) : (
+      <Badge variant="secondary">Inactive</Badge>
+    ),
+  },
 ]
 
 function EditPriceCell({
@@ -136,6 +231,58 @@ export default function ItemListPage() {
   const navigate = useNavigate()
   const updateItem = useUpdateItem()
   const { getParam, setParam } = usePersistedFilters('items-filters')
+
+  // Inventory type tab (items vs accessories)
+  const inventoryTab = getParam('inventoryTab', 'items') as 'items' | 'accessories'
+  const setInventoryTab = useCallback((v: string) => setParam('inventoryTab', v, 'items'), [setParam])
+
+  // Accessories state
+  const accSearch = getParam('accQ')
+  const setAccSearch = useCallback((v: string) => setParam('accQ', v), [setParam])
+  const accCategoryFilter = getParam('accCategory') || 'all'
+  const debouncedAccSearch = useDebounce(accSearch, 400)
+  const { data: accessories, isLoading: accLoading } = useAccessories({
+    search: debouncedAccSearch || undefined,
+    categoryId: accCategoryFilter !== 'all' ? accCategoryFilter : undefined,
+  })
+  const { data: categories } = useCategories()
+  const createMutation = useCreateAccessory()
+  const [createOpen, setCreateOpen] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newBrand, setNewBrand] = useState('')
+  const [newPrice, setNewPrice] = useState('')
+  const [newCategory, setNewCategory] = useState('')
+  const [newShopVisible, setNewShopVisible] = useState(false)
+
+  function handleCreateAccessory() {
+    const price = parseInt(newPrice, 10)
+    if (!newName.trim() || isNaN(price) || price < 0) {
+      toast.error('Name and valid price are required')
+      return
+    }
+    createMutation.mutate(
+      {
+        name: newName.trim(),
+        brand: newBrand.trim() || null,
+        selling_price: price,
+        category_id: newCategory || null,
+        shop_visible: newShopVisible,
+      },
+      {
+        onSuccess: (accessory) => {
+          toast.success(`Created ${accessory.accessory_code}`)
+          setCreateOpen(false)
+          setNewName('')
+          setNewBrand('')
+          setNewPrice('')
+          setNewCategory('')
+          setNewShopVisible(false)
+          navigate(`/admin/accessories/${accessory.id}`)
+        },
+        onError: (err) => toast.error(err.message),
+      },
+    )
+  }
 
   // Read filter state from URL search params
   const search = getParam('q')
@@ -429,33 +576,39 @@ export default function ItemListPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Items"
-        description="All physical inventory items (P-codes)."
+        title="Inventory"
+        description={inventoryTab === 'accessories' ? 'Manage quantity-based inventory items.' : 'All physical inventory items (P-codes).'}
         actions={
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => navigate('/admin/items/scan')}>
-              <QrCode className="h-4 w-4 mr-2" />
-              Scan QR
+          inventoryTab === 'accessories' ? (
+            <Button onClick={() => setCreateOpen(true)}>
+              <Plus className="h-4 w-4 mr-1" />
+              New Accessory
             </Button>
-            <Button onClick={() => navigate('/admin/items/intake')}>
-              <Plus className="h-4 w-4 mr-2" />
-              Bulk Intake
-            </Button>
-          </div>
+          ) : (
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => navigate('/admin/items/scan')}>
+                <QrCode className="h-4 w-4 mr-2" />
+                Scan QR
+              </Button>
+              <Button onClick={() => navigate('/admin/items/intake')}>
+                <Plus className="h-4 w-4 mr-2" />
+                Bulk Intake
+              </Button>
+            </div>
+          )
         }
       />
 
-      {/* Status Tabs */}
+      {/* Inventory Type Tabs */}
       <div className="border-b">
         <nav className="flex gap-0 -mb-px overflow-x-auto">
-          {STATUS_TABS.map((tab) => {
-            const count = statusCounts[tab.value] ?? 0
-            const isActive = statusTab === tab.value
+          {INVENTORY_TABS.map((tab) => {
+            const isActive = inventoryTab === tab.value
             return (
               <button
                 key={tab.value}
                 type="button"
-                onClick={() => setStatusTab(tab.value)}
+                onClick={() => setInventoryTab(tab.value)}
                 className={cn(
                   'px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors',
                   isActive
@@ -464,114 +617,222 @@ export default function ItemListPage() {
                 )}
               >
                 {tab.label}
-                <span
-                  className={cn(
-                    'ml-1.5 inline-flex items-center justify-center rounded-full px-2 py-0.5 text-xs',
-                    isActive
-                      ? 'bg-primary/10 text-primary'
-                      : 'bg-muted text-muted-foreground',
-                  )}
-                >
-                  {count}
-                </span>
               </button>
             )
           })}
         </nav>
       </div>
 
-      {/* Search & Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        <SearchBar
-          value={search}
-          onChange={setSearch}
-          placeholder="Search P-code..."
-          className="w-[140px]"
-        />
-        <Select value={gradeFilter} onValueChange={setGradeFilter}>
-          <SelectTrigger className="w-[130px]">
-            <SelectValue placeholder="Grade" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Grades</SelectItem>
-            <SelectItem value="UNGRADED">Ungraded</SelectItem>
-            {CONDITION_GRADES.map((g) => (
-              <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      {inventoryTab === 'accessories' ? (
+        <>
+          {/* Accessories Search & Filters */}
+          <div className="flex items-center gap-3">
+            <SearchBar
+              value={accSearch}
+              onChange={setAccSearch}
+              placeholder="Search A-code, name, or brand..."
+              className="flex-1 max-w-md"
+            />
+            <Select value={accCategoryFilter} onValueChange={(v) => setParam('accCategory', v)}>
+              <SelectTrigger className="w-44">
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {(categories ?? []).map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-      {/* Additional Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="Category" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Categories</SelectItem>
-            {categoryOptions.map((c) => (
-              <SelectItem key={c} value={c}>{c}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={brandFilter} onValueChange={setBrandFilter}>
-          <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="Brand" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Brands</SelectItem>
-            {brandOptions.map((b) => (
-              <SelectItem key={b} value={b}>{b}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <SearchBar
-          value={descriptionSearch}
-          onChange={setDescriptionSearch}
-          placeholder="Search description..."
-          className="min-w-[180px]"
-        />
-        <SearchBar
-          value={conditionSearch}
-          onChange={setConditionSearch}
-          placeholder="Search condition..."
-          className="min-w-[180px]"
-        />
-        <Input
-          type="number"
-          value={priceFrom}
-          onChange={(e) => setPriceFrom(e.target.value)}
-          placeholder="¥ From"
-          className="w-[110px]"
-        />
-        <Input
-          type="number"
-          value={priceTo}
-          onChange={(e) => setPriceTo(e.target.value)}
-          placeholder="¥ To"
-          className="w-[110px]"
-        />
-        <div className="flex items-center gap-2">
-          <Checkbox
-            id="no-sell-price"
-            checked={noSellFilter === 'yes'}
-            onCheckedChange={(checked) => setNoSellFilter(checked ? 'yes' : '')}
-          />
-          <Label htmlFor="no-sell-price" className="text-sm font-normal cursor-pointer">No Sell Price</Label>
-        </div>
-      </div>
+          {accLoading ? (
+            <TableSkeleton />
+          ) : (
+            <DataTable
+              columns={accessoryColumns}
+              data={(accessories ?? []) as AccessoryRow[]}
+              onRowClick={(row) => navigate(`/admin/accessories/${row.id}`)}
+            />
+          )}
 
-      {isLoading ? (
-        <TableSkeleton rows={8} columns={Object.values(columnVisibility).filter(Boolean).length || 9} />
+          {/* Create Accessory Dialog */}
+          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>New Accessory</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label>Name *</Label>
+                  <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="USB-C Cable" />
+                </div>
+                <div>
+                  <Label>Brand</Label>
+                  <Input value={newBrand} onChange={(e) => setNewBrand(e.target.value)} placeholder="Anker" />
+                </div>
+                <div>
+                  <Label>Selling Price (¥) *</Label>
+                  <Input type="number" min={0} value={newPrice} onChange={(e) => setNewPrice(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Category</Label>
+                  <Select value={newCategory} onValueChange={setNewCategory}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(categories ?? []).map((c) => (
+                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch checked={newShopVisible} onCheckedChange={setNewShopVisible} />
+                  <Label>Visible on shop</Label>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
+                <Button onClick={handleCreateAccessory} disabled={createMutation.isPending}>
+                  {createMutation.isPending ? 'Creating...' : 'Create'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </>
       ) : (
-        <DataTable
-          columns={columns}
-          data={filteredItems}
-          columnVisibility={columnVisibility}
-          enableColumnResizing
-          onRowClick={(row) => navigate(`/admin/items/${row.id}`)}
-        />
+        <>
+          {/* Status Tabs */}
+          <div className="border-b">
+            <nav className="flex gap-0 -mb-px overflow-x-auto">
+              {STATUS_TABS.map((tab) => {
+                const count = statusCounts[tab.value] ?? 0
+                const isActive = statusTab === tab.value
+                return (
+                  <button
+                    key={tab.value}
+                    type="button"
+                    onClick={() => setStatusTab(tab.value)}
+                    className={cn(
+                      'px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors',
+                      isActive
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30',
+                    )}
+                  >
+                    {tab.label}
+                    <span
+                      className={cn(
+                        'ml-1.5 inline-flex items-center justify-center rounded-full px-2 py-0.5 text-xs',
+                        isActive
+                          ? 'bg-primary/10 text-primary'
+                          : 'bg-muted text-muted-foreground',
+                      )}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                )
+              })}
+            </nav>
+          </div>
+
+          {/* Search & Filters */}
+          <div className="flex flex-wrap items-center gap-3">
+            <SearchBar
+              value={search}
+              onChange={setSearch}
+              placeholder="Search P-code..."
+              className="w-[140px]"
+            />
+            <Select value={gradeFilter} onValueChange={setGradeFilter}>
+              <SelectTrigger className="w-[130px]">
+                <SelectValue placeholder="Grade" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Grades</SelectItem>
+                <SelectItem value="UNGRADED">Ungraded</SelectItem>
+                {CONDITION_GRADES.map((g) => (
+                  <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Additional Filters */}
+          <div className="flex flex-wrap items-center gap-3">
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {categoryOptions.map((c) => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={brandFilter} onValueChange={setBrandFilter}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Brand" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Brands</SelectItem>
+                {brandOptions.map((b) => (
+                  <SelectItem key={b} value={b}>{b}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <SearchBar
+              value={descriptionSearch}
+              onChange={setDescriptionSearch}
+              placeholder="Search description..."
+              className="min-w-[180px]"
+            />
+            <SearchBar
+              value={conditionSearch}
+              onChange={setConditionSearch}
+              placeholder="Search condition..."
+              className="min-w-[180px]"
+            />
+            <Input
+              type="number"
+              value={priceFrom}
+              onChange={(e) => setPriceFrom(e.target.value)}
+              placeholder="¥ From"
+              className="w-[110px]"
+            />
+            <Input
+              type="number"
+              value={priceTo}
+              onChange={(e) => setPriceTo(e.target.value)}
+              placeholder="¥ To"
+              className="w-[110px]"
+            />
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="no-sell-price"
+                checked={noSellFilter === 'yes'}
+                onCheckedChange={(checked) => setNoSellFilter(checked ? 'yes' : '')}
+              />
+              <Label htmlFor="no-sell-price" className="text-sm font-normal cursor-pointer">No Sell Price</Label>
+            </div>
+          </div>
+
+          {isLoading ? (
+            <TableSkeleton rows={8} columns={Object.values(columnVisibility).filter(Boolean).length || 9} />
+          ) : (
+            <DataTable
+              columns={columns}
+              data={filteredItems}
+              columnVisibility={columnVisibility}
+              enableColumnResizing
+              onRowClick={(row) => navigate(`/admin/items/${row.id}`)}
+            />
+          )}
+        </>
       )}
     </div>
   )

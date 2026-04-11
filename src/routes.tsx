@@ -65,7 +65,6 @@ const StaffManagementPage = lazy(() => import('@/pages/admin/staff-management'))
 const ForgotPasswordPage = lazy(() => import('@/pages/admin/forgot-password'))
 const AuthCallbackPage = lazy(() => import('@/pages/admin/auth-callback'))
 const SetPasswordPage = lazy(() => import('@/pages/admin/set-password'))
-const AccessoryListPage = lazy(() => import('@/pages/admin/accessories'))
 const AccessoryDetailPage = lazy(() => import('@/pages/admin/accessory-detail'))
 const ShopAccessoryDetailPage = lazy(() => import('@/pages/shop/accessory-detail'))
 
@@ -131,7 +130,7 @@ export const router = createBrowserRouter([
           { path: 'products/:id', element: lazyElement(ProductDetailPage) },
           { path: 'products/:id/media-studio', element: lazyElement(MediaStudioPage) },
           { path: 'categories', element: lazyElement(CategoriesPage) },
-          { path: 'accessories', element: lazyElement(AccessoryListPage) },
+          { path: 'accessories', element: <Navigate to="/admin/items?inventoryTab=accessories" replace /> },
           { path: 'accessories/:id', element: lazyElement(AccessoryDetailPage) },
           { path: 'sell-groups', element: lazyElement(SellGroupListPage) },
           { path: 'sell-groups/:id', element: lazyElement(SellGroupDetailPage) },
