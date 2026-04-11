@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import type { AccessoryMedia } from '@/lib/types'
 
 export interface ShowcaseItem {
   id: string
@@ -84,5 +85,44 @@ export async function getShowcaseItem(itemCode: string): Promise<ShowcaseItem | 
     description,
     photos: [...photos, ...itemPhotos],
     videos: [...videos, ...itemVideos],
+  }
+}
+
+export async function getShowcaseAccessory(accessoryCode: string): Promise<ShowcaseItem | null> {
+  const { data, error } = await supabase
+    .from('accessories')
+    .select(`
+      id, accessory_code, name, brand, selling_price,
+      accessory_media(id, file_url, media_type, sort_order)
+    `)
+    .eq('accessory_code', accessoryCode.toUpperCase())
+    .single()
+
+  if (error || !data) return null
+
+  const media = (data.accessory_media ?? []) as AccessoryMedia[]
+
+  const photos = media
+    .filter((m) => m.media_type === 'image')
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((m) => ({ id: m.id, url: m.file_url }))
+
+  const videos = media
+    .filter((m) => m.media_type === 'video')
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((m) => ({ id: m.id, url: m.file_url }))
+
+  const description = [data.brand, data.name].filter(Boolean).join(' ')
+
+  return {
+    id: data.id,
+    item_code: data.accessory_code,
+    selling_price: data.selling_price,
+    purchase_price: null,
+    condition_grade: null,
+    condition_notes: null,
+    description,
+    photos,
+    videos,
   }
 }

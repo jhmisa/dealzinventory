@@ -27,6 +27,7 @@ interface AccessoryFilters {
   categoryId?: string
   active?: boolean
   shopVisible?: boolean
+  inStock?: boolean
 }
 
 export async function getAccessories(filters: AccessoryFilters = {}) {
@@ -52,6 +53,9 @@ export async function getAccessories(filters: AccessoryFilters = {}) {
   }
   if (filters.shopVisible !== undefined) {
     query = query.eq('shop_visible', filters.shopVisible)
+  }
+  if (filters.inStock) {
+    query = query.gt('stock_quantity', 0)
   }
 
   const { data, error } = await query
@@ -371,6 +375,21 @@ export async function getShopAccessories(filters: { search?: string; categoryId?
 }
 
 // --- Available accessories for orders ---
+
+export async function getAccessoryCountForTabs(): Promise<{ all: number; available: number }> {
+  const [allResult, availableResult] = await Promise.all([
+    supabase.from('accessories').select('id', { count: 'exact', head: true }),
+    supabase.from('accessories').select('id', { count: 'exact', head: true }).eq('active', true).gt('stock_quantity', 0),
+  ])
+
+  if (allResult.error) throw allResult.error
+  if (availableResult.error) throw availableResult.error
+
+  return {
+    all: allResult.count ?? 0,
+    available: availableResult.count ?? 0,
+  }
+}
 
 export async function getAvailableAccessories(search: string) {
   const { data, error } = await supabase

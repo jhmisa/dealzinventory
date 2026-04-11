@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Search, Image, Clock } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatPrice } from '@/lib/utils'
-import { getShowcaseItem, type ShowcaseItem } from '@/services/showcase'
+import { getShowcaseItem, getShowcaseAccessory, type ShowcaseItem } from '@/services/showcase'
 
 const TIMER_SECONDS = 3
 const DESIGN_W = 720
@@ -47,8 +47,9 @@ export default function ShowcasePage() {
     if (!itemCode) return
 
     const mode = params.get('mode')
+    const fetcher = itemCode.toUpperCase().startsWith('A') ? getShowcaseAccessory : getShowcaseItem
     setLoading(true)
-    getShowcaseItem(itemCode).then((item) => {
+    fetcher(itemCode).then((item) => {
       if (item) {
         setCurrentItem(item)
         setMediaMode(mode === 'videos' ? 'videos' : 'photos')
@@ -65,8 +66,9 @@ export default function ShowcasePage() {
     channel.onmessage = (event) => {
       const { itemCode, mediaMode: mode } = event.data as { itemCode: string; mediaMode?: 'photos' | 'videos' }
       if (!itemCode) return
+      const fetcher = itemCode.toUpperCase().startsWith('A') ? getShowcaseAccessory : getShowcaseItem
       setLoading(true)
-      getShowcaseItem(itemCode).then((item) => {
+      fetcher(itemCode).then((item) => {
         if (item) {
           setCurrentItem(item)
           setMediaMode(mode === 'videos' ? 'videos' : 'photos')
@@ -254,7 +256,7 @@ export default function ShowcasePage() {
           {!currentItem && (
             <div className="flex flex-col items-center justify-center grow shrink basis-0 text-[#A1A1AA] gap-3">
               <Search className="h-10 w-10" strokeWidth={1.5} />
-              <span className="text-base">Scan or search a P-code to begin</span>
+              <span className="text-base">Scan or search a P-code or A-code to begin</span>
             </div>
           )}
         </div>

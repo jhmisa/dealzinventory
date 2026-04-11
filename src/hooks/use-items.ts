@@ -11,10 +11,11 @@ interface ItemFilters {
   supplierId?: string
 }
 
-export function useItems(filters: ItemFilters = {}) {
+export function useItems(filters: ItemFilters = {}, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: queryKeys.items.list(filters),
     queryFn: () => itemsService.getItems(filters),
+    enabled: options?.enabled,
   })
 }
 

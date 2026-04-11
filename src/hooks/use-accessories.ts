@@ -7,12 +7,14 @@ interface AccessoryFilters {
   search?: string
   categoryId?: string
   active?: boolean
+  inStock?: boolean
 }
 
-export function useAccessories(filters: AccessoryFilters = {}) {
+export function useAccessories(filters: AccessoryFilters = {}, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: queryKeys.accessories.list(filters),
     queryFn: () => accessoriesService.getAccessories(filters),
+    enabled: options?.enabled,
   })
 }
 
@@ -134,6 +136,13 @@ export function useAvailableAccessories(search: string) {
     queryKey: queryKeys.accessories.list({ _type: 'available', search }),
     queryFn: () => accessoriesService.getAvailableAccessories(search),
     enabled: !!search && search.length >= 1,
+  })
+}
+
+export function useAccessoryTabCounts() {
+  return useQuery({
+    queryKey: queryKeys.accessories.list({ _type: 'tab-counts' }),
+    queryFn: () => accessoriesService.getAccessoryCountForTabs(),
   })
 }
 

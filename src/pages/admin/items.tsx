@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/dialog'
 import { PageHeader, SearchBar, DataTable, StatusBadge, GradeBadge, CodeDisplay, PriceDisplay, TableSkeleton } from '@/components/shared'
 import { useItems, useUpdateItem, useItemStatusCounts } from '@/hooks/use-items'
-import { useAccessories, useCreateAccessory } from '@/hooks/use-accessories'
+import { useAccessories, useCreateAccessory, useAccessoryTabCounts } from '@/hooks/use-accessories'
 import { useCategories } from '@/hooks/use-categories'
 import { useItemListColumnSettings } from '@/hooks/use-settings'
 import { usePersistedFilters } from '@/hooks/use-persisted-filters'
@@ -71,6 +71,18 @@ type AccessoryRow = Accessory & {
   categories: { name: string } | null
   accessory_media: AccessoryMedia[]
 }
+
+type InventoryRow =
+  | (ItemRow & { _kind: 'item' })
+  | (AccessoryRow & { _kind: 'accessory' })
+
+type InventoryTypeFilter = 'all' | 'products' | 'accessories'
+
+const INVENTORY_TYPE_OPTIONS = [
+  { value: 'all', label: 'All' },
+  { value: 'products', label: 'Products' },
+  { value: 'accessories', label: 'Accessories' },
+] as const
 
 const INVENTORY_TABS = [
   { value: 'items', label: 'Items' },
@@ -231,6 +243,13 @@ export default function ItemListPage() {
   const inventoryTab = getParam('inventoryTab', 'items') as 'items' | 'accessories'
   const setInventoryTab = useCallback((v: string) => setParam('inventoryTab', v, 'items'), [setParam])
 
+  // Inventory type filter (within Items tab, for All & Available sub-tabs)
+  const inventoryType = (getParam('invType', 'all') || 'all') as InventoryTypeFilter
+  const setInventoryType = useCallback((v: string) => setParam('invType', v, 'all'), [setParam])
+
+  // Accessory tab counts for badges
+  const { data: accTabCounts } = useAccessoryTabCounts()
+
   // Accessories state
   const accSearch = getParam('accQ')
   const setAccSearch = useCallback((v: string) => setParam('accQ', v), [setParam])
@@ -335,11 +354,22 @@ export default function ItemListPage() {
   // Server-side counts for tab badges (no status filter)
   const { data: statusCounts = {} as Record<string, number> } = useItemStatusCounts(baseFilters)
 
+  // Should we show unified view? Only on All/AVAILABLE tabs within Items tab
+  const showUnified = inventoryTab === 'items' && (statusTab === 'all' || statusTab === 'AVAILABLE')
+  const skipItemsFetch = showUnified && inventoryType === 'accessories'
+  const skipAccFetch = !showUnified || inventoryType === 'products'
+
   // Fetch items filtered by active status tab
   const { data: allItems, isLoading } = useItems({
     ...baseFilters,
     status: statusTab !== 'all' ? statusTab : undefined,
-  })
+  }, { enabled: !skipItemsFetch })
+
+  // Fetch accessories for unified view
+  const { data: unifiedAccessories, isLoading: unifiedAccLoading } = useAccessories({
+    search: debouncedSearch || undefined,
+    ...(statusTab === 'AVAILABLE' ? { active: true, inStock: true } : {}),
+  }, { enabled: !skipAccFetch })
 
   const items = (allItems ?? []) as ItemRow[]
 
@@ -365,6 +395,321 @@ export default function ItemListPage() {
     if (pt !== null && (item.selling_price == null || item.selling_price > pt)) return false
     return true
   })
+
+  // Build merged unified data when in unified mode
+  const unifiedData: InventoryRow[] = useMemo(() => {
+    if (!showUnified || inventoryType === 'products') return []
+    if (inventoryType === 'accessories') {
+      return ((unifiedAccessories ?? []) as AccessoryRow[]).map((a) => ({ ...a, _kind: 'accessory' as const }))
+    }
+    // inventoryType === 'all': merge both
+    const taggedItems: InventoryRow[] = filteredItems.map((i) => ({ ...i, _kind: 'item' as const }))
+    const taggedAcc: InventoryRow[] = ((unifiedAccessories ?? []) as AccessoryRow[])
+      .filter((acc) => {
+        // Apply client-side filters that also apply to accessories
+        if (categoryFilter && categoryFilter !== 'all' && acc.categories?.name !== categoryFilter) return false
+        if (brandFilter && brandFilter !== 'all' && acc.brand !== brandFilter) return false
+        const pf = priceFrom ? Number(priceFrom) : null
+        const pt = priceTo ? Number(priceTo) : null
+        if (pf !== null && (acc.selling_price == null || Number(acc.selling_price) < pf)) return false
+        if (pt !== null && (acc.selling_price == null || Number(acc.selling_price) > pt)) return false
+        return true
+      })
+      .map((a) => ({ ...a, _kind: 'accessory' as const }))
+    return [...taggedItems, ...taggedAcc].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )
+  }, [showUnified, inventoryType, filteredItems, unifiedAccessories, categoryFilter, brandFilter, priceFrom, priceTo])
+
+  // Unified loading state
+  const unifiedIsLoading = showUnified
+    ? (inventoryType === 'accessories' ? unifiedAccLoading : inventoryType === 'products' ? isLoading : isLoading || unifiedAccLoading)
+    : isLoading
+
+  // Helper to open showcase window for a code
+  const openShowcase = useCallback((code: string, mode: 'photos' | 'videos') => {
+    const ch = new BroadcastChannel('showcase')
+    ch.postMessage({ itemCode: code, mediaMode: mode })
+    ch.close()
+    const w = 720
+    const h = 1280
+    const left = window.screenX + window.outerWidth
+    const top = window.screenY
+    const win = window.open('', 'item-showcase', `width=${w},height=${h},left=${left},top=${top}`)
+    if (!win || !win.location.pathname?.startsWith('/admin/showcase')) {
+      win?.location.assign(`/admin/showcase?item=${code}&mode=${mode}`)
+    }
+  }, [])
+
+  // Unified columns for when inventoryType === 'all'
+  const unifiedColumns: ColumnDef<InventoryRow>[] = useMemo(() => [
+    {
+      id: 'unified_summary',
+      header: 'Item',
+      size: 480,
+      minSize: 200,
+      maxSize: 900,
+      cell: ({ row }) => {
+        const r = row.original
+        if (r._kind === 'accessory') {
+          const brandName = [r.brand, r.name].filter(Boolean).join(' ')
+          return (
+            <div className="flex items-center gap-3">
+              {r.accessory_media?.[0] ? (
+                <img
+                  src={r.accessory_media[0].file_url}
+                  alt={r.name}
+                  className="h-10 w-10 rounded border bg-muted flex-shrink-0 object-cover"
+                />
+              ) : (
+                <div className="h-10 w-10 rounded border bg-muted flex-shrink-0 flex items-center justify-center text-muted-foreground text-xs">—</div>
+              )}
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <CodeDisplay code={r.accessory_code} />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    title="Showcase Photos"
+                    onClick={(e) => { e.stopPropagation(); openShowcase(r.accessory_code, 'photos') }}
+                  >
+                    <Image className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    title="Showcase Videos"
+                    onClick={(e) => { e.stopPropagation(); openShowcase(r.accessory_code, 'videos') }}
+                  >
+                    <Play className="h-3 w-3" />
+                  </Button>
+                </div>
+                <div className="text-sm text-muted-foreground">{brandName || '—'}</div>
+              </div>
+            </div>
+          )
+        }
+        // Item rendering (same as existing columns)
+        const pm = r.product_models
+        const descFields = pm?.categories?.description_fields
+        let modelLine: string
+        if (descFields && descFields.length > 0) {
+          const resolvedValues: Record<string, unknown> = {}
+          for (const key of descFields) {
+            resolvedValues[key] = (r as Record<string, unknown>)[key] ?? (pm as Record<string, unknown> | null)?.[key]
+          }
+          modelLine = buildShortDescription(resolvedValues, descFields) || r.supplier_description || '—'
+        } else {
+          const { brand, model_name, cpu, ram_gb, storage_gb, screen_size } = r
+          const modelName = brand && model_name
+            ? `${brand} ${model_name}`
+            : pm ? `${pm.brand} ${pm.model_name}` : null
+          const screenVal = screen_size ?? pm?.screen_size
+          const parts = [modelName, cpu, ram_gb, storage_gb, screenVal ? `${screenVal}"` : null].filter(Boolean)
+          modelLine = parts.length > 0 ? parts.join(' / ') : (r.supplier_description || '—')
+        }
+        const media = (pm?.product_media ?? []).sort((a, b) => a.sort_order - b.sort_order)
+        const thumbUrl = (media.find(m => m.role === 'hero') ?? media[0])?.file_url
+        const productLink = r.product_id ? `/admin/products/${r.product_id}` : null
+
+        return (
+          <div className="flex items-center gap-3">
+            {productLink ? (
+              <Link
+                to={productLink}
+                onClick={(e) => e.stopPropagation()}
+                className="h-10 w-10 rounded border bg-muted flex-shrink-0 overflow-hidden hover:ring-2 hover:ring-primary/50 transition-shadow"
+                title="Go to product model"
+              >
+                {thumbUrl ? (
+                  <img src={thumbUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="h-full w-full flex items-center justify-center text-muted-foreground text-xs">—</div>
+                )}
+              </Link>
+            ) : (
+              <div className="h-10 w-10 rounded border bg-muted flex-shrink-0 overflow-hidden">
+                <div className="h-full w-full flex items-center justify-center text-muted-foreground text-xs">—</div>
+              </div>
+            )}
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <CodeDisplay code={r.item_code} />
+                <GradeBadge grade={r.condition_grade as never} />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  title="Copy item info"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    const text = [
+                      r.item_code,
+                      modelLine !== '—' ? modelLine : '',
+                      r.condition_grade ? `Rank ${r.condition_grade}` : '',
+                      r.selling_price != null ? formatPrice(r.selling_price) : '',
+                    ].filter(Boolean).join(' | ')
+                    navigator.clipboard.writeText(text)
+                    toast.success('Copied to clipboard')
+                  }}
+                >
+                  <Copy className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  title="Showcase Photos"
+                  onClick={(e) => { e.stopPropagation(); openShowcase(r.item_code, 'photos') }}
+                >
+                  <Image className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  title="Showcase Videos"
+                  onClick={(e) => { e.stopPropagation(); openShowcase(r.item_code, 'videos') }}
+                >
+                  <Play className="h-3 w-3" />
+                </Button>
+              </div>
+              <div className="text-sm text-muted-foreground">{modelLine}</div>
+              {r.condition_notes && (
+                <div className="text-xs text-muted-foreground">{r.condition_notes}</div>
+              )}
+            </div>
+          </div>
+        )
+      },
+    },
+    {
+      id: 'unified_status',
+      header: 'Status',
+      size: 90,
+      cell: ({ row }) => {
+        const r = row.original
+        if (r._kind === 'accessory') {
+          const qty = r.stock_quantity
+          const threshold = r.low_stock_threshold
+          if (qty === 0) return <Badge variant="destructive">Out of Stock</Badge>
+          if (qty <= threshold) return <Badge variant="outline" className="text-yellow-700 border-yellow-400 bg-yellow-50">Low Stock ({qty})</Badge>
+          return <Badge variant="outline" className="text-green-700 border-green-400">In Stock ({qty})</Badge>
+        }
+        const config = ITEM_STATUSES.find((s) => s.value === r.item_status)
+        return config ? <StatusBadge label={config.label} color={config.color} /> : r.item_status
+      },
+    },
+    {
+      id: 'unified_supplier',
+      header: 'Supplier',
+      size: 90,
+      cell: ({ row }) => {
+        const r = row.original
+        return r._kind === 'item' ? (r.suppliers?.supplier_name ?? '—') : '—'
+      },
+    },
+    {
+      id: 'unified_buy_price',
+      header: 'Buy',
+      size: 65,
+      cell: ({ row }) => {
+        const r = row.original
+        return r._kind === 'item' ? <PriceDisplay amount={r.purchase_price} /> : <span className="text-muted-foreground">—</span>
+      },
+    },
+    {
+      id: 'unified_sell_price',
+      header: 'Sell',
+      size: 65,
+      cell: ({ row }) => {
+        const r = row.original
+        if (r._kind === 'accessory') return <PriceDisplay amount={Number(r.selling_price)} />
+        return (
+          <EditPriceCell
+            itemId={r.id}
+            itemCode={r.item_code}
+            field="selling_price"
+            value={r.selling_price}
+            updateItem={updateItem}
+          />
+        )
+      },
+    },
+    {
+      id: 'unified_discount',
+      header: 'Discount',
+      size: 65,
+      cell: ({ row }) => {
+        const r = row.original
+        if (r._kind === 'accessory') return <span className="text-muted-foreground">—</span>
+        return (
+          <EditPriceCell
+            itemId={r.id}
+            itemCode={r.item_code}
+            field="discount"
+            value={r.discount}
+            updateItem={updateItem}
+          />
+        )
+      },
+    },
+    {
+      id: 'unified_sold_to',
+      header: 'Sold To',
+      size: 180,
+      cell: ({ row }) => {
+        const r = row.original
+        if (r._kind === 'accessory') return <span className="text-xs text-muted-foreground">—</span>
+        const soldTo = resolveSoldTo(r.order_items)
+        if (!soldTo) return <span className="text-xs text-muted-foreground">—</span>
+        const fullName = `${soldTo.customer.last_name} ${soldTo.customer.first_name ?? ''}`.trim()
+        return (
+          <div onClick={(e) => e.stopPropagation()} className="text-sm leading-tight">
+            <Link to={`/admin/customers/${soldTo.customer.id}`} className="font-medium text-primary hover:underline">{fullName}</Link>
+            <div className="text-xs text-muted-foreground">
+              {soldTo.customer.customer_code} ·{' '}
+              <Link to={`/admin/orders/${soldTo.orderId}`} className="hover:underline">{soldTo.orderCode}</Link>
+            </div>
+          </div>
+        )
+      },
+    },
+    {
+      id: 'unified_date',
+      header: 'Date',
+      size: 75,
+      cell: ({ row }) => formatDate(row.original.created_at),
+    },
+    {
+      id: 'unified_actions',
+      header: 'Actions',
+      size: 40,
+      cell: ({ row }) => {
+        const r = row.original
+        if (r._kind === 'accessory') return null
+        const pm = r.product_models
+        const descFields = pm?.categories?.description_fields ?? []
+        const desc = buildShortDescription(r, descFields) || undefined
+        return (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            title="Print label"
+            onClick={(e) => {
+              e.stopPropagation()
+              printItemLabel({ item_code: r.item_code, description: desc })
+            }}
+          >
+            <Printer className="h-3.5 w-3.5" />
+          </Button>
+        )
+      },
+    },
+  ], [updateItem, openShowcase])
 
   const columns: ColumnDef<ItemRow>[] = [
     {
@@ -616,7 +961,7 @@ export default function ItemListPage() {
     <div className="space-y-4">
       <PageHeader
         title="Inventory"
-        description={inventoryTab === 'accessories' ? 'Manage quantity-based inventory items.' : 'All physical inventory items (P-codes).'}
+        description={inventoryTab === 'accessories' ? 'Manage quantity-based inventory items.' : 'All inventory — products (P-codes) and accessories (A-codes).'}
         actions={
           inventoryTab === 'accessories' ? (
             <Button onClick={() => setCreateOpen(true)}>
@@ -747,7 +1092,12 @@ export default function ItemListPage() {
           <div className="border-b">
             <nav className="flex gap-0 -mb-px overflow-x-auto">
               {STATUS_TABS.map((tab) => {
-                const count = statusCounts[tab.value] ?? 0
+                let count = statusCounts[tab.value] ?? 0
+                // Add accessory counts to All and Available tabs when not filtering to products-only
+                if (inventoryType !== 'products' && accTabCounts) {
+                  if (tab.value === 'all') count += accTabCounts.all
+                  else if (tab.value === 'AVAILABLE') count += accTabCounts.available
+                }
                 const isActive = statusTab === tab.value
                 return (
                   <button
@@ -778,12 +1128,33 @@ export default function ItemListPage() {
             </nav>
           </div>
 
+          {/* Inventory Type Filter — only on All & Available tabs */}
+          {showUnified && (
+            <div className="flex items-center gap-1 p-1 bg-muted rounded-lg w-fit">
+              {INVENTORY_TYPE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setInventoryType(opt.value)}
+                  className={cn(
+                    'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
+                    inventoryType === opt.value
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Search & Filters */}
           <div className="flex flex-wrap items-center gap-3">
             <SearchBar
               value={search}
               onChange={setSearch}
-              placeholder="Search P-code..."
+              placeholder={showUnified && inventoryType !== 'products' ? 'Search P-code, A-code, name...' : 'Search P-code...'}
               className="w-[140px]"
             />
             <Select value={gradeFilter} onValueChange={setGradeFilter}>
@@ -860,8 +1231,24 @@ export default function ItemListPage() {
             </div>
           </div>
 
-          {isLoading ? (
+          {unifiedIsLoading ? (
             <TableSkeleton rows={8} columns={Object.values(columnVisibility).filter(Boolean).length || 9} />
+          ) : showUnified && inventoryType === 'all' ? (
+            <DataTable
+              columns={unifiedColumns}
+              data={unifiedData}
+              enableColumnResizing
+              onRowClick={(row) => {
+                if (row._kind === 'accessory') navigate(`/admin/accessories/${row.id}`)
+                else navigate(`/admin/items/${row.id}`)
+              }}
+            />
+          ) : showUnified && inventoryType === 'accessories' ? (
+            <DataTable
+              columns={accessoryColumns}
+              data={(unifiedAccessories ?? []) as AccessoryRow[]}
+              onRowClick={(row) => navigate(`/admin/accessories/${row.id}`)}
+            />
           ) : (
             <DataTable
               columns={columns}
