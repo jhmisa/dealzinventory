@@ -459,7 +459,10 @@ export default function ItemListPage() {
                     const ch = new BroadcastChannel('showcase')
                     ch.postMessage({ itemCode: r.item_code, mediaMode: 'photos' })
                     ch.close()
-                    window.open(`/admin/showcase?item=${r.item_code}&mode=photos`, 'item-showcase')
+                    const win = window.open('', 'item-showcase')
+                    if (!win || !win.location.pathname?.startsWith('/admin/showcase')) {
+                      win?.location.assign(`/admin/showcase?item=${r.item_code}&mode=photos`)
+                    }
                   }}
                 >
                   <Image className="h-3 w-3" />
@@ -474,7 +477,10 @@ export default function ItemListPage() {
                     const ch = new BroadcastChannel('showcase')
                     ch.postMessage({ itemCode: r.item_code, mediaMode: 'videos' })
                     ch.close()
-                    window.open(`/admin/showcase?item=${r.item_code}&mode=videos`, 'item-showcase')
+                    const win = window.open('', 'item-showcase')
+                    if (!win || !win.location.pathname?.startsWith('/admin/showcase')) {
+                      win?.location.assign(`/admin/showcase?item=${r.item_code}&mode=videos`)
+                    }
                   }}
                 >
                   <Play className="h-3 w-3" />
