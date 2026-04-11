@@ -402,8 +402,14 @@ export default function BulkIntakePage() {
       })
       setStep('success')
       toast.success(`${result.total_items} accessory units stocked — ${result.receipt_code}`)
-    } catch (err) {
-      toast.error(`Failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
+    } catch (err: unknown) {
+      const message = err instanceof Error
+        ? err.message
+        : typeof err === 'object' && err !== null && 'message' in err
+          ? String((err as { message: unknown }).message)
+          : 'Unknown error'
+      console.error('Accessory intake failed:', err)
+      toast.error(`Failed: ${message}`)
     }
   }
 
@@ -461,8 +467,14 @@ export default function BulkIntakePage() {
       setStep('verify')
       toast.success(`Extracted ${newItems.length} line items`)
       runAutoMatch(newItems)
-    } catch (err) {
-      toast.error(`Failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
+    } catch (err: unknown) {
+      const message = err instanceof Error
+        ? err.message
+        : typeof err === 'object' && err !== null && 'message' in err
+          ? String((err as { message: unknown }).message)
+          : 'Unknown error'
+      console.error('Invoice parse failed:', err)
+      toast.error(`Failed: ${message}`)
     }
   }, [supplierId, activeAiConfig, uploadMutation, parseMutation])
 
@@ -530,8 +542,14 @@ export default function BulkIntakePage() {
       setStep('success')
       setConfirmDialogOpen(false)
       toast.success(`${result.total_items} items created — ${result.receipt_code}`)
-    } catch (err) {
-      toast.error(`Failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
+    } catch (err: unknown) {
+      const message = err instanceof Error
+        ? err.message
+        : typeof err === 'object' && err !== null && 'message' in err
+          ? String((err as { message: unknown }).message)
+          : 'Unknown error'
+      console.error('Bulk intake failed:', err)
+      toast.error(`Failed: ${message}`)
       setConfirmDialogOpen(false)
     }
   }
