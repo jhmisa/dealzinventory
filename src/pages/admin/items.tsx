@@ -84,34 +84,29 @@ const STATUS_TABS = [
 
 const accessoryColumns: ColumnDef<AccessoryRow>[] = [
   {
-    accessorKey: 'accessory_code',
-    header: 'A-Code',
-    cell: ({ row }) => (
-      <span className="font-mono text-xs">{row.original.accessory_code}</span>
-    ),
-  },
-  {
-    accessorKey: 'name',
-    header: 'Name',
-    cell: ({ row }) => (
-      <div className="flex items-center gap-2">
-        {row.original.accessory_media?.[0] ? (
-          <img
-            src={row.original.accessory_media[0].file_url}
-            alt={row.original.name}
-            className="w-8 h-8 rounded object-cover"
-          />
-        ) : (
-          <div className="w-8 h-8 rounded bg-muted" />
-        )}
-        <span className="font-medium">{row.original.name}</span>
-      </div>
-    ),
-  },
-  {
-    accessorKey: 'brand',
-    header: 'Brand',
-    cell: ({ row }) => row.original.brand ?? '—',
+    id: 'accessory_summary',
+    header: 'Accessory',
+    cell: ({ row }) => {
+      const r = row.original
+      const brandName = [r.brand, r.name].filter(Boolean).join(' ')
+      return (
+        <div className="flex items-center gap-3">
+          {r.accessory_media?.[0] ? (
+            <img
+              src={r.accessory_media[0].file_url}
+              alt={r.name}
+              className="h-10 w-10 rounded border bg-muted flex-shrink-0 object-cover"
+            />
+          ) : (
+            <div className="h-10 w-10 rounded border bg-muted flex-shrink-0 flex items-center justify-center text-muted-foreground text-xs">—</div>
+          )}
+          <div className="min-w-0">
+            <CodeDisplay code={r.accessory_code} />
+            <div className="text-sm text-muted-foreground">{brandName || '—'}</div>
+          </div>
+        </div>
+      )
+    },
   },
   {
     accessorKey: 'categories',
