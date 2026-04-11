@@ -456,6 +456,9 @@ export default function ItemListPage() {
                   title="Showcase"
                   onClick={(e) => {
                     e.stopPropagation()
+                    const ch = new BroadcastChannel('showcase')
+                    ch.postMessage({ itemCode: r.item_code })
+                    ch.close()
                     window.open(`/admin/showcase?item=${r.item_code}`, 'item-showcase')
                   }}
                 >

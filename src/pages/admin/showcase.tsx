@@ -60,6 +60,23 @@ export default function ShowcasePage() {
     window.history.replaceState({}, '', window.location.pathname)
   }, [])
 
+  // Listen for cross-window item updates via BroadcastChannel
+  useEffect(() => {
+    const channel = new BroadcastChannel('showcase')
+    channel.onmessage = (event) => {
+      const { itemCode } = event.data as { itemCode: string }
+      if (!itemCode) return
+      setLoading(true)
+      getShowcaseItem(itemCode).then((item) => {
+        if (item) {
+          setCurrentItem(item)
+          setMediaMode('photos')
+        }
+      }).finally(() => setLoading(false))
+    }
+    return () => channel.close()
+  }, [])
+
   // Media arrays for current mode
   const photos = currentItem?.photos ?? []
   const videos = currentItem?.videos ?? []
