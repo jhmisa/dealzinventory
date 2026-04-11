@@ -251,9 +251,8 @@ export async function getStockHistory(accessoryId: string) {
       .order('created_at', { ascending: false }),
     supabase
       .from('order_items')
-      .select('*, orders(id, order_code, customers(customer_code, last_name))')
-      .eq('accessory_id', accessoryId)
-      .order('created_at', { ascending: false }),
+      .select('*, orders(id, order_code, created_at, customers(customer_code, last_name))')
+      .eq('accessory_id', accessoryId),
   ])
 
   if (entriesResult.error) throw entriesResult.error
@@ -264,7 +263,7 @@ export async function getStockHistory(accessoryId: string) {
     id: string
     quantity: number
     created_at: string
-    orders: { id: string; order_code: string; customers: { customer_code: string; last_name: string } | null } | null
+    orders: { id: string; order_code: string; created_at: string; customers: { customer_code: string; last_name: string } | null } | null
   }
 
   type StockHistoryItem =
@@ -287,7 +286,7 @@ export async function getStockHistory(accessoryId: string) {
   const orders: StockHistoryItem[] = (ordersResult.data ?? []).map((o) => ({
     type: 'order' as const,
     data: o as OrderItemWithOrder,
-    date: o.created_at,
+    date: o.orders?.created_at ?? new Date().toISOString(),
   }))
 
   return [...entries, ...adjustments, ...orders].sort(
