@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/collapsible'
 import { generateReceiptPdf } from '@/components/intake/receipt-pdf'
 import { printItemLabels } from '@/components/items/label-print'
-import { useIntakeReceipt, useReceiptItems, useReceiptAdjustments } from '@/hooks/use-intake-receipts'
+import { useIntakeReceipt, useReceiptItems, useReceiptAccessoryEntries, useReceiptAdjustments } from '@/hooks/use-intake-receipts'
 import { getInvoiceSignedUrl } from '@/services/intake-receipts'
 import { formatDate, formatDateTime, formatPrice, buildShortDescription } from '@/lib/utils'
 import { getStatusConfig, getAdjustmentTypeConfig } from '@/lib/constants'
@@ -29,6 +29,7 @@ export default function ReceivingReportDetailPage() {
 
   const { data: receipt, isLoading } = useIntakeReceipt(id!)
   const { data: items } = useReceiptItems(id!)
+  const { data: accessoryEntries } = useReceiptAccessoryEntries(id!)
   const { data: adjustments } = useReceiptAdjustments(id!)
 
   const invoicePath = receipt?.invoice_file_url
@@ -45,6 +46,8 @@ export default function ReceivingReportDetailPage() {
 
   if (isLoading) return <TableSkeleton />
   if (!receipt) return <div>Receipt not found</div>
+
+  const isAccessoryReceipt = (accessoryEntries ?? []).length > 0
 
   // Adjustment summary
   const adjustmentCounts = {
@@ -139,12 +142,14 @@ export default function ReceivingReportDetailPage() {
               <span className="text-muted-foreground block">Total Items</span>
               <span className="font-semibold text-lg">{receipt.total_items}</span>
             </div>
+            {!isAccessoryReceipt && (
             <div>
               <span className="text-muted-foreground block">P-Code Range</span>
               <span className="font-mono text-sm">
                 {receipt.p_code_range_start} → {receipt.p_code_range_end}
               </span>
             </div>
+            )}
             <div>
               <span className="text-muted-foreground block">Total Cost</span>
               <span className="font-semibold">{formatPrice(receipt.total_cost)}</span>
@@ -165,7 +170,8 @@ export default function ReceivingReportDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Line items */}
+      {/* Line items (P-code only) */}
+      {!isAccessoryReceipt && (
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Line Items</CardTitle>
@@ -201,8 +207,10 @@ export default function ReceivingReportDetailPage() {
           </div>
         </CardContent>
       </Card>
+      )}
 
-      {/* Items */}
+      {/* Items (P-code only) */}
+      {!isAccessoryReceipt && (
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Items ({items?.length ?? 0})</CardTitle>
@@ -269,6 +277,48 @@ export default function ReceivingReportDetailPage() {
           </div>
         </CardContent>
       </Card>
+      )}
+
+      {/* Accessory Entries */}
+      {isAccessoryReceipt && (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Accessory Items ({accessoryEntries?.length ?? 0})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="border rounded-md overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50">
+                <tr>
+                  <th className="px-3 py-2 text-left font-medium">A-Code</th>
+                  <th className="px-3 py-2 text-left font-medium">Name</th>
+                  <th className="px-3 py-2 text-left font-medium">Brand</th>
+                  <th className="px-3 py-2 text-right font-medium">Qty</th>
+                  <th className="px-3 py-2 text-right font-medium">Unit Cost</th>
+                  <th className="px-3 py-2 text-right font-medium">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(accessoryEntries ?? []).map((entry) => (
+                  <tr key={entry.id} className="border-t">
+                    <td className="px-3 py-2">
+                      <Link to={`/admin/accessories/${entry.accessories?.id}`} className="hover:underline">
+                        <CodeDisplay code={entry.accessories?.accessory_code ?? '—'} />
+                      </Link>
+                    </td>
+                    <td className="px-3 py-2">{entry.accessories?.name ?? '—'}</td>
+                    <td className="px-3 py-2">{entry.accessories?.brand ?? '—'}</td>
+                    <td className="px-3 py-2 text-right">{entry.quantity}</td>
+                    <td className="px-3 py-2 text-right">{formatPrice(entry.unit_cost)}</td>
+                    <td className="px-3 py-2 text-right font-medium">{formatPrice(entry.total_cost)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+      )}
 
       {/* Adjustments */}
       <Card>

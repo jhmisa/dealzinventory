@@ -64,6 +64,20 @@ export async function getReceiptItems(receiptId: string) {
   return data ?? []
 }
 
+export async function getReceiptAccessoryEntries(receiptId: string) {
+  const { data, error } = await supabase
+    .from('accessory_stock_entries')
+    .select(`
+      *,
+      accessories(id, accessory_code, name, brand)
+    `)
+    .eq('receipt_id', receiptId)
+    .order('created_at', { ascending: true })
+
+  if (error) throw error
+  return data ?? []
+}
+
 export async function getReceiptAdjustments(receiptId: string) {
   const { data, error } = await supabase
     .from('intake_adjustments')

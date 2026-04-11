@@ -31,6 +31,14 @@ export function useReceiptItems(receiptId: string) {
   })
 }
 
+export function useReceiptAccessoryEntries(receiptId: string) {
+  return useQuery({
+    queryKey: ['receipt-accessory-entries', receiptId],
+    queryFn: () => receiptService.getReceiptAccessoryEntries(receiptId),
+    enabled: !!receiptId,
+  })
+}
+
 export function useReceiptAdjustments(receiptId: string) {
   return useQuery({
     queryKey: queryKeys.intakeReceipts.adjustments(receiptId),
