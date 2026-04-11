@@ -204,7 +204,7 @@ export default function ShowcasePage() {
 
       {/* Product Info — black section, seamless with media area */}
       {currentItem && (
-        <div className="shrink-0 bg-black px-8 py-5 w-full">
+        <div className="shrink-0 bg-gradient-to-b from-[#1A1A1A] to-black px-8 py-5 w-full">
           <div className="flex items-end gap-6">
             {/* Left: code + rank (inline) then price */}
             <div className="flex flex-col shrink-0 min-w-0">
