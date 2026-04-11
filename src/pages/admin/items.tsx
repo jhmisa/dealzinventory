@@ -453,10 +453,10 @@ export default function ItemListPage() {
                   variant="ghost"
                   size="icon"
                   className="h-6 w-6"
-                  title="Slideshow"
+                  title="Showcase"
                   onClick={(e) => {
                     e.stopPropagation()
-                    window.open(`/admin/items/slideshow/${r.id}`, 'item-slideshow')
+                    window.open(`/admin/showcase?item=${r.item_code}`, 'item-showcase')
                   }}
                 >
                   <Presentation className="h-3 w-3" />

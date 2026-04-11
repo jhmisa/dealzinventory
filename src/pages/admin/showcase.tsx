@@ -42,6 +42,24 @@ export default function ShowcasePage() {
     })
   }, [])
 
+  // Auto-load item from ?item= query param
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const itemCode = params.get('item')
+    if (!itemCode) return
+
+    setLoading(true)
+    getShowcaseItem(itemCode).then((item) => {
+      if (item) {
+        setCurrentItem(item)
+        setMediaMode('photos')
+      }
+    }).finally(() => setLoading(false))
+
+    // Clean up query param from URL
+    window.history.replaceState({}, '', window.location.pathname)
+  }, [])
+
   // Media arrays for current mode
   const photos = currentItem?.photos ?? []
   const videos = currentItem?.videos ?? []

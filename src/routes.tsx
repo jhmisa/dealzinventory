@@ -65,7 +65,6 @@ const StaffManagementPage = lazy(() => import('@/pages/admin/staff-management'))
 const ForgotPasswordPage = lazy(() => import('@/pages/admin/forgot-password'))
 const AuthCallbackPage = lazy(() => import('@/pages/admin/auth-callback'))
 const SetPasswordPage = lazy(() => import('@/pages/admin/set-password'))
-const ItemSlideshowPage = lazy(() => import('@/pages/admin/item-slideshow'))
 const AccessoryDetailPage = lazy(() => import('@/pages/admin/accessory-detail'))
 const ShopAccessoryDetailPage = lazy(() => import('@/pages/shop/accessory-detail'))
 
@@ -124,7 +123,6 @@ export const router = createBrowserRouter([
           { path: 'items', element: lazyElement(ItemListPage) },
           { path: 'items/intake', element: lazyElement(BulkIntakePage) },
           { path: 'items/scan', element: lazyElement(QRScannerPage) },
-          { path: 'items/slideshow/:id', element: lazyElement(ItemSlideshowPage) },
           { path: 'items/:id', element: lazyElement(ItemDetailPage) },
           { path: 'inspection', element: lazyElement(InspectionQueuePage) },
           { path: 'inspection/:id', element: lazyElement(InspectItemPage) },
