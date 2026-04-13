@@ -139,6 +139,8 @@ Deno.serve(async (req) => {
         }
       }
 
+      console.log('from_field resolved:', JSON.stringify(fromField ?? null));
+
       const draftPayload: Record<string, unknown> = {
         body: content,
         conversation: conversation.missive_conversation_id,
@@ -215,8 +217,9 @@ Deno.serve(async (req) => {
       .eq('id', conversation.id);
 
     if (sendError) {
+      console.error('Send message failed:', JSON.stringify(sendError));
       return jsonResponse({
-        error: 'Message delivery failed',
+        error: `Message delivery failed: ${sendError.missive_error ?? 'Unknown error'}`,
         message_id: msg.id,
         details: sendError,
       });
