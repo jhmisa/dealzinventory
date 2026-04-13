@@ -19,22 +19,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Auth check — require staff JWT
-    const authHeader = req.headers.get('authorization') ?? '';
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
-      { global: { headers: { authorization: authHeader } } },
-    );
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
     const { messages, customer_id }: { messages: TestMessage[]; customer_id?: string } =
       await req.json();
 
@@ -45,7 +29,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Use service role client for data access
     const serviceClient = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
