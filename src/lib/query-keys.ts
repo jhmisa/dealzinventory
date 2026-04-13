@@ -137,6 +137,13 @@ export const queryKeys = {
     media: (id: string) => [...queryKeys.accessories.all, 'media', id] as const,
     stockHistory: (id: string) => [...queryKeys.accessories.all, 'stock-history', id] as const,
   },
+  inventorySnapshots: {
+    all: ['inventory-snapshots'] as const,
+    lists: () => [...queryKeys.inventorySnapshots.all, 'list'] as const,
+    details: () => [...queryKeys.inventorySnapshots.all, 'detail'] as const,
+    detail: (id: string) => [...queryKeys.inventorySnapshots.details(), id] as const,
+    items: (snapshotId: string) => [...queryKeys.inventorySnapshots.all, 'items', snapshotId] as const,
+  },
   postalCodes: {
     all: ['postal-codes'] as const,
     lookup: (code: string) => ['postal-codes', 'lookup', code] as const,

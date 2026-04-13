@@ -79,9 +79,9 @@ function AddProviderDialog({
   }
 
   const modelSuggestions: Record<string, string[]> = {
-    anthropic: ['claude-sonnet-4-20250514', 'claude-haiku-4-5-20251001'],
-    openai: ['gpt-4o', 'gpt-4o-mini'],
-    google: ['gemini-2.0-flash', 'gemini-2.5-pro-preview-06-05'],
+    anthropic: ['claude-sonnet-4-20250514', 'claude-opus-4-20250514', 'claude-haiku-4-5-20251001'],
+    openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'],
+    google: ['gemini-2.5-pro-preview-06-05', 'gemini-2.5-flash', 'gemini-2.0-flash'],
   }
 
   return (
@@ -108,14 +108,17 @@ function AddProviderDialog({
           </div>
           <div className="space-y-2">
             <Label>Model ID</Label>
-            <Select value={modelId} onValueChange={setModelId}>
-              <SelectTrigger><SelectValue placeholder="Select a model" /></SelectTrigger>
-              <SelectContent>
-                {modelSuggestions[provider]?.map((m) => (
-                  <SelectItem key={m} value={m}>{m}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Input
+              value={modelId}
+              onChange={(e) => setModelId(e.target.value)}
+              placeholder="e.g. claude-sonnet-4-20250514"
+              list={`models-${provider}`}
+            />
+            <datalist id={`models-${provider}`}>
+              {modelSuggestions[provider]?.map((m) => (
+                <option key={m} value={m} />
+              ))}
+            </datalist>
           </div>
           <div className="space-y-2">
             <Label>API Key</Label>

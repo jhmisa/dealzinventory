@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 const MISSIVE_API_TOKEN = Deno.env.get('MISSIVE_API_TOKEN') ?? '';
-const MISSIVE_API_URL = 'https://mail.missiveapp.com/v1';
+const MISSIVE_API_URL = 'https://public.missiveapp.com/v1';
 
 // ---------- Types ----------
 

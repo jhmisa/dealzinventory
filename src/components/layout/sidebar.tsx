@@ -118,13 +118,14 @@ const settingsItems: NavItem[] = [
   { title: 'Postal Codes', href: '/admin/settings/postal-codes', icon: MapPin },
   { title: 'Members', href: '/admin/settings/staff', icon: UserCog },
   { title: 'Reports', href: '/admin/reports', icon: BarChart3 },
+  { title: 'Inventory Report', href: '/admin/reports/inventory', icon: FileText },
 ]
 
 export function AppSidebar() {
   const location = useLocation()
   const { isAdmin } = useAuth()
   const { data: needsReviewCount } = useNeedsReviewCount()
-  const settingsActive = location.pathname.startsWith('/admin/settings') || location.pathname === '/admin/reports'
+  const settingsActive = location.pathname.startsWith('/admin/settings') || location.pathname.startsWith('/admin/reports')
   const [settingsOpen, setSettingsOpen] = useState(settingsActive)
 
   return (

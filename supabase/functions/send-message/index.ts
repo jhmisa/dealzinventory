@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 const MISSIVE_API_TOKEN = Deno.env.get('MISSIVE_API_TOKEN') ?? '';
-const MISSIVE_API_URL = 'https://mail.missiveapp.com/v1';
+const MISSIVE_API_URL = 'https://public.missiveapp.com/v1';
 
 // ---------- Types ----------
 
@@ -26,7 +26,28 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Verify staff auth
+    const body = await req.json();
+
+    // Health check endpoint (no auth required)
+    if (body.health_check) {
+      if (!MISSIVE_API_TOKEN) {
+        return jsonResponse({ error: 'MISSIVE_API_TOKEN not configured' });
+      }
+      try {
+        const res = await fetch(`${MISSIVE_API_URL}/organizations`, {
+          headers: { Authorization: `Bearer ${MISSIVE_API_TOKEN}` },
+        });
+        // 200 = success, 403 = token valid but no access (still connected)
+        if (res.status === 401) {
+          return jsonResponse({ error: 'MISSIVE_API_TOKEN is invalid' });
+        }
+        return jsonResponse({ ok: true, connected: true });
+      } catch (e) {
+        return jsonResponse({ error: e instanceof Error ? e.message : 'Network error' });
+      }
+    }
+
+    // All other endpoints require staff auth
     const authHeader = req.headers.get('Authorization') ?? '';
     const supabaseUser = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -43,26 +64,6 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
-
-    const body = await req.json();
-
-    // Health check endpoint
-    if (body.health_check) {
-      if (!MISSIVE_API_TOKEN) {
-        return jsonResponse({ error: 'MISSIVE_API_TOKEN not configured' });
-      }
-      try {
-        const res = await fetch(`${MISSIVE_API_URL}/organizations`, {
-          headers: { Authorization: `Bearer ${MISSIVE_API_TOKEN}` },
-        });
-        if (!res.ok) {
-          return jsonResponse({ error: `Missive API returned ${res.status}` });
-        }
-        return jsonResponse({ ok: true, connected: true });
-      } catch (e) {
-        return jsonResponse({ error: e instanceof Error ? e.message : 'Network error' });
-      }
-    }
 
     const { conversation_id, content, approve_draft_id } = body as SendMessageInput;
 

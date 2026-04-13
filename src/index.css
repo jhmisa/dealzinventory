@@ -122,3 +122,36 @@
     font-family: 'Inter', 'Noto Sans JP', ui-sans-serif, system-ui, sans-serif;
   }
 }
+
+/* Print styles for inventory report */
+@media print {
+  /* Hide non-printable elements */
+  [data-sidebar],
+  header,
+  nav {
+    display: none !important;
+  }
+
+  /* Remove layout constraints */
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+  }
+
+  /* Page break between summary and detail */
+  .print\:break-before-page {
+    break-before: page;
+  }
+
+  /* Ensure tables don't break mid-row */
+  tr {
+    break-inside: avoid;
+  }
+
+  /* Compact card padding for print */
+  .card {
+    box-shadow: none !important;
+    border: 1px solid #ddd !important;
+  }
+}

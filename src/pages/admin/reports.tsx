@@ -1,9 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { PageHeader, PriceDisplay, TableSkeleton } from '@/components/shared'
 import { ITEM_STATUSES, CONDITION_GRADES, SOURCE_TYPES, ORDER_STATUSES, KAITORI_STATUSES } from '@/lib/constants'
-import { Package, ShoppingCart, HandCoins, Users, TrendingUp, AlertTriangle } from 'lucide-react'
+import { Package, ShoppingCart, HandCoins, Users, TrendingUp, AlertTriangle, FileText } from 'lucide-react'
 
 const LABEL_MAP: Record<string, string> = {}
 for (const arr of [ITEM_STATUSES, CONDITION_GRADES, SOURCE_TYPES, ORDER_STATUSES, KAITORI_STATUSES]) {
@@ -94,7 +96,17 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Reports" />
+      <PageHeader
+        title="Reports"
+        actions={
+          <Button asChild variant="outline">
+            <Link to="/admin/reports/inventory">
+              <FileText className="h-4 w-4 mr-1" />
+              Inventory Report
+            </Link>
+          </Button>
+        }
+      />
 
       {/* Top-level KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

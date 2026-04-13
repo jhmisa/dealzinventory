@@ -68,6 +68,7 @@ const SetPasswordPage = lazy(() => import('@/pages/admin/set-password'))
 const MessagesPage = lazy(() => import('@/pages/admin/messages'))
 const MessagingSettingsPage = lazy(() => import('@/pages/admin/messaging-settings'))
 const AccessoryDetailPage = lazy(() => import('@/pages/admin/accessory-detail'))
+const InventoryReportPage = lazy(() => import('@/pages/admin/inventory-report'))
 const ShopAccessoryDetailPage = lazy(() => import('@/pages/shop/accessory-detail'))
 
 function lazyElement(Component: React.LazyExoticComponent<ComponentType>) {
@@ -149,6 +150,7 @@ export const router = createBrowserRouter([
           { path: 'receiving-reports', element: lazyElement(ReceivingReportsPage) },
           { path: 'receiving-reports/:id', element: lazyElement(ReceivingReportDetailPage) },
           { path: 'reports', element: lazyElement(ReportsPage) },
+          { path: 'reports/inventory', element: lazyElement(InventoryReportPage) },
           { path: 'returns', element: lazyElement(AdminReturnsPage) },
           { path: 'returns/:id', element: lazyElement(AdminReturnDetailPage) },
           { path: 'messages', element: lazyElement(MessagesPage) },
