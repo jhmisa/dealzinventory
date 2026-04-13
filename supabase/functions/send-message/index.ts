@@ -115,69 +115,12 @@ Deno.serve(async (req) => {
         throw new Error('MISSIVE_API_TOKEN not configured');
       }
 
-      // Fetch conversation from Missive to determine the correct sender (from_field)
-      const convRes = await fetch(
-        `${MISSIVE_API_URL}/conversations/${conversation.missive_conversation_id}`,
-        { headers: { Authorization: `Bearer ${MISSIVE_API_TOKEN}` } },
-      );
-
-      let fromField: { address: string; name?: string } | undefined;
-      if (convRes.ok) {
-        const convData = await convRes.json();
-        const messages = convData?.conversations?.messages ?? [];
-
-        // Strategy 1: Find from_field of a previous outbound message (sent by us)
-        for (const m of messages) {
-          if (m.delivered_at && m.from_field?.address) {
-            // Outbound messages have delivered_at set by Missive
-            // Check if this is from our side (not the customer)
-            const toFields = m.to_fields ?? [];
-            const isOutbound = toFields.some((t: { address: string }) =>
-              t.address && !t.address.includes('@')
-            ) || m.references?.length > 0;
-            if (isOutbound) {
-              fromField = m.from_field;
-              break;
-            }
-          }
-        }
-
-        // Strategy 2: For Facebook — our page ID is in to_fields of inbound customer messages
-        if (!fromField) {
-          for (const m of messages) {
-            const toFields = m.to_fields ?? [];
-            for (const t of toFields) {
-              if (t.address && !t.address.includes('@')) {
-                fromField = t;
-                break;
-              }
-            }
-            if (fromField) break;
-          }
-        }
-
-        // Strategy 3: Don't send from_field at all — let Missive pick the default
-        // (fromField stays undefined)
-
-        console.log('Missive conversation messages sample:', JSON.stringify(
-          messages.slice(0, 2).map((m: Record<string, unknown>) => ({
-            from_field: m.from_field,
-            to_fields: m.to_fields,
-            delivered_at: m.delivered_at,
-          }))
-        ));
-      }
-
-      console.log('from_field resolved:', JSON.stringify(fromField ?? null));
-
+      // Let Missive pick the sender automatically based on the conversation
       const draftPayload: Record<string, unknown> = {
         body: content,
         conversation: conversation.missive_conversation_id,
         send: true,
       };
-      if (fromField) {
-        draftPayload.from_field = fromField;
-      }
 
       const missiveRes = await fetch(`${MISSIVE_API_URL}/drafts`, {
         method: 'POST',
