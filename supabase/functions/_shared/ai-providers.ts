@@ -46,21 +46,33 @@ function consolidateMessages(messages: ChatMessage[]): ChatMessage[] {
 
 // ---------- Provider-agnostic dispatcher ----------
 
+const INVENTORY_RESPONSE_RULE = `
+# Response Strategy for Product Inquiries
+When a customer asks about a product or what's available:
+1. FIRST check the Available Inventory / Available Items in the context below.
+2. If there are matches, lead your reply with 1-2 concrete options (model, grade, price, G-code). Present the best match first, then one alternative if available.
+3. THEN ask ONE short qualifying question only if needed (e.g. preferred storage size, budget, or condition grade).
+4. Do NOT ask multiple qualifying questions before showing inventory. Show what you have first.
+5. Keep replies short — 2-4 sentences max. No walls of text.`;
+
 export async function generateAIReply(
   provider: AIProvider,
   systemPrompt: string,
   contextBlock: string,
   messages: ChatMessage[],
 ): Promise<AIResponse> {
+  // Inject inventory response strategy into every prompt
+  const enhancedPrompt = `${systemPrompt}\n\n${INVENTORY_RESPONSE_RULE}`;
+
   switch (provider.provider) {
     case 'anthropic':
-      return callClaude(provider, systemPrompt, contextBlock, messages);
+      return callClaude(provider, enhancedPrompt, contextBlock, messages);
     case 'openai':
-      return callOpenAI(provider, systemPrompt, contextBlock, messages);
+      return callOpenAI(provider, enhancedPrompt, contextBlock, messages);
     case 'google':
-      return callGemini(provider, systemPrompt, contextBlock, messages);
+      return callGemini(provider, enhancedPrompt, contextBlock, messages);
     case 'openrouter':
-      return callOpenRouter(provider, systemPrompt, contextBlock, messages);
+      return callOpenRouter(provider, enhancedPrompt, contextBlock, messages);
     default:
       throw new Error(`Unsupported provider: ${provider.provider}`);
   }
@@ -186,6 +198,7 @@ async function callOpenRouter(
         model: provider.model_id,
         max_tokens: 1024,
         messages: openrouterMessages,
+        response_format: { type: 'json_object' },
       }),
     });
 

@@ -108,7 +108,7 @@ function ProviderFormDialog({
     anthropic: ['claude-sonnet-4-20250514', 'claude-opus-4-20250514', 'claude-haiku-4-5-20251001'],
     openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'],
     google: ['gemini-2.5-pro-preview-06-05', 'gemini-2.5-flash', 'gemini-2.0-flash'],
-    openrouter: ['google/gemini-2.5-flash', 'google/gemini-2.0-flash-001', 'anthropic/claude-sonnet-4', 'openai/gpt-4o-mini'],
+    openrouter: ['openrouter/auto', 'google/gemini-2.5-flash', 'google/gemini-2.0-flash-001', 'anthropic/claude-sonnet-4', 'openai/gpt-4o-mini'],
   }
 
   const isPending = createProvider.isPending || updateProvider.isPending
