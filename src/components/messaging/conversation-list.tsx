@@ -28,7 +28,7 @@ function getDisplayName(conv: ConversationWithRelations): string {
     const first = conv.customers.first_name ?? ''
     return `${conv.customers.last_name} ${first}`.trim()
   }
-  return 'Unknown'
+  return conv.contact_name || 'Unknown'
 }
 
 function getStatusDot(conv: ConversationWithRelations): { color: string; label: string } {

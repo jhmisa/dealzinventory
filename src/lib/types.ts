@@ -261,6 +261,7 @@ export interface Conversation {
   customer_id: string | null
   missive_conversation_id: string
   channel: MessageChannel
+  contact_name: string | null
   needs_human_review: boolean
   unmatched_contact: boolean
   assigned_staff_id: string | null

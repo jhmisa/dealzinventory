@@ -86,7 +86,7 @@ export const ConversationThread = memo(function ConversationThread({
 
   const customerName = conversation.customers
     ? `${conversation.customers.last_name} ${conversation.customers.first_name ?? ''}`.trim()
-    : 'Unknown Contact'
+    : conversation.contact_name || 'Unknown Contact'
 
   return (
     <div className="flex h-full flex-col">

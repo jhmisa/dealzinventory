@@ -190,6 +190,7 @@ Deno.serve(async (req) => {
         {
           missive_conversation_id: conversation.id,
           customer_id: customer?.id ?? null,
+          contact_name: message.from_field?.name ?? null,
           channel: 'facebook' as const,
           unmatched_contact: !customer,
           needs_human_review: !customer,
