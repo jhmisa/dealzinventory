@@ -10,6 +10,11 @@ import type {
   MessagingPersona,
   MessagingPersonaUpdate,
   SystemAlert,
+  KnowledgeBaseEntry,
+  KnowledgeBaseEntryInsert,
+  KnowledgeBaseEntryUpdate,
+  TestAIMessage,
+  TestAIResponse,
 } from '@/lib/types'
 
 // ---------- Conversations ----------
@@ -356,6 +361,63 @@ export async function getMessagingStats(): Promise<MessagingStats> {
     avgConfidence,
     escalationRate,
   }
+}
+
+// ---------- Missive Health Check ----------
+
+// ---------- Knowledge Base ----------
+
+export async function getKnowledgeBaseEntries() {
+  const { data, error } = await supabase
+    .from('knowledge_base')
+    .select('*')
+    .order('sort_order')
+  if (error) throw error
+  return (data ?? []) as KnowledgeBaseEntry[]
+}
+
+export async function createKnowledgeBaseEntry(entry: KnowledgeBaseEntryInsert) {
+  const { data, error } = await supabase
+    .from('knowledge_base')
+    .insert(entry)
+    .select()
+    .single()
+  if (error) throw error
+  return data as KnowledgeBaseEntry
+}
+
+export async function updateKnowledgeBaseEntry(id: string, updates: KnowledgeBaseEntryUpdate) {
+  const { data, error } = await supabase
+    .from('knowledge_base')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data as KnowledgeBaseEntry
+}
+
+export async function deleteKnowledgeBaseEntry(id: string) {
+  const { error } = await supabase
+    .from('knowledge_base')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
+}
+
+// ---------- Test AI ----------
+
+export async function testAIReply(messages: TestAIMessage[], customerId?: string) {
+  const { data, error } = await supabase.functions.invoke('test-ai-reply', {
+    body: { messages, customer_id: customerId },
+  })
+
+  if (error) {
+    if (data?.error) throw new Error(data.error)
+    throw new Error(error.message ?? 'Failed to get AI reply')
+  }
+  if (data?.error) throw new Error(data.error)
+  return data as TestAIResponse
 }
 
 // ---------- Missive Health Check ----------

@@ -282,6 +282,36 @@ async function generateAndSaveDraft(
 
   if (!persona?.system_prompt) return;
 
+  // 2b. Fetch active guardrails + knowledge base entries
+  const { data: kbEntries } = await supabase
+    .from('knowledge_base')
+    .select('entry_type, title, content')
+    .eq('is_active', true)
+    .order('sort_order');
+
+  const entries = kbEntries ?? [];
+  const guardrails = entries.filter((e: { entry_type: string }) => e.entry_type === 'guardrail');
+  const knowledge = entries.filter((e: { entry_type: string }) => e.entry_type === 'knowledge');
+
+  // Build full system prompt: guardrails → persona → knowledge
+  let fullSystemPrompt = '';
+
+  if (guardrails.length > 0) {
+    const rules = guardrails
+      .map((g: { title: string; content: string }, i: number) => `${i + 1}. **${g.title}**: ${g.content}`)
+      .join('\n');
+    fullSystemPrompt += `# Rules (NEVER violate)\n${rules}\n\n`;
+  }
+
+  fullSystemPrompt += persona.system_prompt;
+
+  if (knowledge.length > 0) {
+    const articles = knowledge
+      .map((k: { title: string; content: string }) => `## ${k.title}\n${k.content}`)
+      .join('\n\n');
+    fullSystemPrompt += `\n\n# Knowledge Base\n${articles}`;
+  }
+
   // 3. Build customer context
   const context = await buildCustomerContext(supabase, customerId, conversationId);
   const contextBlock = formatContextForPrompt(context);
@@ -295,7 +325,7 @@ async function generateAndSaveDraft(
   // 5. Generate AI reply
   const aiResponse = await generateAIReply(
     provider as AIProvider,
-    persona.system_prompt,
+    fullSystemPrompt,
     contextBlock,
     chatMessages,
   );

@@ -4,7 +4,14 @@ import { queryKeys } from '@/lib/query-keys'
 import { supabase } from '@/lib/supabase'
 import * as messagingService from '@/services/messaging'
 import type { ConversationFilters } from '@/services/messaging'
-import type { MessagingTemplateInsert, AiProviderInsert, MessagingPersonaUpdate } from '@/lib/types'
+import type {
+  MessagingTemplateInsert,
+  AiProviderInsert,
+  MessagingPersonaUpdate,
+  KnowledgeBaseEntryInsert,
+  KnowledgeBaseEntryUpdate,
+  TestAIMessage,
+} from '@/lib/types'
 
 // ---------- Conversations ----------
 
@@ -217,6 +224,56 @@ export function useResolveAlert() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.messaging.alerts() })
     },
+  })
+}
+
+// ---------- Knowledge Base ----------
+
+export function useKnowledgeBase() {
+  return useQuery({
+    queryKey: queryKeys.messaging.knowledgeBase(),
+    queryFn: () => messagingService.getKnowledgeBaseEntries(),
+  })
+}
+
+export function useCreateKnowledgeBaseEntry() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (entry: KnowledgeBaseEntryInsert) =>
+      messagingService.createKnowledgeBaseEntry(entry),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.messaging.knowledgeBase() })
+    },
+  })
+}
+
+export function useUpdateKnowledgeBaseEntry() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: KnowledgeBaseEntryUpdate }) =>
+      messagingService.updateKnowledgeBaseEntry(id, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.messaging.knowledgeBase() })
+    },
+  })
+}
+
+export function useDeleteKnowledgeBaseEntry() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => messagingService.deleteKnowledgeBaseEntry(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.messaging.knowledgeBase() })
+    },
+  })
+}
+
+// ---------- Test AI ----------
+
+export function useTestAIReply() {
+  return useMutation({
+    mutationFn: ({ messages, customerId }: { messages: TestAIMessage[]; customerId?: string }) =>
+      messagingService.testAIReply(messages, customerId),
   })
 }
 

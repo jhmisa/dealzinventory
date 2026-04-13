@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Plus, Trash2, Check, Bot, Sparkles, FileText, Pencil } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { Plus, Trash2, Check, Bot, Sparkles, FileText, Pencil, ShieldAlert, BookOpen, FlaskConical, Send, ChevronUp, ChevronDown, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Select,
   SelectContent,
@@ -34,8 +35,14 @@ import {
   useCreateTemplate,
   useUpdateTemplate,
   useDeleteTemplate,
+  useKnowledgeBase,
+  useCreateKnowledgeBaseEntry,
+  useUpdateKnowledgeBaseEntry,
+  useDeleteKnowledgeBaseEntry,
+  useTestAIReply,
 } from '@/hooks/use-messaging'
-import type { AiProvider, MessagingTemplate, MessagingTemplateInsert } from '@/lib/types'
+import { useCustomers } from '@/hooks/use-customers'
+import type { AiProvider, MessagingTemplate, MessagingTemplateInsert, KnowledgeBaseEntry, TestAIMessage, TestAIResponse } from '@/lib/types'
 
 // ---------- AI Provider Form ----------
 
@@ -168,7 +175,6 @@ function TemplateFormDialog({
   const createTemplate = useCreateTemplate()
   const updateTemplate = useUpdateTemplate()
 
-  // Reset form when template changes
   const isEdit = !!template
   if (isEdit && name !== template.name && !createTemplate.isPending) {
     setName(template.name)
@@ -261,20 +267,151 @@ function TemplateFormDialog({
   )
 }
 
+// ---------- Knowledge Base / Guardrail Form ----------
+
+const KB_CATEGORY_OPTIONS = ['Products', 'Shipping', 'Returns', 'Payments', 'Grading', 'Policies', 'FAQ', 'Kaitori', 'Custom'] as const
+
+function KbEntryFormDialog({
+  open,
+  onOpenChange,
+  entry,
+  entryType,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  entry?: KnowledgeBaseEntry | null
+  entryType: 'knowledge' | 'guardrail'
+}) {
+  const [title, setTitle] = useState(entry?.title ?? '')
+  const [content, setContent] = useState(entry?.content ?? '')
+  const [category, setCategory] = useState(entry?.category ?? 'Custom')
+  const [isActive, setIsActive] = useState(entry?.is_active ?? true)
+
+  const createEntry = useCreateKnowledgeBaseEntry()
+  const updateEntry = useUpdateKnowledgeBaseEntry()
+
+  const isEdit = !!entry
+  if (isEdit && title !== entry.title && !createEntry.isPending) {
+    setTitle(entry.title)
+    setContent(entry.content)
+    setCategory(entry.category)
+    setIsActive(entry.is_active)
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!title || !content) return
+
+    if (isEdit) {
+      updateEntry.mutate(
+        { id: entry.id, updates: { title, content, category, is_active: isActive } },
+        {
+          onSuccess: () => { toast.success(`${entryType === 'guardrail' ? 'Rule' : 'Article'} updated`); onOpenChange(false) },
+          onError: (err) => toast.error(`Failed: ${err.message}`),
+        },
+      )
+    } else {
+      createEntry.mutate(
+        { entry_type: entryType, title, content, category, is_active: isActive },
+        {
+          onSuccess: () => { toast.success(`${entryType === 'guardrail' ? 'Rule' : 'Article'} created`); onOpenChange(false) },
+          onError: (err) => toast.error(`Failed: ${err.message}`),
+        },
+      )
+    }
+  }
+
+  const isPending = createEntry.isPending || updateEntry.isPending
+  const isGuardrail = entryType === 'guardrail'
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{isEdit ? 'Edit' : 'New'} {isGuardrail ? 'Rule' : 'Article'}</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label>Title</Label>
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder={isGuardrail ? 'e.g. Never share selling prices' : 'e.g. Shipping Information'}
+            />
+          </div>
+          {!isGuardrail && (
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <Select value={category} onValueChange={setCategory}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {KB_CATEGORY_OPTIONS.map((c) => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          <div className="space-y-2">
+            <Label>{isGuardrail ? 'Rule Description' : 'Content'}</Label>
+            <Textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              className={`min-h-[150px] text-sm ${!isGuardrail ? 'font-mono' : ''}`}
+              placeholder={isGuardrail ? 'Describe the rule the AI must follow...' : 'Article content...'}
+            />
+          </div>
+          <div className="flex items-center gap-3">
+            <Switch checked={isActive} onCheckedChange={setIsActive} />
+            <Label>Active</Label>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" disabled={isPending || !title || !content}>
+              {isEdit ? 'Update' : 'Create'}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ---------- Confidence Badge ----------
+
+function ConfidenceBadge({ confidence }: { confidence: number }) {
+  if (confidence >= 0.7) {
+    return <Badge className="bg-green-100 text-green-800 border-green-300" variant="outline">{(confidence * 100).toFixed(0)}%</Badge>
+  }
+  if (confidence >= 0.5) {
+    return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300" variant="outline">{(confidence * 100).toFixed(0)}%</Badge>
+  }
+  return <Badge className="bg-red-100 text-red-800 border-red-300" variant="outline">{(confidence * 100).toFixed(0)}%</Badge>
+}
+
 // ---------- Main Page ----------
 
 export default function MessagingSettingsPage() {
   const [addOpen, setAddOpen] = useState(false)
   const [templateFormOpen, setTemplateFormOpen] = useState(false)
   const [editTemplate, setEditTemplate] = useState<MessagingTemplate | null>(null)
+  const [kbFormOpen, setKbFormOpen] = useState(false)
+  const [editKbEntry, setEditKbEntry] = useState<KnowledgeBaseEntry | null>(null)
+  const [kbFormType, setKbFormType] = useState<'knowledge' | 'guardrail'>('knowledge')
 
   const { data: providers = [], isLoading: loadingProviders } = useAiProviders()
   const { data: templates = [], isLoading: loadingTemplates } = useTemplates()
+  const { data: kbEntries = [], isLoading: loadingKb } = useKnowledgeBase()
   const deleteTemplateMutation = useDeleteTemplate()
   const setActive = useSetActiveAiProvider()
   const deleteProvider = useDeleteAiProvider()
   const { data: persona, isLoading: loadingPersona } = useActivePersona()
   const updatePersona = useUpdatePersona()
+  const updateKbEntry = useUpdateKnowledgeBaseEntry()
+  const deleteKbEntry = useDeleteKnowledgeBaseEntry()
+
+  const guardrails = kbEntries.filter((e) => e.entry_type === 'guardrail')
+  const knowledgeArticles = kbEntries.filter((e) => e.entry_type === 'knowledge')
 
   // Persona form state
   const [personaName, setPersonaName] = useState('')
@@ -293,6 +430,19 @@ export default function MessagingSettingsPage() {
     if (useEmojis !== persona.use_emojis) setUseEmojis(persona.use_emojis)
     if (greetingTemplate !== (persona.greeting_template ?? '')) setGreetingTemplate(persona.greeting_template ?? '')
   }
+
+  // Test playground state
+  const [testMessages, setTestMessages] = useState<(TestAIMessage & { meta?: TestAIResponse })[]>([])
+  const [testInput, setTestInput] = useState('')
+  const [customerSearch, setCustomerSearch] = useState('')
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | undefined>(undefined)
+  const { data: customerResults } = useCustomers(customerSearch || undefined)
+  const testAI = useTestAIReply()
+  const chatEndRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [testMessages])
 
   function handleSavePersona() {
     if (!persona) return
@@ -334,11 +484,66 @@ export default function MessagingSettingsPage() {
     })
   }
 
+  function handleToggleKbEntry(entry: KnowledgeBaseEntry) {
+    updateKbEntry.mutate(
+      { id: entry.id, updates: { is_active: !entry.is_active } },
+      {
+        onSuccess: () => toast.success(`${entry.title} ${entry.is_active ? 'disabled' : 'enabled'}`),
+        onError: (err) => toast.error(`Failed: ${err.message}`),
+      },
+    )
+  }
+
+  function handleMoveKbEntry(entry: KnowledgeBaseEntry, direction: 'up' | 'down') {
+    const sameType = kbEntries.filter((e) => e.entry_type === entry.entry_type)
+    const idx = sameType.findIndex((e) => e.id === entry.id)
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+    if (swapIdx < 0 || swapIdx >= sameType.length) return
+
+    const swapEntry = sameType[swapIdx]
+    updateKbEntry.mutate({ id: entry.id, updates: { sort_order: swapEntry.sort_order } })
+    updateKbEntry.mutate({ id: swapEntry.id, updates: { sort_order: entry.sort_order } })
+  }
+
+  function handleDeleteKbEntry(entry: KnowledgeBaseEntry) {
+    deleteKbEntry.mutate(entry.id, {
+      onSuccess: () => toast.success(`${entry.title} deleted`),
+      onError: (err) => toast.error(`Failed: ${err.message}`),
+    })
+  }
+
+  function handleSendTestMessage() {
+    if (!testInput.trim()) return
+    const newMsg: TestAIMessage = { role: 'customer', content: testInput.trim() }
+    const allMessages = [...testMessages.map(({ role, content }) => ({ role, content })), newMsg]
+    setTestMessages((prev) => [...prev, newMsg])
+    setTestInput('')
+
+    testAI.mutate(
+      { messages: allMessages, customerId: selectedCustomerId },
+      {
+        onSuccess: (response) => {
+          setTestMessages((prev) => [
+            ...prev,
+            {
+              role: 'assistant' as const,
+              content: response.reply,
+              meta: response,
+            },
+          ])
+        },
+        onError: (err) => {
+          toast.error(`AI error: ${err.message}`)
+        },
+      },
+    )
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="AI Messaging"
-        description="Configure AI providers and agent persona for automated customer replies"
+        description="Configure AI providers, persona, guardrails, knowledge base, and test the AI"
       />
 
       {/* AI Providers Section */}
@@ -421,7 +626,7 @@ export default function MessagingSettingsPage() {
             Agent Persona
           </CardTitle>
           <CardDescription>
-            Define how the AI responds to customers — tone, language, and knowledge base
+            Define how the AI responds to customers — tone, language, and personality
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -469,7 +674,7 @@ export default function MessagingSettingsPage() {
               <Separator />
 
               <div className="space-y-2">
-                <Label>System Prompt (includes knowledge base)</Label>
+                <Label>System Prompt</Label>
                 <Textarea
                   value={systemPrompt}
                   onChange={(e) => { setSystemPrompt(e.target.value); setPersonaDirty(true) }}
@@ -477,7 +682,7 @@ export default function MessagingSettingsPage() {
                   placeholder="System instructions for the AI agent..."
                 />
                 <p className="text-xs text-muted-foreground">
-                  This prompt defines the AI's personality, rules, and knowledge. Customer context (orders, tracking) is injected automatically.
+                  Core personality and instructions. Guardrails and knowledge base articles are injected automatically around this prompt.
                 </p>
               </div>
 
@@ -500,6 +705,270 @@ export default function MessagingSettingsPage() {
               </div>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* AI Guardrails Section */}
+      <Card className="border-red-200">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-red-700">
+                <ShieldAlert className="h-5 w-5" />
+                AI Guardrails
+              </CardTitle>
+              <CardDescription>Rules the AI must NEVER violate — injected at the top of every prompt</CardDescription>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-red-300 text-red-700 hover:bg-red-50"
+              onClick={() => { setEditKbEntry(null); setKbFormType('guardrail'); setKbFormOpen(true) }}
+            >
+              <Plus className="h-4 w-4" />
+              Add Rule
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loadingKb ? (
+            <p className="text-sm text-muted-foreground">Loading...</p>
+          ) : guardrails.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">
+              No guardrails configured. Add rules to prevent the AI from making mistakes.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {guardrails.map((g) => (
+                <div
+                  key={g.id}
+                  className={`flex items-center justify-between rounded-lg border p-3 ${g.is_active ? 'border-red-200 bg-red-50/50' : 'opacity-60'}`}
+                >
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <Switch
+                      checked={g.is_active}
+                      onCheckedChange={() => handleToggleKbEntry(g)}
+                    />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{g.title}</p>
+                      <p className="text-xs text-muted-foreground line-clamp-1">{g.content}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0 ml-2">
+                    <Button size="icon-xs" variant="ghost" onClick={() => { setEditKbEntry(g); setKbFormType('guardrail'); setKbFormOpen(true) }}>
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                    <Button size="icon-xs" variant="ghost" onClick={() => handleDeleteKbEntry(g)} disabled={deleteKbEntry.isPending}>
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Knowledge Base Section */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5" />
+                Knowledge Base
+              </CardTitle>
+              <CardDescription>Informational articles injected into the AI's context</CardDescription>
+            </div>
+            <Button size="sm" onClick={() => { setEditKbEntry(null); setKbFormType('knowledge'); setKbFormOpen(true) }}>
+              <Plus className="h-4 w-4" />
+              Add Article
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loadingKb ? (
+            <p className="text-sm text-muted-foreground">Loading...</p>
+          ) : knowledgeArticles.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">
+              No knowledge articles yet. Add articles to give the AI domain knowledge.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {knowledgeArticles.map((k, idx) => (
+                <div
+                  key={k.id}
+                  className={`flex items-center justify-between rounded-lg border p-3 ${!k.is_active ? 'opacity-60' : ''}`}
+                >
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <Switch
+                      checked={k.is_active}
+                      onCheckedChange={() => handleToggleKbEntry(k)}
+                    />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium truncate">{k.title}</p>
+                        <Badge variant="secondary" className="shrink-0">{k.category}</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground line-clamp-1">{k.content}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0 ml-2">
+                    <Button size="icon-xs" variant="ghost" onClick={() => handleMoveKbEntry(k, 'up')} disabled={idx === 0}>
+                      <ChevronUp className="h-3 w-3" />
+                    </Button>
+                    <Button size="icon-xs" variant="ghost" onClick={() => handleMoveKbEntry(k, 'down')} disabled={idx === knowledgeArticles.length - 1}>
+                      <ChevronDown className="h-3 w-3" />
+                    </Button>
+                    <Button size="icon-xs" variant="ghost" onClick={() => { setEditKbEntry(k); setKbFormType('knowledge'); setKbFormOpen(true) }}>
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                    <Button size="icon-xs" variant="ghost" onClick={() => handleDeleteKbEntry(k)} disabled={deleteKbEntry.isPending}>
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <KbEntryFormDialog
+        open={kbFormOpen}
+        onOpenChange={setKbFormOpen}
+        entry={editKbEntry}
+        entryType={kbFormType}
+      />
+
+      {/* AI Test Playground Section */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <FlaskConical className="h-5 w-5" />
+                AI Test Playground
+              </CardTitle>
+              <CardDescription>Test the AI before it handles real customers</CardDescription>
+            </div>
+            {testMessages.length > 0 && (
+              <Button size="sm" variant="outline" onClick={() => setTestMessages([])}>
+                <RotateCcw className="h-4 w-4" />
+                Clear Chat
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Customer Selector */}
+          <div className="space-y-2">
+            <Label>Customer Context (optional)</Label>
+            <div className="flex gap-2">
+              <Input
+                value={customerSearch}
+                onChange={(e) => setCustomerSearch(e.target.value)}
+                placeholder="Search customer by name or code..."
+                className="flex-1"
+              />
+              {selectedCustomerId && (
+                <Button size="sm" variant="outline" onClick={() => { setSelectedCustomerId(undefined); setCustomerSearch('') }}>
+                  Clear
+                </Button>
+              )}
+            </div>
+            {customerSearch && !selectedCustomerId && customerResults && customerResults.length > 0 && (
+              <div className="rounded-md border bg-popover text-popover-foreground shadow-md">
+                {customerResults.slice(0, 5).map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2"
+                    onClick={() => {
+                      setSelectedCustomerId(c.id)
+                      setCustomerSearch(`${c.customer_code} — ${c.last_name} ${c.first_name ?? ''}`)
+                    }}
+                  >
+                    <Badge variant="outline" className="shrink-0">{c.customer_code}</Badge>
+                    <span>{c.last_name} {c.first_name ?? ''}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              {selectedCustomerId ? 'Real customer data (orders, kaitori) will be injected into AI context.' : 'No customer selected — AI will respond with general knowledge only.'}
+            </p>
+          </div>
+
+          <Separator />
+
+          {/* Chat Area */}
+          <ScrollArea className="h-[400px] rounded-md border p-4">
+            <div className="space-y-4">
+              {testMessages.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-12">
+                  Send a message to test the AI. The full system prompt, guardrails, and knowledge base will be used.
+                </p>
+              )}
+              {testMessages.map((msg, idx) => (
+                <div key={idx} className={`flex ${msg.role === 'customer' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[80%] space-y-1 ${msg.role === 'customer' ? 'items-end' : 'items-start'}`}>
+                    <div
+                      className={`rounded-lg px-3 py-2 text-sm ${
+                        msg.role === 'customer'
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-muted'
+                      }`}
+                    >
+                      {msg.content}
+                    </div>
+                    {msg.meta && (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <ConfidenceBadge confidence={msg.meta.confidence} />
+                        <Badge variant="outline" className="text-xs">{msg.meta.intent}</Badge>
+                        {msg.meta.escalation_reason && (
+                          <Badge variant="destructive" className="text-xs">
+                            Escalate: {msg.meta.escalation_reason}
+                          </Badge>
+                        )}
+                        {msg.meta.data_used.length > 0 && (
+                          <span className="text-xs text-muted-foreground">
+                            Data: {msg.meta.data_used.join(', ')}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {testAI.isPending && (
+                <div className="flex justify-start">
+                  <div className="bg-muted rounded-lg px-3 py-2 text-sm text-muted-foreground animate-pulse">
+                    AI is thinking...
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+          </ScrollArea>
+
+          {/* Input Bar */}
+          <form
+            onSubmit={(e) => { e.preventDefault(); handleSendTestMessage() }}
+            className="flex gap-2"
+          >
+            <Input
+              value={testInput}
+              onChange={(e) => setTestInput(e.target.value)}
+              placeholder="Type a test message..."
+              className="flex-1"
+              disabled={testAI.isPending}
+            />
+            <Button type="submit" disabled={testAI.isPending || !testInput.trim()}>
+              <Send className="h-4 w-4" />
+              Send
+            </Button>
+          </form>
         </CardContent>
       </Card>
 

@@ -375,3 +375,50 @@ export interface SystemAlert {
   resolved_at: string | null
   created_at: string
 }
+
+// Knowledge Base / Guardrails
+export type KbEntryType = 'knowledge' | 'guardrail'
+
+export interface KnowledgeBaseEntry {
+  id: string
+  entry_type: KbEntryType
+  title: string
+  content: string
+  category: string
+  is_active: boolean
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface KnowledgeBaseEntryInsert {
+  entry_type?: KbEntryType
+  title: string
+  content: string
+  category?: string
+  is_active?: boolean
+  sort_order?: number
+}
+
+export interface KnowledgeBaseEntryUpdate {
+  entry_type?: KbEntryType
+  title?: string
+  content?: string
+  category?: string
+  is_active?: boolean
+  sort_order?: number
+}
+
+// AI Test Playground
+export interface TestAIMessage {
+  role: 'customer' | 'assistant'
+  content: string
+}
+
+export interface TestAIResponse {
+  reply: string
+  confidence: number
+  intent: string
+  data_used: string[]
+  escalation_reason: string | null
+}

@@ -176,5 +176,6 @@ export const queryKeys = {
     persona: () => [...queryKeys.messaging.all, 'persona'] as const,
     alerts: () => [...queryKeys.messaging.all, 'alerts'] as const,
     needsReviewCount: () => [...queryKeys.messaging.all, 'needs-review-count'] as const,
+    knowledgeBase: () => [...queryKeys.messaging.all, 'knowledge-base'] as const,
   },
 }
