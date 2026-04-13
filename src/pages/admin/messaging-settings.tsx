@@ -57,7 +57,7 @@ function ProviderFormDialog({
   editProvider?: AiProvider | null
 }) {
   const [name, setName] = useState(editProvider?.name ?? '')
-  const [provider, setProvider] = useState<'anthropic' | 'openai' | 'google'>(editProvider?.provider ?? 'anthropic')
+  const [provider, setProvider] = useState<'anthropic' | 'openai' | 'google' | 'openrouter'>(editProvider?.provider ?? 'anthropic')
   const [modelId, setModelId] = useState(editProvider?.model_id ?? '')
   const [apiKey, setApiKey] = useState('')
 
@@ -108,6 +108,7 @@ function ProviderFormDialog({
     anthropic: ['claude-sonnet-4-20250514', 'claude-opus-4-20250514', 'claude-haiku-4-5-20251001'],
     openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'],
     google: ['gemini-2.5-pro-preview-06-05', 'gemini-2.5-flash', 'gemini-2.0-flash'],
+    openrouter: ['google/gemini-2.5-flash', 'google/gemini-2.0-flash-001', 'anthropic/claude-sonnet-4', 'openai/gpt-4o-mini'],
   }
 
   const isPending = createProvider.isPending || updateProvider.isPending
@@ -131,6 +132,7 @@ function ProviderFormDialog({
                 <SelectItem value="anthropic">Anthropic (Claude)</SelectItem>
                 <SelectItem value="openai">OpenAI (GPT)</SelectItem>
                 <SelectItem value="google">Google (Gemini)</SelectItem>
+                <SelectItem value="openrouter">OpenRouter</SelectItem>
               </SelectContent>
             </Select>
           </div>

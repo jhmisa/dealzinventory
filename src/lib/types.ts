@@ -329,7 +329,7 @@ export interface MessagingTemplateInsert {
 export interface AiProvider {
   id: string
   name: string
-  provider: 'anthropic' | 'openai' | 'google'
+  provider: 'anthropic' | 'openai' | 'google' | 'openrouter'
   model_id: string
   api_key_encrypted: string
   purpose: string
@@ -339,7 +339,7 @@ export interface AiProvider {
 
 export interface AiProviderInsert {
   name: string
-  provider: 'anthropic' | 'openai' | 'google'
+  provider: 'anthropic' | 'openai' | 'google' | 'openrouter'
   model_id: string
   api_key_encrypted: string
   purpose?: string

@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
 
     if (!messages || messages.length === 0) {
       return new Response(JSON.stringify({ error: 'Messages required' }), {
-        status: 400,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -44,10 +44,12 @@ Deno.serve(async (req) => {
 
     if (!provider) {
       return new Response(JSON.stringify({ error: 'No active AI provider configured' }), {
-        status: 400,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    console.log('Using AI provider:', provider.name, provider.provider, provider.model_id);
 
     // Fetch active persona
     const { data: persona } = await serviceClient
@@ -58,7 +60,7 @@ Deno.serve(async (req) => {
 
     if (!persona?.system_prompt) {
       return new Response(JSON.stringify({ error: 'No active persona configured' }), {
-        status: 400,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -123,8 +125,9 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal server error';
+    console.error('test-ai-reply error:', message);
     return new Response(JSON.stringify({ error: message }), {
-      status: 500,
+      status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
