@@ -9,6 +9,7 @@ export interface AIContext {
   kaitoriRequests: KaitoriSummary[];
   recentMessages: MessageSummary[];
   inventorySummary: InventoryItem[];
+  availableItems: AvailableItemSummary[];
   accessorySummary: AccessoryItem[];
 }
 
@@ -58,6 +59,15 @@ interface InventoryItem {
   stock_count: number;
 }
 
+interface AvailableItemSummary {
+  brand: string;
+  model_name: string;
+  specs: string;
+  condition_grades: string[];
+  price_range: string;
+  count: number;
+}
+
 interface AccessoryItem {
   accessory_code: string;
   name: string;
@@ -74,9 +84,10 @@ export async function buildCustomerContext(
   conversationId: string,
 ): Promise<AIContext> {
   // Always fetch recent messages and inventory (not customer-specific)
-  const [recentMessages, inventorySummary, accessorySummary] = await Promise.all([
+  const [recentMessages, inventorySummary, availableItems, accessorySummary] = await Promise.all([
     getRecentMessages(supabase, conversationId),
     getInventorySummary(supabase),
+    getAvailableItemsSummary(supabase),
     getAccessorySummary(supabase),
   ]);
 
@@ -88,6 +99,7 @@ export async function buildCustomerContext(
       kaitoriRequests: [],
       recentMessages,
       inventorySummary,
+      availableItems,
       accessorySummary,
     };
   }
@@ -107,6 +119,7 @@ export async function buildCustomerContext(
     kaitoriRequests,
     recentMessages,
     inventorySummary,
+    availableItems,
     accessorySummary,
   };
 }
@@ -156,6 +169,13 @@ export function formatContextForPrompt(context: AIContext): string {
       (i) => `- ${i.brand} ${i.model_name} (${i.specs}) | Grade ${i.condition_grade} | ¥${i.base_price.toLocaleString()} | ${i.stock_count} in stock | ${i.sell_group_code}`
     );
     sections.push(`## Available Inventory\n${lines.join('\n')}`);
+  }
+
+  if (context.availableItems.length > 0) {
+    const lines = context.availableItems.map(
+      (i) => `- ${i.brand} ${i.model_name} (${i.specs}) | Grades: ${i.condition_grades.join(', ')} | ${i.price_range} | ${i.count} in stock`
+    );
+    sections.push(`## Available Items\n${lines.join('\n')}`);
   }
 
   if (context.accessorySummary.length > 0) {
@@ -275,7 +295,7 @@ async function getInventorySummary(
     .from('sell_groups')
     .select(`
       sell_group_code, condition_grade, base_price,
-      product_models(brand, model_name, cpu, ram_gb, storage_gb, os_family,
+      product_models(brand, model_name, color, cpu, ram_gb, storage_gb, os_family,
         categories(name)),
       sell_group_items(count)
     `)
@@ -296,6 +316,7 @@ async function getInventorySummary(
       const pm = sg.product_models as {
         brand: string;
         model_name: string;
+        color: string | null;
         cpu: string | null;
         ram_gb: string | null;
         storage_gb: string | null;
@@ -303,7 +324,7 @@ async function getInventorySummary(
         categories: { name: string } | null;
       } | null;
 
-      const specParts = [pm?.cpu, pm?.ram_gb ? `${pm.ram_gb}GB` : null, pm?.storage_gb ? `${pm.storage_gb}GB` : null, pm?.os_family].filter(Boolean);
+      const specParts = [pm?.color, pm?.cpu, pm?.ram_gb ? `${pm.ram_gb}GB` : null, pm?.storage_gb ? `${pm.storage_gb}GB` : null, pm?.os_family].filter(Boolean);
       const counts = sg.sell_group_items as Array<{ count: number }>;
 
       return {
@@ -315,6 +336,71 @@ async function getInventorySummary(
         condition_grade: sg.condition_grade as string,
         base_price: sg.base_price as number,
         stock_count: counts[0].count,
+      };
+    });
+}
+
+async function getAvailableItemsSummary(
+  supabase: ReturnType<typeof createClient>,
+): Promise<AvailableItemSummary[]> {
+  // Fetch AVAILABLE items grouped by brand + model, with selling prices
+  const { data, error } = await supabase
+    .from('items')
+    .select('brand, model_name, color, cpu, ram_gb, storage_gb, os_family, condition_grade, selling_price')
+    .eq('item_status', 'AVAILABLE')
+    .not('brand', 'is', null)
+    .order('brand')
+    .limit(300);
+
+  if (error || !data) return [];
+
+  // Group by brand + model_name
+  const groups = new Map<string, {
+    brand: string; model_name: string; specs: Set<string>;
+    grades: Set<string>; prices: number[]; count: number;
+  }>();
+
+  for (const item of data as Array<{
+    brand: string; model_name: string | null; color: string | null;
+    cpu: string | null; ram_gb: string | null; storage_gb: string | null;
+    os_family: string | null; condition_grade: string | null; selling_price: number | null;
+  }>) {
+    const key = `${item.brand}|${item.model_name ?? 'Unknown'}`;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        brand: item.brand,
+        model_name: item.model_name ?? 'Unknown',
+        specs: new Set(),
+        grades: new Set(),
+        prices: [],
+        count: 0,
+      });
+    }
+    const g = groups.get(key)!;
+    g.count++;
+    if (item.condition_grade) g.grades.add(item.condition_grade);
+    if (item.selling_price) g.prices.push(item.selling_price);
+    const specParts = [item.color, item.cpu, item.ram_gb ? `${item.ram_gb}` : null, item.storage_gb ? `${item.storage_gb}` : null, item.os_family].filter(Boolean);
+    if (specParts.length > 0) g.specs.add(specParts.join(' / '));
+  }
+
+  return Array.from(groups.values())
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 50)
+    .map((g) => {
+      let priceRange = 'Price not set';
+      if (g.prices.length > 0) {
+        const min = Math.min(...g.prices);
+        const max = Math.max(...g.prices);
+        priceRange = min === max ? `¥${min.toLocaleString()}` : `¥${min.toLocaleString()}–¥${max.toLocaleString()}`;
+      }
+      return {
+        brand: g.brand,
+        model_name: g.model_name,
+        specs: Array.from(g.specs).slice(0, 3).join(' | ') || 'N/A',
+        condition_grades: Array.from(g.grades).sort(),
+        price_range: priceRange,
+        count: g.count,
       };
     });
 }

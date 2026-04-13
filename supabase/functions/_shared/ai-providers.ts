@@ -21,6 +21,29 @@ interface ChatMessage {
   content: string;
 }
 
+// ---------- Helpers ----------
+
+/**
+ * Merge consecutive messages with the same role into one.
+ * LLM APIs (Anthropic, Gemini) require alternating user/assistant turns.
+ * When FAILED messages are filtered out, we can end up with consecutive
+ * customer messages that need to be consolidated.
+ */
+function consolidateMessages(messages: ChatMessage[]): ChatMessage[] {
+  if (messages.length === 0) return [];
+
+  const result: ChatMessage[] = [{ ...messages[0] }];
+  for (let i = 1; i < messages.length; i++) {
+    const prev = result[result.length - 1];
+    if (messages[i].role === prev.role) {
+      prev.content += '\n' + messages[i].content;
+    } else {
+      result.push({ ...messages[i] });
+    }
+  }
+  return result;
+}
+
 // ---------- Provider-agnostic dispatcher ----------
 
 export async function generateAIReply(
@@ -49,8 +72,8 @@ async function callClaude(
   contextBlock: string,
   messages: ChatMessage[],
 ): Promise<AIResponse> {
-  const anthropicMessages = messages.map((m) => ({
-    role: m.role === 'customer' ? 'user' : 'assistant',
+  const anthropicMessages = consolidateMessages(messages).map((m) => ({
+    role: m.role === 'customer' ? 'user' as const : 'assistant' as const,
     content: m.content,
   }));
 
@@ -95,7 +118,7 @@ async function callOpenAI(
       role: 'system',
       content: `${systemPrompt}\n\n---\n\n# Current Customer Context\n${contextBlock}\n\n---\n\nRespond with a JSON object containing:\n- "reply": your message to the customer\n- "confidence": 0.0-1.0 how confident you are this reply is correct and complete\n- "intent": one of tracking|order_status|product_inquiry|complaint|return|kaitori|general|unknown\n- "data_used": array of data references used e.g. ["order:ORD000123"]\n- "escalation_reason": null if no escalation needed, otherwise a short reason string\n\nRespond ONLY with the JSON object, no markdown fences.`,
     },
-    ...messages.map((m) => ({
+    ...consolidateMessages(messages).map((m) => ({
       role: m.role === 'customer' ? 'user' as const : 'assistant' as const,
       content: m.content,
     })),
@@ -133,7 +156,7 @@ async function callGemini(
   contextBlock: string,
   messages: ChatMessage[],
 ): Promise<AIResponse> {
-  const geminiContents = messages.map((m) => ({
+  const geminiContents = consolidateMessages(messages).map((m) => ({
     role: m.role === 'customer' ? 'user' : 'model',
     parts: [{ text: m.content }],
   }));

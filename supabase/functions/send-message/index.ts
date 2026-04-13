@@ -115,19 +115,46 @@ Deno.serve(async (req) => {
         throw new Error('MISSIVE_API_TOKEN not configured');
       }
 
+      // Fetch conversation from Missive to determine the correct sender (from_field)
+      const convRes = await fetch(
+        `${MISSIVE_API_URL}/conversations/${conversation.missive_conversation_id}`,
+        { headers: { Authorization: `Bearer ${MISSIVE_API_TOKEN}` } },
+      );
+
+      let fromField: { address: string; name?: string } | undefined;
+      if (convRes.ok) {
+        const convData = await convRes.json();
+        // Extract the organization's sender from the conversation's messages
+        const messages = convData?.conversations?.messages ?? [];
+        for (const m of messages) {
+          if (m.from_field?.address && !m.from_field?.address?.includes('@')) {
+            // Non-email address = likely Facebook page ID
+            fromField = m.from_field;
+            break;
+          }
+        }
+        // Fallback: check the conversation-level from_field
+        if (!fromField && convData?.conversations?.from_field?.address) {
+          fromField = convData.conversations.from_field;
+        }
+      }
+
+      const draftPayload: Record<string, unknown> = {
+        body: content,
+        conversation: conversation.missive_conversation_id,
+        send: true,
+      };
+      if (fromField) {
+        draftPayload.from_field = fromField;
+      }
+
       const missiveRes = await fetch(`${MISSIVE_API_URL}/drafts`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${MISSIVE_API_TOKEN}`,
         },
-        body: JSON.stringify({
-          drafts: {
-            body: content,
-            conversation: conversation.missive_conversation_id,
-            send: true,
-          },
-        }),
+        body: JSON.stringify({ drafts: draftPayload }),
       });
 
       if (!missiveRes.ok) {
