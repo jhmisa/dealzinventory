@@ -8,6 +8,8 @@ export interface AIContext {
   recentOrders: OrderSummary[];
   kaitoriRequests: KaitoriSummary[];
   recentMessages: MessageSummary[];
+  inventorySummary: InventoryItem[];
+  accessorySummary: AccessoryItem[];
 }
 
 interface CustomerSummary {
@@ -45,6 +47,25 @@ interface MessageSummary {
   created_at: string;
 }
 
+interface InventoryItem {
+  sell_group_code: string;
+  brand: string;
+  model_name: string;
+  category: string | null;
+  specs: string;
+  condition_grade: string;
+  base_price: number;
+  stock_count: number;
+}
+
+interface AccessoryItem {
+  accessory_code: string;
+  name: string;
+  brand: string | null;
+  selling_price: number;
+  stock_quantity: number;
+}
+
 // ---------- Context Assembly ----------
 
 export async function buildCustomerContext(
@@ -52,8 +73,12 @@ export async function buildCustomerContext(
   customerId: string | null,
   conversationId: string,
 ): Promise<AIContext> {
-  // Always fetch recent messages for conversation context
-  const recentMessages = await getRecentMessages(supabase, conversationId);
+  // Always fetch recent messages and inventory (not customer-specific)
+  const [recentMessages, inventorySummary, accessorySummary] = await Promise.all([
+    getRecentMessages(supabase, conversationId),
+    getInventorySummary(supabase),
+    getAccessorySummary(supabase),
+  ]);
 
   if (!customerId) {
     return {
@@ -62,6 +87,8 @@ export async function buildCustomerContext(
       recentOrders: [],
       kaitoriRequests: [],
       recentMessages,
+      inventorySummary,
+      accessorySummary,
     };
   }
 
@@ -79,6 +106,8 @@ export async function buildCustomerContext(
     recentOrders,
     kaitoriRequests,
     recentMessages,
+    inventorySummary,
+    accessorySummary,
   };
 }
 
@@ -120,6 +149,20 @@ export function formatContextForPrompt(context: AIContext): string {
       (k) => `- ${k.kaitori_code}: ${k.request_status}, quote=¥${k.auto_quote_price ?? 'N/A'}, final=¥${k.final_price ?? 'N/A'}`
     );
     sections.push(`## Kaitori Requests\n${lines.join('\n')}`);
+  }
+
+  if (context.inventorySummary.length > 0) {
+    const lines = context.inventorySummary.map(
+      (i) => `- ${i.brand} ${i.model_name} (${i.specs}) | Grade ${i.condition_grade} | ¥${i.base_price.toLocaleString()} | ${i.stock_count} in stock | ${i.sell_group_code}`
+    );
+    sections.push(`## Available Inventory\n${lines.join('\n')}`);
+  }
+
+  if (context.accessorySummary.length > 0) {
+    const lines = context.accessorySummary.map(
+      (a) => `- ${a.brand ? `${a.brand} ` : ''}${a.name} | ¥${a.selling_price.toLocaleString()} | ${a.stock_quantity} in stock | ${a.accessory_code}`
+    );
+    sections.push(`## Accessories in Stock\n${lines.join('\n')}`);
   }
 
   if (context.recentMessages.length > 0) {
@@ -223,6 +266,73 @@ async function getKaitoriRequests(
 
   if (error || !data) return [];
   return data as KaitoriSummary[];
+}
+
+async function getInventorySummary(
+  supabase: ReturnType<typeof createClient>,
+): Promise<InventoryItem[]> {
+  const { data, error } = await supabase
+    .from('sell_groups')
+    .select(`
+      sell_group_code, condition_grade, base_price,
+      product_models(brand, model_name, cpu, ram_gb, storage_gb, os_family,
+        categories(name)),
+      sell_group_items(count)
+    `)
+    .eq('active', true)
+    .order('base_price', { ascending: true })
+    .limit(80);
+
+  if (error || !data) return [];
+
+  // Filter to in-stock items and take top 50
+  return data
+    .filter((sg: Record<string, unknown>) => {
+      const counts = sg.sell_group_items as Array<{ count: number }> | null;
+      return counts && counts.length > 0 && counts[0].count > 0;
+    })
+    .slice(0, 50)
+    .map((sg: Record<string, unknown>) => {
+      const pm = sg.product_models as {
+        brand: string;
+        model_name: string;
+        cpu: string | null;
+        ram_gb: string | null;
+        storage_gb: string | null;
+        os_family: string | null;
+        categories: { name: string } | null;
+      } | null;
+
+      const specParts = [pm?.cpu, pm?.ram_gb ? `${pm.ram_gb}GB` : null, pm?.storage_gb ? `${pm.storage_gb}GB` : null, pm?.os_family].filter(Boolean);
+      const counts = sg.sell_group_items as Array<{ count: number }>;
+
+      return {
+        sell_group_code: sg.sell_group_code as string,
+        brand: pm?.brand ?? 'Unknown',
+        model_name: pm?.model_name ?? 'Unknown',
+        category: pm?.categories?.name ?? null,
+        specs: specParts.join(' / ') || 'N/A',
+        condition_grade: sg.condition_grade as string,
+        base_price: sg.base_price as number,
+        stock_count: counts[0].count,
+      };
+    });
+}
+
+async function getAccessorySummary(
+  supabase: ReturnType<typeof createClient>,
+): Promise<AccessoryItem[]> {
+  const { data, error } = await supabase
+    .from('accessories')
+    .select('accessory_code, name, brand, selling_price, stock_quantity')
+    .eq('active', true)
+    .eq('shop_visible', true)
+    .gt('stock_quantity', 0)
+    .order('name')
+    .limit(30);
+
+  if (error || !data) return [];
+  return data as AccessoryItem[];
 }
 
 async function getRecentMessages(
