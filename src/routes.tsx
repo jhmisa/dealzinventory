@@ -65,6 +65,8 @@ const StaffManagementPage = lazy(() => import('@/pages/admin/staff-management'))
 const ForgotPasswordPage = lazy(() => import('@/pages/admin/forgot-password'))
 const AuthCallbackPage = lazy(() => import('@/pages/admin/auth-callback'))
 const SetPasswordPage = lazy(() => import('@/pages/admin/set-password'))
+const MessagesPage = lazy(() => import('@/pages/admin/messages'))
+const MessagingSettingsPage = lazy(() => import('@/pages/admin/messaging-settings'))
 const AccessoryDetailPage = lazy(() => import('@/pages/admin/accessory-detail'))
 const ShopAccessoryDetailPage = lazy(() => import('@/pages/shop/accessory-detail'))
 
@@ -149,7 +151,9 @@ export const router = createBrowserRouter([
           { path: 'reports', element: lazyElement(ReportsPage) },
           { path: 'returns', element: lazyElement(AdminReturnsPage) },
           { path: 'returns/:id', element: lazyElement(AdminReturnDetailPage) },
+          { path: 'messages', element: lazyElement(MessagesPage) },
           { path: 'suppliers', element: lazyElement(SupplierListPage) },
+          { path: 'settings/messaging', element: adminElement(MessagingSettingsPage) },
           { path: 'settings/general', element: adminElement(GeneralSettingsPage) },
           { path: 'settings/ai', element: adminElement(AiSettingsPage) },
           { path: 'settings/items-columns', element: adminElement(ItemsColumnSettingsPage) },

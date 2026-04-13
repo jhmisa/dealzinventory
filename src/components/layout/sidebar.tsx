@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -21,9 +22,12 @@ import {
   RotateCcw,
   Columns3,
   Settings,
-  MonitorPlay,
+  MessageSquare,
+  ChevronRight,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
+import { useNeedsReviewCount } from '@/hooks/use-messaging'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import {
   Sidebar,
   SidebarContent,
@@ -32,27 +36,23 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
 } from '@/components/ui/sidebar'
 
 type NavItem = {
   title: string
   icon: typeof LayoutDashboard
-} & ({ href: string; action?: never } | { action: string; href?: never })
+  href: string
+}
 
 interface NavSection {
   label: string
-  adminOnly?: boolean
   items: NavItem[]
-}
-
-function openShowcaseWindow() {
-  window.open(
-    '/admin/showcase',
-    'showcase',
-    'width=720,height=1280,menubar=no,toolbar=no,location=no,status=no',
-  )
 }
 
 const navSections: NavSection[] = [
@@ -77,7 +77,6 @@ const navSections: NavSection[] = [
     items: [
       { title: 'Products', href: '/admin/products', icon: Box },
       { title: 'Categories', href: '/admin/categories', icon: Tags },
-      { title: 'Showcase', action: 'showcase', icon: MonitorPlay },
     ],
   },
   {
@@ -90,46 +89,43 @@ const navSections: NavSection[] = [
     ],
   },
   {
+    label: 'Messaging',
+    items: [
+      { title: 'Messages', href: '/admin/messages', icon: MessageSquare },
+    ],
+  },
+  {
     label: 'Kaitori',
     items: [
-      { title: 'Requests', href: '/admin/kaitori', icon: HandCoins },
+      { title: 'Kaitori', href: '/admin/kaitori', icon: HandCoins },
       { title: 'Price List', href: '/admin/kaitori-prices', icon: List },
     ],
   },
   {
-    label: 'Customers',
+    label: 'Contacts',
     items: [
       { title: 'Customers', href: '/admin/customers', icon: Users },
-    ],
-  },
-  {
-    label: 'Partners',
-    items: [
       { title: 'Suppliers', href: '/admin/suppliers', icon: Truck },
     ],
   },
-  {
-    label: 'Analytics',
-    items: [
-      { title: 'Reports', href: '/admin/reports', icon: BarChart3 },
-    ],
-  },
-  {
-    label: 'Settings',
-    adminOnly: true,
-    items: [
-      { title: 'General', href: '/admin/settings/general', icon: Settings },
-      { title: 'AI Configuration', href: '/admin/settings/ai', icon: BrainCircuit },
-      { title: 'Items Columns', href: '/admin/settings/items-columns', icon: Columns3 },
-      { title: 'Postal Codes', href: '/admin/settings/postal-codes', icon: MapPin },
-      { title: 'Members', href: '/admin/settings/staff', icon: UserCog },
-    ],
-  },
+]
+
+const settingsItems: NavItem[] = [
+  { title: 'General', href: '/admin/settings/general', icon: Settings },
+  { title: 'AI Configuration', href: '/admin/settings/ai', icon: BrainCircuit },
+  { title: 'AI Messaging', href: '/admin/settings/messaging', icon: MessageSquare },
+  { title: 'Items Columns', href: '/admin/settings/items-columns', icon: Columns3 },
+  { title: 'Postal Codes', href: '/admin/settings/postal-codes', icon: MapPin },
+  { title: 'Members', href: '/admin/settings/staff', icon: UserCog },
+  { title: 'Reports', href: '/admin/reports', icon: BarChart3 },
 ]
 
 export function AppSidebar() {
   const location = useLocation()
   const { isAdmin } = useAuth()
+  const { data: needsReviewCount } = useNeedsReviewCount()
+  const settingsActive = location.pathname.startsWith('/admin/settings') || location.pathname === '/admin/reports'
+  const [settingsOpen, setSettingsOpen] = useState(settingsActive)
 
   return (
     <Sidebar>
@@ -148,23 +144,14 @@ export function AppSidebar() {
         </Link>
       </SidebarHeader>
       <SidebarContent>
-        {navSections.filter((section) => !section.adminOnly || isAdmin).map((section) => (
+        {navSections.map((section) => (
           <SidebarGroup key={section.label}>
             <SidebarGroupLabel>{section.label}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {section.items.map((item) => {
-                  if (item.action) {
-                    return (
-                      <SidebarMenuItem key={item.action}>
-                        <SidebarMenuButton onClick={item.action === 'showcase' ? openShowcaseWindow : undefined}>
-                          <item.icon className="h-4 w-4" />
-                          <span>{item.title}</span>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    )
-                  }
                   const isActive = location.pathname === item.href || location.pathname.startsWith(item.href + '/')
+                  const showBadge = item.href === '/admin/messages' && (needsReviewCount ?? 0) > 0
                   return (
                     <SidebarMenuItem key={item.href}>
                       <SidebarMenuButton asChild isActive={isActive}>
@@ -173,6 +160,11 @@ export function AppSidebar() {
                           <span>{item.title}</span>
                         </Link>
                       </SidebarMenuButton>
+                      {showBadge && (
+                        <SidebarMenuBadge className="bg-destructive text-white">
+                          {needsReviewCount}
+                        </SidebarMenuBadge>
+                      )}
                     </SidebarMenuItem>
                   )
                 })}
@@ -180,6 +172,43 @@ export function AppSidebar() {
             </SidebarGroupContent>
           </SidebarGroup>
         ))}
+
+        {/* Collapsible Settings — admin only */}
+        {isAdmin && (
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton isActive={settingsActive}>
+                        <Settings className="h-4 w-4" />
+                        <span>Settings</span>
+                        <ChevronRight className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        {settingsItems.map((item) => {
+                          const isActive = location.pathname === item.href || location.pathname.startsWith(item.href + '/')
+                          return (
+                            <SidebarMenuSubItem key={item.href}>
+                              <SidebarMenuSubButton asChild isActive={isActive}>
+                                <Link to={item.href}>
+                                  <span>{item.title}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          )
+                        })}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
     </Sidebar>
   )

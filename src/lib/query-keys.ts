@@ -155,4 +155,19 @@ export const queryKeys = {
     detail: (id: string) => [...queryKeys.staffProfiles.details(), id] as const,
     me: () => [...queryKeys.staffProfiles.all, 'me'] as const,
   },
+  messaging: {
+    all: ['messaging'] as const,
+    conversations: () => [...queryKeys.messaging.all, 'conversations'] as const,
+    conversationList: (filters: Record<string, unknown>) =>
+      [...queryKeys.messaging.conversations(), filters] as const,
+    conversationDetail: (id: string) =>
+      [...queryKeys.messaging.conversations(), 'detail', id] as const,
+    messages: (conversationId: string) =>
+      [...queryKeys.messaging.all, 'messages', conversationId] as const,
+    templates: () => [...queryKeys.messaging.all, 'templates'] as const,
+    aiProviders: () => [...queryKeys.messaging.all, 'ai-providers'] as const,
+    persona: () => [...queryKeys.messaging.all, 'persona'] as const,
+    alerts: () => [...queryKeys.messaging.all, 'alerts'] as const,
+    needsReviewCount: () => [...queryKeys.messaging.all, 'needs-review-count'] as const,
+  },
 }

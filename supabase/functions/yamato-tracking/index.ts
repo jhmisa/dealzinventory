@@ -212,6 +212,50 @@ Deno.serve(async (req) => {
       } else if (ISSUE_STATUSES.has(yamatoStatus)) {
         updateFields.delivery_issue_flag = true;
         result.issue = true;
+
+        // Queue delivery alert if not already flagged
+        try {
+          const { data: orderData } = await supabase
+            .from('orders')
+            .select('customer_id, delivery_issue_flag')
+            .eq('id', order.order_id)
+            .single();
+
+          if (orderData?.customer_id && !orderData.delivery_issue_flag) {
+            // Only queue if transitioning to issue state (not already flagged)
+            const { data: alertTemplate } = await supabase
+              .from('messaging_templates')
+              .select('id')
+              .eq('message_type', 'DELIVERY_ALERT')
+              .eq('is_active', true)
+              .limit(1)
+              .maybeSingle();
+
+            if (alertTemplate) {
+              // Check not already queued for this order
+              const { data: existing } = await supabase
+                .from('automated_message_queue')
+                .select('id')
+                .eq('order_id', order.order_id)
+                .eq('message_type', 'DELIVERY_ALERT')
+                .eq('status', 'PENDING')
+                .maybeSingle();
+
+              if (!existing) {
+                await supabase.from('automated_message_queue').insert({
+                  customer_id: orderData.customer_id,
+                  order_id: order.order_id,
+                  template_id: alertTemplate.id,
+                  message_type: 'DELIVERY_ALERT',
+                  status: 'PENDING',
+                  scheduled_at: new Date().toISOString(),
+                });
+              }
+            }
+          }
+        } catch {
+          // Don't fail tracking update if alert queuing fails
+        }
       } else {
         // Normal in-transit status — clear any previous issue flag
         updateFields.delivery_issue_flag = false;

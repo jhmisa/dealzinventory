@@ -1,0 +1,195 @@
+// ---------- Types ----------
+
+export interface AIProvider {
+  id: string;
+  name: string;
+  provider: 'anthropic' | 'openai' | 'google';
+  model_id: string;
+  api_key_encrypted: string;
+}
+
+export interface AIResponse {
+  reply: string;
+  confidence: number;
+  intent: string;
+  data_used: string[];
+  escalation_reason: string | null;
+}
+
+interface ChatMessage {
+  role: string;
+  content: string;
+}
+
+// ---------- Provider-agnostic dispatcher ----------
+
+export async function generateAIReply(
+  provider: AIProvider,
+  systemPrompt: string,
+  contextBlock: string,
+  messages: ChatMessage[],
+): Promise<AIResponse> {
+  switch (provider.provider) {
+    case 'anthropic':
+      return callClaude(provider, systemPrompt, contextBlock, messages);
+    case 'openai':
+      return callOpenAI(provider, systemPrompt, contextBlock, messages);
+    case 'google':
+      return callGemini(provider, systemPrompt, contextBlock, messages);
+    default:
+      throw new Error(`Unsupported provider: ${provider.provider}`);
+  }
+}
+
+// ---------- Anthropic (Claude) ----------
+
+async function callClaude(
+  provider: AIProvider,
+  systemPrompt: string,
+  contextBlock: string,
+  messages: ChatMessage[],
+): Promise<AIResponse> {
+  const anthropicMessages = messages.map((m) => ({
+    role: m.role === 'customer' ? 'user' : 'assistant',
+    content: m.content,
+  }));
+
+  // Add the latest customer message context prompt
+  const fullSystem = `${systemPrompt}\n\n---\n\n# Current Customer Context\n${contextBlock}\n\n---\n\nRespond with a JSON object containing:\n- "reply": your message to the customer\n- "confidence": 0.0-1.0 how confident you are this reply is correct and complete\n- "intent": one of tracking|order_status|product_inquiry|complaint|return|kaitori|general|unknown\n- "data_used": array of data references used e.g. ["order:ORD000123"]\n- "escalation_reason": null if no escalation needed, otherwise a short reason string\n\nRespond ONLY with the JSON object, no markdown fences.`;
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': provider.api_key_encrypted,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: provider.model_id,
+      max_tokens: 1024,
+      system: fullSystem,
+      messages: anthropicMessages,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Claude API error ${res.status}: ${err}`);
+  }
+
+  const data = await res.json();
+  const text = data.content?.[0]?.text ?? '';
+  return parseAIResponse(text);
+}
+
+// ---------- OpenAI (GPT) ----------
+
+async function callOpenAI(
+  provider: AIProvider,
+  systemPrompt: string,
+  contextBlock: string,
+  messages: ChatMessage[],
+): Promise<AIResponse> {
+  const openaiMessages = [
+    {
+      role: 'system',
+      content: `${systemPrompt}\n\n---\n\n# Current Customer Context\n${contextBlock}\n\n---\n\nRespond with a JSON object containing:\n- "reply": your message to the customer\n- "confidence": 0.0-1.0 how confident you are this reply is correct and complete\n- "intent": one of tracking|order_status|product_inquiry|complaint|return|kaitori|general|unknown\n- "data_used": array of data references used e.g. ["order:ORD000123"]\n- "escalation_reason": null if no escalation needed, otherwise a short reason string\n\nRespond ONLY with the JSON object, no markdown fences.`,
+    },
+    ...messages.map((m) => ({
+      role: m.role === 'customer' ? 'user' as const : 'assistant' as const,
+      content: m.content,
+    })),
+  ];
+
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${provider.api_key_encrypted}`,
+    },
+    body: JSON.stringify({
+      model: provider.model_id,
+      max_tokens: 1024,
+      messages: openaiMessages,
+      response_format: { type: 'json_object' },
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`OpenAI API error ${res.status}: ${err}`);
+  }
+
+  const data = await res.json();
+  const text = data.choices?.[0]?.message?.content ?? '';
+  return parseAIResponse(text);
+}
+
+// ---------- Google (Gemini) ----------
+
+async function callGemini(
+  provider: AIProvider,
+  systemPrompt: string,
+  contextBlock: string,
+  messages: ChatMessage[],
+): Promise<AIResponse> {
+  const geminiContents = messages.map((m) => ({
+    role: m.role === 'customer' ? 'user' : 'model',
+    parts: [{ text: m.content }],
+  }));
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${provider.model_id}:generateContent?key=${provider.api_key_encrypted}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [{
+            text: `${systemPrompt}\n\n---\n\n# Current Customer Context\n${contextBlock}\n\n---\n\nRespond with a JSON object containing:\n- "reply": your message to the customer\n- "confidence": 0.0-1.0 how confident you are this reply is correct and complete\n- "intent": one of tracking|order_status|product_inquiry|complaint|return|kaitori|general|unknown\n- "data_used": array of data references used e.g. ["order:ORD000123"]\n- "escalation_reason": null if no escalation needed, otherwise a short reason string\n\nRespond ONLY with the JSON object, no markdown fences.`,
+          }],
+        },
+        contents: geminiContents,
+        generationConfig: {
+          maxOutputTokens: 1024,
+          responseMimeType: 'application/json',
+        },
+      }),
+    },
+  );
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Gemini API error ${res.status}: ${err}`);
+  }
+
+  const data = await res.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+  return parseAIResponse(text);
+}
+
+// ---------- Response parser ----------
+
+function parseAIResponse(text: string): AIResponse {
+  try {
+    // Strip markdown fences if present
+    const cleaned = text.replace(/^```(?:json)?\n?/m, '').replace(/\n?```$/m, '').trim();
+    const parsed = JSON.parse(cleaned);
+    return {
+      reply: String(parsed.reply ?? ''),
+      confidence: Math.min(1, Math.max(0, Number(parsed.confidence ?? 0.5))),
+      intent: String(parsed.intent ?? 'unknown'),
+      data_used: Array.isArray(parsed.data_used) ? parsed.data_used.map(String) : [],
+      escalation_reason: parsed.escalation_reason ? String(parsed.escalation_reason) : null,
+    };
+  } catch {
+    // If parsing fails, use the raw text as the reply with low confidence
+    return {
+      reply: text,
+      confidence: 0.3,
+      intent: 'unknown',
+      data_used: [],
+      escalation_reason: 'AI response could not be parsed as structured JSON',
+    };
+  }
+}

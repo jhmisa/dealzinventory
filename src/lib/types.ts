@@ -248,3 +248,129 @@ export interface StaffProfile {
 
 export type StaffProfileInsert = Omit<StaffProfile, 'created_at' | 'updated_at'>
 export type StaffProfileUpdate = Partial<Pick<StaffProfile, 'display_name' | 'role' | 'is_active'>>
+
+// Messaging types — manually defined until DB types are regenerated
+export type MessageRole = 'customer' | 'assistant' | 'staff' | 'system'
+export type MessageStatus = 'DRAFT' | 'SENDING' | 'SENT' | 'FAILED' | 'REJECTED'
+export type MessageType = 'REPLY' | 'REVIEW_REQUEST' | 'DELIVERY_ALERT'
+export type MessageChannel = 'facebook' | 'email' | 'sms'
+export type QueueStatus = 'PENDING' | 'PROCESSING' | 'SENT' | 'FAILED'
+
+export interface Conversation {
+  id: string
+  customer_id: string | null
+  missive_conversation_id: string
+  channel: MessageChannel
+  needs_human_review: boolean
+  unmatched_contact: boolean
+  assigned_staff_id: string | null
+  ai_enabled: boolean
+  unread_count: number
+  last_message_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ConversationWithRelations extends Conversation {
+  customers: Pick<Customer, 'id' | 'customer_code' | 'last_name' | 'first_name'> | null
+  messages: Message[]
+}
+
+export interface Message {
+  id: string
+  conversation_id: string
+  missive_message_id: string | null
+  role: MessageRole
+  content: string
+  status: MessageStatus
+  message_type: MessageType
+  ai_confidence: number | null
+  ai_context_summary: string | null
+  error_details: Record<string, unknown> | null
+  sent_by: string | null
+  created_at: string
+}
+
+export interface MessageInsert {
+  conversation_id: string
+  role: MessageRole
+  content: string
+  status?: MessageStatus
+  message_type?: MessageType
+  ai_confidence?: number | null
+  ai_context_summary?: string | null
+  sent_by?: string | null
+}
+
+export interface MessagingTemplate {
+  id: string
+  name: string
+  description: string | null
+  content_ja: string
+  content_en: string
+  message_type: MessageType
+  variables: string[]
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface MessagingTemplateInsert {
+  name: string
+  description?: string | null
+  content_ja: string
+  content_en: string
+  message_type: MessageType
+  variables?: string[]
+  is_active?: boolean
+}
+
+export interface AiProvider {
+  id: string
+  name: string
+  provider: 'anthropic' | 'openai' | 'google'
+  model_id: string
+  api_key_encrypted: string
+  purpose: string
+  is_active: boolean
+  created_at: string
+}
+
+export interface AiProviderInsert {
+  name: string
+  provider: 'anthropic' | 'openai' | 'google'
+  model_id: string
+  api_key_encrypted: string
+  purpose?: string
+  is_active?: boolean
+}
+
+export interface MessagingPersona {
+  id: string
+  name: string
+  system_prompt: string
+  language_style: string
+  use_emojis: boolean
+  greeting_template: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface MessagingPersonaUpdate {
+  name?: string
+  system_prompt?: string
+  language_style?: string
+  use_emojis?: boolean
+  greeting_template?: string | null
+}
+
+export interface SystemAlert {
+  id: string
+  alert_type: string
+  message: string
+  details: Record<string, unknown> | null
+  resolved: boolean
+  resolved_at: string | null
+  created_at: string
+}
