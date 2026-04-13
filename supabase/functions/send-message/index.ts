@@ -210,6 +210,7 @@ Deno.serve(async (req) => {
       .update({
         last_message_at: new Date().toISOString(),
         needs_human_review: false,
+        draft_pending_since: null,  // Cancel pending AI draft — staff already replied
       })
       .eq('id', conversation.id);
 
