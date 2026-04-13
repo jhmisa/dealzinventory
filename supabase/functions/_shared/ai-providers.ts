@@ -279,25 +279,54 @@ async function callGemini(
 // ---------- Response parser ----------
 
 function parseAIResponse(text: string): AIResponse {
-  try {
-    // Strip markdown fences if present
-    const cleaned = text.replace(/^```(?:json)?\n?/m, '').replace(/\n?```$/m, '').trim();
-    const parsed = JSON.parse(cleaned);
+  // Try multiple strategies to extract JSON from the response
+  const strategies = [
+    // 1. Raw text as-is
+    () => JSON.parse(text.trim()),
+    // 2. Strip markdown fences
+    () => JSON.parse(text.replace(/^```(?:json)?\n?/m, '').replace(/\n?```$/m, '').trim()),
+    // 3. Extract first JSON object found anywhere in the text
+    () => {
+      const match = text.match(/\{[\s\S]*"reply"[\s\S]*\}/);
+      if (!match) throw new Error('No JSON object found');
+      return JSON.parse(match[0]);
+    },
+  ];
+
+  for (const strategy of strategies) {
+    try {
+      const parsed = strategy();
+      if (parsed && typeof parsed.reply === 'string') {
+        return {
+          reply: String(parsed.reply),
+          confidence: Math.min(1, Math.max(0, Number(parsed.confidence ?? 0.5))),
+          intent: String(parsed.intent ?? 'unknown'),
+          data_used: Array.isArray(parsed.data_used) ? parsed.data_used.map(String) : [],
+          escalation_reason: parsed.escalation_reason ? String(parsed.escalation_reason) : null,
+        };
+      }
+    } catch {
+      // Try next strategy
+    }
+  }
+
+  // Last resort: if the text looks like a normal reply (not JSON), use it directly
+  // This handles models that ignore the JSON instruction entirely
+  if (text.trim().length > 0 && !text.trim().startsWith('{')) {
     return {
-      reply: String(parsed.reply ?? ''),
-      confidence: Math.min(1, Math.max(0, Number(parsed.confidence ?? 0.5))),
-      intent: String(parsed.intent ?? 'unknown'),
-      data_used: Array.isArray(parsed.data_used) ? parsed.data_used.map(String) : [],
-      escalation_reason: parsed.escalation_reason ? String(parsed.escalation_reason) : null,
-    };
-  } catch {
-    // If parsing fails, use the raw text as the reply with low confidence
-    return {
-      reply: text,
-      confidence: 0.3,
-      intent: 'unknown',
+      reply: text.trim(),
+      confidence: 0.5,
+      intent: 'general',
       data_used: [],
-      escalation_reason: 'AI response could not be parsed as structured JSON',
+      escalation_reason: null,
     };
   }
+
+  return {
+    reply: text,
+    confidence: 0.3,
+    intent: 'unknown',
+    data_used: [],
+    escalation_reason: 'AI response could not be parsed as structured JSON',
+  };
 }
