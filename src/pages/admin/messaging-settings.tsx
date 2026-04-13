@@ -28,6 +28,7 @@ import {
   useAiProviders,
   useCreateAiProvider,
   useSetActiveAiProvider,
+  useUpdateAiProvider,
   useDeleteAiProvider,
   useActivePersona,
   useUpdatePersona,
@@ -46,43 +47,61 @@ import type { AiProvider, MessagingTemplate, MessagingTemplateInsert, KnowledgeB
 
 // ---------- AI Provider Form ----------
 
-function AddProviderDialog({
+function ProviderFormDialog({
   open,
   onOpenChange,
+  editProvider,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
+  editProvider?: AiProvider | null
 }) {
-  const [name, setName] = useState('')
-  const [provider, setProvider] = useState<'anthropic' | 'openai' | 'google'>('anthropic')
-  const [modelId, setModelId] = useState('')
+  const [name, setName] = useState(editProvider?.name ?? '')
+  const [provider, setProvider] = useState<'anthropic' | 'openai' | 'google'>(editProvider?.provider ?? 'anthropic')
+  const [modelId, setModelId] = useState(editProvider?.model_id ?? '')
   const [apiKey, setApiKey] = useState('')
 
   const createProvider = useCreateAiProvider()
+  const updateProvider = useUpdateAiProvider()
+
+  const isEdit = !!editProvider
+  if (isEdit && name !== editProvider.name && !updateProvider.isPending) {
+    setName(editProvider.name)
+    setProvider(editProvider.provider)
+    setModelId(editProvider.model_id)
+    setApiKey('')
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!name || !modelId || !apiKey) return
+    if (!name || !modelId) return
 
-    createProvider.mutate(
-      {
-        name,
-        provider,
-        model_id: modelId,
-        api_key_encrypted: apiKey,
-        purpose: 'messaging',
-      },
-      {
-        onSuccess: () => {
-          toast.success('AI provider added')
-          onOpenChange(false)
-          setName('')
-          setModelId('')
-          setApiKey('')
+    if (isEdit) {
+      const updates: Record<string, string> = { name, provider, model_id: modelId }
+      if (apiKey) updates.api_key_encrypted = apiKey
+      updateProvider.mutate(
+        { id: editProvider.id, updates },
+        {
+          onSuccess: () => { toast.success('Provider updated'); onOpenChange(false) },
+          onError: (err) => toast.error(`Failed: ${err.message}`),
         },
-        onError: (err) => toast.error(`Failed: ${err.message}`),
-      },
-    )
+      )
+    } else {
+      if (!apiKey) return
+      createProvider.mutate(
+        { name, provider, model_id: modelId, api_key_encrypted: apiKey, purpose: 'messaging' },
+        {
+          onSuccess: () => {
+            toast.success('AI provider added')
+            onOpenChange(false)
+            setName('')
+            setModelId('')
+            setApiKey('')
+          },
+          onError: (err) => toast.error(`Failed: ${err.message}`),
+        },
+      )
+    }
   }
 
   const modelSuggestions: Record<string, string[]> = {
@@ -91,11 +110,13 @@ function AddProviderDialog({
     google: ['gemini-2.5-pro-preview-06-05', 'gemini-2.5-flash', 'gemini-2.0-flash'],
   }
 
+  const isPending = createProvider.isPending || updateProvider.isPending
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add AI Provider</DialogTitle>
+          <DialogTitle>{isEdit ? 'Edit AI Provider' : 'Add AI Provider'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -128,18 +149,18 @@ function AddProviderDialog({
             </datalist>
           </div>
           <div className="space-y-2">
-            <Label>API Key</Label>
+            <Label>API Key{isEdit ? ' (leave blank to keep current)' : ''}</Label>
             <Input
               type="password"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
-              placeholder="sk-..."
+              placeholder={isEdit ? '(unchanged)' : 'sk-...'}
             />
           </div>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" disabled={createProvider.isPending || !name || !modelId || !apiKey}>
-              Add Provider
+            <Button type="submit" disabled={isPending || !name || !modelId || (!isEdit && !apiKey)}>
+              {isEdit ? 'Update' : 'Add Provider'}
             </Button>
           </div>
         </form>
@@ -392,7 +413,8 @@ function ConfidenceBadge({ confidence }: { confidence: number }) {
 // ---------- Main Page ----------
 
 export default function MessagingSettingsPage() {
-  const [addOpen, setAddOpen] = useState(false)
+  const [providerFormOpen, setProviderFormOpen] = useState(false)
+  const [editProvider, setEditProvider] = useState<AiProvider | null>(null)
   const [templateFormOpen, setTemplateFormOpen] = useState(false)
   const [editTemplate, setEditTemplate] = useState<MessagingTemplate | null>(null)
   const [kbFormOpen, setKbFormOpen] = useState(false)
@@ -557,7 +579,7 @@ export default function MessagingSettingsPage() {
               </CardTitle>
               <CardDescription>Add and manage AI services for message generation</CardDescription>
             </div>
-            <Button size="sm" onClick={() => setAddOpen(true)}>
+            <Button size="sm" onClick={() => { setEditProvider(null); setProviderFormOpen(true) }}>
               <Plus className="h-4 w-4" />
               Add Provider
             </Button>
@@ -603,6 +625,13 @@ export default function MessagingSettingsPage() {
                     <Button
                       size="icon-xs"
                       variant="ghost"
+                      onClick={() => { setEditProvider(p); setProviderFormOpen(true) }}
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      size="icon-xs"
+                      variant="ghost"
                       onClick={() => handleDeleteProvider(p)}
                       disabled={deleteProvider.isPending}
                     >
@@ -616,7 +645,7 @@ export default function MessagingSettingsPage() {
         </CardContent>
       </Card>
 
-      <AddProviderDialog open={addOpen} onOpenChange={setAddOpen} />
+      <ProviderFormDialog open={providerFormOpen} onOpenChange={setProviderFormOpen} editProvider={editProvider} />
 
       {/* Persona Section */}
       <Card>

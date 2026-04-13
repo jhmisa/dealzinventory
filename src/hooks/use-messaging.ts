@@ -166,6 +166,17 @@ export function useCreateAiProvider() {
   })
 }
 
+export function useUpdateAiProvider() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: Partial<AiProviderInsert> }) =>
+      messagingService.updateAiProvider(id, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.messaging.aiProviders() })
+    },
+  })
+}
+
 export function useSetActiveAiProvider() {
   const queryClient = useQueryClient()
   return useMutation({
