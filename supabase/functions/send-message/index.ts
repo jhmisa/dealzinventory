@@ -124,19 +124,48 @@ Deno.serve(async (req) => {
       let fromField: { address: string; name?: string } | undefined;
       if (convRes.ok) {
         const convData = await convRes.json();
-        // Extract the organization's sender from the conversation's messages
         const messages = convData?.conversations?.messages ?? [];
+
+        // Strategy 1: Find from_field of a previous outbound message (sent by us)
         for (const m of messages) {
-          if (m.from_field?.address && !m.from_field?.address?.includes('@')) {
-            // Non-email address = likely Facebook page ID
-            fromField = m.from_field;
-            break;
+          if (m.delivered_at && m.from_field?.address) {
+            // Outbound messages have delivered_at set by Missive
+            // Check if this is from our side (not the customer)
+            const toFields = m.to_fields ?? [];
+            const isOutbound = toFields.some((t: { address: string }) =>
+              t.address && !t.address.includes('@')
+            ) || m.references?.length > 0;
+            if (isOutbound) {
+              fromField = m.from_field;
+              break;
+            }
           }
         }
-        // Fallback: check the conversation-level from_field
-        if (!fromField && convData?.conversations?.from_field?.address) {
-          fromField = convData.conversations.from_field;
+
+        // Strategy 2: For Facebook — our page ID is in to_fields of inbound customer messages
+        if (!fromField) {
+          for (const m of messages) {
+            const toFields = m.to_fields ?? [];
+            for (const t of toFields) {
+              if (t.address && !t.address.includes('@')) {
+                fromField = t;
+                break;
+              }
+            }
+            if (fromField) break;
+          }
         }
+
+        // Strategy 3: Don't send from_field at all — let Missive pick the default
+        // (fromField stays undefined)
+
+        console.log('Missive conversation messages sample:', JSON.stringify(
+          messages.slice(0, 2).map((m: Record<string, unknown>) => ({
+            from_field: m.from_field,
+            to_fields: m.to_fields,
+            delivered_at: m.delivered_at,
+          }))
+        ));
       }
 
       console.log('from_field resolved:', JSON.stringify(fromField ?? null));
