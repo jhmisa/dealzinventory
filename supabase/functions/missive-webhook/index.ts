@@ -188,24 +188,28 @@ Deno.serve(async (req) => {
       message.from_field?.address,
     );
 
-    // Upsert conversation
+    // Resolve contact name — only from inbound customer messages
+    const resolvedContactName = message.from_field?.name
+      ?? conversation.subject
+      ?? (conversation.authors ?? []).find((a: { name?: string }) => a.name && a.name !== 'Dealz K.K.')?.name
+      ?? null;
+
+    // Upsert conversation — only update contact_name if we have a value
+    const upsertData: Record<string, unknown> = {
+      missive_conversation_id: conversation.id,
+      customer_id: customer?.id ?? null,
+      channel: 'facebook' as const,
+      unmatched_contact: !customer,
+      needs_human_review: !customer,
+      last_message_at: new Date().toISOString(),
+    };
+    if (resolvedContactName) {
+      upsertData.contact_name = resolvedContactName;
+    }
+
     const { data: conv, error: convError } = await supabase
       .from('conversations')
-      .upsert(
-        {
-          missive_conversation_id: conversation.id,
-          customer_id: customer?.id ?? null,
-          contact_name: message.from_field?.name
-            ?? conversation.subject
-            ?? (conversation.authors ?? []).find((a) => a.name && a.name !== 'Dealz K.K.')?.name
-            ?? null,
-          channel: 'facebook' as const,
-          unmatched_contact: !customer,
-          needs_human_review: !customer,
-          last_message_at: new Date().toISOString(),
-        },
-        { onConflict: 'missive_conversation_id' },
-      )
+      .upsert(upsertData, { onConflict: 'missive_conversation_id' })
       .select('id')
       .single();
 
