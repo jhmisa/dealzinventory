@@ -95,16 +95,11 @@ Deno.serve(async (req) => {
       fullSystemPrompt += `\n\n# Knowledge Base\n${articles}`;
     }
 
-    // Build customer context if customer_id provided
-    let contextBlock = '';
-    if (customer_id) {
-      // Use 'test-playground' as a sentinel conversation ID — buildCustomerContext
-      // will still fetch customer data but won't find messages for this fake ID
-      const context = await buildCustomerContext(serviceClient, customer_id, 'test-playground');
-      // Override recentMessages with our test messages for context
-      context.recentMessages = [];
-      contextBlock = formatContextForPrompt(context);
-    }
+    // Always build context — inventory data doesn't require a customer
+    const context = await buildCustomerContext(serviceClient, customer_id ?? null, 'test-playground');
+    // Override recentMessages with our test messages for context
+    context.recentMessages = [];
+    const contextBlock = formatContextForPrompt(context);
 
     // Call AI
     const chatMessages = messages.map((m) => ({
