@@ -18,6 +18,7 @@ interface MissiveWebhookPayload {
     id: string;
     subject?: string;
     assignee_id?: string;
+    authors?: Array<{ name?: string }>;
   };
   message: {
     id: string;
@@ -196,7 +197,10 @@ Deno.serve(async (req) => {
         {
           missive_conversation_id: conversation.id,
           customer_id: customer?.id ?? null,
-          contact_name: message.from_field?.name ?? conversation.subject ?? null,
+          contact_name: message.from_field?.name
+            ?? conversation.subject
+            ?? (conversation.authors ?? []).find((a) => a.name && a.name !== 'Dealz K.K.')?.name
+            ?? null,
           channel: 'facebook' as const,
           unmatched_contact: !customer,
           needs_human_review: !customer,
