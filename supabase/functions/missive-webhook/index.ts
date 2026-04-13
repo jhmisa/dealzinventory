@@ -194,22 +194,21 @@ Deno.serve(async (req) => {
       ?? (conversation.authors ?? []).find((a: { name?: string }) => a.name && a.name !== 'Dealz K.K.')?.name
       ?? null;
 
-    // Upsert conversation — only update contact_name if we have a value
-    const upsertData: Record<string, unknown> = {
-      missive_conversation_id: conversation.id,
-      customer_id: customer?.id ?? null,
-      channel: 'facebook' as const,
-      unmatched_contact: !customer,
-      needs_human_review: !customer,
-      last_message_at: new Date().toISOString(),
-    };
-    if (resolvedContactName) {
-      upsertData.contact_name = resolvedContactName;
-    }
-
+    // Upsert conversation — only update contact_name if we have a non-null value
     const { data: conv, error: convError } = await supabase
       .from('conversations')
-      .upsert(upsertData, { onConflict: 'missive_conversation_id' })
+      .upsert(
+        {
+          missive_conversation_id: conversation.id,
+          customer_id: customer?.id ?? null,
+          ...(resolvedContactName ? { contact_name: resolvedContactName } : {}),
+          channel: 'facebook' as const,
+          unmatched_contact: !customer,
+          needs_human_review: !customer,
+          last_message_at: new Date().toISOString(),
+        },
+        { onConflict: 'missive_conversation_id' },
+      )
       .select('id')
       .single();
 
