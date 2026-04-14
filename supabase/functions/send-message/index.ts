@@ -205,7 +205,7 @@ Deno.serve(async (req) => {
         send: true,
         ...(organizationId ? { organization: organizationId } : {}),
         ...(MISSIVE_MESSENGER_ACCOUNT_ID ? { account: MISSIVE_MESSENGER_ACCOUNT_ID } : {}),
-        to_fields: [recipientToField],
+        to_fields: [{ id: recipientToField.id, name: recipientToField.name }],
       };
 
       console.log('Sending draft payload:', JSON.stringify({ drafts: draftPayload }));
