@@ -193,11 +193,16 @@ Deno.serve(async (req) => {
         }
       }
 
-      console.log('Resolved recipientToField:', JSON.stringify(recipientToField));
+      console.log('Resolved recipientToField (full):', JSON.stringify(recipientToField));
 
       if (!recipientToField) {
         throw new Error('Could not determine recipient for Messenger conversation — no inbound messages found');
       }
+
+      // For Messenger: the customer's Facebook PSID is in the `address` field, not `id`
+      // `id` is Missive's internal contact ID
+      const toFieldId = recipientToField.address ?? recipientToField.id;
+      console.log('Using to_field id:', toFieldId);
 
       const draftPayload: Record<string, unknown> = {
         body: content,
@@ -205,7 +210,7 @@ Deno.serve(async (req) => {
         send: true,
         ...(organizationId ? { organization: organizationId } : {}),
         ...(MISSIVE_MESSENGER_ACCOUNT_ID ? { account: MISSIVE_MESSENGER_ACCOUNT_ID } : {}),
-        to_fields: [{ id: recipientToField.id }],
+        to_fields: [{ id: toFieldId }],
       };
 
       console.log('Sending draft payload:', JSON.stringify({ drafts: draftPayload }));
