@@ -168,6 +168,26 @@ export async function getProductDetail(productModelId: string) {
   return data ?? []
 }
 
+// ---------- Item detail (single P-code) ----------
+
+export async function getShopItemDetail(itemId: string) {
+  const { data, error } = await supabase
+    .from('items')
+    .select(`
+      *,
+      product_models(*, categories(name, form_fields, description_fields),
+        product_media(id, file_url, media_type, role, sort_order)
+      ),
+      item_media(id, file_url, sort_order, visible, thumbnail_url, media_type, description)
+    `)
+    .eq('id', itemId)
+    .eq('item_status', 'AVAILABLE')
+    .single()
+
+  if (error) throw error
+  return data
+}
+
 // Check global shop enabled toggle
 export async function getShopEnabled(): Promise<boolean> {
   const { data, error } = await supabase

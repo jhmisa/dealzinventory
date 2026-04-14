@@ -31,6 +31,15 @@ export function useProductDetail(configGroupId: string) {
   })
 }
 
+export function useShopItemDetail(itemId: string) {
+  return useQuery({
+    queryKey: ['shop', 'item-detail', itemId],
+    queryFn: () => shopService.getShopItemDetail(itemId),
+    enabled: !!itemId,
+    retry: false,
+  })
+}
+
 export function useSellGroupByCode(code: string) {
   return useQuery({
     queryKey: queryKeys.shop.sellGroupByCode(code),

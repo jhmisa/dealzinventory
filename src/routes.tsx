@@ -43,6 +43,7 @@ const MediaStudioPage = lazy(() => import('@/pages/admin/media-studio'))
 const OfferClaimPage = lazy(() => import('@/pages/offer/claim'))
 const ShopBrowsePage = lazy(() => import('@/pages/shop/browse'))
 const ShopProductDetailPage = lazy(() => import('@/pages/shop/product-detail'))
+const ShopItemDetailPage = lazy(() => import('@/pages/shop/item-detail'))
 const CheckoutPage = lazy(() => import('@/pages/shop/checkout'))
 const KaitoriLandingPage = lazy(() => import('@/pages/kaitori/landing'))
 const KaitoriAssessPage = lazy(() => import('@/pages/kaitori/assess'))
@@ -171,6 +172,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: lazyElement(ShopBrowsePage) },
       { path: 'product/:id', element: lazyElement(ShopProductDetailPage) },
+      { path: 'item/:id', element: lazyElement(ShopItemDetailPage) },
       { path: 'checkout/:sellGroupId', element: lazyElement(CheckoutPage) },
       { path: 'accessory/:id', element: lazyElement(ShopAccessoryDetailPage) },
     ],

@@ -198,7 +198,7 @@ export default function ShopBrowsePage() {
               <Card
                 key={`item-${item.id}`}
                 className="group cursor-pointer overflow-hidden transition-all hover:shadow-lg hover:-translate-y-0.5"
-                onClick={() => navigate(`/shop/product/${pm?.id ?? item.id}`)}
+                onClick={() => navigate(`/shop/item/${item.id}`)}
               >
                 <div className="aspect-square bg-muted relative overflow-hidden">
                   {heroImg ? (
