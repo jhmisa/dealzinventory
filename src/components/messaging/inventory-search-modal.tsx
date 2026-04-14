@@ -64,7 +64,13 @@ export const InventorySearchModal = memo(function InventorySearchModal({
             const response = await fetch(imageUrl)
             if (response.ok) {
               const blob = await response.blob()
-              const ext = imageUrl.split('.').pop()?.split('?')[0] ?? 'jpg'
+              const mimeToExt: Record<string, string> = {
+                'image/jpeg': 'jpg',
+                'image/png': 'png',
+                'image/webp': 'jpg',  // WebP → .jpg for better Messenger compatibility
+                'image/gif': 'gif',
+              }
+              const ext = mimeToExt[blob.type] ?? 'jpg'
               const filename = `${item.code}.${ext}`
               const file = new File([blob], filename, { type: blob.type || 'image/jpeg' })
               attachment = await uploadAttachment(file, `inventory-insert`)
