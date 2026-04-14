@@ -116,8 +116,9 @@ Deno.serve(async (req) => {
         throw new Error('MISSIVE_API_TOKEN not configured');
       }
 
-      // Fetch conversation from Missive to get organization context
+      // Fetch conversation from Missive to get organization + recipient info
       let organizationId: string | undefined;
+      let recipientToField: { id?: string; username?: string; name?: string } | undefined;
       try {
         const convRes = await fetch(
           `${MISSIVE_API_URL}/conversations/${conversation.missive_conversation_id}`,
@@ -125,10 +126,44 @@ Deno.serve(async (req) => {
         );
         if (convRes.ok) {
           const convData = await convRes.json();
-          organizationId = convData?.conversations?.organization?.id;
+          const conv = convData?.conversations;
+          organizationId = conv?.organization?.id;
+
+          // For Messenger: find the customer's Facebook ID from inbound message from_field
+          // The customer's from_field on inbound messages = our to_field on outbound
+          const messages = conv?.messages ?? [];
+          for (const m of messages) {
+            // Inbound messages have from_field with the customer's FB ID
+            if (m.from_field?.id && !m.delivered_at) {
+              recipientToField = { id: m.from_field.id, name: m.from_field.name, username: m.from_field.username };
+              break;
+            }
+          }
+
+          // Fallback: check conversation contacts
+          if (!recipientToField && conv?.contacts?.[0]) {
+            const contact = conv.contacts[0];
+            if (contact.id) {
+              recipientToField = { id: contact.id, name: contact.name, username: contact.username };
+            }
+          }
+
+          // Fallback: check latest_message from_field
+          if (!recipientToField && conv?.latest_message?.from_field?.id) {
+            const ff = conv.latest_message.from_field;
+            recipientToField = { id: ff.id, name: ff.name, username: ff.username };
+          }
+
           console.log('Missive conv data:', JSON.stringify({
-            organization: convData?.conversations?.organization,
-            assignees: convData?.conversations?.assignees,
+            organization: conv?.organization,
+            contacts: conv?.contacts,
+            recipientToField,
+            messages_count: messages.length,
+            sample_message: messages[0] ? {
+              from_field: messages[0].from_field,
+              to_fields: messages[0].to_fields,
+              delivered_at: messages[0].delivered_at,
+            } : null,
           }));
         }
       } catch (e) {
@@ -141,7 +176,10 @@ Deno.serve(async (req) => {
         send: true,
         ...(organizationId ? { organization: organizationId } : {}),
         ...(MISSIVE_MESSENGER_ACCOUNT_ID ? { account: MISSIVE_MESSENGER_ACCOUNT_ID } : {}),
+        ...(recipientToField ? { to_fields: [recipientToField] } : {}),
       };
+
+      console.log('Sending draft payload:', JSON.stringify({ drafts: draftPayload }));
 
       const missiveRes = await fetch(`${MISSIVE_API_URL}/drafts`, {
         method: 'POST',
