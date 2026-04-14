@@ -12,11 +12,19 @@ const MISSIVE_MESSENGER_ACCOUNT_ID = Deno.env.get('MISSIVE_MESSENGER_ACCOUNT_ID'
 
 // ---------- Types ----------
 
+interface MessageAttachment {
+  file_url: string;
+  filename: string;
+  mime_type: string;
+  size_bytes?: number;
+}
+
 interface SendMessageInput {
   conversation_id: string;
   content: string;
   // If approving an AI draft, pass the draft message ID
   approve_draft_id?: string;
+  attachments?: MessageAttachment[];
 }
 
 // ---------- Main handler ----------
@@ -66,7 +74,7 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
-    const { conversation_id, content, approve_draft_id } = body as SendMessageInput;
+    const { conversation_id, content, approve_draft_id, attachments: inputAttachments } = body as SendMessageInput;
 
     if (!conversation_id || !content) {
       return jsonResponse({ error: 'conversation_id and content are required' });
@@ -101,11 +109,45 @@ Deno.serve(async (req) => {
         status: 'SENDING' as const,
         message_type: 'REPLY' as const,
         sent_by: user.id,
+        attachments: inputAttachments ?? [],
       })
       .select('id')
       .single();
 
     if (insertError) throw insertError;
+
+    // Fetch attachment files from Storage and convert to base64 for Missive
+    const missiveAttachments: Array<{ base64: string; filename: string; media_type: string }> = [];
+    if (inputAttachments && inputAttachments.length > 0) {
+      for (const att of inputAttachments) {
+        try {
+          const { data: fileData, error: downloadError } = await supabase.storage
+            .from('messaging-attachments')
+            .download(att.file_url);
+
+          if (downloadError || !fileData) {
+            console.error(`Failed to download attachment ${att.filename}:`, downloadError);
+            continue;
+          }
+
+          const arrayBuffer = await fileData.arrayBuffer();
+          const uint8Array = new Uint8Array(arrayBuffer);
+          let binary = '';
+          for (let i = 0; i < uint8Array.length; i++) {
+            binary += String.fromCharCode(uint8Array[i]);
+          }
+          const base64 = btoa(binary);
+
+          missiveAttachments.push({
+            base64,
+            filename: att.filename,
+            media_type: att.mime_type,
+          });
+        } catch (err) {
+          console.error(`Error processing attachment ${att.filename}:`, err);
+        }
+      }
+    }
 
     // Send via Missive Drafts API
     let missiveMessageId: string | null = null;
@@ -130,6 +172,7 @@ Deno.serve(async (req) => {
         body: content,
         to_fields: [{ id: contactPlatformId }],
         conversation: conversation.missive_conversation_id,
+        ...(missiveAttachments.length > 0 && { attachments: missiveAttachments }),
       };
 
       console.log('Sending draft payload:', JSON.stringify({ drafts: draftPayload }));

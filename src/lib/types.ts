@@ -249,6 +249,14 @@ export interface StaffProfile {
 export type StaffProfileInsert = Omit<StaffProfile, 'created_at' | 'updated_at'>
 export type StaffProfileUpdate = Partial<Pick<StaffProfile, 'display_name' | 'role' | 'is_active'>>
 
+// Messaging attachment type
+export interface MessageAttachment {
+  file_url: string
+  filename: string
+  mime_type: string
+  size_bytes?: number
+}
+
 // Messaging types — manually defined until DB types are regenerated
 export type MessageRole = 'customer' | 'assistant' | 'staff' | 'system'
 export type MessageStatus = 'DRAFT' | 'SENDING' | 'SENT' | 'FAILED' | 'REJECTED'
@@ -287,6 +295,7 @@ export interface Message {
   message_type: MessageType
   ai_confidence: number | null
   ai_context_summary: string | null
+  attachments: MessageAttachment[]
   error_details: Record<string, unknown> | null
   sent_by: string | null
   created_at: string
@@ -300,6 +309,7 @@ export interface MessageInsert {
   message_type?: MessageType
   ai_confidence?: number | null
   ai_context_summary?: string | null
+  attachments?: MessageAttachment[]
   sent_by?: string | null
 }
 
@@ -311,6 +321,7 @@ export interface MessagingTemplate {
   content_en: string
   message_type: MessageType
   variables: string[]
+  attachments: MessageAttachment[]
   is_active: boolean
   created_at: string
   updated_at: string
@@ -323,6 +334,7 @@ export interface MessagingTemplateInsert {
   content_en: string
   message_type: MessageType
   variables?: string[]
+  attachments?: MessageAttachment[]
   is_active?: boolean
 }
 

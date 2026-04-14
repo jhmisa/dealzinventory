@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import * as messagingService from '@/services/messaging'
 import type { ConversationFilters } from '@/services/messaging'
 import type {
+  MessageAttachment,
   MessagingTemplateInsert,
   AiProviderInsert,
   MessagingPersonaUpdate,
@@ -74,14 +75,22 @@ export function useMessages(conversationId: string) {
 export function useSendMessage() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ conversationId, content, approveDraftId }: {
+    mutationFn: ({ conversationId, content, approveDraftId, attachments }: {
       conversationId: string
       content: string
       approveDraftId?: string
-    }) => messagingService.sendMessage(conversationId, content, approveDraftId),
+      attachments?: MessageAttachment[]
+    }) => messagingService.sendMessage(conversationId, content, approveDraftId, attachments),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.messaging.all })
     },
+  })
+}
+
+export function useUploadAttachment() {
+  return useMutation({
+    mutationFn: ({ file, pathPrefix }: { file: File; pathPrefix: string }) =>
+      messagingService.uploadAttachment(file, pathPrefix),
   })
 }
 

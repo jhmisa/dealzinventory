@@ -1,7 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/query-keys'
 import * as itemsService from '@/services/items'
+import { searchAvailableAccessories } from '@/services/accessories'
 import type { ItemInsert, ItemUpdate } from '@/lib/types'
+import type { AvailableInventoryResult } from '@/services/items'
 
 interface ItemFilters {
   search?: string
@@ -142,6 +144,30 @@ export function useUpdateItemMedia() {
     onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.items.detail(vars.itemId) })
     },
+  })
+}
+
+// --- Inventory Search (for messaging) ---
+
+export function useAvailableInventorySearch(query: string) {
+  return useQuery({
+    queryKey: [...queryKeys.items.all, 'available-search', query] as const,
+    queryFn: async (): Promise<AvailableInventoryResult[]> => {
+      const [items, accessories] = await Promise.all([
+        itemsService.searchAvailableItems(query),
+        searchAvailableAccessories(query),
+      ])
+      // Sort: exact code matches first, then alphabetically
+      const all = [...items, ...accessories as unknown as AvailableInventoryResult[]]
+      const q = query.toLowerCase()
+      return all.sort((a, b) => {
+        const aExact = a.code.toLowerCase() === q ? 0 : 1
+        const bExact = b.code.toLowerCase() === q ? 0 : 1
+        if (aExact !== bExact) return aExact - bExact
+        return a.description.localeCompare(b.description)
+      })
+    },
+    enabled: query.trim().length >= 2,
   })
 }
 

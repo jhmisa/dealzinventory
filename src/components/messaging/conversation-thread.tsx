@@ -1,6 +1,6 @@
-import { memo, useRef, useEffect } from 'react'
+import { memo, useRef, useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { User, AlertCircle, RotateCw, Bot, UserCheck } from 'lucide-react'
+import { User, AlertCircle, RotateCw, Bot, UserCheck, FileIcon, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
@@ -13,12 +13,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import type { StaffProfile } from '@/lib/types'
+import type { StaffProfile, MessageAttachment } from '@/lib/types'
+import { getAttachmentSignedUrl } from '@/services/messaging'
 import { AiDraftCard } from './ai-draft-card'
 import { MessageStatusBadge } from './message-status-badge'
 import { ChannelBadge } from './channel-badge'
 import { CustomerLinker } from './customer-linker'
 import { MessageComposer } from './message-composer'
+import { CannedResponsesPanel } from './canned-responses-panel'
+import { InventorySearchModal } from './inventory-search-modal'
 import type { Conversation, Message } from '@/lib/types'
 
 function formatTime(dateStr: string): string {
@@ -35,12 +38,62 @@ function formatDate(dateStr: string): string {
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' })
 }
 
+// Attachment thumbnail component with signed URL loading
+const AttachmentThumbnail = memo(function AttachmentThumbnail({
+  attachment,
+  isOutbound,
+}: {
+  attachment: MessageAttachment
+  isOutbound: boolean
+}) {
+  const [url, setUrl] = useState<string | null>(null)
+  const isImage = attachment.mime_type.startsWith('image/')
+
+  useEffect(() => {
+    let cancelled = false
+    getAttachmentSignedUrl(attachment.file_url).then((signedUrl) => {
+      if (!cancelled) setUrl(signedUrl)
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [attachment.file_url])
+
+  if (!url) return null
+
+  if (isImage) {
+    return (
+      <a href={url} target="_blank" rel="noopener noreferrer" className="block">
+        <img
+          src={url}
+          alt={attachment.filename}
+          className="mt-1.5 max-w-[200px] rounded-md"
+        />
+      </a>
+    )
+  }
+
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={cn(
+        'mt-1.5 flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs hover:bg-accent/10',
+        isOutbound ? 'border-primary-foreground/20' : 'border-border',
+      )}
+    >
+      <FileIcon className="h-3.5 w-3.5 shrink-0" />
+      <span className="truncate max-w-[140px]">{attachment.filename}</span>
+      <ExternalLink className="h-3 w-3 shrink-0 opacity-60" />
+    </a>
+  )
+})
+
 interface ConversationThreadProps {
   conversation: Conversation & {
     customers: { id: string; customer_code: string; last_name: string; first_name: string | null } | null
   }
   messages: Message[]
-  onSend: (content: string) => void
+  onSend: (content: string, attachments?: MessageAttachment[]) => void
   onApproveDraft: (messageId: string, content: string) => void
   onRejectDraft: (messageId: string) => void
   onRetryMessage: (messageId: string) => void
@@ -67,6 +120,9 @@ export const ConversationThread = memo(function ConversationThread({
   isSending,
 }: ConversationThreadProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
+  const composerRef = useRef<HTMLDivElement>(null)
+  const [showResponses, setShowResponses] = useState(false)
+  const [showInventory, setShowInventory] = useState(false)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -87,6 +143,50 @@ export const ConversationThread = memo(function ConversationThread({
   const customerName = conversation.customers
     ? `${conversation.customers.last_name} ${conversation.customers.first_name ?? ''}`.trim()
     : conversation.contact_name || 'Unknown Contact'
+
+  // Get composer API for inserting content from panels
+  const getComposerApi = useCallback(() => {
+    const composerEl = composerRef.current?.querySelector('[data-composer]') as
+      | (HTMLDivElement & { composerApi?: { appendContent: (text: string) => void; addAttachments: (attachments: MessageAttachment[], thumbnails?: Record<string, string>) => void } })
+      | null
+    return composerEl?.composerApi
+  }, [])
+
+  const handleInsertResponse = useCallback(
+    (content: string, attachments?: MessageAttachment[]) => {
+      const api = getComposerApi()
+      if (api) {
+        api.appendContent(content)
+        if (attachments && attachments.length > 0) {
+          api.addAttachments(attachments)
+        }
+      }
+      setShowResponses(false)
+    },
+    [getComposerApi],
+  )
+
+  const handleSendNowResponse = useCallback(
+    (content: string, attachments?: MessageAttachment[]) => {
+      onSend(content, attachments)
+      setShowResponses(false)
+    },
+    [onSend],
+  )
+
+  const handleInsertInventoryItem = useCallback(
+    (text: string, attachment?: MessageAttachment, thumbnailUrl?: string) => {
+      const api = getComposerApi()
+      if (api) {
+        api.appendContent(text)
+        if (attachment) {
+          const thumbs = thumbnailUrl ? { [attachment.file_url]: thumbnailUrl } : undefined
+          api.addAttachments([attachment], thumbs)
+        }
+      }
+    },
+    [getComposerApi],
+  )
 
   return (
     <div className="flex h-full flex-col">
@@ -167,6 +267,7 @@ export const ConversationThread = memo(function ConversationThread({
                   const isCustomer = msg.role === 'customer'
                   const isDraft = msg.status === 'DRAFT' && msg.role === 'assistant'
                   const isFailed = msg.status === 'FAILED'
+                  const msgAttachments = msg.attachments ?? []
 
                   if (isDraft) {
                     return (
@@ -199,6 +300,18 @@ export const ConversationThread = memo(function ConversationThread({
                         )}
                       >
                         <p className="whitespace-pre-wrap">{msg.content}</p>
+                        {/* Attachments */}
+                        {msgAttachments.length > 0 && (
+                          <div className="space-y-1">
+                            {msgAttachments.map((att, idx) => (
+                              <AttachmentThumbnail
+                                key={`${att.file_url}-${idx}`}
+                                attachment={att}
+                                isOutbound={!isCustomer}
+                              />
+                            ))}
+                          </div>
+                        )}
                         <div className={cn(
                           'mt-1 flex items-center gap-1',
                           isCustomer ? 'justify-start' : 'justify-end',
@@ -238,7 +351,31 @@ export const ConversationThread = memo(function ConversationThread({
       </ScrollArea>
 
       {/* Composer */}
-      <MessageComposer onSend={onSend} isLoading={isSending} />
+      <div ref={composerRef}>
+        <MessageComposer
+          onSend={onSend}
+          isLoading={isSending}
+          conversationId={conversation.id}
+          onOpenResponses={() => setShowResponses(true)}
+          onOpenInventory={() => setShowInventory(true)}
+        />
+      </div>
+
+      {/* Canned Responses Panel */}
+      <CannedResponsesPanel
+        open={showResponses}
+        onClose={() => setShowResponses(false)}
+        onInsert={handleInsertResponse}
+        onSendNow={handleSendNowResponse}
+        conversation={conversation}
+      />
+
+      {/* Inventory Search Modal */}
+      <InventorySearchModal
+        open={showInventory}
+        onClose={() => setShowInventory(false)}
+        onInsertItem={handleInsertInventoryItem}
+      />
     </div>
   )
 })

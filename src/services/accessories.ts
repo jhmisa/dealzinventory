@@ -323,6 +323,54 @@ export async function getStockHistory(accessoryId: string) {
   )
 }
 
+// --- Available Inventory Search (for messaging) ---
+
+export interface AvailableAccessoryResult {
+  type: 'accessory'
+  id: string
+  code: string
+  description: string
+  grade: null
+  price: number | null
+  thumbnail_url: string | null
+  product_model_id: null
+  accessory_id: string
+}
+
+export async function searchAvailableAccessories(query: string): Promise<AvailableAccessoryResult[]> {
+  if (!query.trim()) return []
+
+  const { data, error } = await supabase
+    .from('accessories')
+    .select(`
+      id, accessory_code, name, brand, selling_price,
+      accessory_media(file_url, sort_order)
+    `)
+    .eq('active', true)
+    .gt('stock_quantity', 0)
+    .or(`accessory_code.ilike.%${query}%,name.ilike.%${query}%,brand.ilike.%${query}%`)
+    .order('name')
+    .limit(20)
+
+  if (error) throw error
+
+  return (data ?? []).map((acc) => {
+    const media = acc.accessory_media as { file_url: string; sort_order: number }[] | null
+    const sortedMedia = (media ?? []).sort((a, b) => a.sort_order - b.sort_order)
+    return {
+      type: 'accessory' as const,
+      id: acc.id,
+      code: acc.accessory_code,
+      description: [acc.brand, acc.name].filter(Boolean).join(' '),
+      grade: null,
+      price: acc.selling_price,
+      thumbnail_url: sortedMedia[0]?.file_url ?? null,
+      product_model_id: null,
+      accessory_id: acc.id,
+    }
+  })
+}
+
 // --- Search for matching (intake flow) ---
 
 export async function searchAccessoriesForMatch(query: string) {

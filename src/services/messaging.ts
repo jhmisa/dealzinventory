@@ -3,6 +3,7 @@ import type {
   Conversation,
   ConversationWithRelations,
   Message,
+  MessageAttachment,
   MessagingTemplate,
   MessagingTemplateInsert,
   AiProvider,
@@ -128,12 +129,18 @@ export async function getMessages(conversationId: string) {
   return (data ?? []) as Message[]
 }
 
-export async function sendMessage(conversationId: string, content: string, approveDraftId?: string) {
+export async function sendMessage(
+  conversationId: string,
+  content: string,
+  approveDraftId?: string,
+  attachments?: MessageAttachment[],
+) {
   const { data, error } = await supabase.functions.invoke('send-message', {
     body: {
       conversation_id: conversationId,
       content,
       approve_draft_id: approveDraftId,
+      attachments,
     },
   })
 
@@ -154,6 +161,58 @@ export async function rejectDraft(messageId: string) {
     .single()
   if (error) throw error
   return data as Message
+}
+
+// ---------- Attachments ----------
+
+const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024 // 10MB
+
+export async function uploadAttachment(
+  file: File,
+  pathPrefix: string,
+): Promise<MessageAttachment> {
+  if (file.size > MAX_ATTACHMENT_SIZE) {
+    throw new Error(`File "${file.name}" exceeds the 10MB limit`)
+  }
+
+  const ext = file.name.split('.').pop() ?? 'bin'
+  const fileName = `${crypto.randomUUID()}_${file.name}`
+  const filePath = `${pathPrefix}/${fileName}`
+
+  const { error: uploadError } = await supabase.storage
+    .from('messaging-attachments')
+    .upload(filePath, file, { contentType: file.type, upsert: false })
+
+  if (uploadError) throw uploadError
+
+  return {
+    file_url: filePath,
+    filename: file.name,
+    mime_type: file.type,
+    size_bytes: file.size,
+  }
+}
+
+export async function deleteAttachment(filePath: string) {
+  const { error } = await supabase.storage
+    .from('messaging-attachments')
+    .remove([filePath])
+  if (error) throw error
+}
+
+export function getAttachmentPublicUrl(filePath: string): string {
+  const { data } = supabase.storage
+    .from('messaging-attachments')
+    .getPublicUrl(filePath)
+  return data.publicUrl
+}
+
+export async function getAttachmentSignedUrl(filePath: string): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from('messaging-attachments')
+    .createSignedUrl(filePath, 3600) // 1 hour
+  if (error) throw error
+  return data.signedUrl
 }
 
 export async function retryFailedMessage(messageId: string) {

@@ -9,6 +9,7 @@ import { PageHeader } from '@/components/shared/page-header'
 import { Badge } from '@/components/ui/badge'
 import { ConversationList } from '@/components/messaging/conversation-list'
 import { ConversationThread } from '@/components/messaging/conversation-thread'
+import type { MessageAttachment } from '@/lib/types'
 import {
   useConversations,
   useConversation,
@@ -77,10 +78,10 @@ export default function MessagesPage() {
   }, [selectedConvId])
 
   const handleSend = useCallback(
-    (content: string) => {
+    (content: string, attachments?: MessageAttachment[]) => {
       if (!selectedConvId) return
       sendMessage.mutate(
-        { conversationId: selectedConvId, content },
+        { conversationId: selectedConvId, content, attachments },
         {
           onError: (err) => toast.error(`Failed to send: ${err.message}`),
         },
