@@ -344,11 +344,11 @@ export async function searchAvailableItems(query: string): Promise<AvailableInve
     item_code: string
     condition_grade: string | null
     selling_price: number | null
-    product_model_id: string | null
+    product_id: string | null
     brand: string | null
     model_name: string | null
-    storage_gb: number | null
-    ram_gb: number | null
+    storage_gb: string | null
+    ram_gb: string | null
     hero_media_url: string | null
     first_product_media_url: string | null
     first_item_media_url: string | null
@@ -372,7 +372,7 @@ export async function searchAvailableItems(query: string): Promise<AvailableInve
       grade: row.condition_grade,
       price: row.selling_price,
       thumbnail_url,
-      product_model_id: row.product_model_id,
+      product_model_id: row.product_id,
       accessory_id: null,
     }
   })
