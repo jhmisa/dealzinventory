@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
     // Fetch conversation to get Missive conversation ID
     const { data: conversation, error: convError } = await supabase
       .from('conversations')
-      .select('id, missive_conversation_id')
+      .select('id, missive_conversation_id, contact_platform_id')
       .eq('id', conversation_id)
       .single();
 
@@ -116,101 +116,20 @@ Deno.serve(async (req) => {
         throw new Error('MISSIVE_API_TOKEN not configured');
       }
 
-      // Fetch conversation from Missive to get organization + recipient info
-      let organizationId: string | undefined;
-      let recipientToField: Record<string, unknown> | undefined;
-      try {
-        const convRes = await fetch(
-          `${MISSIVE_API_URL}/conversations/${conversation.missive_conversation_id}`,
-          { headers: { Authorization: `Bearer ${MISSIVE_API_TOKEN}` } },
-        );
-        if (convRes.ok) {
-          const convData = await convRes.json();
-          const conv = convData?.conversations;
-          organizationId = conv?.organization?.id;
+      // Use the customer's Facebook PSID stored in our DB (set by webhook on inbound messages)
+      const contactPlatformId = conversation.contact_platform_id;
+      console.log('contact_platform_id from DB:', contactPlatformId);
 
-          // Log the full conversation structure to understand available fields
-          console.log('Missive conv keys:', JSON.stringify(Object.keys(conv ?? {})));
-          console.log('Missive conv details:', JSON.stringify({
-            organization: conv?.organization,
-            contacts: conv?.contacts,
-            authors: conv?.authors,
-            latest_message: conv?.latest_message ? {
-              from_field: conv.latest_message.from_field,
-              to_fields: conv.latest_message.to_fields,
-              delivered_at: conv.latest_message.delivered_at,
-            } : null,
-            messages_count: conv?.messages?.length ?? 'no messages field',
-          }));
-        }
-      } catch (e) {
-        console.warn('Failed to fetch Missive conversation context:', e);
+      if (!contactPlatformId) {
+        throw new Error('No contact_platform_id on conversation — customer must send a message first so we can capture their Facebook ID');
       }
-
-      // Get the recipient's Facebook ID from the most recent inbound message in Missive
-      // The conversation endpoint may not include messages, so fetch them separately
-      if (!recipientToField) {
-        try {
-          const msgsRes = await fetch(
-            `${MISSIVE_API_URL}/conversations/${conversation.missive_conversation_id}/messages`,
-            { headers: { Authorization: `Bearer ${MISSIVE_API_TOKEN}` } },
-          );
-          if (msgsRes.ok) {
-            const msgsData = await msgsRes.json();
-            const messages = msgsData?.messages ?? [];
-            console.log('Missive messages count:', messages.length);
-
-            // Find inbound message (no delivered_at = inbound from customer)
-            for (const m of messages) {
-              console.log('Message sample:', JSON.stringify({
-                id: m.id,
-                from_field: m.from_field,
-                to_fields: m.to_fields,
-                delivered_at: m.delivered_at,
-              }));
-
-              // Inbound customer messages: from_field has their FB identity
-              if (m.from_field && !m.delivered_at) {
-                recipientToField = m.from_field;
-                break;
-              }
-            }
-
-            // Fallback: if all messages have delivered_at, check to_fields of outbound
-            if (!recipientToField) {
-              for (const m of messages) {
-                if (m.to_fields?.length === 1 && m.delivered_at) {
-                  recipientToField = m.to_fields[0];
-                  break;
-                }
-              }
-            }
-          } else {
-            console.error('Failed to fetch messages:', msgsRes.status, await msgsRes.text());
-          }
-        } catch (e) {
-          console.warn('Failed to fetch Missive messages:', e);
-        }
-      }
-
-      console.log('Resolved recipientToField (full):', JSON.stringify(recipientToField));
-
-      if (!recipientToField) {
-        throw new Error('Could not determine recipient for Messenger conversation — no inbound messages found');
-      }
-
-      // For Messenger: the customer's Facebook PSID is in the `address` field, not `id`
-      // `id` is Missive's internal contact ID
-      const toFieldId = recipientToField.address ?? recipientToField.id;
-      console.log('Using to_field id:', toFieldId);
 
       const draftPayload: Record<string, unknown> = {
         body: content,
         conversation: conversation.missive_conversation_id,
         send: true,
-        ...(organizationId ? { organization: organizationId } : {}),
-        ...(MISSIVE_MESSENGER_ACCOUNT_ID ? { account: MISSIVE_MESSENGER_ACCOUNT_ID } : {}),
-        to_fields: [{ id: toFieldId }],
+        account: MISSIVE_MESSENGER_ACCOUNT_ID || undefined,
+        to_fields: [{ id: contactPlatformId }],
       };
 
       console.log('Sending draft payload:', JSON.stringify({ drafts: draftPayload }));
