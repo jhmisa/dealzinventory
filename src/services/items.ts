@@ -332,55 +332,47 @@ export interface AvailableInventoryResult {
 export async function searchAvailableItems(query: string): Promise<AvailableInventoryResult[]> {
   if (!query.trim()) return []
 
-  const { data, error } = await supabase
-    .from('items')
-    .select(`
-      id, item_code, condition_grade, selling_price,
-      product_models!inner(
-        id, brand, model_name, storage_gb, ram_gb,
-        categories(description_fields),
-        product_media(file_url, role, sort_order)
-      ),
-      item_media(file_url, thumbnail_url, sort_order)
-    `)
-    .eq('item_status', 'AVAILABLE')
-    .or(`item_code.ilike.%${query}%,product_models.brand.ilike.%${query}%,product_models.model_name.ilike.%${query}%`)
-    .order('item_code')
-    .limit(20)
+  const { data, error } = await supabase.rpc('search_available_inventory', {
+    search_query: query.trim(),
+    result_limit: 20,
+  })
 
   if (error) throw error
 
-  return (data ?? []).map((item) => {
-    const pm = item.product_models as {
-      id: string
-      brand: string | null
-      model_name: string | null
-      storage_gb: number | null
-      ram_gb: number | null
-      categories: { description_fields: string[] } | null
-      product_media: { file_url: string; role: string; sort_order: number }[]
-    }
-
-    // Build description from product model
-    const parts = [pm.brand, pm.model_name]
-    if (pm.storage_gb) parts.push(`${pm.storage_gb}GB`)
+  return (data ?? []).map((row: {
+    id: string
+    item_code: string
+    condition_grade: string | null
+    selling_price: number | null
+    product_model_id: string | null
+    brand: string | null
+    model_name: string | null
+    storage_gb: number | null
+    ram_gb: number | null
+    hero_media_url: string | null
+    first_product_media_url: string | null
+    first_item_media_url: string | null
+    first_item_thumb_url: string | null
+  }) => {
+    const parts = [row.brand, row.model_name]
+    if (row.storage_gb) parts.push(`${row.storage_gb}GB`)
     const description = parts.filter(Boolean).join(' ')
 
-    // Resolve thumbnail: hero product_media → first item_media thumbnail → first item_media → first product_media
-    const heroMedia = pm.product_media?.find((m) => m.role === 'hero')
-    const itemMedia = item.item_media as { file_url: string; thumbnail_url: string | null; sort_order: number }[] | null
-    const firstItemThumb = itemMedia?.[0]?.thumbnail_url ?? itemMedia?.[0]?.file_url
-    const thumbnail_url = heroMedia?.file_url ?? firstItemThumb ?? pm.product_media?.[0]?.file_url ?? null
+    const thumbnail_url = row.hero_media_url
+      ?? row.first_item_thumb_url
+      ?? row.first_item_media_url
+      ?? row.first_product_media_url
+      ?? null
 
     return {
       type: 'item' as const,
-      id: item.id,
-      code: item.item_code,
+      id: row.id,
+      code: row.item_code,
       description,
-      grade: item.condition_grade,
-      price: item.selling_price,
+      grade: row.condition_grade,
+      price: row.selling_price,
       thumbnail_url,
-      product_model_id: pm.id,
+      product_model_id: row.product_model_id,
       accessory_id: null,
     }
   })
