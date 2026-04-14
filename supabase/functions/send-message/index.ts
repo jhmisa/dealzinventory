@@ -30,12 +30,20 @@ interface SendMessageInput {
 // ---------- Main handler ----------
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
-
+  // Top-level catch — ensures we ALWAYS return a 200 JSON response
+  // so `supabase.functions.invoke()` never sees a non-2xx status
   try {
-    const body = await req.json();
+    if (req.method === 'OPTIONS') {
+      return new Response('ok', { headers: corsHeaders });
+    }
+
+    let body: Record<string, unknown>;
+    try {
+      body = await req.json();
+    } catch (parseErr) {
+      console.error('Failed to parse request body:', parseErr);
+      return jsonResponse({ error: 'Invalid JSON in request body' });
+    }
 
     // Health check endpoint (no auth required)
     if (body.health_check) {
@@ -56,8 +64,25 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Env check — log which vars are present for debugging
+    const hasUrl = !!Deno.env.get('SUPABASE_URL');
+    const hasAnon = !!Deno.env.get('SUPABASE_ANON_KEY');
+    const hasService = !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const hasMissive = !!MISSIVE_API_TOKEN;
+    const hasMessengerAccount = !!MISSIVE_MESSENGER_ACCOUNT_ID;
+    console.log('Env check:', { hasUrl, hasAnon, hasService, hasMissive, hasMessengerAccount });
+
+    if (!hasUrl || !hasAnon || !hasService) {
+      return jsonResponse({
+        error: 'Missing Supabase env vars',
+        details: { hasUrl, hasAnon, hasService },
+      });
+    }
+
     // All other endpoints require staff auth
     const authHeader = req.headers.get('Authorization') ?? '';
+    console.log('Auth header present:', !!authHeader, 'length:', authHeader.length);
+
     const supabaseUser = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_ANON_KEY')!,
@@ -66,19 +91,23 @@ Deno.serve(async (req) => {
 
     const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
     if (authError || !user) {
-      return jsonResponse({ error: 'Invalid or expired token' });
+      console.error('Auth failed:', authError?.message ?? 'no user');
+      return jsonResponse({ error: `Auth failed: ${authError?.message ?? 'Invalid or expired token'}` });
     }
+    console.log('Authenticated as:', user.id, user.email);
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
-    const { conversation_id, content, approve_draft_id, attachments: inputAttachments } = body as SendMessageInput;
+    const { conversation_id, content, approve_draft_id, attachments: inputAttachments } = body as unknown as SendMessageInput;
 
     if (!conversation_id || !content) {
       return jsonResponse({ error: 'conversation_id and content are required' });
     }
+
+    console.log('Sending message for conversation:', conversation_id, 'content length:', content.length);
 
     // Fetch conversation to get Missive conversation ID
     const { data: conversation, error: convError } = await supabase
@@ -88,8 +117,10 @@ Deno.serve(async (req) => {
       .single();
 
     if (convError || !conversation) {
-      return jsonResponse({ error: 'Conversation not found' });
+      console.error('Conversation lookup failed:', convError?.message);
+      return jsonResponse({ error: `Conversation not found: ${convError?.message ?? 'unknown'}` });
     }
+    console.log('Found conversation:', conversation.id, 'missive_id:', conversation.missive_conversation_id);
 
     // If approving a draft, update its status first
     if (approve_draft_id) {
@@ -114,7 +145,11 @@ Deno.serve(async (req) => {
       .select('id')
       .single();
 
-    if (insertError) throw insertError;
+    if (insertError) {
+      console.error('Message insert failed:', insertError.message);
+      return jsonResponse({ error: `Failed to insert message: ${insertError.message}` });
+    }
+    console.log('Inserted message:', msg.id);
 
     // Fetch attachment files from Storage and convert to base64 for Missive
     const missiveAttachments: Array<{ base64_data: string; filename: string }> = [];
@@ -187,6 +222,7 @@ Deno.serve(async (req) => {
 
       if (!missiveRes.ok) {
         const errBody = await missiveRes.text();
+        console.error('Missive API error:', missiveRes.status, errBody);
         sendError = {
           missive_status: missiveRes.status,
           missive_error: errBody,
@@ -196,8 +232,10 @@ Deno.serve(async (req) => {
       } else {
         const missiveData = await missiveRes.json();
         missiveMessageId = missiveData?.drafts?.id ?? null;
+        console.log('Missive send success, message ID:', missiveMessageId);
       }
     } catch (fetchErr) {
+      console.error('Missive fetch error:', fetchErr);
       sendError = {
         missive_error: fetchErr instanceof Error ? fetchErr.message : 'Network error',
         attempted_at: new Date().toISOString(),
@@ -259,7 +297,9 @@ Deno.serve(async (req) => {
       missive_message_id: missiveMessageId,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Internal server error';
+    // Absolute last resort — log everything and still return 200 JSON
+    console.error('FATAL send-message error:', err);
+    const message = err instanceof Error ? `${err.message}\n${err.stack}` : 'Internal server error';
     return jsonResponse({ error: message });
   }
 });

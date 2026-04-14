@@ -145,8 +145,10 @@ export async function sendMessage(
   })
 
   if (error) {
-    if (data?.error) throw new Error(data.error)
-    throw new Error(error.message ?? 'Failed to send message')
+    // Try to extract the actual error from the response body
+    const detail = data?.error ?? error.message ?? 'Failed to send message'
+    console.error('send-message invoke error:', { error: error.message, data, detail })
+    throw new Error(`Failed to send: ${detail}`)
   }
   if (data?.error) throw new Error(data.error)
   return data
