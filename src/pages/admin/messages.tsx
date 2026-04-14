@@ -164,7 +164,7 @@ export default function MessagesPage() {
   )
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4 h-[calc(100vh-5rem)]">
       <PageHeader
         title="Messages"
         description="Customer conversations via Missive"
@@ -212,7 +212,7 @@ export default function MessagesPage() {
         </div>
       )}
 
-      <div className="flex h-[calc(100vh-16rem)] rounded-lg border bg-card overflow-hidden">
+      <div className="flex flex-1 min-h-0 rounded-lg border bg-card overflow-hidden">
         {/* Left panel — Conversation list */}
         <div className="flex w-80 shrink-0 flex-col border-r">
           <div className="space-y-2 p-3 border-b">
@@ -246,7 +246,7 @@ export default function MessagesPage() {
         </div>
 
         {/* Right panel — Conversation thread */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-h-0">
           {selectedConversation ? (
             <ConversationThread
               conversation={selectedConversation}

@@ -253,7 +253,7 @@ export const ConversationThread = memo(function ConversationThread({
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 px-4">
+      <ScrollArea className="flex-1 min-h-0 px-4">
         <div className="space-y-4 py-4">
           {groups.map((group) => (
             <div key={group.date}>
