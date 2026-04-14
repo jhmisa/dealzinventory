@@ -118,7 +118,7 @@ Deno.serve(async (req) => {
 
       // Fetch conversation from Missive to get organization + recipient info
       let organizationId: string | undefined;
-      let recipientToField: { id?: string; username?: string; name?: string } | undefined;
+      let recipientToField: Record<string, unknown> | undefined;
       try {
         const convRes = await fetch(
           `${MISSIVE_API_URL}/conversations/${conversation.missive_conversation_id}`,
@@ -129,45 +129,74 @@ Deno.serve(async (req) => {
           const conv = convData?.conversations;
           organizationId = conv?.organization?.id;
 
-          // For Messenger: find the customer's Facebook ID from inbound message from_field
-          // The customer's from_field on inbound messages = our to_field on outbound
-          const messages = conv?.messages ?? [];
-          for (const m of messages) {
-            // Inbound messages have from_field with the customer's FB ID
-            if (m.from_field?.id && !m.delivered_at) {
-              recipientToField = { id: m.from_field.id, name: m.from_field.name, username: m.from_field.username };
-              break;
-            }
-          }
-
-          // Fallback: check conversation contacts
-          if (!recipientToField && conv?.contacts?.[0]) {
-            const contact = conv.contacts[0];
-            if (contact.id) {
-              recipientToField = { id: contact.id, name: contact.name, username: contact.username };
-            }
-          }
-
-          // Fallback: check latest_message from_field
-          if (!recipientToField && conv?.latest_message?.from_field?.id) {
-            const ff = conv.latest_message.from_field;
-            recipientToField = { id: ff.id, name: ff.name, username: ff.username };
-          }
-
-          console.log('Missive conv data:', JSON.stringify({
+          // Log the full conversation structure to understand available fields
+          console.log('Missive conv keys:', JSON.stringify(Object.keys(conv ?? {})));
+          console.log('Missive conv details:', JSON.stringify({
             organization: conv?.organization,
             contacts: conv?.contacts,
-            recipientToField,
-            messages_count: messages.length,
-            sample_message: messages[0] ? {
-              from_field: messages[0].from_field,
-              to_fields: messages[0].to_fields,
-              delivered_at: messages[0].delivered_at,
+            authors: conv?.authors,
+            latest_message: conv?.latest_message ? {
+              from_field: conv.latest_message.from_field,
+              to_fields: conv.latest_message.to_fields,
+              delivered_at: conv.latest_message.delivered_at,
             } : null,
+            messages_count: conv?.messages?.length ?? 'no messages field',
           }));
         }
       } catch (e) {
         console.warn('Failed to fetch Missive conversation context:', e);
+      }
+
+      // Get the recipient's Facebook ID from the most recent inbound message in Missive
+      // The conversation endpoint may not include messages, so fetch them separately
+      if (!recipientToField) {
+        try {
+          const msgsRes = await fetch(
+            `${MISSIVE_API_URL}/conversations/${conversation.missive_conversation_id}/messages`,
+            { headers: { Authorization: `Bearer ${MISSIVE_API_TOKEN}` } },
+          );
+          if (msgsRes.ok) {
+            const msgsData = await msgsRes.json();
+            const messages = msgsData?.messages ?? [];
+            console.log('Missive messages count:', messages.length);
+
+            // Find inbound message (no delivered_at = inbound from customer)
+            for (const m of messages) {
+              console.log('Message sample:', JSON.stringify({
+                id: m.id,
+                from_field: m.from_field,
+                to_fields: m.to_fields,
+                delivered_at: m.delivered_at,
+              }));
+
+              // Inbound customer messages: from_field has their FB identity
+              if (m.from_field && !m.delivered_at) {
+                recipientToField = m.from_field;
+                break;
+              }
+            }
+
+            // Fallback: if all messages have delivered_at, check to_fields of outbound
+            if (!recipientToField) {
+              for (const m of messages) {
+                if (m.to_fields?.length === 1 && m.delivered_at) {
+                  recipientToField = m.to_fields[0];
+                  break;
+                }
+              }
+            }
+          } else {
+            console.error('Failed to fetch messages:', msgsRes.status, await msgsRes.text());
+          }
+        } catch (e) {
+          console.warn('Failed to fetch Missive messages:', e);
+        }
+      }
+
+      console.log('Resolved recipientToField:', JSON.stringify(recipientToField));
+
+      if (!recipientToField) {
+        throw new Error('Could not determine recipient for Messenger conversation — no inbound messages found');
       }
 
       const draftPayload: Record<string, unknown> = {
@@ -176,7 +205,7 @@ Deno.serve(async (req) => {
         send: true,
         ...(organizationId ? { organization: organizationId } : {}),
         ...(MISSIVE_MESSENGER_ACCOUNT_ID ? { account: MISSIVE_MESSENGER_ACCOUNT_ID } : {}),
-        ...(recipientToField ? { to_fields: [recipientToField] } : {}),
+        to_fields: [recipientToField],
       };
 
       console.log('Sending draft payload:', JSON.stringify({ drafts: draftPayload }));
