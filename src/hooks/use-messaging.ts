@@ -288,6 +288,26 @@ export function useTestAIReply() {
   })
 }
 
+// ---------- System Settings ----------
+
+export function useSystemSetting(key: string) {
+  return useQuery({
+    queryKey: queryKeys.messaging.systemSetting(key),
+    queryFn: () => messagingService.getSystemSetting(key),
+  })
+}
+
+export function useUpdateSystemSetting() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ key, value }: { key: string; value: string }) =>
+      messagingService.updateSystemSetting(key, value),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.messaging.systemSetting(variables.key) })
+    },
+  })
+}
+
 // ---------- Analytics ----------
 
 export function useMessagingStats() {

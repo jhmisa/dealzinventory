@@ -363,7 +363,28 @@ export async function getMessagingStats(): Promise<MessagingStats> {
   }
 }
 
-// ---------- Missive Health Check ----------
+// ---------- System Settings ----------
+
+export async function getSystemSetting(key: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('system_settings')
+    .select('value')
+    .eq('key', key)
+    .maybeSingle()
+  if (error) throw error
+  return data?.value ?? null
+}
+
+export async function updateSystemSetting(key: string, value: string) {
+  const { data, error } = await supabase
+    .from('system_settings')
+    .update({ value })
+    .eq('key', key)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
 
 // ---------- Knowledge Base ----------
 

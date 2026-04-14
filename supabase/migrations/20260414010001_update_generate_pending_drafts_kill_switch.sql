@@ -1,27 +1,4 @@
--- ============================================================
--- AI Draft Debounce: wait for customer to finish typing before
--- generating AI drafts (prevents partial-context responses)
--- ============================================================
-
--- 1. Add debounce column
-ALTER TABLE conversations ADD COLUMN IF NOT EXISTS draft_pending_since timestamptz;
-
--- Partial index for efficient cron queries
-CREATE INDEX IF NOT EXISTS idx_conversations_draft_pending
-  ON conversations (draft_pending_since)
-  WHERE draft_pending_since IS NOT NULL;
-
--- 2. Configurable delay (default 120 seconds / 2 minutes)
-INSERT INTO system_settings (key, value)
-VALUES ('ai_draft_debounce_seconds', '120')
-ON CONFLICT (key) DO NOTHING;
-
--- ============================================================
--- DB function: generate_pending_drafts()
--- Called by pg_cron every minute. If any conversations are ready
--- for AI draft generation, invokes the edge function.
--- ============================================================
-
+-- Update generate_pending_drafts() to check global AI kill switch
 CREATE OR REPLACE FUNCTION generate_pending_drafts()
 RETURNS void
 LANGUAGE plpgsql
@@ -90,13 +67,3 @@ BEGIN
   );
 END;
 $$;
-
--- ============================================================
--- pg_cron schedule — every 1 minute
--- ============================================================
-
-SELECT cron.schedule(
-  'generate-pending-drafts',
-  '* * * * *',
-  $$SELECT generate_pending_drafts()$$
-);

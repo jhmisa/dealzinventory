@@ -234,17 +234,28 @@ Deno.serve(async (req) => {
     // --- AI Draft Debounce ---
     // Set/reset draft_pending_since so the cron job generates a draft
     // after the customer stops sending messages (debounce window).
-    const { data: convState } = await supabase
-      .from('conversations')
-      .select('ai_enabled')
-      .eq('id', conv.id)
-      .single();
+    // First check global AI kill switch
+    const { data: aiGlobalSetting } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'ai_messaging_enabled')
+      .maybeSingle();
 
-    if (convState?.ai_enabled !== false) {
-      await supabase
+    const aiGlobalEnabled = aiGlobalSetting?.value === 'true';
+
+    if (aiGlobalEnabled) {
+      const { data: convState } = await supabase
         .from('conversations')
-        .update({ draft_pending_since: new Date().toISOString() })
-        .eq('id', conv.id);
+        .select('ai_enabled')
+        .eq('id', conv.id)
+        .single();
+
+      if (convState?.ai_enabled !== false) {
+        await supabase
+          .from('conversations')
+          .update({ draft_pending_since: new Date().toISOString() })
+          .eq('id', conv.id);
+      }
     }
 
     return jsonResponse({

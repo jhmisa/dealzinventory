@@ -8,6 +8,7 @@ const corsHeaders = {
 
 const MISSIVE_API_TOKEN = Deno.env.get('MISSIVE_API_TOKEN') ?? '';
 const MISSIVE_API_URL = 'https://public.missiveapp.com/v1';
+const MISSIVE_MESSENGER_ACCOUNT_ID = Deno.env.get('MISSIVE_MESSENGER_ACCOUNT_ID') ?? '';
 
 // ---------- Types ----------
 
@@ -115,11 +116,31 @@ Deno.serve(async (req) => {
         throw new Error('MISSIVE_API_TOKEN not configured');
       }
 
-      // Let Missive pick the sender automatically based on the conversation
+      // Fetch conversation from Missive to get organization context
+      let organizationId: string | undefined;
+      try {
+        const convRes = await fetch(
+          `${MISSIVE_API_URL}/conversations/${conversation.missive_conversation_id}`,
+          { headers: { Authorization: `Bearer ${MISSIVE_API_TOKEN}` } },
+        );
+        if (convRes.ok) {
+          const convData = await convRes.json();
+          organizationId = convData?.conversations?.organization?.id;
+          console.log('Missive conv data:', JSON.stringify({
+            organization: convData?.conversations?.organization,
+            assignees: convData?.conversations?.assignees,
+          }));
+        }
+      } catch (e) {
+        console.warn('Failed to fetch Missive conversation context:', e);
+      }
+
       const draftPayload: Record<string, unknown> = {
         body: content,
         conversation: conversation.missive_conversation_id,
         send: true,
+        ...(organizationId ? { organization: organizationId } : {}),
+        ...(MISSIVE_MESSENGER_ACCOUNT_ID ? { account: MISSIVE_MESSENGER_ACCOUNT_ID } : {}),
       };
 
       const missiveRes = await fetch(`${MISSIVE_API_URL}/drafts`, {
@@ -178,15 +199,17 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Update conversation state
-    await supabase
-      .from('conversations')
-      .update({
-        last_message_at: new Date().toISOString(),
-        needs_human_review: false,
-        draft_pending_since: null,  // Cancel pending AI draft — staff already replied
-      })
-      .eq('id', conversation.id);
+    // Only update conversation state on successful send
+    if (!sendError) {
+      await supabase
+        .from('conversations')
+        .update({
+          last_message_at: new Date().toISOString(),
+          needs_human_review: false,
+          draft_pending_since: null,  // Cancel pending AI draft — staff already replied
+        })
+        .eq('id', conversation.id);
+    }
 
     if (sendError) {
       console.error('Send message failed:', JSON.stringify(sendError));

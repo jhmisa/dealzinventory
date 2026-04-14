@@ -56,6 +56,18 @@ export default function MessagesPage() {
   // Realtime subscriptions — replaces polling
   useMessagingRealtime(selectedConvId)
 
+  // Auto-switch to "All" tab if selected conversation leaves current filtered list
+  useEffect(() => {
+    if (
+      selectedConvId &&
+      !loadingConversations &&
+      conversations.length > 0 &&
+      !conversations.find((c) => c.id === selectedConvId)
+    ) {
+      setTab('all')
+    }
+  }, [conversations, selectedConvId, loadingConversations])
+
   // Mark conversation as read when selected
   useEffect(() => {
     if (selectedConvId && selectedConversation && selectedConversation.unread_count > 0) {

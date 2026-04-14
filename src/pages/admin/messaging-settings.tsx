@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Plus, Trash2, Check, Bot, Sparkles, FileText, Pencil, ShieldAlert, BookOpen, FlaskConical, Send, ChevronUp, ChevronDown, RotateCcw } from 'lucide-react'
+import { Plus, Trash2, Check, Bot, Sparkles, FileText, Pencil, ShieldAlert, BookOpen, FlaskConical, Send, ChevronUp, ChevronDown, RotateCcw, Power } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -41,6 +41,8 @@ import {
   useUpdateKnowledgeBaseEntry,
   useDeleteKnowledgeBaseEntry,
   useTestAIReply,
+  useSystemSetting,
+  useUpdateSystemSetting,
 } from '@/hooks/use-messaging'
 import { useCustomers } from '@/hooks/use-customers'
 import type { AiProvider, MessagingTemplate, MessagingTemplateInsert, KnowledgeBaseEntry, TestAIMessage, TestAIResponse } from '@/lib/types'
@@ -434,6 +436,9 @@ export default function MessagingSettingsPage() {
   const updateKbEntry = useUpdateKnowledgeBaseEntry()
   const deleteKbEntry = useDeleteKnowledgeBaseEntry()
 
+  const { data: aiGlobalEnabled, isLoading: loadingAiGlobal } = useSystemSetting('ai_messaging_enabled')
+  const updateSystemSetting = useUpdateSystemSetting()
+
   const guardrails = kbEntries.filter((e) => e.entry_type === 'guardrail')
   const knowledgeArticles = kbEntries.filter((e) => e.entry_type === 'knowledge')
 
@@ -569,6 +574,36 @@ export default function MessagingSettingsPage() {
         title="AI Messaging"
         description="Configure AI providers, persona, guardrails, knowledge base, and test the AI"
       />
+
+      {/* Global AI Kill Switch */}
+      <Card className={aiGlobalEnabled === 'true' ? 'border-green-200 bg-green-50/50' : 'border-orange-200 bg-orange-50/50'}>
+        <CardContent className="flex items-center justify-between py-4">
+          <div className="flex items-center gap-3">
+            <Power className={`h-5 w-5 ${aiGlobalEnabled === 'true' ? 'text-green-600' : 'text-orange-600'}`} />
+            <div>
+              <p className="font-medium">AI Auto-Replies</p>
+              <p className="text-sm text-muted-foreground">
+                {aiGlobalEnabled === 'true'
+                  ? 'AI drafts are enabled globally. Per-conversation toggles still apply.'
+                  : 'AI drafts are globally disabled. No AI drafts will be generated for any conversation.'}
+              </p>
+            </div>
+          </div>
+          <Switch
+            checked={aiGlobalEnabled === 'true'}
+            disabled={loadingAiGlobal || updateSystemSetting.isPending}
+            onCheckedChange={(checked) => {
+              updateSystemSetting.mutate(
+                { key: 'ai_messaging_enabled', value: checked ? 'true' : 'false' },
+                {
+                  onSuccess: () => toast.success(checked ? 'AI auto-replies enabled' : 'AI auto-replies disabled'),
+                  onError: (err) => toast.error(`Failed: ${err.message}`),
+                },
+              )
+            }}
+          />
+        </CardContent>
+      </Card>
 
       {/* AI Providers Section */}
       <Card>
