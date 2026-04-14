@@ -125,11 +125,11 @@ Deno.serve(async (req) => {
       }
 
       const draftPayload: Record<string, unknown> = {
-        body: content,
-        conversation: conversation.missive_conversation_id,
         send: true,
-        account: MISSIVE_MESSENGER_ACCOUNT_ID || undefined,
+        account: MISSIVE_MESSENGER_ACCOUNT_ID,
+        body: content,
         to_fields: [{ id: contactPlatformId }],
+        conversation: conversation.missive_conversation_id,
       };
 
       console.log('Sending draft payload:', JSON.stringify({ drafts: draftPayload }));
