@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 export function ShopFooter() {
   return (
     <footer className="border-t bg-muted/50 mt-auto">
-      <div className="container py-8">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div>
             <h3 className="font-semibold mb-3">Dealz K.K.</h3>

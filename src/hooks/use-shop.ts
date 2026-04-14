@@ -2,21 +2,25 @@ import { useQuery } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/query-keys'
 import * as shopService from '@/services/shop'
 import * as accessoriesService from '@/services/accessories'
+import type { ShopFilters } from '@/services/shop'
 
-interface ShopFilters {
-  search?: string
-  brand?: string
-  grade?: string
-  minPrice?: number
-  maxPrice?: number
-  sort?: 'price_asc' | 'price_desc' | 'newest'
+export function useShopItems(filters: ShopFilters = {}) {
+  return useQuery({
+    queryKey: [...queryKeys.shop.products(filters), 'items'],
+    queryFn: () => shopService.getShopItems(filters),
+  })
 }
 
-export function useShopProducts(filters: ShopFilters = {}) {
+export function useShopSellGroups(filters: ShopFilters = {}) {
   return useQuery({
-    queryKey: queryKeys.shop.products(filters),
-    queryFn: () => shopService.getShopProducts(filters),
+    queryKey: [...queryKeys.shop.products(filters), 'sell-groups'],
+    queryFn: () => shopService.getShopSellGroups(filters),
   })
+}
+
+// Keep for backward compat
+export function useShopProducts(filters: ShopFilters = {}) {
+  return useShopSellGroups(filters)
 }
 
 export function useProductDetail(configGroupId: string) {

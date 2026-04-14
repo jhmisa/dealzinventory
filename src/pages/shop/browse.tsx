@@ -20,7 +20,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet'
 import { Label } from '@/components/ui/label'
-import { useShopProducts, useShopBrands, useShopEnabled, useShopAccessories } from '@/hooks/use-shop'
+import { useShopItems, useShopSellGroups, useShopBrands, useShopEnabled, useShopAccessories } from '@/hooks/use-shop'
 import { CONDITION_GRADES } from '@/lib/constants'
 import { formatPrice, cn } from '@/lib/utils'
 import type { Accessory, AccessoryMedia } from '@/lib/types'
@@ -38,19 +38,23 @@ export default function ShopBrowsePage() {
 
   const { data: shopEnabled } = useShopEnabled()
 
-  const { data: products, isLoading } = useShopProducts({
+  const filters = {
     search: search || undefined,
     brand: brand === 'all' ? undefined : brand,
     grade: grade === 'all' ? undefined : grade,
     sort,
-  })
+  }
 
-  const { data: shopAccessories } = useShopAccessories({
+  const { data: items, isLoading: itemsLoading } = useShopItems(filters)
+  const { data: sellGroups, isLoading: sgLoading } = useShopSellGroups(filters)
+  const { data: shopAccessories, isLoading: accLoading } = useShopAccessories({
     search: search || undefined,
     sort,
   })
-
   const { data: brands } = useShopBrands()
+
+  const isLoading = itemsLoading || sgLoading || accLoading
+  const totalCount = (items?.length ?? 0) + (sellGroups?.length ?? 0) + (shopAccessories?.length ?? 0)
 
   if (shopEnabled === false) {
     return (
@@ -62,18 +66,18 @@ export default function ShopBrowsePage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold">Shop</h1>
-        <p className="text-muted-foreground">Quality refurbished laptops, phones, and tablets.</p>
+        <h1 className="text-3xl font-bold tracking-tight">Shop</h1>
+        <p className="text-muted-foreground mt-1">Quality refurbished laptops, phones, and tablets.</p>
       </div>
 
-      {/* Search + Sort + Filter Toggle */}
+      {/* Search + Sort + Filters */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[200px] max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search products..."
+            placeholder="Search by code, brand, model..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
@@ -161,35 +165,46 @@ export default function ShopBrowsePage() {
         </div>
       </div>
 
-      {/* Product Grid */}
+      {/* Results */}
       {isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="aspect-[3/4] rounded-lg bg-muted animate-pulse" />
           ))}
         </div>
-      ) : !products || products.length === 0 ? (
+      ) : totalCount === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
           <p className="text-lg">No products found.</p>
           <p className="text-sm mt-1">Try adjusting your search or filters.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {/* Accessory Cards */}
-          {(shopAccessories ?? []).map((acc: Accessory & { categories: { name: string } | null; accessory_media: AccessoryMedia[] }) => {
-            const media = acc.accessory_media ?? []
-            const heroImg = media.sort((a, b) => a.sort_order - b.sort_order)[0]
+          {/* Individual Items (P-codes) */}
+          {(items ?? []).map((item) => {
+            const pm = item.product_models as {
+              id: string; brand: string; model_name: string; color: string | null
+              short_description: string | null
+              product_media?: { id: string; file_url: string; role: string; sort_order: number }[]
+            } | null
+            const itemMedia = (item.item_media ?? []) as { file_url: string; sort_order: number; visible: boolean; thumbnail_url: string | null }[]
+            const visibleItemMedia = itemMedia.filter(m => m.visible !== false).sort((a, b) => a.sort_order - b.sort_order)
+            const productMedia = pm?.product_media ?? []
+            const heroProductImg = productMedia.find(m => m.role === 'hero') ?? productMedia[0]
+            const heroImg = visibleItemMedia[0]?.thumbnail_url ?? visibleItemMedia[0]?.file_url ?? heroProductImg?.file_url
+            const gradeInfo = CONDITION_GRADES.find(g => g.value === item.condition_grade)
+            const description = pm?.short_description ?? item.specs_notes ?? ''
+
             return (
               <Card
-                key={`acc-${acc.id}`}
+                key={`item-${item.id}`}
                 className="group cursor-pointer overflow-hidden transition-all hover:shadow-lg hover:-translate-y-0.5"
-                onClick={() => navigate(`/shop/accessory/${acc.id}`)}
+                onClick={() => navigate(`/shop/product/${pm?.id ?? item.id}`)}
               >
                 <div className="aspect-square bg-muted relative overflow-hidden">
                   {heroImg ? (
                     <img
-                      src={heroImg.file_url}
-                      alt={acc.name}
+                      src={heroImg}
+                      alt={pm ? `${pm.brand} ${pm.model_name}` : item.item_code}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                   ) : (
@@ -197,21 +212,21 @@ export default function ShopBrowsePage() {
                       <Image className="h-16 w-16 text-muted-foreground/30" />
                     </div>
                   )}
-                  <Badge variant="outline" className="absolute top-2 right-2 text-xs bg-blue-50 text-blue-700 border-blue-300">
-                    Accessory
-                  </Badge>
+                  {gradeInfo && (
+                    <Badge variant="outline" className={cn('absolute top-2 right-2 text-xs', gradeInfo.color)}>
+                      Grade {gradeInfo.value}
+                    </Badge>
+                  )}
                 </div>
-                <CardContent className="p-4 space-y-1.5">
+                <CardContent className="p-4 space-y-1">
+                  <p className="font-mono text-xs text-muted-foreground">{item.item_code}</p>
                   <h3 className="font-semibold text-sm line-clamp-1">
-                    {acc.brand ? `${acc.brand} ${acc.name}` : acc.name}
+                    {pm ? `${pm.brand} ${pm.model_name}` : item.item_code}
                   </h3>
-                  <p className="text-xs text-muted-foreground line-clamp-1">
-                    {acc.description ?? ''}
-                  </p>
+                  <p className="text-xs text-muted-foreground line-clamp-2">{description}</p>
                   <div className="flex items-center justify-between pt-1">
-                    <span className="text-lg font-bold">{formatPrice(Number(acc.selling_price))}</span>
-                    <span className="text-xs text-green-600 dark:text-green-400">
-                      {acc.stock_quantity} in stock
+                    <span className="text-lg font-bold">
+                      {item.selling_price ? formatPrice(Number(item.selling_price)) : '—'}
                     </span>
                   </div>
                 </CardContent>
@@ -219,12 +234,11 @@ export default function ShopBrowsePage() {
             )
           })}
 
-          {/* Sell Group Cards */}
-          {products.map((sg) => {
+          {/* Sell Groups (G-codes) */}
+          {(sellGroups ?? []).map((sg) => {
             const pm = sg.product_models as {
               id: string; brand: string; model_name: string; color: string | null
-              cpu: string | null; ram_gb: string | null; storage_gb: string | null; os_family: string | null
-              screen_size: number | null; short_description: string | null
+              short_description: string | null
               product_media?: { id: string; file_url: string; role: string; sort_order: number }[]
             } | null
             const media = pm?.product_media ?? []
@@ -234,7 +248,7 @@ export default function ShopBrowsePage() {
 
             return (
               <Card
-                key={sg.id}
+                key={`sg-${sg.id}`}
                 className={cn(
                   'group cursor-pointer overflow-hidden transition-all hover:shadow-lg hover:-translate-y-0.5',
                   stockCount === 0 && 'opacity-75',
@@ -264,17 +278,63 @@ export default function ShopBrowsePage() {
                     </Badge>
                   )}
                 </div>
-                <CardContent className="p-4 space-y-1.5">
+                <CardContent className="p-4 space-y-1">
+                  <p className="font-mono text-xs text-muted-foreground">{sg.sell_group_code}</p>
                   <h3 className="font-semibold text-sm line-clamp-1">
                     {pm ? `${pm.brand} ${pm.model_name}` : sg.sell_group_code}
                   </h3>
-                  <p className="text-xs text-muted-foreground line-clamp-1">
+                  <p className="text-xs text-muted-foreground line-clamp-2">
                     {pm?.short_description ?? ''}
                   </p>
                   <div className="flex items-center justify-between pt-1">
                     <span className="text-lg font-bold">{formatPrice(Number(sg.base_price))}</span>
                     <span className={cn('text-xs', stockCount > 0 ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground')}>
                       {stockCount > 0 ? `${stockCount} in stock` : 'Sold out'}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
+
+          {/* Accessories (A-codes) */}
+          {(shopAccessories ?? []).map((acc: Accessory & { categories: { name: string } | null; accessory_media: AccessoryMedia[] }) => {
+            const media = acc.accessory_media ?? []
+            const heroImg = media.sort((a, b) => a.sort_order - b.sort_order)[0]
+            return (
+              <Card
+                key={`acc-${acc.id}`}
+                className="group cursor-pointer overflow-hidden transition-all hover:shadow-lg hover:-translate-y-0.5"
+                onClick={() => navigate(`/shop/accessory/${acc.id}`)}
+              >
+                <div className="aspect-square bg-muted relative overflow-hidden">
+                  {heroImg ? (
+                    <img
+                      src={heroImg.file_url}
+                      alt={acc.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Image className="h-16 w-16 text-muted-foreground/30" />
+                    </div>
+                  )}
+                  <Badge variant="outline" className="absolute top-2 right-2 text-xs bg-blue-50 text-blue-700 border-blue-300">
+                    Accessory
+                  </Badge>
+                </div>
+                <CardContent className="p-4 space-y-1">
+                  <p className="font-mono text-xs text-muted-foreground">{acc.accessory_code}</p>
+                  <h3 className="font-semibold text-sm line-clamp-1">
+                    {acc.brand ? `${acc.brand} ${acc.name}` : acc.name}
+                  </h3>
+                  <p className="text-xs text-muted-foreground line-clamp-2">
+                    {acc.description ?? ''}
+                  </p>
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-lg font-bold">{formatPrice(Number(acc.selling_price))}</span>
+                    <span className="text-xs text-green-600 dark:text-green-400">
+                      {acc.stock_quantity} in stock
                     </span>
                   </div>
                 </CardContent>

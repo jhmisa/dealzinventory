@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase'
 
-interface ShopFilters {
+export interface ShopFilters {
   search?: string
   brand?: string
   grade?: string
@@ -9,8 +9,78 @@ interface ShopFilters {
   sort?: 'price_asc' | 'price_desc' | 'newest'
 }
 
-// Get all active sell groups for the public shop, with stock counts
-export async function getShopProducts(filters: ShopFilters = {}) {
+// ---------- Unified shop listing type ----------
+
+export interface ShopListing {
+  type: 'item' | 'sell_group' | 'accessory'
+  id: string
+  code: string          // P000123, G000456, A000789
+  title: string         // brand + model or accessory name
+  description: string   // short_description or condition notes
+  price: number | null
+  image_url: string | null
+  grade: string | null
+  stock: number
+  brand: string | null
+}
+
+// ---------- Individual items (P-codes) ----------
+
+export async function getShopItems(filters: ShopFilters = {}) {
+  let query = supabase
+    .from('items')
+    .select(`
+      id, item_code, condition_grade, selling_price, specs_notes, condition_notes,
+      product_models(id, brand, model_name, color, short_description,
+        product_media(id, file_url, role, sort_order)
+      ),
+      item_media(id, file_url, sort_order, visible, thumbnail_url)
+    `)
+    .eq('item_status', 'AVAILABLE')
+    .neq('condition_grade', 'J')
+
+  if (filters.grade) {
+    query = query.eq('condition_grade', filters.grade)
+  }
+
+  if (filters.sort === 'price_asc') {
+    query = query.order('selling_price', { ascending: true, nullsFirst: false })
+  } else if (filters.sort === 'price_desc') {
+    query = query.order('selling_price', { ascending: false })
+  } else {
+    query = query.order('created_at', { ascending: false })
+  }
+
+  const { data, error } = await query
+  if (error) throw error
+
+  let results = data ?? []
+
+  // Client-side filtering for search and brand
+  const searchTerm = filters.search?.toLowerCase()
+  results = results.filter((item) => {
+    if (searchTerm) {
+      const pm = item.product_models as { brand: string; model_name: string } | null
+      const name = pm ? `${pm.brand} ${pm.model_name}`.toLowerCase() : ''
+      if (!name.includes(searchTerm) && !item.item_code.toLowerCase().includes(searchTerm)) {
+        return false
+      }
+    }
+    if (filters.brand) {
+      const pm = item.product_models as { brand: string } | null
+      if (pm?.brand !== filters.brand) return false
+    }
+    if (filters.minPrice !== undefined && Number(item.selling_price) < filters.minPrice) return false
+    if (filters.maxPrice !== undefined && Number(item.selling_price) > filters.maxPrice) return false
+    return true
+  })
+
+  return results
+}
+
+// ---------- Sell groups (G-codes) ----------
+
+export async function getShopSellGroups(filters: ShopFilters = {}) {
   let query = supabase
     .from('sell_groups')
     .select(`
@@ -40,9 +110,7 @@ export async function getShopProducts(filters: ShopFilters = {}) {
 
   let results = data ?? []
 
-  // Client-side filtering (single pass for search, brand, price)
   const searchTerm = filters.search?.toLowerCase()
-
   results = results.filter((sg) => {
     if (searchTerm) {
       const pm = sg.product_models as { brand: string; model_name: string } | null
@@ -62,6 +130,9 @@ export async function getShopProducts(filters: ShopFilters = {}) {
 
   return results
 }
+
+// Keep old name as alias for backward compat
+export const getShopProducts = getShopSellGroups
 
 // Get a sell group by its G-code (for live-selling links)
 export async function getSellGroupByCode(code: string) {
@@ -109,18 +180,23 @@ export async function getShopEnabled(): Promise<boolean> {
   return data.value !== 'false'
 }
 
-// Get unique brands from active sell groups (for filter dropdown)
+// Get unique brands from available items + active sell groups
 export async function getShopBrands() {
-  const { data, error } = await supabase
-    .from('sell_groups')
-    .select('product_models(brand)')
-    .eq('active', true)
-
-  if (error) throw error
+  const [{ data: itemData }, { data: sgData }] = await Promise.all([
+    supabase
+      .from('items')
+      .select('product_models(brand)')
+      .eq('item_status', 'AVAILABLE')
+      .neq('condition_grade', 'J'),
+    supabase
+      .from('sell_groups')
+      .select('product_models(brand)')
+      .eq('active', true),
+  ])
 
   const brands = new Set<string>()
-  for (const sg of data ?? []) {
-    const pm = sg.product_models as { brand: string } | null
+  for (const row of [...(itemData ?? []), ...(sgData ?? [])]) {
+    const pm = row.product_models as { brand: string } | null
     if (pm?.brand) brands.add(pm.brand)
   }
 
