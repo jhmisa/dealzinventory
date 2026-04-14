@@ -117,7 +117,7 @@ Deno.serve(async (req) => {
     if (insertError) throw insertError;
 
     // Fetch attachment files from Storage and convert to base64 for Missive
-    const missiveAttachments: Array<{ base64: string; filename: string; media_type: string }> = [];
+    const missiveAttachments: Array<{ base64_data: string; filename: string }> = [];
     if (inputAttachments && inputAttachments.length > 0) {
       for (const att of inputAttachments) {
         try {
@@ -139,9 +139,8 @@ Deno.serve(async (req) => {
           const base64 = btoa(binary);
 
           missiveAttachments.push({
-            base64,
+            base64_data: base64,
             filename: att.filename,
-            media_type: att.mime_type,
           });
         } catch (err) {
           console.error(`Error processing attachment ${att.filename}:`, err);
