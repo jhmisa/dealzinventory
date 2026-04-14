@@ -57,39 +57,44 @@ export const InventorySearchModal = memo(function InventorySearchModal({
         let attachment: MessageAttachment | undefined
         let thumbnailUrl: string | undefined
 
-        // Download hero photo and add as attachment
-        if (item.thumbnail_url) {
+        // Download display-size photo (not thumbnail) for attachment
+        const imageUrl = item.display_url ?? item.thumbnail_url
+        if (imageUrl) {
           try {
-            const response = await fetch(item.thumbnail_url)
+            const response = await fetch(imageUrl)
             if (response.ok) {
               const blob = await response.blob()
-              const ext = item.thumbnail_url.split('.').pop()?.split('?')[0] ?? 'jpg'
+              const ext = imageUrl.split('.').pop()?.split('?')[0] ?? 'jpg'
               const filename = `${item.code}.${ext}`
               const file = new File([blob], filename, { type: blob.type || 'image/jpeg' })
               attachment = await uploadAttachment(file, `inventory-insert`)
-              thumbnailUrl = item.thumbnail_url
+              thumbnailUrl = item.thumbnail_url ?? imageUrl
             }
           } catch {
             // Photo download failed — continue without attachment
           }
         }
 
-        // Build message text
-        let text: string
+        // Build message text matching Available items table format
+        const lines: string[] = []
         if (item.type === 'item') {
-          const grade = item.grade ? ` - Grade ${item.grade}` : ''
-          text = `[${item.code}] ${item.description}${grade}`
-          if (item.price) text += `\nPrice: ${formatPrice(item.price)}`
+          lines.push(item.code)
+          lines.push(item.description)
+          if (item.condition_notes) lines.push(item.condition_notes)
+          if (item.grade) lines.push(`Rank ${item.grade}`)
+          if (item.price) lines.push(formatPrice(item.price))
           if (SHOP_URL && item.product_model_id) {
-            text += `\nView details: ${SHOP_URL}/shop/product/${item.product_model_id}`
+            lines.push(`${SHOP_URL}/shop/product/${item.product_model_id}`)
           }
         } else {
-          text = `[${item.code}] ${item.description}`
-          if (item.price) text += `\nPrice: ${formatPrice(item.price)}`
+          lines.push(item.code)
+          lines.push(item.description)
+          if (item.price) lines.push(formatPrice(item.price))
           if (SHOP_URL && item.accessory_id) {
-            text += `\nView details: ${SHOP_URL}/shop/accessory/${item.accessory_id}`
+            lines.push(`${SHOP_URL}/shop/accessory/${item.accessory_id}`)
           }
         }
+        const text = lines.join('\n')
 
         onInsertItem(text, attachment, thumbnailUrl)
         toast.success(`Added ${item.code} to message`)

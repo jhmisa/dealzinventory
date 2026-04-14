@@ -365,6 +365,8 @@ export async function searchAvailableAccessories(query: string): Promise<Availab
       grade: null,
       price: acc.selling_price,
       thumbnail_url: sortedMedia[0]?.file_url ?? null,
+      display_url: sortedMedia[0]?.file_url ?? null,
+      condition_notes: null,
       product_model_id: null,
       accessory_id: acc.id,
     }

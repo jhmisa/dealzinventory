@@ -11,12 +11,20 @@ RETURNS TABLE (
   product_id uuid,
   brand text,
   model_name text,
+  model_number text,
   storage_gb text,
   ram_gb text,
+  cpu text,
+  gpu text,
+  screen_size numeric,
+  color text,
+  os_family text,
+  condition_notes text,
+  year integer,
+  first_item_display_url text,
+  first_item_thumb_url text,
   hero_media_url text,
-  first_product_media_url text,
-  first_item_media_url text,
-  first_item_thumb_url text
+  first_product_media_url text
 ) AS $$
 BEGIN
   RETURN QUERY
@@ -28,20 +36,28 @@ BEGIN
     i.product_id,
     i.brand,
     i.model_name,
+    i.model_number,
     i.storage_gb,
     i.ram_gb,
+    i.cpu,
+    i.gpu,
+    i.screen_size,
+    i.color,
+    i.os_family,
+    i.condition_notes,
+    i.year,
+    (SELECT imed.file_url FROM item_media imed
+     WHERE imed.item_id = i.id
+     ORDER BY imed.sort_order LIMIT 1) AS first_item_display_url,
+    (SELECT imed.thumbnail_url FROM item_media imed
+     WHERE imed.item_id = i.id AND imed.thumbnail_url IS NOT NULL
+     ORDER BY imed.sort_order LIMIT 1) AS first_item_thumb_url,
     (SELECT pmed.file_url FROM product_media pmed
      WHERE pmed.product_id = i.product_id AND pmed.role = 'hero'
      ORDER BY pmed.sort_order LIMIT 1) AS hero_media_url,
     (SELECT pmed.file_url FROM product_media pmed
      WHERE pmed.product_id = i.product_id
-     ORDER BY pmed.sort_order LIMIT 1) AS first_product_media_url,
-    (SELECT imed.file_url FROM item_media imed
-     WHERE imed.item_id = i.id
-     ORDER BY imed.sort_order LIMIT 1) AS first_item_media_url,
-    (SELECT imed.thumbnail_url FROM item_media imed
-     WHERE imed.item_id = i.id AND imed.thumbnail_url IS NOT NULL
-     ORDER BY imed.sort_order LIMIT 1) AS first_item_thumb_url
+     ORDER BY pmed.sort_order LIMIT 1) AS first_product_media_url
   FROM items i
   WHERE i.item_status = 'AVAILABLE'
     AND (

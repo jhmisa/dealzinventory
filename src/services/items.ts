@@ -325,6 +325,8 @@ export interface AvailableInventoryResult {
   grade: string | null
   price: number | null
   thumbnail_url: string | null
+  display_url: string | null
+  condition_notes: string | null
   product_model_id: string | null
   accessory_id: string | null
 }
@@ -347,20 +349,45 @@ export async function searchAvailableItems(query: string): Promise<AvailableInve
     product_id: string | null
     brand: string | null
     model_name: string | null
+    model_number: string | null
     storage_gb: string | null
     ram_gb: string | null
+    cpu: string | null
+    gpu: string | null
+    screen_size: number | null
+    color: string | null
+    os_family: string | null
+    condition_notes: string | null
+    year: number | null
+    first_item_display_url: string | null
+    first_item_thumb_url: string | null
     hero_media_url: string | null
     first_product_media_url: string | null
-    first_item_media_url: string | null
-    first_item_thumb_url: string | null
   }) => {
-    const parts = [row.brand, row.model_name]
-    if (row.storage_gb) parts.push(`${row.storage_gb}GB`)
-    const description = parts.filter(Boolean).join(' ')
+    // Build full description matching Available items table format
+    const specParts = [
+      row.brand,
+      row.model_name,
+      row.model_number,
+      row.year,
+      row.ram_gb,
+      row.storage_gb,
+      row.cpu,
+      row.gpu,
+      row.screen_size ? `${row.screen_size}"` : null,
+      row.color,
+      row.os_family,
+    ].filter(Boolean)
+    const description = specParts.length > 0 ? specParts.join(' ') : '—'
 
-    const thumbnail_url = row.hero_media_url
-      ?? row.first_item_thumb_url
-      ?? row.first_item_media_url
+    const thumbnail_url = row.first_item_thumb_url
+      ?? row.hero_media_url
+      ?? row.first_product_media_url
+      ?? null
+
+    // Display URL: full-size image for attachments
+    const display_url = row.first_item_display_url
+      ?? row.hero_media_url
       ?? row.first_product_media_url
       ?? null
 
@@ -372,6 +399,8 @@ export async function searchAvailableItems(query: string): Promise<AvailableInve
       grade: row.condition_grade,
       price: row.selling_price,
       thumbnail_url,
+      display_url,
+      condition_notes: row.condition_notes,
       product_model_id: row.product_id,
       accessory_id: null,
     }
