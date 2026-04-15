@@ -9,6 +9,7 @@ import { PageHeader } from '@/components/shared/page-header'
 import { Badge } from '@/components/ui/badge'
 import { ConversationList } from '@/components/messaging/conversation-list'
 import { ConversationThread } from '@/components/messaging/conversation-thread'
+import { CustomerPanel } from '@/components/messaging/customer-panel'
 import type { MessageAttachment } from '@/lib/types'
 import {
   useConversations,
@@ -31,6 +32,17 @@ export default function MessagesPage() {
   const [tab, setTab] = useState<FilterTab>('needs_review')
   const [search, setSearch] = useState('')
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null)
+  const [panelCollapsed, setPanelCollapsed] = useState(
+    () => localStorage.getItem('messaging-panel-collapsed') === 'true'
+  )
+
+  const handleTogglePanel = useCallback(() => {
+    setPanelCollapsed((prev: boolean) => {
+      const next = !prev
+      localStorage.setItem('messaging-panel-collapsed', String(next))
+      return next
+    })
+  }, [])
 
   const { user } = useAuth()
   const { data: staffProfiles = [] } = useStaffProfiles()
@@ -285,6 +297,16 @@ export default function MessagesPage() {
             </div>
           )}
         </div>
+
+        {/* Right panel — Customer info */}
+        {selectedConversation && (
+          <CustomerPanel
+            conversation={selectedConversation}
+            onLinkCustomer={handleLinkCustomer}
+            collapsed={panelCollapsed}
+            onToggleCollapse={handleTogglePanel}
+          />
+        )}
       </div>
     </div>
   )
