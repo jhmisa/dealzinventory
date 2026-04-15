@@ -46,16 +46,18 @@ const AttachmentThumbnail = memo(function AttachmentThumbnail({
   attachment: MessageAttachment
   isOutbound: boolean
 }) {
-  const [url, setUrl] = useState<string | null>(null)
+  const isExternal = attachment.file_url.startsWith('http://') || attachment.file_url.startsWith('https://')
+  const [url, setUrl] = useState<string | null>(isExternal ? attachment.file_url : null)
   const isImage = attachment.mime_type.startsWith('image/')
 
   useEffect(() => {
+    if (isExternal) return // already have the URL
     let cancelled = false
     getAttachmentSignedUrl(attachment.file_url).then((signedUrl) => {
       if (!cancelled) setUrl(signedUrl)
     }).catch(() => {})
     return () => { cancelled = true }
-  }, [attachment.file_url])
+  }, [attachment.file_url, isExternal])
 
   if (!url) return null
 

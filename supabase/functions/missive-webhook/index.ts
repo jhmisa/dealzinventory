@@ -7,6 +7,8 @@ const corsHeaders = {
 };
 
 const MISSIVE_WEBHOOK_SECRET = Deno.env.get('MISSIVE_WEBHOOK_SECRET') ?? '';
+const MISSIVE_API_TOKEN = Deno.env.get('MISSIVE_API_TOKEN') ?? '';
+const MISSIVE_API_URL = 'https://public.missiveapp.com/v1';
 
 // ---------- Types ----------
 
@@ -27,13 +29,6 @@ interface MissiveWebhookPayload {
       address?: string;
     };
     delivered_at?: number;
-    attachments?: Array<{
-      url: string;
-      filename?: string;
-      content_type?: string;
-      size?: number;
-      media_type?: string;
-    }>;
   };
 }
 
@@ -162,7 +157,6 @@ Deno.serve(async (req) => {
       conv_subject: conversation?.subject,
       msg_from_field: message?.from_field,
       msg_id: message?.id,
-      attachment_count: message?.attachments?.length ?? 0,
     }));
 
     if (!conversation?.id || !message?.id) {
@@ -228,15 +222,32 @@ Deno.serve(async (req) => {
       ? message.body.replace(/<[^>]+>/g, '').trim()
       : message.preview ?? '';
 
-    // Map Missive attachments to our format
-    const attachments = (message.attachments ?? [])
-      .filter(a => a.url)
-      .map(a => ({
-        file_url: a.url,
-        filename: a.filename ?? 'attachment',
-        mime_type: a.content_type ?? a.media_type ?? 'application/octet-stream',
-        ...(a.size ? { size_bytes: a.size } : {}),
-      }));
+    // Fetch full message from Missive API to get attachments
+    // (webhook payloads don't include attachments)
+    let attachments: Array<{ file_url: string; filename: string; mime_type: string; size_bytes?: number }> = [];
+    if (MISSIVE_API_TOKEN) {
+      try {
+        const msgRes = await fetch(`${MISSIVE_API_URL}/messages/${message.id}`, {
+          headers: { Authorization: `Bearer ${MISSIVE_API_TOKEN}` },
+        });
+        if (msgRes.ok) {
+          const msgData = await msgRes.json();
+          const rawAttachments = msgData?.messages?.attachments ?? msgData?.message?.attachments ?? [];
+          attachments = rawAttachments
+            .filter((a: { url?: string }) => a.url)
+            .map((a: { url: string; filename?: string; media_type?: string; sub_type?: string; size?: number }) => ({
+              file_url: a.url,
+              filename: a.filename ?? 'attachment',
+              mime_type: a.media_type && a.sub_type ? `${a.media_type}/${a.sub_type}` : 'application/octet-stream',
+              ...(a.size ? { size_bytes: a.size } : {}),
+            }));
+        } else {
+          console.warn('Missive API fetch failed:', msgRes.status);
+        }
+      } catch (e) {
+        console.warn('Failed to fetch message attachments from Missive:', e);
+      }
+    }
 
     // Store inbound message
     const { error: msgError } = await supabase.from('messages').insert({
