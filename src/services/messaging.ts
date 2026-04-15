@@ -43,19 +43,21 @@ export async function getConversations(filters: ConversationFilters = {}) {
     query = query.eq('assigned_staff_id', filters.assigned_staff_id)
   }
   if (filters.search) {
-    // PostgREST does not support .or() on joined tables.
-    // Pre-fetch matching customer IDs, then filter by foreign key.
+    // Search both the conversation's contact_name and linked customer fields.
+    // PostgREST does not support .or() on joined tables, so we pre-fetch
+    // matching customer IDs and combine with a contact_name filter.
     const { data: matchingCustomers } = await supabase
       .from('customers')
       .select('id')
       .or(`last_name.ilike.%${filters.search}%,first_name.ilike.%${filters.search}%,customer_code.ilike.%${filters.search}%`)
-    const ids = (matchingCustomers ?? []).map(c => c.id)
-    if (ids.length > 0) {
-      query = query.in('customer_id', ids)
-    } else {
-      // No matching customers — return empty
-      return []
+    const customerIds = (matchingCustomers ?? []).map(c => c.id)
+
+    // Build an OR filter: contact_name match OR customer_id in matched IDs
+    const orParts: string[] = [`contact_name.ilike.%${filters.search}%`]
+    if (customerIds.length > 0) {
+      orParts.push(`customer_id.in.(${customerIds.join(',')})`)
     }
+    query = query.or(orParts.join(','))
   }
 
   // Only fetch the latest message per conversation for the list view
