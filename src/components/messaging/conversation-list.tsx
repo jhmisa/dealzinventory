@@ -1,11 +1,13 @@
 import { memo } from 'react'
-import { Link2 } from 'lucide-react'
+import { Link2, UserCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { ChannelBadge } from './channel-badge'
 import { CustomerLinker } from './customer-linker'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { SearchBar } from '@/components/shared/search-bar'
 import type { ConversationWithRelations } from '@/lib/types'
 
 function formatTimeAgo(dateStr: string | null): string {
@@ -46,6 +48,12 @@ interface ConversationListProps {
   selectedId: string | null
   onSelect: (id: string) => void
   onLinkCustomer?: (conversationId: string, customerId: string) => void
+  mineOnly: boolean
+  onToggleMineOnly: (v: boolean) => void
+  staffMap?: Record<string, { display_name: string; avatar_url: string | null }>
+  currentUserId?: string
+  search: string
+  onSearchChange: (v: string) => void
 }
 
 export const ConversationList = memo(function ConversationList({
@@ -53,83 +61,113 @@ export const ConversationList = memo(function ConversationList({
   selectedId,
   onSelect,
   onLinkCustomer,
+  mineOnly,
+  onToggleMineOnly,
+  staffMap,
+  search,
+  onSearchChange,
 }: ConversationListProps) {
   return (
-    <ScrollArea className="h-full">
-      <div className="space-y-0.5 p-2">
-        {conversations.length === 0 && (
-          <p className="text-sm text-muted-foreground text-center py-8">No conversations</p>
-        )}
-        {conversations.map((conv) => {
-          const last = getLastMessage(conv)
-          const dot = getStatusDot(conv)
-          const name = getDisplayName(conv)
-          const isSelected = conv.id === selectedId
-
-          return (
-            <button
-              key={conv.id}
-              className={cn(
-                'flex w-full items-start gap-3 rounded-md p-2.5 text-left transition-colors',
-                isSelected ? 'bg-accent' : 'hover:bg-muted/50',
-              )}
-              onClick={() => onSelect(conv.id)}
+    <>
+      <div className="flex items-center gap-2 p-2 border-b">
+        <SearchBar value={search} onChange={onSearchChange} placeholder="Search..." className="flex-1" />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant={mineOnly ? 'default' : 'ghost'}
+              size="icon"
+              className="h-8 w-8 shrink-0"
+              onClick={() => onToggleMineOnly(!mineOnly)}
             >
-              <span
-                className={cn('mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full', dot.color)}
-                title={dot.label}
-              />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-2">
-                  <span className={cn('truncate text-sm', conv.unread_count > 0 ? 'font-bold' : 'font-medium')}>
-                    {name}
-                  </span>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {conv.unread_count > 0 && (
-                      <Badge variant="default" className="h-4 min-w-4 px-1 text-[10px]">
-                        {conv.unread_count}
-                      </Badge>
-                    )}
-                    <span className="text-[10px] text-muted-foreground">
-                      {formatTimeAgo(conv.last_message_at)}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <ChannelBadge channel={conv.channel} />
-                  {conv.customers ? (
-                    <span className="text-[10px] text-muted-foreground">{conv.customers.customer_code}</span>
-                  ) : conv.unmatched_contact && onLinkCustomer ? (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span onClick={(e) => e.stopPropagation()}>
-                          <CustomerLinker
-                            onLink={(customerId) => onLinkCustomer(conv.id, customerId)}
-                            trigger={
-                              <span
-                                role="button"
-                                className="inline-flex items-center justify-center h-4 w-4 rounded hover:bg-muted-foreground/20 text-muted-foreground hover:text-primary transition-colors"
-                              >
-                                <Link2 className="h-3 w-3" />
-                              </span>
-                            }
-                          />
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">Link to customer</TooltipContent>
-                    </Tooltip>
-                  ) : null}
-                </div>
-                {last && (
-                  <p className="mt-1 truncate text-xs text-muted-foreground">
-                    {last.content}
-                  </p>
-                )}
-              </div>
-            </button>
-          )
-        })}
+              <UserCheck className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            {mineOnly ? 'Showing mine only' : 'Show mine only'}
+          </TooltipContent>
+        </Tooltip>
       </div>
-    </ScrollArea>
+      <ScrollArea className="flex-1">
+        <div className="space-y-0.5 p-2">
+          {conversations.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-8">No conversations</p>
+          )}
+          {conversations.map((conv) => {
+            const last = getLastMessage(conv)
+            const dot = getStatusDot(conv)
+            const name = getDisplayName(conv)
+            const isSelected = conv.id === selectedId
+
+            return (
+              <button
+                key={conv.id}
+                className={cn(
+                  'flex w-full items-start gap-3 rounded-md p-2.5 text-left transition-colors',
+                  isSelected ? 'bg-accent' : 'hover:bg-muted/50',
+                )}
+                onClick={() => onSelect(conv.id)}
+              >
+                <span
+                  className={cn('mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full', dot.color)}
+                  title={dot.label}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={cn('truncate text-sm', conv.unread_count > 0 ? 'font-bold' : 'font-medium')}>
+                      {name}
+                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {conv.unread_count > 0 && (
+                        <Badge variant="default" className="h-4 min-w-4 px-1 text-[10px]">
+                          {conv.unread_count}
+                        </Badge>
+                      )}
+                      <span className="text-[10px] text-muted-foreground">
+                        {formatTimeAgo(conv.last_message_at)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <ChannelBadge channel={conv.channel} />
+                    {conv.customers ? (
+                      <span className="text-[10px] text-muted-foreground">{conv.customers.customer_code}</span>
+                    ) : conv.unmatched_contact && onLinkCustomer ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span onClick={(e) => e.stopPropagation()}>
+                            <CustomerLinker
+                              onLink={(customerId) => onLinkCustomer(conv.id, customerId)}
+                              trigger={
+                                <span
+                                  role="button"
+                                  className="inline-flex items-center justify-center h-4 w-4 rounded hover:bg-muted-foreground/20 text-muted-foreground hover:text-primary transition-colors"
+                                >
+                                  <Link2 className="h-3 w-3" />
+                                </span>
+                              }
+                            />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">Link to customer</TooltipContent>
+                      </Tooltip>
+                    ) : null}
+                    {conv.assigned_staff_id && staffMap?.[conv.assigned_staff_id] && (
+                      <span className="text-[10px] text-muted-foreground">
+                        {staffMap[conv.assigned_staff_id].display_name.split(' ')[0]}
+                      </span>
+                    )}
+                  </div>
+                  {last && (
+                    <p className="mt-1 truncate text-xs text-muted-foreground">
+                      {last.content}
+                    </p>
+                  )}
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      </ScrollArea>
+    </>
   )
 })
