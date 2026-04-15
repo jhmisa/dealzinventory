@@ -13,8 +13,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import type { StaffProfile, MessageAttachment } from '@/lib/types'
+import type { StaffProfile, MessageAttachment, MessageFolder } from '@/lib/types'
 import { getAttachmentSignedUrl } from '@/services/messaging'
+import { MessageAvatar } from './message-avatar'
 import { AiDraftCard } from './ai-draft-card'
 import { MessageStatusBadge } from './message-status-badge'
 import { ChannelBadge } from './channel-badge'
@@ -180,6 +181,9 @@ interface ConversationThreadProps {
   staffMembers?: StaffProfile[]
   currentUserId?: string
   isSending?: boolean
+  staffMap?: Record<string, { display_name: string; avatar_url: string | null }>
+  folders?: MessageFolder[]
+  onMoveToFolder?: (folderId: string) => void
 }
 
 export const ConversationThread = memo(function ConversationThread({
@@ -195,6 +199,9 @@ export const ConversationThread = memo(function ConversationThread({
   staffMembers = [],
   currentUserId,
   isSending,
+  staffMap,
+  folders,
+  onMoveToFolder,
 }: ConversationThreadProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const composerRef = useRef<HTMLDivElement>(null)
@@ -312,6 +319,23 @@ export const ConversationThread = memo(function ConversationThread({
                 ))}
             </SelectContent>
           </Select>
+          {folders && folders.length > 0 && onMoveToFolder && (
+            <Select
+              value={conversation.folder_id ?? ''}
+              onValueChange={(v) => onMoveToFolder(v)}
+            >
+              <SelectTrigger className="h-8 w-[140px] text-xs">
+                <SelectValue placeholder="Move to folder..." />
+              </SelectTrigger>
+              <SelectContent>
+                {folders.map((f) => (
+                  <SelectItem key={f.id} value={f.id}>
+                    {f.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <Tooltip>
             <TooltipTrigger asChild>
               <div className="flex items-center gap-1.5">
@@ -366,16 +390,28 @@ export const ConversationThread = memo(function ConversationThread({
                   return (
                     <div
                       key={msg.id}
-                      className={cn('flex', isCustomer ? 'justify-start' : 'justify-end')}
+                      className={cn('flex items-end gap-2', isCustomer ? 'justify-start' : 'justify-end')}
                     >
+                      {isCustomer && (
+                        <MessageAvatar
+                          role="customer"
+                          name={customerName}
+                          avatarUrl={conversation.contact_avatar_url}
+                        />
+                      )}
                       <div
                         className={cn(
-                          'max-w-[80%] rounded-lg px-3 py-2 text-sm',
+                          'max-w-[75%] rounded-lg px-3 py-2 text-sm',
                           isCustomer
                             ? 'bg-muted'
                             : 'bg-primary text-primary-foreground',
                         )}
                       >
+                        {msg.role === 'staff' && msg.sent_by && staffMap?.[msg.sent_by] && (
+                          <p className="text-[10px] font-medium text-primary-foreground/70 mb-0.5">
+                            {staffMap[msg.sent_by].display_name}
+                          </p>
+                        )}
                         <p className="whitespace-pre-wrap">{msg.content}</p>
                         {/* Attachments */}
                         {msgAttachments.length > 0 && (
@@ -417,6 +453,13 @@ export const ConversationThread = memo(function ConversationThread({
                           </div>
                         )}
                       </div>
+                      {!isCustomer && (
+                        <MessageAvatar
+                          role={msg.role}
+                          name={msg.sent_by && staffMap?.[msg.sent_by] ? staffMap[msg.sent_by].display_name : 'AI'}
+                          avatarUrl={msg.sent_by && staffMap?.[msg.sent_by] ? staffMap[msg.sent_by].avatar_url : null}
+                        />
+                      )}
                     </div>
                   )
                 })}
