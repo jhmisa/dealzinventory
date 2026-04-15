@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, ImageIcon, Video } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -8,11 +8,21 @@ import { useShopItemDetail } from '@/hooks/use-shop'
 import { CONDITION_GRADES, getSpecFieldLabel } from '@/lib/constants'
 import { formatPrice, cn } from '@/lib/utils'
 
+type MediaTab = 'photos' | 'videos'
+
+interface MediaItem {
+  id: string
+  file_url: string
+  role: string
+  media_type: 'image' | 'video'
+}
+
 export default function ShopItemDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { data: item, isLoading, isError } = useShopItemDetail(id!)
-  const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [mediaTab, setMediaTab] = useState<MediaTab>('photos')
 
   if (isLoading) {
     return (
@@ -45,33 +55,47 @@ export default function ShopItemDetailPage() {
     cpu: string | null; ram_gb: string | null; storage_gb: string | null; os_family: string | null
     screen_size: number | null; chipset: string | null; ports: string | null
     categories?: { name: string; form_fields: string[] } | null
-    product_media?: { id: string; file_url: string; role: string; sort_order: number }[]
+    product_media?: { id: string; file_url: string; role: string; sort_order: number; media_type?: string }[]
   } | null
 
   const formFields = new Set(pm?.categories?.form_fields ?? [])
 
-  // Combine item-specific media + product model media
-  const itemMedia = ((item.item_media ?? []) as { id: string; file_url: string; sort_order: number; visible: boolean; thumbnail_url: string | null }[])
+  // Combine item media + product model media
+  const itemMedia = ((item.item_media ?? []) as { id: string; file_url: string; sort_order: number; visible: boolean; thumbnail_url: string | null; media_type?: string }[])
     .filter(m => m.visible !== false)
     .sort((a, b) => a.sort_order - b.sort_order)
 
   const productMedia = (pm?.product_media ?? []).sort((a, b) => a.sort_order - b.sort_order)
 
-  // Item photos first, then product model photos as fallback
-  const allMedia = [
-    ...itemMedia.map(m => ({ id: m.id, file_url: m.file_url, role: 'item' })),
-    ...productMedia.map(m => ({ id: m.id, file_url: m.file_url, role: m.role })),
-  ]
-  // Deduplicate by id
+  // Build unified media list with type info
+  const allMedia: MediaItem[] = []
   const seenIds = new Set<string>()
-  const uniqueMedia = allMedia.filter(m => {
-    if (seenIds.has(m.id)) return false
-    seenIds.add(m.id)
-    return true
-  })
 
-  const currentImage = uniqueMedia[currentImageIndex]
+  for (const m of itemMedia) {
+    if (!seenIds.has(m.id)) {
+      seenIds.add(m.id)
+      allMedia.push({ id: m.id, file_url: m.file_url, role: 'item', media_type: (m.media_type === 'video' ? 'video' : 'image') })
+    }
+  }
+  for (const m of productMedia) {
+    if (!seenIds.has(m.id)) {
+      seenIds.add(m.id)
+      allMedia.push({ id: m.id, file_url: m.file_url, role: m.role, media_type: (m.media_type === 'video' ? 'video' : 'image') })
+    }
+  }
+
+  const photos = allMedia.filter(m => m.media_type === 'image')
+  const videos = allMedia.filter(m => m.media_type === 'video')
+  const activeMedia = mediaTab === 'photos' ? photos : videos
+  const currentItem = activeMedia[currentIndex]
+
   const gradeInfo = CONDITION_GRADES.find(g => g.value === item.condition_grade)
+
+  // Reset index when switching tabs
+  function switchTab(tab: MediaTab) {
+    setMediaTab(tab)
+    setCurrentIndex(0)
+  }
 
   return (
     <div className="space-y-8">
@@ -81,53 +105,103 @@ export default function ShopItemDetailPage() {
       </Button>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Image Gallery */}
+        {/* Media Gallery */}
         <div className="space-y-3">
-          <div className="aspect-square rounded-lg overflow-hidden bg-muted flex items-center justify-center relative">
-            {currentImage ? (
-              <>
-                <img
-                  src={currentImage.file_url}
-                  alt={pm ? `${pm.brand} ${pm.model_name}` : item.item_code}
-                  className="w-full h-full object-cover"
-                />
-                {uniqueMedia.length > 1 && (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background"
-                      onClick={() => setCurrentImageIndex((i) => (i > 0 ? i - 1 : uniqueMedia.length - 1))}
-                    >
-                      <ChevronLeft className="h-5 w-5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background"
-                      onClick={() => setCurrentImageIndex((i) => (i < uniqueMedia.length - 1 ? i + 1 : 0))}
-                    >
-                      <ChevronRight className="h-5 w-5" />
-                    </Button>
-                  </>
+          {/* Photos / Videos toggle */}
+          {(photos.length > 0 || videos.length > 0) && (
+            <div className="flex border-b">
+              <button
+                onClick={() => switchTab('photos')}
+                className={cn(
+                  'flex-1 py-2.5 text-sm font-medium text-center border-b-2 transition-colors flex items-center justify-center gap-2',
+                  mediaTab === 'photos'
+                    ? 'border-foreground text-foreground'
+                    : 'border-transparent text-muted-foreground hover:text-foreground',
                 )}
-              </>
+              >
+                <ImageIcon className="h-4 w-4" />
+                Photos ({String(photos.length).padStart(2, '0')})
+              </button>
+              <button
+                onClick={() => switchTab('videos')}
+                className={cn(
+                  'flex-1 py-2.5 text-sm font-medium text-center border-b-2 transition-colors flex items-center justify-center gap-2',
+                  mediaTab === 'videos'
+                    ? 'border-foreground text-foreground'
+                    : 'border-transparent text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <Video className="h-4 w-4" />
+                Videos ({String(videos.length).padStart(2, '0')})
+              </button>
+            </div>
+          )}
+
+          {/* Main viewer */}
+          <div className="aspect-square rounded-lg overflow-hidden bg-muted flex items-center justify-center relative">
+            {currentItem ? (
+              currentItem.media_type === 'video' ? (
+                <video
+                  key={currentItem.id}
+                  src={currentItem.file_url}
+                  controls
+                  className="w-full h-full object-contain bg-black"
+                />
+              ) : (
+                <>
+                  <img
+                    src={currentItem.file_url}
+                    alt={pm ? `${pm.brand} ${pm.model_name}` : item.item_code}
+                    className="w-full h-full object-cover"
+                  />
+                </>
+              )
             ) : (
-              <p className="text-muted-foreground">No photos available</p>
+              <p className="text-muted-foreground">
+                {mediaTab === 'videos' ? 'No videos available' : 'No photos available'}
+              </p>
+            )}
+            {activeMedia.length > 1 && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background"
+                  onClick={() => setCurrentIndex((i) => (i > 0 ? i - 1 : activeMedia.length - 1))}
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background"
+                  onClick={() => setCurrentIndex((i) => (i < activeMedia.length - 1 ? i + 1 : 0))}
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </Button>
+              </>
             )}
           </div>
-          {uniqueMedia.length > 1 && (
+
+          {/* Thumbnails */}
+          {activeMedia.length > 1 && (
             <div className="flex gap-2 overflow-x-auto pb-1">
-              {uniqueMedia.map((m, idx) => (
+              {activeMedia.map((m, idx) => (
                 <button
                   key={m.id}
-                  onClick={() => setCurrentImageIndex(idx)}
+                  onClick={() => setCurrentIndex(idx)}
                   className={cn(
                     'w-16 h-16 rounded border-2 overflow-hidden flex-shrink-0',
-                    idx === currentImageIndex ? 'border-primary' : 'border-transparent',
+                    idx === currentIndex ? 'border-primary' : 'border-transparent',
                   )}
                 >
-                  <img src={m.file_url} alt="" className="w-full h-full object-cover" />
+                  {m.media_type === 'video' ? (
+                    <div className="w-full h-full bg-muted flex items-center justify-center">
+                      <Video className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  ) : (
+                    <img src={m.file_url} alt="" className="w-full h-full object-cover" />
+                  )}
                 </button>
               ))}
             </div>
