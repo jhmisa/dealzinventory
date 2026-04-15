@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   PanelLeftOpen,
@@ -7,10 +8,22 @@ import {
   ExternalLink,
   User,
   Store,
+  Unlink,
 } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 import { CodeDisplay } from '@/components/shared/code-display'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { AddressDisplay } from '@/components/shared/address-display'
@@ -23,6 +36,7 @@ import type { ConversationWithRelations } from '@/lib/types'
 interface CustomerPanelProps {
   conversation: ConversationWithRelations
   onLinkCustomer: (customerId: string) => void
+  onUnlinkCustomer: () => void
   collapsed: boolean
   onToggleCollapse: () => void
 }
@@ -30,6 +44,7 @@ interface CustomerPanelProps {
 export function CustomerPanel({
   conversation,
   onLinkCustomer,
+  onUnlinkCustomer,
   collapsed,
   onToggleCollapse,
 }: CustomerPanelProps) {
@@ -207,7 +222,7 @@ export function CustomerPanel({
 
       {/* Footer */}
       {isLinked && customer && (
-        <div className="border-t px-3 py-2">
+        <div className="border-t px-3 py-2 flex items-center justify-between">
           <Link
             to={`/admin/customers/${customer.id}`}
             className="text-xs text-primary hover:underline flex items-center gap-1"
@@ -215,6 +230,28 @@ export function CustomerPanel({
             View Full Profile
             <ExternalLink className="h-3 w-3" />
           </Link>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" size="xs" className="text-xs text-muted-foreground hover:text-destructive">
+                <Unlink className="h-3 w-3 mr-1" />
+                Unlink
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Unlink customer?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will unlink <span className="font-medium text-foreground">{customer.last_name} {customer.first_name ?? ''}</span> ({customer.customer_code}) from this conversation. You can re-link a customer at any time.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={onUnlinkCustomer} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  Unlink
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       )}
     </div>

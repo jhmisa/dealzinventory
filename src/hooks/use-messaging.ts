@@ -50,6 +50,17 @@ export function useLinkCustomer() {
   })
 }
 
+export function useUnlinkCustomer() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (conversationId: string) =>
+      messagingService.unlinkCustomerFromConversation(conversationId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.messaging.all })
+    },
+  })
+}
+
 export function useUpdateConversation() {
   const queryClient = useQueryClient()
   return useMutation({

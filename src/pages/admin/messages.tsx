@@ -14,6 +14,7 @@ import {
   useRejectDraft,
   useRetryMessage,
   useLinkCustomer,
+  useUnlinkCustomer,
   useUpdateConversation,
   useMessagingRealtime,
   useMarkConversationRead,
@@ -69,6 +70,7 @@ export default function MessagesPage() {
   const rejectDraft = useRejectDraft()
   const retryMessage = useRetryMessage()
   const linkCustomer = useLinkCustomer()
+  const unlinkCustomer = useUnlinkCustomer()
   const updateConversation = useUpdateConversation()
   const markRead = useMarkConversationRead()
 
@@ -150,6 +152,17 @@ export default function MessagesPage() {
     [selectedConvId, linkCustomer],
   )
 
+  const handleUnlinkCustomer = useCallback(
+    () => {
+      if (!selectedConvId) return
+      unlinkCustomer.mutate(selectedConvId, {
+        onSuccess: () => toast.success('Customer unlinked'),
+        onError: (err) => toast.error(`Failed to unlink: ${err.message}`),
+      })
+    },
+    [selectedConvId, unlinkCustomer],
+  )
+
   const handleLinkCustomerFromList = useCallback(
     (conversationId: string, customerId: string) => {
       linkCustomer.mutate(
@@ -208,7 +221,7 @@ export default function MessagesPage() {
         />
 
         {/* Pane 2 — Conversation list */}
-        <div className="w-[300px] shrink-0 border-r overflow-hidden">
+        <div className="w-[300px] shrink-0 flex flex-col min-h-0 border-r overflow-hidden">
           <ConversationList
             conversations={conversations}
             selectedId={selectedConvId}
@@ -270,6 +283,7 @@ export default function MessagesPage() {
           <CustomerPanel
             conversation={selectedConversation}
             onLinkCustomer={handleLinkCustomer}
+            onUnlinkCustomer={handleUnlinkCustomer}
             collapsed={panelCollapsed}
             onToggleCollapse={handleTogglePanel}
           />

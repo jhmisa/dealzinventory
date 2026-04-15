@@ -22,7 +22,7 @@ interface CustomerLinkerProps {
 export function CustomerLinker({ onLink, isLoading, trigger }: CustomerLinkerProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
-  const [results, setResults] = useState<Pick<Customer, 'id' | 'customer_code' | 'last_name' | 'first_name' | 'email' | 'phone'>[]>([])
+  const [results, setResults] = useState<(Pick<Customer, 'id' | 'customer_code' | 'last_name' | 'first_name' | 'email' | 'phone'> & { order_count: number; kaitori_count: number })[]>([])
   const [searching, setSearching] = useState(false)
 
   async function handleSearch() {
@@ -31,11 +31,21 @@ export function CustomerLinker({ onLink, isLoading, trigger }: CustomerLinkerPro
     try {
       const { data, error } = await supabase
         .from('customers')
-        .select('id, customer_code, last_name, first_name, email, phone')
+        .select('id, customer_code, last_name, first_name, email, phone, orders(count), kaitori_requests(count)')
         .or(`last_name.ilike.%${search}%,first_name.ilike.%${search}%,customer_code.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`)
         .limit(10)
       if (error) throw error
-      setResults(data ?? [])
+      const mapped = (data ?? []).map((c) => ({
+        id: c.id,
+        customer_code: c.customer_code,
+        last_name: c.last_name,
+        first_name: c.first_name,
+        email: c.email,
+        phone: c.phone,
+        order_count: (c.orders as unknown as { count: number }[])?.[0]?.count ?? 0,
+        kaitori_count: (c.kaitori_requests as unknown as { count: number }[])?.[0]?.count ?? 0,
+      }))
+      setResults(mapped)
     } catch {
       toast.error('Failed to search customers')
     } finally {
@@ -83,11 +93,17 @@ export function CustomerLinker({ onLink, isLoading, trigger }: CustomerLinkerPro
                 className="flex w-full items-center justify-between rounded-md p-2 text-left text-sm hover:bg-muted"
                 onClick={() => handleSelect(c.id)}
               >
-                <div>
-                  <span className="font-medium">{c.last_name} {c.first_name ?? ''}</span>
-                  <span className="ml-2 text-xs text-muted-foreground">{c.customer_code}</span>
+                <div className="min-w-0">
+                  <div>
+                    <span className="font-medium">{c.last_name} {c.first_name ?? ''}</span>
+                    <span className="ml-2 text-xs text-muted-foreground">{c.customer_code}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">{c.email ?? c.phone}</div>
                 </div>
-                <span className="text-xs text-muted-foreground">{c.email ?? c.phone}</span>
+                <div className="flex shrink-0 gap-2 ml-2 text-xs text-muted-foreground">
+                  <span title="Orders">{c.order_count} ord</span>
+                  <span title="Kaitori">{c.kaitori_count} kt</span>
+                </div>
               </button>
             ))}
           </div>

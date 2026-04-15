@@ -114,6 +114,20 @@ export async function linkCustomerToConversation(conversationId: string, custome
   return data as Conversation
 }
 
+export async function unlinkCustomerFromConversation(conversationId: string) {
+  const { data, error } = await supabase
+    .from('conversations')
+    .update({
+      customer_id: null,
+      unmatched_contact: true,
+    })
+    .eq('id', conversationId)
+    .select()
+    .single()
+  if (error) throw error
+  return data as Conversation
+}
+
 export async function getNeedsReviewCount(): Promise<number> {
   const { count, error } = await supabase
     .from('conversations')
