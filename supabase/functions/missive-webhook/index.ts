@@ -27,6 +27,13 @@ interface MissiveWebhookPayload {
       address?: string;
     };
     delivered_at?: number;
+    attachments?: Array<{
+      url: string;
+      filename?: string;
+      content_type?: string;
+      size?: number;
+      media_type?: string;
+    }>;
   };
 }
 
@@ -155,6 +162,7 @@ Deno.serve(async (req) => {
       conv_subject: conversation?.subject,
       msg_from_field: message?.from_field,
       msg_id: message?.id,
+      attachment_count: message?.attachments?.length ?? 0,
     }));
 
     if (!conversation?.id || !message?.id) {
@@ -220,6 +228,16 @@ Deno.serve(async (req) => {
       ? message.body.replace(/<[^>]+>/g, '').trim()
       : message.preview ?? '';
 
+    // Map Missive attachments to our format
+    const attachments = (message.attachments ?? [])
+      .filter(a => a.url)
+      .map(a => ({
+        file_url: a.url,
+        filename: a.filename ?? 'attachment',
+        mime_type: a.content_type ?? a.media_type ?? 'application/octet-stream',
+        ...(a.size ? { size_bytes: a.size } : {}),
+      }));
+
     // Store inbound message
     const { error: msgError } = await supabase.from('messages').insert({
       conversation_id: conv.id,
@@ -228,6 +246,7 @@ Deno.serve(async (req) => {
       content,
       status: 'SENT' as const,
       message_type: 'REPLY' as const,
+      ...(attachments.length > 0 ? { attachments } : {}),
     });
 
     if (msgError) throw msgError;
