@@ -100,23 +100,24 @@ export const ConversationList = memo(function ConversationList({
                   {conv.customers ? (
                     <span className="text-[10px] text-muted-foreground">{conv.customers.customer_code}</span>
                   ) : conv.unmatched_contact && onLinkCustomer ? (
-                    <CustomerLinker
-                      onLink={(customerId) => onLinkCustomer(conv.id, customerId)}
-                      trigger={
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span
-                              role="button"
-                              className="inline-flex items-center justify-center h-4 w-4 rounded hover:bg-muted-foreground/20 text-muted-foreground hover:text-primary transition-colors"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <Link2 className="h-3 w-3" />
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent side="right">Link to customer</TooltipContent>
-                        </Tooltip>
-                      }
-                    />
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span onClick={(e) => e.stopPropagation()}>
+                          <CustomerLinker
+                            onLink={(customerId) => onLinkCustomer(conv.id, customerId)}
+                            trigger={
+                              <span
+                                role="button"
+                                className="inline-flex items-center justify-center h-4 w-4 rounded hover:bg-muted-foreground/20 text-muted-foreground hover:text-primary transition-colors"
+                              >
+                                <Link2 className="h-3 w-3" />
+                              </span>
+                            }
+                          />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">Link to customer</TooltipContent>
+                    </Tooltip>
                   ) : null}
                 </div>
                 {last && (
