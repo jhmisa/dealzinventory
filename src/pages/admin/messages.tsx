@@ -1,21 +1,15 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
-import { MessageSquare, Bot, Send, AlertTriangle, TrendingUp } from 'lucide-react'
+import { MessageSquare } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
 import { useStaffProfiles } from '@/hooks/use-staff-profiles'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { SearchBar } from '@/components/shared/search-bar'
 import { PageHeader } from '@/components/shared/page-header'
-import { Badge } from '@/components/ui/badge'
-import { ConversationList } from '@/components/messaging/conversation-list'
-import { ConversationThread } from '@/components/messaging/conversation-thread'
-import { CustomerPanel } from '@/components/messaging/customer-panel'
+import { ConversationList, ConversationThread, CustomerPanel, FolderSidebar } from '@/components/messaging'
 import type { MessageAttachment } from '@/lib/types'
 import {
   useConversations,
   useConversation,
   useMessages,
-  useNeedsReviewCount,
   useSendMessage,
   useRejectDraft,
   useRetryMessage,
@@ -23,13 +17,16 @@ import {
   useUpdateConversation,
   useMessagingRealtime,
   useMarkConversationRead,
-  useMessagingStats,
 } from '@/hooks/use-messaging'
-
-type FilterTab = 'needs_review' | 'all' | 'mine'
+import {
+  useMessageFolders,
+  useAwaitingReplyCounts,
+  useMoveConversationToFolder,
+} from '@/hooks/use-message-folders'
 
 export default function MessagesPage() {
-  const [tab, setTab] = useState<FilterTab>('needs_review')
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null)
+  const [mineOnly, setMineOnly] = useState(false)
   const [search, setSearch] = useState('')
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null)
   const [panelCollapsed, setPanelCollapsed] = useState(
@@ -46,13 +43,23 @@ export default function MessagesPage() {
 
   const { user } = useAuth()
   const { data: staffProfiles = [] } = useStaffProfiles()
-  const { data: needsReviewCount } = useNeedsReviewCount()
+  const { data: folders = [] } = useMessageFolders()
+  const { data: awaitingCounts = {} } = useAwaitingReplyCounts()
+  const moveToFolder = useMoveConversationToFolder()
+
+  // Auto-select Inbox on first load
+  useEffect(() => {
+    if (!selectedFolderId && folders.length > 0) {
+      const inbox = folders.find((f) => f.is_system && f.name === 'Inbox')
+      setSelectedFolderId(inbox?.id ?? folders[0].id)
+    }
+  }, [folders, selectedFolderId])
 
   const filters = useMemo(() => ({
-    ...(tab === 'needs_review' ? { needs_review: true } : {}),
-    ...(tab === 'mine' && user ? { assigned_staff_id: user.id } : {}),
-    ...(search ? { search } : {}),
-  }), [tab, search, user])
+    folder_id: selectedFolderId ?? undefined,
+    search: search || undefined,
+    assigned_staff_id: mineOnly ? user?.id : undefined,
+  }), [selectedFolderId, search, mineOnly, user])
 
   const { data: conversations = [], isLoading: loadingConversations } = useConversations(filters)
   const { data: selectedConversation } = useConversation(selectedConvId ?? '')
@@ -64,22 +71,18 @@ export default function MessagesPage() {
   const linkCustomer = useLinkCustomer()
   const updateConversation = useUpdateConversation()
   const markRead = useMarkConversationRead()
-  const { data: stats } = useMessagingStats()
+
+  // Build staffMap for avatars
+  const staffMap = useMemo(() => {
+    const map: Record<string, { display_name: string; avatar_url: string | null }> = {}
+    for (const s of staffProfiles) {
+      map[s.id] = { display_name: s.display_name, avatar_url: s.avatar_url ?? null }
+    }
+    return map
+  }, [staffProfiles])
 
   // Realtime subscriptions — replaces polling
   useMessagingRealtime(selectedConvId)
-
-  // Auto-switch to "All" tab if selected conversation leaves current filtered list
-  useEffect(() => {
-    if (
-      selectedConvId &&
-      !loadingConversations &&
-      conversations.length > 0 &&
-      !conversations.find((c) => c.id === selectedConvId)
-    ) {
-      setTab('all')
-    }
-  }, [conversations, selectedConvId, loadingConversations])
 
   // Mark conversation as read when selected
   useEffect(() => {
@@ -189,74 +192,23 @@ export default function MessagesPage() {
   )
 
   return (
-    <div className="flex flex-col gap-4 h-[calc(100vh-5rem)]">
+    <div className="flex flex-col h-[calc(100vh-5rem)]">
       <PageHeader
         title="Messages"
         description="Customer conversations via Missive"
-        actions={
-          needsReviewCount ? (
-            <Badge variant="destructive">{needsReviewCount} need review</Badge>
-          ) : undefined
-        }
       />
 
-      {stats && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div className="flex items-center gap-3 rounded-lg border bg-card p-3">
-            <Bot className="h-5 w-5 text-primary shrink-0" />
-            <div>
-              <p className="text-lg font-semibold leading-none">{stats.aiDraftsToday}</p>
-              <p className="text-xs text-muted-foreground">AI drafts today</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 rounded-lg border bg-card p-3">
-            <Send className="h-5 w-5 text-green-600 shrink-0" />
-            <div>
-              <p className="text-lg font-semibold leading-none">{stats.sentToday}</p>
-              <p className="text-xs text-muted-foreground">Sent today</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 rounded-lg border bg-card p-3">
-            <TrendingUp className="h-5 w-5 text-blue-600 shrink-0" />
-            <div>
-              <p className="text-lg font-semibold leading-none">
-                {stats.avgConfidence !== null ? `${Math.round(stats.avgConfidence * 100)}%` : '—'}
-              </p>
-              <p className="text-xs text-muted-foreground">Avg confidence</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 rounded-lg border bg-card p-3">
-            <AlertTriangle className="h-5 w-5 text-yellow-600 shrink-0" />
-            <div>
-              <p className="text-lg font-semibold leading-none">
-                {stats.escalationRate !== null ? `${Math.round(stats.escalationRate * 100)}%` : '—'}
-              </p>
-              <p className="text-xs text-muted-foreground">Escalation rate</p>
-            </div>
-          </div>
-        </div>
-      )}
+      <div className="flex flex-1 min-h-0 mt-4 rounded-lg border bg-card overflow-hidden">
+        {/* Pane 1 — Folder sidebar */}
+        <FolderSidebar
+          folders={folders}
+          selectedFolderId={selectedFolderId}
+          onSelectFolder={setSelectedFolderId}
+          awaitingCounts={awaitingCounts}
+        />
 
-      <div className="flex flex-1 min-h-0 rounded-lg border bg-card overflow-hidden">
-        {/* Left panel — Conversation list */}
-        <div className="flex w-80 shrink-0 flex-col border-r min-h-0">
-          <div className="space-y-2 p-3 border-b">
-            <Tabs value={tab} onValueChange={(v) => setTab(v as FilterTab)}>
-              <TabsList className="w-full">
-                <TabsTrigger value="needs_review" className="flex-1 gap-1.5">
-                  Needs Review
-                  {(needsReviewCount ?? 0) > 0 && (
-                    <Badge variant="destructive" className="h-5 min-w-5 px-1 text-[10px]">
-                      {needsReviewCount}
-                    </Badge>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger value="mine" className="flex-1">Mine</TabsTrigger>
-                <TabsTrigger value="all" className="flex-1">All</TabsTrigger>
-              </TabsList>
-            </Tabs>
-            <SearchBar value={search} onChange={setSearch} placeholder="Search customers..." />
-          </div>
+        {/* Pane 2 — Conversation list */}
+        <div className="flex w-[300px] shrink-0 flex-col border-r min-h-0">
           <div className="flex-1 min-h-0">
             {loadingConversations ? (
               <div className="h-full flex items-center justify-center">
@@ -268,12 +220,18 @@ export default function MessagesPage() {
                 selectedId={selectedConvId}
                 onSelect={setSelectedConvId}
                 onLinkCustomer={handleLinkCustomerFromList}
+                mineOnly={mineOnly}
+                onToggleMineOnly={setMineOnly}
+                staffMap={staffMap}
+                currentUserId={user?.id}
+                search={search}
+                onSearchChange={setSearch}
               />
             )}
           </div>
         </div>
 
-        {/* Right panel — Conversation thread */}
+        {/* Pane 3 — Conversation thread */}
         <div className="flex-1 flex flex-col min-h-0">
           {selectedConversation ? (
             <ConversationThread
@@ -289,18 +247,26 @@ export default function MessagesPage() {
               staffMembers={staffProfiles}
               currentUserId={user?.id}
               isSending={sendMessage.isPending}
+              staffMap={staffMap}
+              folders={folders}
+              onMoveToFolder={(folderId) =>
+                moveToFolder.mutate(
+                  { conversationId: selectedConvId!, folderId },
+                  { onSuccess: () => toast.success('Moved to folder') }
+                )
+              }
             />
           ) : (
-            <div className="flex flex-1 items-center justify-center text-muted-foreground">
-              <div className="text-center space-y-2">
-                <MessageSquare className="h-10 w-10 mx-auto opacity-50" />
-                <p className="text-sm">Select a conversation to view messages</p>
+            <div className="flex flex-1 items-center justify-center">
+              <div className="text-center">
+                <MessageSquare className="mx-auto h-12 w-12 text-muted-foreground/30" />
+                <p className="mt-2 text-sm text-muted-foreground">Select a conversation to view messages</p>
               </div>
             </div>
           )}
         </div>
 
-        {/* Right panel — Customer info */}
+        {/* Pane 4 — Customer info panel */}
         {selectedConversation && (
           <CustomerPanel
             conversation={selectedConversation}
