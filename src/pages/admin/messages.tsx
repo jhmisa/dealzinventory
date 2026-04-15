@@ -239,7 +239,7 @@ export default function MessagesPage() {
 
       <div className="flex flex-1 min-h-0 rounded-lg border bg-card overflow-hidden">
         {/* Left panel — Conversation list */}
-        <div className="flex w-80 shrink-0 flex-col border-r">
+        <div className="flex w-80 shrink-0 flex-col border-r min-h-0">
           <div className="space-y-2 p-3 border-b">
             <Tabs value={tab} onValueChange={(v) => setTab(v as FilterTab)}>
               <TabsList className="w-full">
@@ -257,18 +257,20 @@ export default function MessagesPage() {
             </Tabs>
             <SearchBar value={search} onChange={setSearch} placeholder="Search customers..." />
           </div>
-          {loadingConversations ? (
-            <div className="flex-1 flex items-center justify-center">
-              <p className="text-sm text-muted-foreground">Loading...</p>
-            </div>
-          ) : (
-            <ConversationList
-              conversations={conversations}
-              selectedId={selectedConvId}
-              onSelect={setSelectedConvId}
-              onLinkCustomer={handleLinkCustomerFromList}
-            />
-          )}
+          <div className="flex-1 min-h-0">
+            {loadingConversations ? (
+              <div className="h-full flex items-center justify-center">
+                <p className="text-sm text-muted-foreground">Loading...</p>
+              </div>
+            ) : (
+              <ConversationList
+                conversations={conversations}
+                selectedId={selectedConvId}
+                onSelect={setSelectedConvId}
+                onLinkCustomer={handleLinkCustomerFromList}
+              />
+            )}
+          </div>
         </div>
 
         {/* Right panel — Conversation thread */}
