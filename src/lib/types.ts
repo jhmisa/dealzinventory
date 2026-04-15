@@ -242,6 +242,7 @@ export interface StaffProfile {
   display_name: string
   role: StaffRole
   is_active: boolean
+  avatar_url: string | null
   created_at: string
   updated_at: string
 }
@@ -270,12 +271,24 @@ export interface Conversation {
   missive_conversation_id: string
   channel: MessageChannel
   contact_name: string | null
+  contact_avatar_url: string | null
+  folder_id: string | null
   needs_human_review: boolean
   unmatched_contact: boolean
   assigned_staff_id: string | null
   ai_enabled: boolean
   unread_count: number
   last_message_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface MessageFolder {
+  id: string
+  name: string
+  icon: string
+  sort_order: number
+  is_system: boolean
   created_at: string
   updated_at: string
 }
