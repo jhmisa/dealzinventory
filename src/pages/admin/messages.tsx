@@ -62,7 +62,7 @@ export default function MessagesPage() {
   }), [selectedFolderId, search, mineOnly, user])
 
   const { data: conversations = [] } = useConversations(filters)
-  const { data: selectedConversation } = useConversation(selectedConvId ?? '')
+  const { data: selectedConversation, error: convError } = useConversation(selectedConvId ?? '')
   const { data: messages = [] } = useMessages(selectedConvId ?? '')
 
   const sendMessage = useSendMessage()
@@ -259,7 +259,13 @@ export default function MessagesPage() {
             <div className="flex flex-1 items-center justify-center">
               <div className="text-center">
                 <MessageSquare className="mx-auto h-12 w-12 text-muted-foreground/30" />
-                <p className="mt-2 text-sm text-muted-foreground">Select a conversation to view messages</p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {convError
+                    ? `Error loading conversation: ${convError.message}`
+                    : selectedConvId
+                      ? 'Loading conversation...'
+                      : 'Select a conversation to view messages'}
+                </p>
               </div>
             </div>
           )}
