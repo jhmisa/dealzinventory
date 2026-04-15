@@ -55,6 +55,14 @@ export function useShopBrands() {
   })
 }
 
+export function useShopCategories() {
+  return useQuery({
+    queryKey: queryKeys.shop.categories(),
+    queryFn: () => shopService.getShopCategories(),
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
 export function useShopEnabled() {
   return useQuery({
     queryKey: queryKeys.shop.enabled(),

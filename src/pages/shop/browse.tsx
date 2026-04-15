@@ -20,7 +20,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet'
 import { Label } from '@/components/ui/label'
-import { useShopItems, useShopSellGroups, useShopBrands, useShopEnabled, useShopAccessories } from '@/hooks/use-shop'
+import { useShopItems, useShopSellGroups, useShopBrands, useShopCategories, useShopEnabled, useShopAccessories } from '@/hooks/use-shop'
 import { CONDITION_GRADES } from '@/lib/constants'
 import { formatPrice, cn } from '@/lib/utils'
 import type { Accessory, AccessoryMedia } from '@/lib/types'
@@ -34,6 +34,7 @@ export default function ShopBrowsePage() {
   const [search, setSearch] = useState('')
   const [brand, setBrand] = useState<string>('all')
   const [grade, setGrade] = useState<string>('all')
+  const [category, setCategory] = useState<string>('all')
   const [sort, setSort] = useState<SortOption>('newest')
 
   const { data: shopEnabled } = useShopEnabled()
@@ -42,6 +43,7 @@ export default function ShopBrowsePage() {
     search: search || undefined,
     brand: brand === 'all' ? undefined : brand,
     grade: grade === 'all' ? undefined : grade,
+    category: category === 'all' ? undefined : category,
     sort,
   }
 
@@ -52,6 +54,7 @@ export default function ShopBrowsePage() {
     sort,
   })
   const { data: brands } = useShopBrands()
+  const { data: categories } = useShopCategories()
 
   const isLoading = itemsLoading || sgLoading || accLoading
   const totalCount = (items?.length ?? 0) + (sellGroups?.length ?? 0) + (shopAccessories?.length ?? 0)
@@ -121,6 +124,20 @@ export default function ShopBrowsePage() {
                 </Select>
               </div>
               <div>
+                <Label>Category</Label>
+                <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {(categories ?? []).map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
                 <Label>Condition</Label>
                 <Select value={grade} onValueChange={setGrade}>
                   <SelectTrigger className="mt-1">
@@ -140,6 +157,17 @@ export default function ShopBrowsePage() {
 
         {/* Desktop Filters */}
         <div className="hidden md:flex items-center gap-2">
+          <Select value={category} onValueChange={setCategory}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              {(categories ?? []).map((c) => (
+                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Select value={brand} onValueChange={setBrand}>
             <SelectTrigger className="w-36">
               <SelectValue placeholder="Brand" />

@@ -61,6 +61,7 @@ export const queryKeys = {
     productDetail: (productModelId: string) => [...queryKeys.shop.all, 'detail', productModelId] as const,
     sellGroupByCode: (code: string) => [...queryKeys.shop.all, 'code', code] as const,
     brands: () => [...queryKeys.shop.all, 'brands'] as const,
+    categories: () => [...queryKeys.shop.all, 'categories'] as const,
     enabled: () => [...queryKeys.shop.all, 'enabled'] as const,
     accessories: (filters: Record<string, unknown>) => [...queryKeys.shop.all, 'accessories', filters] as const,
   },

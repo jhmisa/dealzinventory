@@ -4,6 +4,7 @@ export interface ShopFilters {
   search?: string
   brand?: string
   grade?: string
+  category?: string
   minPrice?: number
   maxPrice?: number
   sort?: 'price_asc' | 'price_desc' | 'newest'
@@ -31,7 +32,8 @@ export async function getShopItems(filters: ShopFilters = {}) {
     .from('items')
     .select(`
       id, item_code, condition_grade, selling_price, specs_notes, condition_notes,
-      product_models(id, brand, model_name, color, short_description,
+      product_models!inner(id, brand, model_name, color, short_description, category_id,
+        categories(id, name),
         product_media(id, file_url, role, sort_order)
       ),
       item_media(id, file_url, sort_order, visible, thumbnail_url)
@@ -41,6 +43,10 @@ export async function getShopItems(filters: ShopFilters = {}) {
 
   if (filters.grade) {
     query = query.eq('condition_grade', filters.grade)
+  }
+
+  if (filters.category) {
+    query = query.eq('product_models.category_id', filters.category)
   }
 
   if (filters.sort === 'price_asc') {
@@ -221,4 +227,15 @@ export async function getShopBrands() {
   }
 
   return Array.from(brands).sort()
+}
+
+// Get categories that have available items
+export async function getShopCategories() {
+  const { data, error } = await supabase
+    .from('categories')
+    .select('id, name')
+    .order('name')
+
+  if (error) throw error
+  return data ?? []
 }
