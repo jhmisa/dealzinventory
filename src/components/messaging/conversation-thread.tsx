@@ -1,6 +1,6 @@
 import { memo, useRef, useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { User, AlertCircle, RotateCw, Bot, UserCheck, FileIcon, ExternalLink } from 'lucide-react'
+import { User, AlertCircle, RotateCw, Bot, UserCheck, FileIcon, ExternalLink, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
@@ -38,6 +38,46 @@ function formatDate(dateStr: string): string {
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' })
 }
 
+// Lightbox for viewing images/videos in a popup
+function MediaLightbox({
+  url,
+  type,
+  onClose,
+}: {
+  url: string
+  type: 'image' | 'video'
+  onClose: () => void
+}) {
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [onClose])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+      onClick={onClose}
+    >
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
+      >
+        <X className="h-5 w-5" />
+      </button>
+      <div onClick={(e) => e.stopPropagation()} className="max-h-[90vh] max-w-[90vw]">
+        {type === 'image' ? (
+          <img src={url} alt="Attachment" className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain" />
+        ) : (
+          <video src={url} controls autoPlay className="max-h-[90vh] max-w-[90vw] rounded-lg" />
+        )}
+      </div>
+    </div>
+  )
+}
+
 // Attachment thumbnail component with signed URL loading
 const AttachmentThumbnail = memo(function AttachmentThumbnail({
   attachment,
@@ -48,10 +88,12 @@ const AttachmentThumbnail = memo(function AttachmentThumbnail({
 }) {
   const isExternal = attachment.file_url.startsWith('http://') || attachment.file_url.startsWith('https://')
   const [url, setUrl] = useState<string | null>(isExternal ? attachment.file_url : null)
+  const [lightboxOpen, setLightboxOpen] = useState(false)
   const isImage = attachment.mime_type.startsWith('image/')
+  const isVideo = attachment.mime_type.startsWith('video/')
 
   useEffect(() => {
-    if (isExternal) return // already have the URL
+    if (isExternal) return
     let cancelled = false
     getAttachmentSignedUrl(attachment.file_url).then((signedUrl) => {
       if (!cancelled) setUrl(signedUrl)
@@ -63,13 +105,46 @@ const AttachmentThumbnail = memo(function AttachmentThumbnail({
 
   if (isImage) {
     return (
-      <a href={url} target="_blank" rel="noopener noreferrer" className="block">
-        <img
-          src={url}
-          alt={attachment.filename}
-          className="mt-1.5 max-w-[200px] rounded-md"
-        />
-      </a>
+      <>
+        <button onClick={() => setLightboxOpen(true)} className="block cursor-pointer">
+          <img
+            src={url}
+            alt={attachment.filename}
+            className="mt-1.5 max-w-[200px] rounded-md hover:opacity-90 transition-opacity"
+          />
+        </button>
+        {lightboxOpen && (
+          <MediaLightbox url={url} type="image" onClose={() => setLightboxOpen(false)} />
+        )}
+      </>
+    )
+  }
+
+  if (isVideo) {
+    return (
+      <>
+        <button
+          onClick={() => setLightboxOpen(true)}
+          className="mt-1.5 block cursor-pointer relative"
+        >
+          <video
+            src={url}
+            className="max-w-[200px] rounded-md hover:opacity-90 transition-opacity"
+            muted
+            preload="metadata"
+          />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="rounded-full bg-black/50 p-2">
+              <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            </div>
+          </div>
+        </button>
+        {lightboxOpen && (
+          <MediaLightbox url={url} type="video" onClose={() => setLightboxOpen(false)} />
+        )}
+      </>
     )
   }
 

@@ -152,11 +152,10 @@ Deno.serve(async (req) => {
     const { conversation, message } = payload;
 
     // Debug: log key payload fields to help diagnose missing contact names
-    console.log('Webhook payload:', JSON.stringify({
+    console.log('Webhook received:', JSON.stringify({
       conv_id: conversation?.id,
-      conv_subject: conversation?.subject,
-      msg_from_field: message?.from_field,
       msg_id: message?.id,
+      from: message?.from_field?.name,
     }));
 
     if (!conversation?.id || !message?.id) {
