@@ -61,7 +61,7 @@ export default function MessagesPage() {
     assigned_staff_id: mineOnly ? user?.id : undefined,
   }), [selectedFolderId, search, mineOnly, user])
 
-  const { data: conversations = [], isLoading: loadingConversations } = useConversations(filters)
+  const { data: conversations = [] } = useConversations(filters)
   const { data: selectedConversation } = useConversation(selectedConvId ?? '')
   const { data: messages = [] } = useMessages(selectedConvId ?? '')
 
@@ -209,33 +209,25 @@ export default function MessagesPage() {
 
         {/* Pane 2 — Conversation list */}
         <div className="flex w-[300px] shrink-0 flex-col border-r min-h-0">
-          <div className="flex-1 min-h-0">
-            {loadingConversations ? (
-              <div className="h-full flex items-center justify-center">
-                <p className="text-sm text-muted-foreground">Loading...</p>
-              </div>
-            ) : (
-              <ConversationList
-                conversations={conversations}
-                selectedId={selectedConvId}
-                onSelect={setSelectedConvId}
-                onLinkCustomer={handleLinkCustomerFromList}
-                mineOnly={mineOnly}
-                onToggleMineOnly={setMineOnly}
-                staffMap={staffMap}
-                currentUserId={user?.id}
-                search={search}
-                onSearchChange={setSearch}
-                folders={folders.map(f => ({ id: f.id, name: f.name }))}
-                onMoveToFolder={(conversationId, folderId) =>
-                  moveToFolder.mutate(
-                    { conversationId, folderId },
-                    { onSuccess: () => toast.success('Moved to folder') }
-                  )
-                }
-              />
-            )}
-          </div>
+          <ConversationList
+            conversations={conversations}
+            selectedId={selectedConvId}
+            onSelect={setSelectedConvId}
+            onLinkCustomer={handleLinkCustomerFromList}
+            mineOnly={mineOnly}
+            onToggleMineOnly={setMineOnly}
+            staffMap={staffMap}
+            currentUserId={user?.id}
+            search={search}
+            onSearchChange={setSearch}
+            folders={folders.map(f => ({ id: f.id, name: f.name }))}
+            onMoveToFolder={(conversationId, folderId) =>
+              moveToFolder.mutate(
+                { conversationId, folderId },
+                { onSuccess: () => toast.success('Moved to folder') }
+              )
+            }
+          />
         </div>
 
         {/* Pane 3 — Conversation thread */}
