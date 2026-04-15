@@ -1,9 +1,10 @@
-import { memo, useState, useCallback, useRef } from 'react'
+import { memo, useState, useCallback, useRef, useMemo } from 'react'
 import { Send, Paperclip, MessageSquareText, Package, X, FileIcon, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { cn } from '@/lib/utils'
 import type { MessageAttachment } from '@/lib/types'
 import { useUploadAttachment } from '@/hooks/use-messaging'
 import { getAttachmentSignedUrl } from '@/services/messaging'
@@ -18,6 +19,8 @@ interface MessageComposerProps {
   conversationId?: string
   onOpenResponses?: () => void
   onOpenInventory?: () => void
+  folders?: Array<{ id: string; name: string }>
+  onMoveToFolder?: (folderId: string) => void
 }
 
 export const MessageComposer = memo(function MessageComposer({
@@ -27,12 +30,23 @@ export const MessageComposer = memo(function MessageComposer({
   conversationId,
   onOpenResponses,
   onOpenInventory,
+  folders,
+  onMoveToFolder,
 }: MessageComposerProps) {
   const [content, setContent] = useState('')
   const [attachments, setAttachments] = useState<MessageAttachment[]>([])
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
+  const [showSlashMenu, setShowSlashMenu] = useState(false)
+  const [slashFilter, setSlashFilter] = useState('')
+  const [highlightedIndex, setHighlightedIndex] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const uploadAttachment = useUploadAttachment()
+
+  const filteredFolders = useMemo(() => {
+    if (!folders) return []
+    if (!slashFilter) return folders
+    return folders.filter((f) => f.name.toLowerCase().startsWith(slashFilter))
+  }, [folders, slashFilter])
 
   const handleSend = useCallback(() => {
     const trimmed = content.trim()
@@ -41,16 +55,59 @@ export const MessageComposer = memo(function MessageComposer({
     setContent('')
     setAttachments([])
     setThumbnails({})
+    setShowSlashMenu(false)
+    setSlashFilter('')
   }, [content, attachments, onSend])
+
+  const handleChange = useCallback((value: string) => {
+    setContent(value)
+    if (value.startsWith('/')) {
+      const query = value.slice(1).toLowerCase()
+      setSlashFilter(query)
+      setShowSlashMenu(true)
+      setHighlightedIndex(0)
+    } else {
+      setShowSlashMenu(false)
+      setSlashFilter('')
+    }
+  }, [])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      if (showSlashMenu) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault()
+          setHighlightedIndex((prev) => Math.min(prev + 1, filteredFolders.length - 1))
+          return
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault()
+          setHighlightedIndex((prev) => Math.max(prev - 1, 0))
+          return
+        }
+        if (e.key === 'Enter' && filteredFolders.length > 0) {
+          e.preventDefault()
+          const folder = filteredFolders[highlightedIndex]
+          if (folder) {
+            onMoveToFolder?.(folder.id)
+            toast.success(`Moved to ${folder.name}`)
+            setContent('')
+            setShowSlashMenu(false)
+            setSlashFilter('')
+          }
+          return
+        }
+        if (e.key === 'Escape') {
+          setShowSlashMenu(false)
+          return
+        }
+      }
       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault()
         handleSend()
       }
     },
-    [handleSend],
+    [showSlashMenu, filteredFolders, highlightedIndex, onMoveToFolder, handleSend],
   )
 
   const handleFileSelect = useCallback(
@@ -174,10 +231,34 @@ export const MessageComposer = memo(function MessageComposer({
       )}
 
       {/* Textarea + send */}
-      <div className="flex items-end gap-2 p-3">
+      <div className="relative flex items-end gap-2 p-3">
+        {showSlashMenu && filteredFolders.length > 0 && (
+          <div className="absolute bottom-full left-3 right-3 mb-1 rounded-md border bg-popover p-1 shadow-md">
+            <p className="px-2 py-1 text-[10px] font-medium text-muted-foreground">Move to folder</p>
+            {filteredFolders.map((folder, idx) => (
+              <button
+                key={folder.id}
+                className={cn(
+                  'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors',
+                  idx === highlightedIndex ? 'bg-accent' : 'hover:bg-muted',
+                )}
+                onMouseDown={(e) => {
+                  e.preventDefault()
+                  onMoveToFolder?.(folder.id)
+                  toast.success(`Moved to ${folder.name}`)
+                  setContent('')
+                  setShowSlashMenu(false)
+                  setSlashFilter('')
+                }}
+              >
+                {folder.name}
+              </button>
+            ))}
+          </div>
+        )}
         <Textarea
           value={content}
-          onChange={(e) => setContent(e.target.value)}
+          onChange={(e) => handleChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           className="min-h-[40px] max-h-[120px] resize-none text-sm"

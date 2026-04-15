@@ -478,6 +478,10 @@ export const ConversationThread = memo(function ConversationThread({
           conversationId={conversation.id}
           onOpenResponses={() => setShowResponses(true)}
           onOpenInventory={() => setShowInventory(true)}
+          folders={folders?.map((f) => ({ id: f.id, name: f.name }))}
+          onMoveToFolder={(folderId) => {
+            onMoveToFolder?.(folderId)
+          }}
         />
       </div>
 
