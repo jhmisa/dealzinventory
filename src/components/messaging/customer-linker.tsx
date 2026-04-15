@@ -22,7 +22,7 @@ interface CustomerLinkerProps {
 export function CustomerLinker({ onLink, isLoading, trigger }: CustomerLinkerProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
-  const [results, setResults] = useState<(Pick<Customer, 'id' | 'customer_code' | 'last_name' | 'first_name' | 'email' | 'phone'> & { order_count: number; kaitori_count: number })[]>([])
+  const [results, setResults] = useState<(Pick<Customer, 'id' | 'customer_code' | 'last_name' | 'first_name' | 'email' | 'phone'> & { fb_name: string | null; order_count: number; kaitori_count: number })[]>([])
   const [searching, setSearching] = useState(false)
 
   async function handleSearch() {
@@ -31,8 +31,8 @@ export function CustomerLinker({ onLink, isLoading, trigger }: CustomerLinkerPro
     try {
       const { data, error } = await supabase
         .from('customers')
-        .select('id, customer_code, last_name, first_name, email, phone, orders(count), kaitori_requests(count)')
-        .or(`last_name.ilike.%${search}%,first_name.ilike.%${search}%,customer_code.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`)
+        .select('id, customer_code, last_name, first_name, email, phone, fb_name, orders(count), kaitori_requests(count)')
+        .or(`last_name.ilike.%${search}%,first_name.ilike.%${search}%,customer_code.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%,fb_name.ilike.%${search}%`)
         .limit(10)
       if (error) throw error
       const mapped = (data ?? []).map((c) => ({
@@ -42,6 +42,7 @@ export function CustomerLinker({ onLink, isLoading, trigger }: CustomerLinkerPro
         first_name: c.first_name,
         email: c.email,
         phone: c.phone,
+        fb_name: c.fb_name as string | null,
         order_count: (c.orders as unknown as { count: number }[])?.[0]?.count ?? 0,
         kaitori_count: (c.kaitori_requests as unknown as { count: number }[])?.[0]?.count ?? 0,
       }))
@@ -98,7 +99,10 @@ export function CustomerLinker({ onLink, isLoading, trigger }: CustomerLinkerPro
                     <span className="font-medium">{c.last_name} {c.first_name ?? ''}</span>
                     <span className="ml-2 text-xs text-muted-foreground">{c.customer_code}</span>
                   </div>
-                  <div className="text-xs text-muted-foreground">{c.email ?? c.phone}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {c.fb_name && <span className="mr-2">FB: {c.fb_name}</span>}
+                    {c.email ?? c.phone}
+                  </div>
                 </div>
                 <div className="flex shrink-0 gap-2 ml-2 text-xs text-muted-foreground">
                   <span title="Orders">{c.order_count} ord</span>

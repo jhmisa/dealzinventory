@@ -100,7 +100,7 @@ export const ConversationList = memo(function ConversationList({
           </TooltipContent>
         </Tooltip>
       </div>
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 overflow-hidden">
         <div className="space-y-0.5 p-2">
           {conversations.length === 0 && (
             <p className="text-sm text-muted-foreground text-center py-8">No conversations</p>
@@ -136,8 +136,8 @@ export const ConversationList = memo(function ConversationList({
                               {conv.unread_count}
                             </Badge>
                           )}
-                          <span className="text-[10px] text-muted-foreground">
-                            {formatTimeAgo(conv.last_message_at)}
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">
+                            {formatTimeAgo(conv.last_message_at ?? conv.updated_at ?? conv.created_at)}
                           </span>
                         </div>
                       </div>
