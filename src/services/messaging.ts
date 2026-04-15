@@ -24,6 +24,7 @@ export interface ConversationFilters {
   needs_review?: boolean
   assigned_staff_id?: string
   search?: string
+  folder_id?: string
 }
 
 export async function getConversations(filters: ConversationFilters = {}) {
@@ -41,6 +42,9 @@ export async function getConversations(filters: ConversationFilters = {}) {
   }
   if (filters.assigned_staff_id) {
     query = query.eq('assigned_staff_id', filters.assigned_staff_id)
+  }
+  if (filters.folder_id) {
+    query = query.eq('folder_id', filters.folder_id)
   }
   if (filters.search) {
     // Search both the conversation's contact_name and linked customer fields.
