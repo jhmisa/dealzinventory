@@ -16,9 +16,10 @@ import { toast } from 'sonner'
 interface CustomerLinkerProps {
   onLink: (customerId: string) => void
   isLoading?: boolean
+  trigger?: React.ReactNode
 }
 
-export function CustomerLinker({ onLink, isLoading }: CustomerLinkerProps) {
+export function CustomerLinker({ onLink, isLoading, trigger }: CustomerLinkerProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [results, setResults] = useState<Pick<Customer, 'id' | 'customer_code' | 'last_name' | 'first_name' | 'email' | 'phone'>[]>([])
@@ -52,10 +53,12 @@ export function CustomerLinker({ onLink, isLoading }: CustomerLinkerProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="xs" variant="outline" disabled={isLoading}>
-          <Link2 className="h-3 w-3" />
-          Link Customer
-        </Button>
+        {trigger ?? (
+          <Button size="xs" variant="outline" disabled={isLoading}>
+            <Link2 className="h-3 w-3" />
+            Link Customer
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>

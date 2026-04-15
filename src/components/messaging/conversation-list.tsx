@@ -1,8 +1,11 @@
 import { memo } from 'react'
+import { Link2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { ChannelBadge } from './channel-badge'
+import { CustomerLinker } from './customer-linker'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { ConversationWithRelations } from '@/lib/types'
 
 function formatTimeAgo(dateStr: string | null): string {
@@ -42,12 +45,14 @@ interface ConversationListProps {
   conversations: ConversationWithRelations[]
   selectedId: string | null
   onSelect: (id: string) => void
+  onLinkCustomer?: (conversationId: string, customerId: string) => void
 }
 
 export const ConversationList = memo(function ConversationList({
   conversations,
   selectedId,
   onSelect,
+  onLinkCustomer,
 }: ConversationListProps) {
   return (
     <ScrollArea className="h-full">
@@ -92,9 +97,27 @@ export const ConversationList = memo(function ConversationList({
                 </div>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <ChannelBadge channel={conv.channel} />
-                  {conv.customers && (
+                  {conv.customers ? (
                     <span className="text-[10px] text-muted-foreground">{conv.customers.customer_code}</span>
-                  )}
+                  ) : conv.unmatched_contact && onLinkCustomer ? (
+                    <CustomerLinker
+                      onLink={(customerId) => onLinkCustomer(conv.id, customerId)}
+                      trigger={
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span
+                              role="button"
+                              className="inline-flex items-center justify-center h-4 w-4 rounded hover:bg-muted-foreground/20 text-muted-foreground hover:text-primary transition-colors"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Link2 className="h-3 w-3" />
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="right">Link to customer</TooltipContent>
+                        </Tooltip>
+                      }
+                    />
+                  ) : null}
                 </div>
                 {last && (
                   <p className="mt-1 truncate text-xs text-muted-foreground">

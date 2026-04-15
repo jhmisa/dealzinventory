@@ -135,6 +135,19 @@ export default function MessagesPage() {
     [selectedConvId, linkCustomer],
   )
 
+  const handleLinkCustomerFromList = useCallback(
+    (conversationId: string, customerId: string) => {
+      linkCustomer.mutate(
+        { conversationId, customerId },
+        {
+          onSuccess: () => toast.success('Customer linked'),
+          onError: (err) => toast.error(`Failed to link: ${err.message}`),
+        },
+      )
+    },
+    [linkCustomer],
+  )
+
   const handleAssignStaff = useCallback(
     (staffId: string | null) => {
       if (!selectedConvId) return
@@ -241,6 +254,7 @@ export default function MessagesPage() {
               conversations={conversations}
               selectedId={selectedConvId}
               onSelect={setSelectedConvId}
+              onLinkCustomer={handleLinkCustomerFromList}
             />
           )}
         </div>
