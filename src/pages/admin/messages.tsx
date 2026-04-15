@@ -62,7 +62,7 @@ export default function MessagesPage() {
   }), [selectedFolderId, search, mineOnly, user])
 
   const { data: conversations = [] } = useConversations(filters)
-  const { data: selectedConversation, error: convError } = useConversation(selectedConvId ?? '')
+  const { data: selectedConversation } = useConversation(selectedConvId ?? '')
   const { data: messages = [] } = useMessages(selectedConvId ?? '')
 
   const sendMessage = useSendMessage()
@@ -208,7 +208,7 @@ export default function MessagesPage() {
         />
 
         {/* Pane 2 — Conversation list */}
-        <div className="flex w-[300px] shrink-0 flex-col border-r min-h-0">
+        <div className="w-[300px] shrink-0 border-r overflow-hidden">
           <ConversationList
             conversations={conversations}
             selectedId={selectedConvId}
@@ -259,13 +259,7 @@ export default function MessagesPage() {
             <div className="flex flex-1 items-center justify-center">
               <div className="text-center">
                 <MessageSquare className="mx-auto h-12 w-12 text-muted-foreground/30" />
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {convError
-                    ? `Error loading conversation: ${convError.message}`
-                    : selectedConvId
-                      ? 'Loading conversation...'
-                      : 'Select a conversation to view messages'}
-                </p>
+                <p className="mt-2 text-sm text-muted-foreground">Select a conversation to view messages</p>
               </div>
             </div>
           )}

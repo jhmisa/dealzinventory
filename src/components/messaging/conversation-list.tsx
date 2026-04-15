@@ -81,8 +81,8 @@ export const ConversationList = memo(function ConversationList({
   onMoveToFolder,
 }: ConversationListProps) {
   return (
-    <>
-      <div className="flex items-center gap-2 p-2 border-b">
+    <div className="flex flex-col h-full min-h-0">
+      <div className="flex items-center gap-2 p-2 border-b shrink-0">
         <SearchBar value={search} onChange={onSearchChange} placeholder="Search..." className="flex-1" />
         <Tooltip>
           <TooltipTrigger asChild>
@@ -201,6 +201,6 @@ export const ConversationList = memo(function ConversationList({
           })}
         </div>
       </ScrollArea>
-    </>
+    </div>
   )
 })
