@@ -7,6 +7,15 @@ import { ChannelBadge } from './channel-badge'
 import { CustomerLinker } from './customer-linker'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu'
 import { SearchBar } from '@/components/shared/search-bar'
 import type { ConversationWithRelations } from '@/lib/types'
 
@@ -54,6 +63,8 @@ interface ConversationListProps {
   currentUserId?: string
   search: string
   onSearchChange: (v: string) => void
+  folders?: Array<{ id: string; name: string }>
+  onMoveToFolder?: (conversationId: string, folderId: string) => void
 }
 
 export const ConversationList = memo(function ConversationList({
@@ -66,6 +77,8 @@ export const ConversationList = memo(function ConversationList({
   staffMap,
   search,
   onSearchChange,
+  folders,
+  onMoveToFolder,
 }: ConversationListProps) {
   return (
     <>
@@ -99,71 +112,91 @@ export const ConversationList = memo(function ConversationList({
             const isSelected = conv.id === selectedId
 
             return (
-              <button
-                key={conv.id}
-                className={cn(
-                  'flex w-full items-start gap-3 rounded-md p-2.5 text-left transition-colors',
-                  isSelected ? 'bg-accent' : 'hover:bg-muted/50',
-                )}
-                onClick={() => onSelect(conv.id)}
-              >
-                <span
-                  className={cn('mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full', dot.color)}
-                  title={dot.label}
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className={cn('truncate text-sm', conv.unread_count > 0 ? 'font-bold' : 'font-medium')}>
-                      {name}
-                    </span>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {conv.unread_count > 0 && (
-                        <Badge variant="default" className="h-4 min-w-4 px-1 text-[10px]">
-                          {conv.unread_count}
-                        </Badge>
-                      )}
-                      <span className="text-[10px] text-muted-foreground">
-                        {formatTimeAgo(conv.last_message_at)}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <ChannelBadge channel={conv.channel} />
-                    {conv.customers ? (
-                      <span className="text-[10px] text-muted-foreground">{conv.customers.customer_code}</span>
-                    ) : conv.unmatched_contact && onLinkCustomer ? (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span onClick={(e) => e.stopPropagation()}>
-                            <CustomerLinker
-                              onLink={(customerId) => onLinkCustomer(conv.id, customerId)}
-                              trigger={
-                                <span
-                                  role="button"
-                                  className="inline-flex items-center justify-center h-4 w-4 rounded hover:bg-muted-foreground/20 text-muted-foreground hover:text-primary transition-colors"
-                                >
-                                  <Link2 className="h-3 w-3" />
-                                </span>
-                              }
-                            />
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent side="right">Link to customer</TooltipContent>
-                      </Tooltip>
-                    ) : null}
-                    {conv.assigned_staff_id && staffMap?.[conv.assigned_staff_id] && (
-                      <span className="text-[10px] text-muted-foreground">
-                        {staffMap[conv.assigned_staff_id].display_name.split(' ')[0]}
-                      </span>
+              <ContextMenu key={conv.id}>
+                <ContextMenuTrigger asChild>
+                  <button
+                    className={cn(
+                      'flex w-full items-start gap-3 rounded-md p-2.5 text-left transition-colors',
+                      isSelected ? 'bg-accent' : 'hover:bg-muted/50',
                     )}
-                  </div>
-                  {last && (
-                    <p className="mt-1 truncate text-xs text-muted-foreground">
-                      {last.content}
-                    </p>
+                    onClick={() => onSelect(conv.id)}
+                  >
+                    <span
+                      className={cn('mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full', dot.color)}
+                      title={dot.label}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={cn('truncate text-sm', conv.unread_count > 0 ? 'font-bold' : 'font-medium')}>
+                          {name}
+                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {conv.unread_count > 0 && (
+                            <Badge variant="default" className="h-4 min-w-4 px-1 text-[10px]">
+                              {conv.unread_count}
+                            </Badge>
+                          )}
+                          <span className="text-[10px] text-muted-foreground">
+                            {formatTimeAgo(conv.last_message_at)}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <ChannelBadge channel={conv.channel} />
+                        {conv.customers ? (
+                          <span className="text-[10px] text-muted-foreground">{conv.customers.customer_code}</span>
+                        ) : conv.unmatched_contact && onLinkCustomer ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span onClick={(e) => e.stopPropagation()}>
+                                <CustomerLinker
+                                  onLink={(customerId) => onLinkCustomer(conv.id, customerId)}
+                                  trigger={
+                                    <span
+                                      role="button"
+                                      className="inline-flex items-center justify-center h-4 w-4 rounded hover:bg-muted-foreground/20 text-muted-foreground hover:text-primary transition-colors"
+                                    >
+                                      <Link2 className="h-3 w-3" />
+                                    </span>
+                                  }
+                                />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="right">Link to customer</TooltipContent>
+                          </Tooltip>
+                        ) : null}
+                        {conv.assigned_staff_id && staffMap?.[conv.assigned_staff_id] && (
+                          <span className="text-[10px] text-muted-foreground">
+                            {staffMap[conv.assigned_staff_id].display_name.split(' ')[0]}
+                          </span>
+                        )}
+                      </div>
+                      {last && (
+                        <p className="mt-1 truncate text-xs text-muted-foreground">
+                          {last.content}
+                        </p>
+                      )}
+                    </div>
+                  </button>
+                </ContextMenuTrigger>
+                <ContextMenuContent>
+                  {folders && folders.length > 0 && onMoveToFolder && (
+                    <ContextMenuSub>
+                      <ContextMenuSubTrigger>Move to...</ContextMenuSubTrigger>
+                      <ContextMenuSubContent>
+                        {folders.map((f) => (
+                          <ContextMenuItem
+                            key={f.id}
+                            onClick={() => onMoveToFolder(conv.id, f.id)}
+                          >
+                            {f.name}
+                          </ContextMenuItem>
+                        ))}
+                      </ContextMenuSubContent>
+                    </ContextMenuSub>
                   )}
-                </div>
-              </button>
+                </ContextMenuContent>
+              </ContextMenu>
             )
           })}
         </div>

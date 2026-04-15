@@ -226,6 +226,13 @@ export default function MessagesPage() {
                 currentUserId={user?.id}
                 search={search}
                 onSearchChange={setSearch}
+                folders={folders.map(f => ({ id: f.id, name: f.name }))}
+                onMoveToFolder={(conversationId, folderId) =>
+                  moveToFolder.mutate(
+                    { conversationId, folderId },
+                    { onSuccess: () => toast.success('Moved to folder') }
+                  )
+                }
               />
             )}
           </div>
