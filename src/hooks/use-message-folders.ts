@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '@/lib/query-keys'
 import * as folderService from '@/services/message-folders'
 
 export function useMessageFolders() {
@@ -22,9 +23,9 @@ export function useMoveConversationToFolder() {
     mutationFn: ({ conversationId, folderId }: { conversationId: string; folderId: string }) =>
       folderService.moveConversationToFolder(conversationId, folderId),
     onMutate: async ({ conversationId, folderId }) => {
-      await qc.cancelQueries({ queryKey: ['conversations'] })
-      const previousQueries = qc.getQueriesData({ queryKey: ['conversations'] })
-      qc.setQueriesData({ queryKey: ['conversations'] }, (old: unknown) => {
+      await qc.cancelQueries({ queryKey: queryKeys.messaging.conversations() })
+      const previousQueries = qc.getQueriesData({ queryKey: queryKeys.messaging.conversations() })
+      qc.setQueriesData({ queryKey: queryKeys.messaging.conversations() }, (old: unknown) => {
         if (!Array.isArray(old)) return old
         return old.map((conv: Record<string, unknown>) =>
           conv.id === conversationId ? { ...conv, folder_id: folderId } : conv
@@ -40,7 +41,7 @@ export function useMoveConversationToFolder() {
       }
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['conversations'] })
+      qc.invalidateQueries({ queryKey: queryKeys.messaging.conversations() })
       qc.invalidateQueries({ queryKey: ['message-folders'] })
     },
   })
@@ -71,7 +72,7 @@ export function useArchiveConversation() {
   return useMutation({
     mutationFn: folderService.archiveConversation,
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['conversations'] })
+      qc.invalidateQueries({ queryKey: queryKeys.messaging.conversations() })
       qc.invalidateQueries({ queryKey: ['message-folders'] })
     },
   })
@@ -82,7 +83,7 @@ export function useUnarchiveConversation() {
   return useMutation({
     mutationFn: folderService.unarchiveConversation,
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['conversations'] })
+      qc.invalidateQueries({ queryKey: queryKeys.messaging.conversations() })
       qc.invalidateQueries({ queryKey: ['message-folders'] })
     },
   })
