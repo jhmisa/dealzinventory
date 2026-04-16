@@ -21,7 +21,25 @@ export function useMoveConversationToFolder() {
   return useMutation({
     mutationFn: ({ conversationId, folderId }: { conversationId: string; folderId: string }) =>
       folderService.moveConversationToFolder(conversationId, folderId),
-    onSuccess: () => {
+    onMutate: async ({ conversationId, folderId }) => {
+      await qc.cancelQueries({ queryKey: ['conversations'] })
+      const previousQueries = qc.getQueriesData({ queryKey: ['conversations'] })
+      qc.setQueriesData({ queryKey: ['conversations'] }, (old: unknown) => {
+        if (!Array.isArray(old)) return old
+        return old.map((conv: Record<string, unknown>) =>
+          conv.id === conversationId ? { ...conv, folder_id: folderId } : conv
+        )
+      })
+      return { previousQueries }
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousQueries) {
+        for (const [key, data] of context.previousQueries) {
+          qc.setQueryData(key, data)
+        }
+      }
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ['conversations'] })
       qc.invalidateQueries({ queryKey: ['message-folders'] })
     },

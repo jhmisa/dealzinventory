@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
-import { MessageSquare } from 'lucide-react'
+import { Loader2, MessageSquare } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
 import { useStaffProfiles } from '@/hooks/use-staff-profiles'
@@ -206,7 +206,17 @@ export default function MessagesPage() {
         description="Customer conversations via Missive"
       />
 
-      <div className="flex flex-1 min-h-0 mt-4 rounded-lg border bg-card overflow-hidden">
+      <div className="relative flex flex-1 min-h-0 mt-4 rounded-lg border bg-card overflow-hidden">
+        {/* Blocking overlay while moving */}
+        {moveToFolder.isPending && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/60 backdrop-blur-sm">
+            <div className="flex flex-col items-center gap-3">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <p className="text-sm font-medium text-muted-foreground">Moving conversation...</p>
+            </div>
+          </div>
+        )}
+
         {/* Pane 1 — Folder sidebar */}
         <FolderSidebar
           folders={folders}
