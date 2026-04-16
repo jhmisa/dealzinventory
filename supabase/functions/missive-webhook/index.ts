@@ -189,11 +189,38 @@ Deno.serve(async (req) => {
       message.from_field?.address,
     );
 
-    // Resolve contact name — only from inbound customer messages
-    const resolvedContactName = message.from_field?.name
+    // Resolve contact name — try webhook payload fields first
+    let resolvedContactName: string | null = message.from_field?.name
       ?? conversation.subject
       ?? (conversation.authors ?? []).find((a: { name?: string }) => a.name && a.name !== 'Dealz K.K.')?.name
       ?? null;
+
+    // For FB Messenger, webhook payload often lacks contact name — fetch from Missive API
+    if (!resolvedContactName && MISSIVE_API_TOKEN) {
+      try {
+        const convRes = await fetch(`${MISSIVE_API_URL}/conversations/${conversation.id}`, {
+          headers: { Authorization: `Bearer ${MISSIVE_API_TOKEN}` },
+        });
+        if (convRes.ok) {
+          const convData = await convRes.json();
+          const convDetail = convData?.conversations ?? convData?.conversation;
+          // Missive stores FB contact names in the conversation subject or contact list
+          resolvedContactName =
+            convDetail?.subject
+            ?? convDetail?.latest_subject
+            ?? (convDetail?.contacts ?? []).find((c: { name?: string }) => c.name)?.name
+            ?? (convDetail?.authors ?? []).find((a: { name?: string }) => a.name && a.name !== 'Dealz K.K.')?.name
+            ?? null;
+          // Strip "Message from " prefix if present
+          if (resolvedContactName?.startsWith('Message from ')) {
+            resolvedContactName = resolvedContactName.slice('Message from '.length);
+          }
+          console.log('Missive API contact resolve:', resolvedContactName);
+        }
+      } catch (e) {
+        console.warn('Failed to fetch conversation from Missive API:', e);
+      }
+    }
 
     // Look up Inbox folder for auto-unarchive
     const { data: inboxFolder } = await supabase
