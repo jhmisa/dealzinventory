@@ -1,10 +1,8 @@
 import { memo } from 'react'
-import { Link2, UserCheck } from 'lucide-react'
+import { UserCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { ChannelBadge } from './channel-badge'
-import { CustomerLinker } from './customer-linker'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
@@ -46,17 +44,16 @@ function getDisplayName(conv: ConversationWithRelations): string {
 }
 
 function getStatusDot(conv: ConversationWithRelations): { color: string; label: string } {
-  if (conv.needs_human_review) return { color: 'bg-red-500', label: 'Needs review' }
+  if (conv.needs_human_review) return { color: 'bg-red-200', label: 'Needs review' }
   const last = getLastMessage(conv)
-  if (last?.status === 'DRAFT') return { color: 'bg-yellow-500', label: 'AI draft pending' }
-  return { color: 'bg-green-500', label: 'Resolved' }
+  if (last?.status === 'DRAFT') return { color: 'bg-amber-300', label: 'AI draft pending' }
+  return { color: 'bg-emerald-400', label: 'Resolved' }
 }
 
 interface ConversationListProps {
   conversations: ConversationWithRelations[]
   selectedId: string | null
   onSelect: (id: string) => void
-  onLinkCustomer?: (conversationId: string, customerId: string) => void
   mineOnly: boolean
   onToggleMineOnly: (v: boolean) => void
   staffMap?: Record<string, { display_name: string; avatar_url: string | null }>
@@ -65,13 +62,13 @@ interface ConversationListProps {
   onSearchChange: (v: string) => void
   folders?: Array<{ id: string; name: string }>
   onMoveToFolder?: (conversationId: string, folderId: string) => void
+  onArchive?: (conversationId: string) => void
 }
 
 export const ConversationList = memo(function ConversationList({
   conversations,
   selectedId,
   onSelect,
-  onLinkCustomer,
   mineOnly,
   onToggleMineOnly,
   staffMap,
@@ -79,6 +76,7 @@ export const ConversationList = memo(function ConversationList({
   onSearchChange,
   folders,
   onMoveToFolder,
+  onArchive,
 }: ConversationListProps) {
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -100,8 +98,8 @@ export const ConversationList = memo(function ConversationList({
           </TooltipContent>
         </Tooltip>
       </div>
-      <ScrollArea className="flex-1 overflow-hidden">
-        <div className="space-y-0.5 p-2">
+      <ScrollArea className="flex-1 overflow-hidden [&_[data-slot=scroll-area-viewport]>div]:!block">
+        <div className="space-y-0.5 p-2 pr-3">
           {conversations.length === 0 && (
             <p className="text-sm text-muted-foreground text-center py-8">No conversations</p>
           )}
@@ -116,65 +114,45 @@ export const ConversationList = memo(function ConversationList({
                 <ContextMenuTrigger asChild>
                   <button
                     className={cn(
-                      'flex w-full items-start gap-3 rounded-md p-2.5 text-left transition-colors',
+                      'flex w-full items-start gap-2.5 overflow-hidden rounded-lg px-3 py-2 text-left transition-colors',
                       isSelected ? 'bg-accent' : 'hover:bg-muted/50',
                     )}
                     onClick={() => onSelect(conv.id)}
                   >
                     <span
-                      className={cn('mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full', dot.color)}
+                      className={cn('mt-[7px] h-2 w-2 shrink-0 rounded-full', dot.color)}
                       title={dot.label}
                     />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className={cn('truncate text-sm', conv.unread_count > 0 ? 'font-bold' : 'font-medium')}>
-                          {name}
-                        </span>
+                    <div className="min-w-0 flex-1 overflow-hidden">
+                      <span className={cn('block truncate text-[13px] leading-tight', conv.unread_count > 0 ? 'font-semibold text-foreground' : 'font-normal text-foreground/80')}>
+                        {name}
+                      </span>
+                      <div className="mt-0.5 flex items-center justify-between gap-2">
+                        <p className="min-w-0 truncate text-[12px] leading-snug text-muted-foreground/60">
+                          {last?.content ?? '\u00A0'}
+                        </p>
                         <div className="flex items-center gap-1.5 shrink-0">
                           {conv.unread_count > 0 && (
-                            <Badge variant="default" className="h-4 min-w-4 px-1 text-[10px]">
+                            <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-50 px-1 text-[10px] font-medium text-blue-400">
                               {conv.unread_count}
-                            </Badge>
+                            </span>
                           )}
-                          <span className="text-xs text-muted-foreground whitespace-nowrap">
+                          <span className="text-[11px] text-muted-foreground/70 whitespace-nowrap">
                             {formatTimeAgo(conv.last_message_at ?? conv.updated_at ?? conv.created_at)}
                           </span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <ChannelBadge channel={conv.channel} />
-                        {conv.customers ? (
-                          <span className="text-[10px] text-muted-foreground">{conv.customers.customer_code}</span>
-                        ) : conv.unmatched_contact && onLinkCustomer ? (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span onClick={(e) => e.stopPropagation()}>
-                                <CustomerLinker
-                                  onLink={(customerId) => onLinkCustomer(conv.id, customerId)}
-                                  trigger={
-                                    <span
-                                      role="button"
-                                      className="inline-flex items-center justify-center h-4 w-4 rounded hover:bg-muted-foreground/20 text-muted-foreground hover:text-primary transition-colors"
-                                    >
-                                      <Link2 className="h-3 w-3" />
-                                    </span>
-                                  }
-                                />
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent side="right">Link to customer</TooltipContent>
-                          </Tooltip>
-                        ) : null}
-                        {conv.assigned_staff_id && staffMap?.[conv.assigned_staff_id] && (
-                          <span className="text-[10px] text-muted-foreground">
-                            {staffMap[conv.assigned_staff_id].display_name.split(' ')[0]}
-                          </span>
-                        )}
-                      </div>
-                      {last && (
-                        <p className="mt-1 truncate text-xs text-muted-foreground">
-                          {last.content}
-                        </p>
+                      {(conv.customers || (conv.assigned_staff_id && staffMap?.[conv.assigned_staff_id])) && (
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          {conv.customers && (
+                            <span className="text-[10px] text-muted-foreground/50">{conv.customers.customer_code}</span>
+                          )}
+                          {conv.assigned_staff_id && staffMap?.[conv.assigned_staff_id] && (
+                            <span className="text-[10px] text-muted-foreground/50">
+                              {staffMap[conv.assigned_staff_id].display_name.split(' ')[0]}
+                            </span>
+                          )}
+                        </div>
                       )}
                     </div>
                   </button>
@@ -194,6 +172,11 @@ export const ConversationList = memo(function ConversationList({
                         ))}
                       </ContextMenuSubContent>
                     </ContextMenuSub>
+                  )}
+                  {onArchive && (
+                    <ContextMenuItem onClick={() => onArchive(conv.id)}>
+                      Archive
+                    </ContextMenuItem>
                   )}
                 </ContextMenuContent>
               </ContextMenu>

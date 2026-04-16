@@ -273,6 +273,7 @@ export interface Conversation {
   contact_name: string | null
   contact_avatar_url: string | null
   folder_id: string | null
+  is_archived: boolean
   needs_human_review: boolean
   unmatched_contact: boolean
   assigned_staff_id: string | null

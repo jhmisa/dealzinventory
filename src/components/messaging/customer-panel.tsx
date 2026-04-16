@@ -28,6 +28,7 @@ import { CodeDisplay } from '@/components/shared/code-display'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { AddressDisplay } from '@/components/shared/address-display'
 import { CustomerLinker } from '@/components/messaging/customer-linker'
+import { OrderDetailDialog } from '@/components/messaging/order-detail-dialog'
 import { useCustomerWithDetails } from '@/hooks/use-customers'
 import { ORDER_STATUSES, KAITORI_STATUSES } from '@/lib/constants'
 import { formatPrice, formatDate } from '@/lib/utils'
@@ -48,6 +49,7 @@ export function CustomerPanel({
   collapsed,
   onToggleCollapse,
 }: CustomerPanelProps) {
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
   const customerId = conversation.customers?.id ?? ''
   const { data: customerDetails } = useCustomerWithDetails(customerId)
 
@@ -157,11 +159,16 @@ export function CustomerPanel({
               </div>
               {customer.orders?.length > 0 ? (
                 <div className="space-y-1.5">
-                  {customer.orders.map((order: { id: string; order_code: string; order_status: string; total_price: number | null; created_at: string }) => (
-                    <Link
+                  {[...customer.orders]
+                    .sort((a: { created_at: string }, b: { created_at: string }) =>
+                      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                    )
+                    .map((order: { id: string; order_code: string; order_status: string; total_price: number | null; created_at: string }) => (
+                    <button
                       key={order.id}
-                      to={`/admin/orders/${order.id}`}
-                      className="flex items-center justify-between rounded-md border px-2 py-1.5 text-xs hover:bg-accent transition-colors"
+                      type="button"
+                      onClick={() => setSelectedOrderId(order.id)}
+                      className="flex w-full items-center justify-between rounded-md border px-2 py-1.5 text-xs hover:bg-accent transition-colors text-left"
                     >
                       <div className="space-y-0.5">
                         <CodeDisplay code={order.order_code} className="text-[11px]" />
@@ -171,12 +178,16 @@ export function CustomerPanel({
                         <StatusBadge status={order.order_status} config={ORDER_STATUSES} />
                         <p className="text-muted-foreground">{formatPrice(order.total_price)}</p>
                       </div>
-                    </Link>
+                    </button>
                   ))}
                 </div>
               ) : (
                 <p className="text-xs text-muted-foreground">No orders yet</p>
               )}
+              <OrderDetailDialog
+                orderId={selectedOrderId}
+                onClose={() => setSelectedOrderId(null)}
+              />
             </div>
           )}
 

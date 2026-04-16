@@ -1,6 +1,6 @@
 import { memo, useRef, useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { User, AlertCircle, RotateCw, Bot, UserCheck, FileIcon, ExternalLink, X } from 'lucide-react'
+import { User, AlertCircle, RotateCw, Bot, UserCheck, FileIcon, ExternalLink, X, Archive, ArchiveRestore } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
@@ -37,6 +37,21 @@ function formatDate(dateStr: string): string {
   yesterday.setDate(yesterday.getDate() - 1)
   if (d.toDateString() === yesterday.toDateString()) return 'Yesterday'
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' })
+}
+
+// Convert URLs in text to clickable links
+function linkifyText(text: string): (string | React.ReactElement)[] {
+  const urlRegex = /(https?:\/\/[^\s]+)/g
+  const parts = text.split(urlRegex)
+  return parts.map((part, i) =>
+    urlRegex.test(part) ? (
+      <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline break-all">
+        {part}
+      </a>
+    ) : (
+      part
+    )
+  )
 }
 
 // Lightbox for viewing images/videos in a popup
@@ -156,7 +171,7 @@ const AttachmentThumbnail = memo(function AttachmentThumbnail({
       rel="noopener noreferrer"
       className={cn(
         'mt-1.5 flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs hover:bg-accent/10',
-        isOutbound ? 'border-primary-foreground/20' : 'border-border',
+        isOutbound ? 'border-blue-200' : 'border-border',
       )}
     >
       <FileIcon className="h-3.5 w-3.5 shrink-0" />
@@ -184,6 +199,8 @@ interface ConversationThreadProps {
   staffMap?: Record<string, { display_name: string; avatar_url: string | null }>
   folders?: MessageFolder[]
   onMoveToFolder?: (folderId: string) => void
+  onArchive?: () => void
+  isArchived?: boolean
 }
 
 export const ConversationThread = memo(function ConversationThread({
@@ -202,6 +219,8 @@ export const ConversationThread = memo(function ConversationThread({
   staffMap,
   folders,
   onMoveToFolder,
+  onArchive,
+  isArchived,
 }: ConversationThreadProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const composerRef = useRef<HTMLDivElement>(null)
@@ -336,6 +355,16 @@ export const ConversationThread = memo(function ConversationThread({
               </SelectContent>
             </Select>
           )}
+          {onArchive && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onArchive}>
+                  {isArchived ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{isArchived ? 'Unarchive' : 'Archive'}</TooltipContent>
+            </Tooltip>
+          )}
           <Tooltip>
             <TooltipTrigger asChild>
               <div className="flex items-center gap-1.5">
@@ -404,15 +433,15 @@ export const ConversationThread = memo(function ConversationThread({
                           'max-w-[75%] rounded-lg px-3 py-2 text-sm',
                           isCustomer
                             ? 'bg-muted'
-                            : 'bg-primary text-primary-foreground',
+                            : 'bg-blue-100 text-foreground',
                         )}
                       >
                         {msg.role === 'staff' && msg.sent_by && staffMap?.[msg.sent_by] && (
-                          <p className="text-[10px] font-medium text-primary-foreground/70 mb-0.5">
+                          <p className="text-[10px] font-medium text-muted-foreground mb-0.5">
                             {staffMap[msg.sent_by].display_name}
                           </p>
                         )}
-                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                        <p className="whitespace-pre-wrap">{linkifyText(msg.content)}</p>
                         {/* Attachments */}
                         {msgAttachments.length > 0 && (
                           <div className="space-y-1">
@@ -431,11 +460,11 @@ export const ConversationThread = memo(function ConversationThread({
                         )}>
                           <span className={cn(
                             'text-[10px]',
-                            isCustomer ? 'text-muted-foreground' : 'text-primary-foreground/70',
+                            isCustomer ? 'text-muted-foreground' : 'text-muted-foreground',
                           )}>
                             {formatTime(msg.created_at)}
                           </span>
-                          {!isCustomer && <MessageStatusBadge status={msg.status} className={isFailed ? '' : 'text-primary-foreground/70'} />}
+                          {!isCustomer && <MessageStatusBadge status={msg.status} className={isFailed ? '' : 'text-muted-foreground'} />}
                         </div>
                         {isFailed && (
                           <div className="mt-1 flex items-center gap-1">

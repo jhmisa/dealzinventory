@@ -3,7 +3,7 @@ import { queryKeys } from '@/lib/query-keys'
 import * as itemsService from '@/services/items'
 import { searchAvailableAccessories } from '@/services/accessories'
 import type { ItemInsert, ItemUpdate } from '@/lib/types'
-import type { AvailableInventoryResult } from '@/services/items'
+import type { AvailableInventoryResult, InventorySearchFilters } from '@/services/items'
 
 interface ItemFilters {
   search?: string
@@ -149,13 +149,15 @@ export function useUpdateItemMedia() {
 
 // --- Inventory Search (for messaging) ---
 
-export function useAvailableInventorySearch(query: string) {
+export function useAvailableInventorySearch(query: string, filters: InventorySearchFilters = {}) {
+  const hasQuery = query.trim().length >= 2
+  const hasFilters = !!(filters.brand || filters.categoryId || filters.priceMin != null || filters.priceMax != null)
   return useQuery({
-    queryKey: [...queryKeys.items.all, 'available-search', query] as const,
+    queryKey: [...queryKeys.items.all, 'available-search', query, filters] as const,
     queryFn: async (): Promise<AvailableInventoryResult[]> => {
       const [items, accessories] = await Promise.all([
-        itemsService.searchAvailableItems(query),
-        searchAvailableAccessories(query),
+        itemsService.searchAvailableItems(query, filters),
+        hasQuery ? searchAvailableAccessories(query) : Promise.resolve([]),
       ])
       // Sort: exact code matches first, then alphabetically
       const all = [...items, ...accessories as unknown as AvailableInventoryResult[]]
@@ -167,7 +169,14 @@ export function useAvailableInventorySearch(query: string) {
         return a.description.localeCompare(b.description)
       })
     },
-    enabled: query.trim().length >= 2,
+    enabled: hasQuery || hasFilters,
+  })
+}
+
+export function useAvailableBrands() {
+  return useQuery({
+    queryKey: [...queryKeys.items.all, 'available-brands'] as const,
+    queryFn: () => itemsService.getAvailableBrands(),
   })
 }
 

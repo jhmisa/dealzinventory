@@ -23,10 +23,13 @@ import {
   useMessageFolders,
   useAwaitingReplyCounts,
   useMoveConversationToFolder,
+  useArchiveConversation,
+  useUnarchiveConversation,
 } from '@/hooks/use-message-folders'
 
 export default function MessagesPage() {
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null)
+  const [isArchiveView, setIsArchiveView] = useState(false)
   const [mineOnly, setMineOnly] = useState(false)
   const [search, setSearch] = useState('')
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null)
@@ -47,6 +50,8 @@ export default function MessagesPage() {
   const { data: folders = [] } = useMessageFolders()
   const { data: awaitingCounts = {} } = useAwaitingReplyCounts()
   const moveToFolder = useMoveConversationToFolder()
+  const archiveConversation = useArchiveConversation()
+  const unarchiveConversation = useUnarchiveConversation()
 
   // Auto-select Inbox on first load
   useEffect(() => {
@@ -57,10 +62,12 @@ export default function MessagesPage() {
   }, [folders, selectedFolderId])
 
   const filters = useMemo(() => ({
-    folder_id: selectedFolderId ?? undefined,
+    ...(isArchiveView
+      ? { is_archived: true as const }
+      : { is_archived: false as const, folder_id: selectedFolderId ?? undefined }),
     search: search || undefined,
     assigned_staff_id: mineOnly ? user?.id : undefined,
-  }), [selectedFolderId, search, mineOnly, user])
+  }), [selectedFolderId, isArchiveView, search, mineOnly, user])
 
   const { data: conversations = [] } = useConversations(filters)
   const { data: selectedConversation } = useConversation(selectedConvId ?? '')
@@ -163,18 +170,6 @@ export default function MessagesPage() {
     [selectedConvId, unlinkCustomer],
   )
 
-  const handleLinkCustomerFromList = useCallback(
-    (conversationId: string, customerId: string) => {
-      linkCustomer.mutate(
-        { conversationId, customerId },
-        {
-          onSuccess: () => toast.success('Customer linked'),
-          onError: (err) => toast.error(`Failed to link: ${err.message}`),
-        },
-      )
-    },
-    [linkCustomer],
-  )
 
   const handleAssignStaff = useCallback(
     (staffId: string | null) => {
@@ -215,9 +210,11 @@ export default function MessagesPage() {
         {/* Pane 1 — Folder sidebar */}
         <FolderSidebar
           folders={folders}
-          selectedFolderId={selectedFolderId}
-          onSelectFolder={setSelectedFolderId}
+          selectedFolderId={isArchiveView ? null : selectedFolderId}
+          onSelectFolder={(id) => { setIsArchiveView(false); setSelectedFolderId(id) }}
           awaitingCounts={awaitingCounts}
+          onSelectArchive={() => { setIsArchiveView(true); setSelectedFolderId(null); setSelectedConvId(null) }}
+          isArchiveSelected={isArchiveView}
         />
 
         {/* Pane 2 — Conversation list */}
@@ -226,7 +223,6 @@ export default function MessagesPage() {
             conversations={conversations}
             selectedId={selectedConvId}
             onSelect={setSelectedConvId}
-            onLinkCustomer={handleLinkCustomerFromList}
             mineOnly={mineOnly}
             onToggleMineOnly={setMineOnly}
             staffMap={staffMap}
@@ -239,6 +235,14 @@ export default function MessagesPage() {
                 { conversationId, folderId },
                 { onSuccess: () => toast.success('Moved to folder') }
               )
+            }
+            onArchive={(conversationId) =>
+              archiveConversation.mutate(conversationId, {
+                onSuccess: () => {
+                  toast.success('Conversation archived')
+                  if (selectedConvId === conversationId) setSelectedConvId(null)
+                },
+              })
             }
           />
         </div>
@@ -267,6 +271,21 @@ export default function MessagesPage() {
                   { onSuccess: () => toast.success('Moved to folder') }
                 )
               }
+              isArchived={selectedConversation.is_archived}
+              onArchive={() => {
+                if (selectedConversation.is_archived) {
+                  unarchiveConversation.mutate(selectedConvId!, {
+                    onSuccess: () => toast.success('Conversation unarchived'),
+                  })
+                } else {
+                  archiveConversation.mutate(selectedConvId!, {
+                    onSuccess: () => {
+                      toast.success('Conversation archived')
+                      setSelectedConvId(null)
+                    },
+                  })
+                }
+              }}
             />
           ) : (
             <div className="flex flex-1 items-center justify-center">

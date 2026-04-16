@@ -72,3 +72,21 @@ export async function moveConversationToFolder(
 
   if (error) throw error
 }
+
+export async function archiveConversation(conversationId: string): Promise<void> {
+  const { error } = await supabase
+    .from('conversations')
+    .update({ is_archived: true })
+    .eq('id', conversationId)
+
+  if (error) throw error
+}
+
+export async function unarchiveConversation(conversationId: string): Promise<void> {
+  const { error } = await supabase
+    .from('conversations')
+    .update({ is_archived: false })
+    .eq('id', conversationId)
+
+  if (error) throw error
+}

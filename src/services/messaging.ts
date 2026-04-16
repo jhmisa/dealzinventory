@@ -25,6 +25,7 @@ export interface ConversationFilters {
   assigned_staff_id?: string
   search?: string
   folder_id?: string
+  is_archived?: boolean
 }
 
 export async function getConversations(filters: ConversationFilters = {}) {
@@ -43,6 +44,9 @@ export async function getConversations(filters: ConversationFilters = {}) {
   if (filters.assigned_staff_id) {
     query = query.eq('assigned_staff_id', filters.assigned_staff_id)
   }
+  // Filter by archive status (default: show non-archived)
+  query = query.eq('is_archived', filters.is_archived ?? false)
+
   if (filters.folder_id) {
     query = query.eq('folder_id', filters.folder_id)
   }

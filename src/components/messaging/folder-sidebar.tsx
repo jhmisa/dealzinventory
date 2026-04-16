@@ -8,6 +8,7 @@ import {
   AlertTriangle,
   Wrench,
   Folder,
+  Archive,
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -24,6 +25,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   'alert-triangle': AlertTriangle,
   wrench: Wrench,
   folder: Folder,
+  archive: Archive,
 }
 
 interface FolderSidebarProps {
@@ -31,6 +33,8 @@ interface FolderSidebarProps {
   selectedFolderId: string | null
   onSelectFolder: (folderId: string) => void
   awaitingCounts: Record<string, number>
+  onSelectArchive?: () => void
+  isArchiveSelected?: boolean
 }
 
 export const FolderSidebar = memo(function FolderSidebar({
@@ -38,6 +42,8 @@ export const FolderSidebar = memo(function FolderSidebar({
   selectedFolderId,
   onSelectFolder,
   awaitingCounts,
+  onSelectArchive,
+  isArchiveSelected,
 }: FolderSidebarProps) {
   const systemFolders = folders.filter((f) => f.is_system)
   const pipelineFolders = folders.filter((f) => !f.is_system)
@@ -72,6 +78,22 @@ export const FolderSidebar = memo(function FolderSidebar({
                   onSelect={onSelectFolder}
                 />
               ))}
+            </>
+          )}
+
+          {onSelectArchive && (
+            <>
+              <div className="my-1 h-px bg-border" />
+              <button
+                className={cn(
+                  'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
+                  isArchiveSelected ? 'bg-accent font-medium' : 'hover:bg-muted/80 text-muted-foreground',
+                )}
+                onClick={onSelectArchive}
+              >
+                <Archive className="h-4 w-4 shrink-0" />
+                <span className="truncate flex-1 text-left">Archive</span>
+              </button>
             </>
           )}
         </div>

@@ -195,7 +195,17 @@ Deno.serve(async (req) => {
       ?? (conversation.authors ?? []).find((a: { name?: string }) => a.name && a.name !== 'Dealz K.K.')?.name
       ?? null;
 
+    // Look up Inbox folder for auto-unarchive
+    const { data: inboxFolder } = await supabase
+      .from('message_folders')
+      .select('id')
+      .eq('name', 'Inbox')
+      .eq('is_system', true)
+      .single();
+    const inboxFolderId = inboxFolder?.id ?? null;
+
     // Upsert conversation — only update contact_name if we have a non-null value
+    // Auto-unarchive and move to Inbox on new inbound messages
     const { data: conv, error: convError } = await supabase
       .from('conversations')
       .upsert(
@@ -208,6 +218,8 @@ Deno.serve(async (req) => {
           unmatched_contact: !customer,
           needs_human_review: !customer,
           last_message_at: new Date().toISOString(),
+          is_archived: false,
+          ...(inboxFolderId ? { folder_id: inboxFolderId } : {}),
         },
         { onConflict: 'missive_conversation_id' },
       )

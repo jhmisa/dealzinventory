@@ -9,15 +9,24 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { GradeBadge } from '@/components/shared/grade-badge'
 import { formatPrice } from '@/lib/utils'
-import { useAvailableInventorySearch } from '@/hooks/use-items'
+import { useAvailableInventorySearch, useAvailableBrands } from '@/hooks/use-items'
+import { useCategories } from '@/hooks/use-categories'
 import { uploadAttachment } from '@/services/messaging'
 import type { MessageAttachment, ConditionGrade } from '@/lib/types'
-import type { AvailableInventoryResult } from '@/services/items'
+import type { AvailableInventoryResult, InventorySearchFilters } from '@/services/items'
 
-const SHOP_URL = import.meta.env.VITE_PUBLIC_SHOP_URL ?? ''
+function getShopUrl() {
+  return import.meta.env.VITE_PUBLIC_SHOP_URL || `${window.location.origin}/shop`
+}
 
 interface InventorySearchModalProps {
   open: boolean
@@ -34,21 +43,57 @@ export const InventorySearchModal = memo(function InventorySearchModal({
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [addingId, setAddingId] = useState<string | null>(null)
 
-  // Debounce search
+  // Filters
+  const [brand, setBrand] = useState<string>('')
+  const [categoryId, setCategoryId] = useState<string>('')
+  const [priceMin, setPriceMin] = useState<string>('')
+  const [priceMax, setPriceMax] = useState<string>('')
+  const [debouncedPriceMin, setDebouncedPriceMin] = useState<string>('')
+  const [debouncedPriceMax, setDebouncedPriceMax] = useState<string>('')
+
+  // Debounce search query
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(query), 300)
     return () => clearTimeout(timer)
   }, [query])
 
-  const { data: results = [], isLoading } = useAvailableInventorySearch(debouncedQuery)
+  // Debounce price inputs
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedPriceMin(priceMin)
+      setDebouncedPriceMax(priceMax)
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [priceMin, priceMax])
+
+  const filters: InventorySearchFilters = {
+    ...(brand ? { brand } : {}),
+    ...(categoryId ? { categoryId } : {}),
+    ...(debouncedPriceMin ? { priceMin: Number(debouncedPriceMin) } : {}),
+    ...(debouncedPriceMax ? { priceMax: Number(debouncedPriceMax) } : {}),
+  }
+
+  const { data: results = [], isLoading } = useAvailableInventorySearch(debouncedQuery, filters)
+  const { data: brands = [] } = useAvailableBrands()
+  const { data: categories = [] } = useCategories()
 
   // Reset on close
   useEffect(() => {
     if (!open) {
       setQuery('')
       setDebouncedQuery('')
+      setBrand('')
+      setCategoryId('')
+      setPriceMin('')
+      setPriceMax('')
+      setDebouncedPriceMin('')
+      setDebouncedPriceMax('')
     }
   }, [open])
+
+  const hasQuery = debouncedQuery.trim().length >= 2
+  const hasFilters = !!(brand || categoryId || debouncedPriceMin || debouncedPriceMax)
+  const hasInput = hasQuery || hasFilters
 
   const handleAdd = useCallback(
     async (item: AvailableInventoryResult) => {
@@ -89,38 +134,82 @@ export const InventorySearchModal = memo(function InventorySearchModal({
           if (item.condition_notes) lines.push(item.condition_notes)
           if (item.grade) lines.push(`Rank ${item.grade}`)
           if (item.price) lines.push(formatPrice(item.price))
-          if (SHOP_URL && item.product_model_id) {
-            lines.push(`${SHOP_URL}/shop/product/${item.product_model_id}`)
+          {
+            const shopUrl = getShopUrl()
+            lines.push(`View Full Specs & Photos: ${shopUrl}/item/${item.id}`)
           }
         } else {
           lines.push(item.code)
           lines.push(item.description)
           if (item.price) lines.push(formatPrice(item.price))
-          if (SHOP_URL && item.accessory_id) {
-            lines.push(`${SHOP_URL}/shop/accessory/${item.accessory_id}`)
+          if (item.accessory_id) {
+            const shopUrl = getShopUrl()
+            lines.push(`${shopUrl}/accessory/${item.accessory_id}`)
           }
         }
         const text = lines.join('\n')
 
         onInsertItem(text, attachment, thumbnailUrl)
         toast.success(`Added ${item.code} to message`)
+        onClose()
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Failed to add item')
       } finally {
         setAddingId(null)
       }
     },
-    [onInsertItem],
+    [onInsertItem, onClose],
   )
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col p-0">
-        <DialogHeader className="px-4 pt-4 pb-2">
+      <DialogContent className="!max-w-3xl !max-h-[80vh] !flex !flex-col !gap-0 !p-0 overflow-hidden">
+        <DialogHeader className="px-6 pt-5 pb-2">
           <DialogTitle className="text-base">Search Inventory</DialogTitle>
         </DialogHeader>
 
-        <div className="px-4 pb-2">
+        <div className="px-6 pb-2 space-y-2">
+          <div className="flex gap-2">
+            <Select value={categoryId} onValueChange={(v) => setCategoryId(v === 'all' ? '' : v)}>
+              <SelectTrigger className="h-8 text-xs flex-1">
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {categories.map((cat) => (
+                  <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={brand} onValueChange={(v) => setBrand(v === 'all' ? '' : v)}>
+              <SelectTrigger className="h-8 text-xs flex-1">
+                <SelectValue placeholder="Brand" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Brands</SelectItem>
+                {brands.map((b) => (
+                  <SelectItem key={b} value={b}>{b}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Input
+              type="number"
+              value={priceMin}
+              onChange={(e) => setPriceMin(e.target.value)}
+              placeholder="¥ Min"
+              className="h-8 text-xs w-24"
+            />
+            <Input
+              type="number"
+              value={priceMax}
+              onChange={(e) => setPriceMax(e.target.value)}
+              placeholder="¥ Max"
+              className="h-8 text-xs w-24"
+            />
+          </div>
+
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -133,28 +222,28 @@ export const InventorySearchModal = memo(function InventorySearchModal({
           </div>
         </div>
 
-        <ScrollArea className="flex-1 min-h-0 px-4 pb-4">
-          {isLoading && debouncedQuery.length >= 2 ? (
+        <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-4">
+          {isLoading && hasInput ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
-          ) : results.length === 0 && debouncedQuery.length >= 2 ? (
+          ) : results.length === 0 && hasInput ? (
             <p className="text-center text-sm text-muted-foreground py-8">
               No available items found
             </p>
-          ) : debouncedQuery.length < 2 ? (
+          ) : !hasInput ? (
             <p className="text-center text-sm text-muted-foreground py-8">
-              Type at least 2 characters to search
+              Type at least 2 characters or select a filter
             </p>
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full table-fixed text-sm">
               <thead>
                 <tr className="border-b text-left text-xs text-muted-foreground">
                   <th className="w-12 pb-2"></th>
-                  <th className="pb-2 pr-3">Code</th>
+                  <th className="w-[88px] pb-2 pr-3">Code</th>
                   <th className="w-14 pb-2">Grade</th>
                   <th className="pb-2 pr-3">Description</th>
-                  <th className="pb-2 pr-3 text-right">Price</th>
+                  <th className="w-20 pb-2 pr-3 text-right">Price</th>
                   <th className="w-16 pb-2"></th>
                 </tr>
               </thead>
@@ -185,7 +274,10 @@ export const InventorySearchModal = memo(function InventorySearchModal({
                       )}
                     </td>
                     <td className="py-2 pr-3">
-                      <span className="text-xs">{item.description}</span>
+                      <span className="text-xs line-clamp-2">{item.description}</span>
+                      {item.condition_notes && (
+                        <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">{item.condition_notes}</p>
+                      )}
                     </td>
                     <td className="py-2 pr-3 text-right">
                       <span className="text-xs font-medium">{formatPrice(item.price)}</span>
@@ -211,7 +303,7 @@ export const InventorySearchModal = memo(function InventorySearchModal({
               </tbody>
             </table>
           )}
-        </ScrollArea>
+        </div>
       </DialogContent>
     </Dialog>
   )

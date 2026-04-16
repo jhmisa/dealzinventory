@@ -331,13 +331,28 @@ export interface AvailableInventoryResult {
   accessory_id: string | null
 }
 
-export async function searchAvailableItems(query: string): Promise<AvailableInventoryResult[]> {
-  if (!query.trim()) return []
+export interface InventorySearchFilters {
+  brand?: string
+  categoryId?: string
+  priceMin?: number
+  priceMax?: number
+}
 
-  const { data, error } = await supabase.rpc('search_available_inventory', {
-    search_query: query.trim(),
-    result_limit: 20,
-  })
+export async function searchAvailableItems(query: string, filters: InventorySearchFilters = {}): Promise<AvailableInventoryResult[]> {
+  const hasQuery = query.trim().length >= 2
+  const hasFilters = filters.brand || filters.categoryId || filters.priceMin != null || filters.priceMax != null
+  if (!hasQuery && !hasFilters) return []
+
+  const params: Record<string, unknown> = {
+    search_query: hasQuery ? query.trim() : '',
+    result_limit: 30,
+  }
+  if (filters.brand) params.filter_brand = filters.brand
+  if (filters.categoryId) params.filter_category_id = filters.categoryId
+  if (filters.priceMin != null) params.price_min = filters.priceMin
+  if (filters.priceMax != null) params.price_max = filters.priceMax
+
+  const { data, error } = await supabase.rpc('search_available_inventory', params)
 
   if (error) throw error
 
@@ -405,6 +420,12 @@ export async function searchAvailableItems(query: string): Promise<AvailableInve
       accessory_id: null,
     }
   })
+}
+
+export async function getAvailableBrands(): Promise<string[]> {
+  const { data, error } = await supabase.rpc('get_available_brands')
+  if (error) throw error
+  return (data ?? []).map((row: { brand: string }) => row.brand)
 }
 
 export async function getIntakeItems() {

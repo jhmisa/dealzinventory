@@ -47,3 +47,25 @@ export function useDeleteMessageFolder() {
     },
   })
 }
+
+export function useArchiveConversation() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: folderService.archiveConversation,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['conversations'] })
+      qc.invalidateQueries({ queryKey: ['message-folders'] })
+    },
+  })
+}
+
+export function useUnarchiveConversation() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: folderService.unarchiveConversation,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['conversations'] })
+      qc.invalidateQueries({ queryKey: ['message-folders'] })
+    },
+  })
+}
