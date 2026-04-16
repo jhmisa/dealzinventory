@@ -165,7 +165,7 @@ export const ConversationList = memo(function ConversationList({
                         {folders.map((f) => (
                           <ContextMenuItem
                             key={f.id}
-                            onClick={() => onMoveToFolder(conv.id, f.id)}
+                            onSelect={() => onMoveToFolder(conv.id, f.id)}
                           >
                             {f.name}
                           </ContextMenuItem>
@@ -174,7 +174,7 @@ export const ConversationList = memo(function ConversationList({
                     </ContextMenuSub>
                   )}
                   {onArchive && (
-                    <ContextMenuItem onClick={() => onArchive(conv.id)}>
+                    <ContextMenuItem onSelect={() => onArchive(conv.id)}>
                       Archive
                     </ContextMenuItem>
                   )}
