@@ -409,13 +409,37 @@ export default function ItemListPage() {
   const unifiedData: InventoryRow[] = useMemo(() => {
     if (!showUnified || inventoryType === 'products') return []
     if (inventoryType === 'accessories') {
-      return ((unifiedAccessories ?? []) as AccessoryRow[]).map((a) => ({ ...a, _kind: 'accessory' as const }))
+      return ((unifiedAccessories ?? []) as AccessoryRow[])
+        .filter((acc) => {
+          if (debouncedDescSearch) {
+            const accDesc = [acc.brand, acc.name, acc.description].filter(Boolean).join(' ')
+            if (!accDesc.toLowerCase().includes(debouncedDescSearch.toLowerCase())) return false
+          }
+          if (debouncedConditionSearch) {
+            if (!acc.condition_notes?.toLowerCase().includes(debouncedConditionSearch.toLowerCase())) return false
+          }
+          if (categoryFilter && categoryFilter !== 'all' && acc.categories?.name !== categoryFilter) return false
+          if (brandFilter && brandFilter !== 'all' && acc.brand !== brandFilter) return false
+          const pf = priceFrom ? Number(priceFrom) : null
+          const pt = priceTo ? Number(priceTo) : null
+          if (pf !== null && (acc.selling_price == null || Number(acc.selling_price) < pf)) return false
+          if (pt !== null && (acc.selling_price == null || Number(acc.selling_price) > pt)) return false
+          return true
+        })
+        .map((a) => ({ ...a, _kind: 'accessory' as const }))
     }
     // inventoryType === 'all': merge both
     const taggedItems: InventoryRow[] = filteredItems.map((i) => ({ ...i, _kind: 'item' as const }))
     const taggedAcc: InventoryRow[] = ((unifiedAccessories ?? []) as AccessoryRow[])
       .filter((acc) => {
         // Apply client-side filters that also apply to accessories
+        if (debouncedDescSearch) {
+          const accDesc = [acc.brand, acc.name, acc.description].filter(Boolean).join(' ')
+          if (!accDesc.toLowerCase().includes(debouncedDescSearch.toLowerCase())) return false
+        }
+        if (debouncedConditionSearch) {
+          if (!acc.condition_notes?.toLowerCase().includes(debouncedConditionSearch.toLowerCase())) return false
+        }
         if (categoryFilter && categoryFilter !== 'all' && acc.categories?.name !== categoryFilter) return false
         if (brandFilter && brandFilter !== 'all' && acc.brand !== brandFilter) return false
         const pf = priceFrom ? Number(priceFrom) : null
@@ -428,7 +452,7 @@ export default function ItemListPage() {
     return [...taggedItems, ...taggedAcc].sort(
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     )
-  }, [showUnified, inventoryType, filteredItems, unifiedAccessories, categoryFilter, brandFilter, priceFrom, priceTo])
+  }, [showUnified, inventoryType, filteredItems, unifiedAccessories, categoryFilter, brandFilter, priceFrom, priceTo, debouncedDescSearch, debouncedConditionSearch])
 
   // Unified loading state
   const unifiedIsLoading = showUnified
