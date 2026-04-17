@@ -401,6 +401,7 @@ export interface MessageSyncStatus {
   checked_at: string
   since: string
   conversations_scanned: number
+  conversations_remaining?: number
   inserted_count: number
   error_count: number
   inserted_preview?: Array<{ conversation_id: string; preview: string; created_at: string }>
@@ -426,6 +427,7 @@ export interface MessageSyncResult {
   skipped_count: number
   error_count: number
   conversations_scanned: number
+  conversations_remaining: number
   inserted: Array<{ conversation_id: string; preview: string; created_at: string; attachments: number }>
   errors: Array<{ conversation_id: string; error: string }>
 }

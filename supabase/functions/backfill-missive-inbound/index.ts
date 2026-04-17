@@ -30,6 +30,10 @@ interface BackfillInput {
   // When true, write the sync result to system_settings so the UI can display it.
   // Used by the scheduled cron and the "Run sync now" button.
   write_status?: boolean;
+  // Pagination: limit the number of conversations scanned per invocation.
+  batch_size?: number;
+  // Pagination: skip the first N conversations (use with batch_size for batching).
+  batch_offset?: number;
 }
 
 interface MissiveMessageSummary {
@@ -91,9 +95,14 @@ Deno.serve(async (req) => {
     let convQuery = supabase
       .from('conversations')
       .select('id, missive_conversation_id, customer_id, contact_platform_id')
-      .not('missive_conversation_id', 'is', null);
+      .not('missive_conversation_id', 'is', null)
+      .order('id');
     if (input.conversation_id) {
       convQuery = convQuery.eq('id', input.conversation_id);
+    }
+    if (input.batch_size) {
+      const offset = input.batch_offset ?? 0;
+      convQuery = convQuery.range(offset, offset + input.batch_size - 1);
     }
     const { data: conversations, error: convError } = await convQuery;
     if (convError) {
@@ -137,7 +146,32 @@ Deno.serve(async (req) => {
     const skipped: Array<{ conversation_id: string; missive_message_id: string; reason: string }> = [];
     const errors: Array<{ conversation_id: string; error: string }> = [];
 
-    for (const conv of conversations ?? []) {
+    // Filter out conversations with invalid missive_conversation_id (not UUID format).
+    // Some legacy records have non-UUID values that always fail on the Missive API.
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const validConversations = (conversations ?? []).filter((c) => {
+      if (!c.missive_conversation_id || !UUID_RE.test(c.missive_conversation_id)) {
+        skipped.push({
+          conversation_id: c.id,
+          missive_message_id: '(none)',
+          reason: 'invalid_missive_conversation_id',
+        });
+        return false;
+      }
+      return true;
+    });
+
+    const startTime = Date.now();
+    const MAX_ELAPSED_MS = 120_000; // Break before 150s Edge Function timeout
+    let timedOut = false;
+    let conversationsProcessed = 0;
+
+    for (const conv of validConversations) {
+      if (Date.now() - startTime > MAX_ELAPSED_MS) {
+        timedOut = true;
+        break;
+      }
+      conversationsProcessed++;
       try {
         // List messages for this conversation
         const listRes = await fetch(
@@ -286,6 +320,7 @@ Deno.serve(async (req) => {
       inserted_count: inserted.length,
       skipped_count: skipped.length,
       error_count: errors.length,
+      conversations_remaining: timedOut ? validConversations.length - conversationsProcessed : 0,
       inserted,
       skipped,
       errors,
@@ -293,11 +328,11 @@ Deno.serve(async (req) => {
 
     // Write sync status to system_settings for the Settings UI
     if (input.write_status && !dryRun) {
-      const status = errors.length > 0
-        ? 'error'
-        : inserted.length > 0
-          ? 'recovered'
-          : 'ok';
+      const status = inserted.length > 0
+        ? 'recovered'       // success takes priority — we did recover messages
+        : errors.length > 0
+          ? 'error'          // only errors, no recoveries
+          : 'ok';           // nothing to recover, no errors
       await supabase.from('system_settings').upsert(
         {
           key: 'messaging_last_sync',
@@ -306,6 +341,7 @@ Deno.serve(async (req) => {
             checked_at: new Date().toISOString(),
             since: new Date(sinceMs).toISOString(),
             conversations_scanned: conversations?.length ?? 0,
+            conversations_remaining: timedOut ? validConversations.length - conversationsProcessed : 0,
             inserted_count: inserted.length,
             error_count: errors.length,
             inserted_preview: inserted.slice(0, 5),

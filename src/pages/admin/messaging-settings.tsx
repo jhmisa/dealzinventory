@@ -1164,12 +1164,19 @@ function MessageSyncCard() {
     const since = windowToSince(window)
     runSync.mutate(since, {
       onSuccess: (result) => {
-        if (result.inserted_count > 0) {
-          toast.success(`Recovered ${result.inserted_count} missing message(s)`)
+        const partial = result.conversations_remaining > 0
+          ? ` (partial scan — ${result.conversations_remaining} conversations remaining)`
+          : ''
+        if (result.inserted_count > 0 && result.error_count > 0) {
+          toast.success(
+            `Recovered ${result.inserted_count} message(s) (${result.error_count} conversation(s) had errors)${partial}`
+          )
+        } else if (result.inserted_count > 0) {
+          toast.success(`Recovered ${result.inserted_count} missing message(s)${partial}`)
         } else if (result.error_count > 0) {
-          toast.error(`Sync completed with ${result.error_count} error(s)`)
+          toast.error(`Sync completed with ${result.error_count} error(s)${partial}`)
         } else {
-          toast.success('All messages are synced')
+          toast.success(`All messages are synced${partial}`)
         }
       },
       onError: (err) => {
