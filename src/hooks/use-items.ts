@@ -11,6 +11,7 @@ interface ItemFilters {
   grade?: string
   source?: string
   supplierId?: string
+  isLiveSelling?: boolean
 }
 
 export function useItems(filters: ItemFilters = {}, options?: { enabled?: boolean }) {
@@ -95,6 +96,19 @@ export function useUpdateItem() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.items.all })
       queryClient.invalidateQueries({ queryKey: queryKeys.offers.all })
+    },
+  })
+}
+
+// --- Live Selling ---
+
+export function useToggleLiveSelling() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ itemIds, value }: { itemIds: string[]; value: boolean }) =>
+      itemsService.toggleLiveSelling(itemIds, value),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.items.all })
     },
   })
 }

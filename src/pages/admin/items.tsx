@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Plus, Printer, QrCode, Pencil, Copy, AlertTriangle, Image, Play } from 'lucide-react'
+import { Plus, Printer, QrCode, Pencil, Copy, AlertTriangle, Image, Play, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -23,7 +23,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { PageHeader, SearchBar, DataTable, StatusBadge, GradeBadge, CodeDisplay, PriceDisplay, TableSkeleton } from '@/components/shared'
-import { useItems, useUpdateItem, useItemStatusCounts } from '@/hooks/use-items'
+import { useItems, useUpdateItem, useItemStatusCounts, useToggleLiveSelling } from '@/hooks/use-items'
 import { useAccessories, useCreateAccessory, useAccessoryTabCounts } from '@/hooks/use-accessories'
 import { useCategories } from '@/hooks/use-categories'
 import { useItemListColumnSettings } from '@/hooks/use-settings'
@@ -55,6 +55,7 @@ type ItemRow = {
   screen_size: number | null
   suppliers: { supplier_name: string } | null
   supplier_description: string | null
+  is_live_selling?: boolean
   product_id: string | null
   product_models: { brand: string; model_name: string; color: string; short_description: string | null; screen_size: number | null; categories: { name: string; description_fields: string[] } | null; product_media?: { file_url: string; role: string; sort_order: number }[] } | null
   order_items?: Array<{
@@ -92,6 +93,7 @@ const INVENTORY_TABS = [
 const STATUS_TABS = [
   { value: 'all', label: 'All' },
   ...ITEM_STATUSES.map((s) => ({ value: s.value, label: s.label })),
+  { value: 'LIVE_SELLING', label: 'LiveSelling' },
 ]
 
 const accessoryColumns: ColumnDef<AccessoryRow>[] = [
@@ -237,6 +239,7 @@ function EditPriceCell({
 export default function ItemListPage() {
   const navigate = useNavigate()
   const updateItem = useUpdateItem()
+  const toggleLiveSelling = useToggleLiveSelling()
   const { getParam, setParam } = usePersistedFilters('items-filters')
 
   // Inventory type tab (items vs accessories)
@@ -354,7 +357,7 @@ export default function ItemListPage() {
   // Server-side counts for tab badges (no status filter)
   const { data: statusCounts = {} as Record<string, number> } = useItemStatusCounts(baseFilters)
 
-  // Should we show unified view? Only on All/AVAILABLE tabs within Items tab
+  // Should we show unified view? Only on All/AVAILABLE tabs within Items tab (not LiveSelling)
   const showUnified = inventoryTab === 'items' && (statusTab === 'all' || statusTab === 'AVAILABLE')
   const skipItemsFetch = showUnified && inventoryType === 'accessories'
   const skipAccFetch = !showUnified || inventoryType === 'products'
@@ -362,7 +365,8 @@ export default function ItemListPage() {
   // Fetch items filtered by active status tab
   const { data: allItems, isLoading } = useItems({
     ...baseFilters,
-    status: statusTab !== 'all' ? statusTab : undefined,
+    status: statusTab !== 'all' && statusTab !== 'LIVE_SELLING' ? statusTab : undefined,
+    isLiveSelling: statusTab === 'LIVE_SELLING' ? true : undefined,
   }, { enabled: !skipItemsFetch })
 
   // Fetch accessories for unified view
@@ -744,7 +748,27 @@ export default function ItemListPage() {
     },
   ], [updateItem, openShowcase])
 
+  const showLiveSellingCheckbox = statusTab === 'AVAILABLE' || statusTab === 'LIVE_SELLING'
+
   const columns: ColumnDef<ItemRow>[] = [
+    ...(showLiveSellingCheckbox ? [{
+      id: 'live_selling',
+      header: () => <Star className="h-4 w-4 text-muted-foreground" />,
+      size: 40,
+      cell: ({ row }: { row: { original: ItemRow } }) => (
+        <div onClick={(e) => e.stopPropagation()}>
+          <Checkbox
+            checked={!!row.original.is_live_selling}
+            onCheckedChange={(checked) => {
+              toggleLiveSelling.mutate({
+                itemIds: [row.original.id],
+                value: !!checked,
+              })
+            }}
+          />
+        </div>
+      ),
+    } as ColumnDef<ItemRow>] : []),
     {
       id: 'item_summary',
       header: 'Item',

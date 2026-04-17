@@ -16,6 +16,7 @@ interface ItemFilters {
   grade?: string
   source?: string
   supplierId?: string
+  isLiveSelling?: boolean
 }
 
 export async function getItems(filters: ItemFilters = {}) {
@@ -51,6 +52,9 @@ export async function getItems(filters: ItemFilters = {}) {
   }
   if (filters.supplierId) {
     query = query.eq('supplier_id', filters.supplierId)
+  }
+  if (filters.isLiveSelling) {
+    query = query.eq('is_live_selling', true)
   }
 
   const { data, error } = await query
@@ -227,14 +231,47 @@ export async function getItemStatusCounts(filters: Omit<ItemFilters, 'status'> =
     return count ?? 0
   })()
 
-  const [results, total] = await Promise.all([Promise.all(promises), totalPromise])
+  // Also get live selling count
+  const liveSellingPromise = (async () => {
+    let query = supabase
+      .from('items')
+      .select('*', { head: true, count: 'exact' })
+      .eq('is_live_selling', true)
+
+    if (filters.search) query = query.ilike('item_code', `%${filters.search}%`)
+    if (filters.grade) {
+      if (filters.grade === 'UNGRADED') {
+        query = query.is('condition_grade', null)
+      } else {
+        query = query.eq('condition_grade', filters.grade)
+      }
+    }
+    if (filters.source) query = query.eq('source_type', filters.source)
+    if (filters.supplierId) query = query.eq('supplier_id', filters.supplierId)
+
+    const { count, error } = await query
+    if (error) throw error
+    return count ?? 0
+  })()
+
+  const [results, total, liveSellingCount] = await Promise.all([Promise.all(promises), totalPromise, liveSellingPromise])
 
   for (const { status, count } of results) {
     counts[status] = count
   }
   counts.all = total
+  counts.LIVE_SELLING = liveSellingCount
 
   return counts
+}
+
+export async function toggleLiveSelling(itemIds: string[], value: boolean) {
+  const { error } = await supabase
+    .from('items')
+    .update({ is_live_selling: value })
+    .in('id', itemIds)
+
+  if (error) throw error
 }
 
 // --- Item Costs ---
