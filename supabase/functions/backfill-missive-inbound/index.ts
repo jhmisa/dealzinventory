@@ -27,6 +27,9 @@ interface BackfillInput {
   // When true, return the raw Missive list response for the scoped conversation
   // so we can inspect the actual message shape. Requires conversation_id.
   debug_dump?: boolean;
+  // When true, write the sync result to system_settings so the UI can display it.
+  // Used by the scheduled cron and the "Run sync now" button.
+  write_status?: boolean;
 }
 
 interface MissiveMessageSummary {
@@ -275,7 +278,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    return jsonResponse({
+    const result = {
       ok: true,
       dry_run: dryRun,
       since: new Date(sinceMs).toISOString(),
@@ -286,7 +289,34 @@ Deno.serve(async (req) => {
       inserted,
       skipped,
       errors,
-    });
+    };
+
+    // Write sync status to system_settings for the Settings UI
+    if (input.write_status && !dryRun) {
+      const status = errors.length > 0
+        ? 'error'
+        : inserted.length > 0
+          ? 'recovered'
+          : 'ok';
+      await supabase.from('system_settings').upsert(
+        {
+          key: 'messaging_last_sync',
+          value: JSON.stringify({
+            status,
+            checked_at: new Date().toISOString(),
+            since: new Date(sinceMs).toISOString(),
+            conversations_scanned: conversations?.length ?? 0,
+            inserted_count: inserted.length,
+            error_count: errors.length,
+            inserted_preview: inserted.slice(0, 5),
+            errors_preview: errors.slice(0, 3),
+          }),
+        },
+        { onConflict: 'key' },
+      );
+    }
+
+    return jsonResponse(result);
   } catch (err) {
     console.error('FATAL backfill-missive-inbound error:', err);
     return jsonResponse({

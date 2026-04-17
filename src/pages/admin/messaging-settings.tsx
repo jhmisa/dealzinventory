@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Plus, Trash2, Check, Bot, Sparkles, FileText, Pencil, ShieldAlert, BookOpen, FlaskConical, Send, ChevronUp, ChevronDown, RotateCcw, Power } from 'lucide-react'
+import { Plus, Trash2, Check, Bot, Sparkles, FileText, Pencil, ShieldAlert, BookOpen, FlaskConical, Send, ChevronUp, ChevronDown, RotateCcw, Power, RefreshCw, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -43,6 +43,8 @@ import {
   useTestAIReply,
   useSystemSetting,
   useUpdateSystemSetting,
+  useMessageSyncStatus,
+  useRunMessageSync,
 } from '@/hooks/use-messaging'
 import { useCustomers } from '@/hooks/use-customers'
 import type { AiProvider, MessagingTemplate, MessagingTemplateInsert, KnowledgeBaseEntry, TestAIMessage, TestAIResponse } from '@/lib/types'
@@ -1116,6 +1118,163 @@ export default function MessagingSettingsPage() {
         onOpenChange={setTemplateFormOpen}
         template={editTemplate}
       />
+
+      {/* Message Sync */}
+      <MessageSyncCard />
     </div>
+  )
+}
+
+// ---------- Message Sync Card ----------
+
+const SYNC_WINDOWS = [
+  { label: 'Last 1 hour', value: '1h' },
+  { label: 'Last 6 hours', value: '6h' },
+  { label: 'Last 24 hours', value: '24h' },
+  { label: 'Last 7 days', value: '7d' },
+] as const
+
+function windowToSince(window: string): string {
+  const now = Date.now()
+  const ms: Record<string, number> = {
+    '1h': 60 * 60 * 1000,
+    '6h': 6 * 60 * 60 * 1000,
+    '24h': 24 * 60 * 60 * 1000,
+    '7d': 7 * 24 * 60 * 60 * 1000,
+  }
+  return new Date(now - (ms[window] ?? ms['24h'])).toISOString()
+}
+
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
+}
+
+function MessageSyncCard() {
+  const [window, setWindow] = useState('24h')
+  const { data: syncStatus, isLoading: loadingStatus } = useMessageSyncStatus()
+  const runSync = useRunMessageSync()
+
+  const handleSync = () => {
+    const since = windowToSince(window)
+    runSync.mutate(since, {
+      onSuccess: (result) => {
+        if (result.inserted_count > 0) {
+          toast.success(`Recovered ${result.inserted_count} missing message(s)`)
+        } else if (result.error_count > 0) {
+          toast.error(`Sync completed with ${result.error_count} error(s)`)
+        } else {
+          toast.success('All messages are synced')
+        }
+      },
+      onError: (err) => {
+        toast.error(`Sync failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      },
+    })
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <RefreshCw className="h-5 w-5" />
+            <div>
+              <CardTitle className="text-base">Message Sync</CardTitle>
+              <CardDescription>
+                Checks for customer messages that may have been missed by the live webhook
+              </CardDescription>
+            </div>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Last sync status */}
+        {loadingStatus ? (
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        ) : syncStatus ? (
+          <div className="rounded-lg border p-3 space-y-1.5">
+            <div className="flex items-center gap-2 text-sm">
+              {syncStatus.status === 'ok' && (
+                <>
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  <span className="text-green-700 font-medium">All synced</span>
+                </>
+              )}
+              {syncStatus.status === 'recovered' && (
+                <>
+                  <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                  <span className="text-yellow-700 font-medium">
+                    Recovered {syncStatus.inserted_count} missing message(s)
+                  </span>
+                </>
+              )}
+              {syncStatus.status === 'error' && (
+                <>
+                  <AlertTriangle className="h-4 w-4 text-red-600" />
+                  <span className="text-red-700 font-medium">
+                    {syncStatus.error_count} error(s) during sync
+                  </span>
+                </>
+              )}
+              <span className="text-muted-foreground ml-auto">
+                {timeAgo(syncStatus.checked_at)}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Scanned {syncStatus.conversations_scanned} conversations
+            </p>
+            {syncStatus.inserted_preview && syncStatus.inserted_preview.length > 0 && (
+              <div className="text-xs text-muted-foreground space-y-0.5 pt-1 border-t">
+                {syncStatus.inserted_preview.map((m, i) => (
+                  <div key={i} className="truncate">
+                    {m.created_at ? new Date(m.created_at).toLocaleTimeString() : '?'} — {m.preview || '(attachment)'}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No sync has run yet.</p>
+        )}
+
+        {/* Run sync controls */}
+        <div className="flex items-center gap-3">
+          <Select value={window} onValueChange={setWindow}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SYNC_WINDOWS.map((w) => (
+                <SelectItem key={w.value} value={w.value}>
+                  {w.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            onClick={handleSync}
+            disabled={runSync.isPending}
+            className="gap-2"
+          >
+            {runSync.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+            {runSync.isPending ? 'Syncing...' : 'Run sync now'}
+          </Button>
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          Automatic sync runs every 15 minutes. Use this button if you suspect messages are missing.
+        </p>
+      </CardContent>
+    </Card>
   )
 }

@@ -393,3 +393,58 @@ export function useMarkConversationRead() {
     },
   })
 }
+
+// ---------- Message Sync ----------
+
+export interface MessageSyncStatus {
+  status: 'ok' | 'recovered' | 'error'
+  checked_at: string
+  since: string
+  conversations_scanned: number
+  inserted_count: number
+  error_count: number
+  inserted_preview?: Array<{ conversation_id: string; preview: string; created_at: string }>
+  errors_preview?: Array<{ conversation_id: string; error: string }>
+}
+
+export function useMessageSyncStatus() {
+  const { data: raw, ...rest } = useSystemSetting('messaging_last_sync')
+  let parsed: MessageSyncStatus | null = null
+  if (raw) {
+    try {
+      parsed = JSON.parse(raw) as MessageSyncStatus
+    } catch {
+      // ignore
+    }
+  }
+  return { data: parsed, ...rest }
+}
+
+export interface MessageSyncResult {
+  ok: boolean
+  inserted_count: number
+  skipped_count: number
+  error_count: number
+  conversations_scanned: number
+  inserted: Array<{ conversation_id: string; preview: string; created_at: string; attachments: number }>
+  errors: Array<{ conversation_id: string; error: string }>
+}
+
+export function useRunMessageSync() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (since: string): Promise<MessageSyncResult> => {
+      const { data, error } = await supabase.functions.invoke('backfill-missive-inbound', {
+        body: { since, write_status: true },
+      })
+      if (error) throw error
+      return data as MessageSyncResult
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.messaging.systemSetting('messaging_last_sync'),
+      })
+      queryClient.invalidateQueries({ queryKey: queryKeys.messaging.conversations() })
+    },
+  })
+}
