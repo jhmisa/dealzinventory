@@ -478,8 +478,31 @@ export default function ItemListPage() {
     }
   }, [])
 
+  const showLiveSellingCheckbox = statusTab === 'AVAILABLE' || statusTab === 'LIVE_SELLING'
+
   // Unified columns for when inventoryType === 'all'
   const unifiedColumns: ColumnDef<InventoryRow>[] = useMemo(() => [
+    ...(showLiveSellingCheckbox ? [{
+      id: 'live_selling',
+      header: () => <Star className="h-4 w-4 text-muted-foreground" />,
+      size: 40,
+      cell: ({ row }: { row: { original: InventoryRow } }) => {
+        if (row.original._kind === 'accessory') return null
+        return (
+          <div onClick={(e) => e.stopPropagation()}>
+            <Checkbox
+              checked={!!row.original.is_live_selling}
+              onCheckedChange={(checked) => {
+                toggleLiveSelling.mutate({
+                  itemIds: [row.original.id],
+                  value: !!checked,
+                })
+              }}
+            />
+          </div>
+        )
+      },
+    } as ColumnDef<InventoryRow>] : []),
     {
       id: 'unified_summary',
       header: 'Item',
@@ -746,9 +769,8 @@ export default function ItemListPage() {
         )
       },
     },
-  ], [updateItem, openShowcase])
+  ], [updateItem, openShowcase, showLiveSellingCheckbox, toggleLiveSelling])
 
-  const showLiveSellingCheckbox = statusTab === 'AVAILABLE' || statusTab === 'LIVE_SELLING'
 
   const columns: ColumnDef<ItemRow>[] = [
     ...(showLiveSellingCheckbox ? [{
