@@ -88,6 +88,7 @@ export interface Accessory {
   low_stock_threshold: number
   shop_visible: boolean
   active: boolean
+  is_live_selling: boolean
   created_at: string
   updated_at: string
 }

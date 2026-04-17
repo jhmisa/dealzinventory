@@ -28,6 +28,7 @@ interface AccessoryFilters {
   active?: boolean
   shopVisible?: boolean
   inStock?: boolean
+  isLiveSelling?: boolean
 }
 
 export async function getAccessories(filters: AccessoryFilters = {}) {
@@ -56,6 +57,9 @@ export async function getAccessories(filters: AccessoryFilters = {}) {
   }
   if (filters.inStock) {
     query = query.gt('stock_quantity', 0)
+  }
+  if (filters.isLiveSelling !== undefined) {
+    query = query.eq('is_live_selling', filters.isLiveSelling)
   }
 
   const { data, error } = await query
@@ -439,6 +443,25 @@ export async function getAccessoryCountForTabs(): Promise<{ all: number; availab
     all: allResult.count ?? 0,
     available: availableResult.count ?? 0,
   }
+}
+
+export async function toggleAccessoryLiveSelling(accessoryIds: string[], value: boolean) {
+  const { error } = await supabase
+    .from('accessories')
+    .update({ is_live_selling: value })
+    .in('id', accessoryIds)
+
+  if (error) throw error
+}
+
+export async function getAccessoryLiveSellingCount(): Promise<number> {
+  const { count, error } = await supabase
+    .from('accessories')
+    .select('id', { count: 'exact', head: true })
+    .eq('is_live_selling', true)
+
+  if (error) throw error
+  return count ?? 0
 }
 
 export async function getAvailableAccessories(search: string) {

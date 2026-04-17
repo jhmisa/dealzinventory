@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/dialog'
 import { PageHeader, SearchBar, DataTable, StatusBadge, GradeBadge, CodeDisplay, PriceDisplay, TableSkeleton } from '@/components/shared'
 import { useItems, useUpdateItem, useItemStatusCounts, useToggleLiveSelling } from '@/hooks/use-items'
-import { useAccessories, useCreateAccessory, useAccessoryTabCounts } from '@/hooks/use-accessories'
+import { useAccessories, useCreateAccessory, useAccessoryTabCounts, useToggleAccessoryLiveSelling, useAccessoryLiveSellingCount } from '@/hooks/use-accessories'
 import { useCategories } from '@/hooks/use-categories'
 import { useItemListColumnSettings } from '@/hooks/use-settings'
 import { usePersistedFilters } from '@/hooks/use-persisted-filters'
@@ -240,6 +240,7 @@ export default function ItemListPage() {
   const navigate = useNavigate()
   const updateItem = useUpdateItem()
   const toggleLiveSelling = useToggleLiveSelling()
+  const toggleAccessoryLiveSelling = useToggleAccessoryLiveSelling()
   const { getParam, setParam } = usePersistedFilters('items-filters')
 
   // Inventory type tab (items vs accessories)
@@ -252,6 +253,7 @@ export default function ItemListPage() {
 
   // Accessory tab counts for badges
   const { data: accTabCounts } = useAccessoryTabCounts()
+  const { data: accLiveSellingCount = 0 } = useAccessoryLiveSellingCount()
 
   // Accessories state
   const accSearch = getParam('accQ')
@@ -357,8 +359,8 @@ export default function ItemListPage() {
   // Server-side counts for tab badges (no status filter)
   const { data: statusCounts = {} as Record<string, number> } = useItemStatusCounts(baseFilters)
 
-  // Should we show unified view? Only on All/AVAILABLE tabs within Items tab (not LiveSelling)
-  const showUnified = inventoryTab === 'items' && (statusTab === 'all' || statusTab === 'AVAILABLE')
+  // Should we show unified view? On All/AVAILABLE/LIVE_SELLING tabs within Items tab
+  const showUnified = inventoryTab === 'items' && (statusTab === 'all' || statusTab === 'AVAILABLE' || statusTab === 'LIVE_SELLING')
   const skipItemsFetch = showUnified && inventoryType === 'accessories'
   const skipAccFetch = !showUnified || inventoryType === 'products'
 
@@ -373,6 +375,7 @@ export default function ItemListPage() {
   const { data: unifiedAccessories, isLoading: unifiedAccLoading } = useAccessories({
     search: debouncedSearch || undefined,
     ...(statusTab === 'AVAILABLE' ? { active: true, inStock: true } : {}),
+    ...(statusTab === 'LIVE_SELLING' ? { isLiveSelling: true } : {}),
   }, { enabled: !skipAccFetch })
 
   const items = (allItems ?? []) as ItemRow[]
@@ -487,14 +490,29 @@ export default function ItemListPage() {
       header: () => <Star className="h-4 w-4 text-muted-foreground" />,
       size: 40,
       cell: ({ row }: { row: { original: InventoryRow } }) => {
-        if (row.original._kind === 'accessory') return null
+        const r = row.original
+        if (r._kind === 'accessory') {
+          return (
+            <div onClick={(e) => e.stopPropagation()}>
+              <Checkbox
+                checked={!!r.is_live_selling}
+                onCheckedChange={(checked) => {
+                  toggleAccessoryLiveSelling.mutate({
+                    accessoryIds: [r.id],
+                    value: !!checked,
+                  })
+                }}
+              />
+            </div>
+          )
+        }
         return (
           <div onClick={(e) => e.stopPropagation()}>
             <Checkbox
-              checked={!!row.original.is_live_selling}
+              checked={!!r.is_live_selling}
               onCheckedChange={(checked) => {
                 toggleLiveSelling.mutate({
-                  itemIds: [row.original.id],
+                  itemIds: [r.id],
                   value: !!checked,
                 })
               }}
@@ -769,7 +787,7 @@ export default function ItemListPage() {
         )
       },
     },
-  ], [updateItem, openShowcase, showLiveSellingCheckbox, toggleLiveSelling])
+  ], [updateItem, openShowcase, showLiveSellingCheckbox, toggleLiveSelling, toggleAccessoryLiveSelling])
 
 
   const columns: ColumnDef<ItemRow>[] = [
@@ -1172,10 +1190,13 @@ export default function ItemListPage() {
             <nav className="flex gap-0 -mb-px overflow-x-auto">
               {STATUS_TABS.map((tab) => {
                 let count = statusCounts[tab.value] ?? 0
-                // Add accessory counts to All and Available tabs when not filtering to products-only
+                // Add accessory counts to All, Available, and LiveSelling tabs when not filtering to products-only
                 if (inventoryType !== 'products' && accTabCounts) {
                   if (tab.value === 'all') count += accTabCounts.all
                   else if (tab.value === 'AVAILABLE') count += accTabCounts.available
+                }
+                if (inventoryType !== 'products' && tab.value === 'LIVE_SELLING') {
+                  count += accLiveSellingCount
                 }
                 const isActive = statusTab === tab.value
                 return (
@@ -1324,7 +1345,27 @@ export default function ItemListPage() {
             />
           ) : showUnified && inventoryType === 'accessories' ? (
             <DataTable
-              columns={accessoryColumns}
+              columns={[
+                ...(showLiveSellingCheckbox ? [{
+                  id: 'live_selling',
+                  header: () => <Star className="h-4 w-4 text-muted-foreground" />,
+                  size: 40,
+                  cell: ({ row }: { row: { original: AccessoryRow } }) => (
+                    <div onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={!!row.original.is_live_selling}
+                        onCheckedChange={(checked: boolean) => {
+                          toggleAccessoryLiveSelling.mutate({
+                            accessoryIds: [row.original.id],
+                            value: !!checked,
+                          })
+                        }}
+                      />
+                    </div>
+                  ),
+                } as ColumnDef<AccessoryRow>] : []),
+                ...accessoryColumns,
+              ]}
               data={(unifiedAccessories ?? []) as AccessoryRow[]}
               onRowClick={(row) => navigate(`/admin/accessories/${row.id}`)}
             />

@@ -118,8 +118,8 @@ export async function getAvailableItems(sellGroupId: string) {
   const { data, error } = await supabase
     .from('items')
     .select(`
-      id, item_code, condition_grade, item_status, inspected_at,
-      product_models(brand, model_name, cpu, ram_gb, storage_gb)
+      id, item_code, condition_grade, item_status, inspected_at, selling_price,
+      product_models(brand, model_name, cpu, ram_gb, storage_gb, short_description)
     `)
     .eq('item_status', 'AVAILABLE')
     .eq('product_id', sg.product_id)

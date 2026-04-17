@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArrowLeft, Pencil, Trash2, Plus, X, Link, Copy } from 'lucide-react'
+import { ArrowLeft, Pencil, Trash2, Plus, X, Link, Copy, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -71,6 +71,7 @@ export default function SellGroupDetailPage() {
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [pickerSearch, setPickerSearch] = useState('')
 
   const form = useForm<SellGroupFormValues>({
     resolver: zodResolver(sellGroupSchema),
@@ -248,41 +249,73 @@ export default function SellGroupDetailPage() {
       </Card>
 
       {/* Available Items Picker Dialog */}
-      <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+      <Dialog open={pickerOpen} onOpenChange={(open) => { setPickerOpen(open); if (!open) setPickerSearch('') }}>
+        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>
               Add Items — {pm ? `${pm.brand} ${pm.model_name}` : ''} Grade {sg.condition_grade}
             </DialogTitle>
           </DialogHeader>
-          {!availableItems || availableItems.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-8 text-center">
-              No matching available items found.
-            </p>
-          ) : (
-            <div className="space-y-1">
-              {availableItems.map((item) => {
-                const aiPm = item.product_models as { brand: string; model_name: string } | null
-                return (
-                  <div key={item.id} className="flex items-center justify-between px-3 py-2 border rounded hover:bg-muted/50">
-                    <div className="flex items-center gap-3">
-                      <CodeDisplay code={item.item_code} />
-                      <span className="text-sm">{aiPm ? `${aiPm.brand} ${aiPm.model_name}` : '—'}</span>
-                      <GradeBadge grade={item.condition_grade} />
-                    </div>
-                    <Button
-                      size="sm"
-                      onClick={() => handleAssign(item.id)}
-                      disabled={assignMutation.isPending}
-                    >
-                      <Plus className="h-3 w-3 mr-1" />
-                      Assign
-                    </Button>
-                  </div>
-                )
-              })}
-            </div>
-          )}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by P-code or description..."
+              value={pickerSearch}
+              onChange={(e) => setPickerSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <div className="overflow-y-auto flex-1 min-h-0">
+            {!availableItems || availableItems.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-8 text-center">
+                No matching available items found.
+              </p>
+            ) : (() => {
+              const q = pickerSearch.toLowerCase().trim()
+              const filtered = q
+                ? availableItems.filter((item) => {
+                    const aiPm = item.product_models as { brand: string; model_name: string; short_description: string | null } | null
+                    return item.item_code.toLowerCase().includes(q) ||
+                      (aiPm?.short_description ?? '').toLowerCase().includes(q) ||
+                      (`${aiPm?.brand ?? ''} ${aiPm?.model_name ?? ''}`).toLowerCase().includes(q)
+                  })
+                : availableItems
+              return filtered.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-8 text-center">
+                  No items match &ldquo;{pickerSearch}&rdquo;.
+                </p>
+              ) : (
+                <div className="space-y-1">
+                  {filtered.map((item) => {
+                    const aiPm = item.product_models as { brand: string; model_name: string; short_description: string | null } | null
+                    return (
+                      <div key={item.id} className="flex items-center justify-between px-3 py-2 border rounded hover:bg-muted/50">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <CodeDisplay code={item.item_code} />
+                          <GradeBadge grade={item.condition_grade} />
+                          <span className="text-sm truncate">
+                            {aiPm?.short_description || (aiPm ? `${aiPm.brand} ${aiPm.model_name}` : '—')}
+                          </span>
+                          {(item as { selling_price?: number | null }).selling_price != null && (
+                            <PriceDisplay amount={(item as { selling_price: number }).selling_price} />
+                          )}
+                        </div>
+                        <Button
+                          size="sm"
+                          className="ml-2 flex-shrink-0"
+                          onClick={() => handleAssign(item.id)}
+                          disabled={assignMutation.isPending}
+                        >
+                          <Plus className="h-3 w-3 mr-1" />
+                          Assign
+                        </Button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })()}
+          </div>
         </DialogContent>
       </Dialog>
 

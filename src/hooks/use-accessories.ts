@@ -8,6 +8,7 @@ interface AccessoryFilters {
   categoryId?: string
   active?: boolean
   inStock?: boolean
+  isLiveSelling?: boolean
 }
 
 export function useAccessories(filters: AccessoryFilters = {}, options?: { enabled?: boolean }) {
@@ -94,6 +95,26 @@ export function useDeleteAccessoryMedia() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.accessories.all })
     },
+  })
+}
+
+// --- Live Selling ---
+
+export function useToggleAccessoryLiveSelling() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ accessoryIds, value }: { accessoryIds: string[]; value: boolean }) =>
+      accessoriesService.toggleAccessoryLiveSelling(accessoryIds, value),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.accessories.all })
+    },
+  })
+}
+
+export function useAccessoryLiveSellingCount() {
+  return useQuery({
+    queryKey: queryKeys.accessories.list({ _type: 'live-selling-count' }),
+    queryFn: () => accessoriesService.getAccessoryLiveSellingCount(),
   })
 }
 
