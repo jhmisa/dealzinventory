@@ -19,7 +19,38 @@ interface ItemFilters {
   isLiveSelling?: boolean
 }
 
+const G_CODE_PATTERN = /^G\d{3,}$/i
+
+async function resolveGCodeToItemIds(gCode: string): Promise<string[] | null> {
+  const { data: sg } = await supabase
+    .from('sell_groups')
+    .select('id')
+    .ilike('sell_group_code', gCode)
+    .maybeSingle()
+
+  if (!sg) return null
+
+  const { data: sgi } = await supabase
+    .from('sell_group_items')
+    .select('item_id')
+    .eq('sell_group_id', sg.id)
+
+  return (sgi ?? []).map(r => r.item_id)
+}
+
+function applySearchFilter(query: ReturnType<typeof supabase.from<'items'>>, search: string, gCodeItemIds: string[] | null) {
+  if (gCodeItemIds !== null) {
+    return gCodeItemIds.length > 0 ? query.in('id', gCodeItemIds) : query.eq('id', 'no-match')
+  }
+  return query.ilike('item_code', `%${search}%`)
+}
+
 export async function getItems(filters: ItemFilters = {}) {
+  // Pre-resolve G-code searches to item IDs
+  const gCodeItemIds = filters.search && G_CODE_PATTERN.test(filters.search.trim())
+    ? await resolveGCodeToItemIds(filters.search.trim())
+    : null
+
   let query = supabase
     .from('items')
     .select(`
@@ -35,7 +66,7 @@ export async function getItems(filters: ItemFilters = {}) {
     .order('created_at', { ascending: false })
 
   if (filters.search) {
-    query = query.ilike('item_code', `%${filters.search}%`)
+    query = applySearchFilter(query, filters.search, gCodeItemIds) as typeof query
   }
   if (filters.status) {
     query = query.eq('item_status', filters.status)
@@ -186,6 +217,11 @@ const ITEM_STATUS_VALUES = ['INTAKE', 'AVAILABLE', 'RESERVED', 'REPAIR', 'MISSIN
 export async function getItemStatusCounts(filters: Omit<ItemFilters, 'status'> = {}) {
   const counts: Record<string, number> = {}
 
+  // Pre-resolve G-code searches to item IDs (once for all count queries)
+  const gCodeItemIds = filters.search && G_CODE_PATTERN.test(filters.search.trim())
+    ? await resolveGCodeToItemIds(filters.search.trim())
+    : null
+
   // Run count queries in parallel for each status + total
   const promises = ITEM_STATUS_VALUES.map(async (status) => {
     let query = supabase
@@ -193,7 +229,7 @@ export async function getItemStatusCounts(filters: Omit<ItemFilters, 'status'> =
       .select('*', { head: true, count: 'exact' })
       .eq('item_status', status)
 
-    if (filters.search) query = query.ilike('item_code', `%${filters.search}%`)
+    if (filters.search) query = applySearchFilter(query, filters.search, gCodeItemIds) as typeof query
     if (filters.grade) {
       if (filters.grade === 'UNGRADED') {
         query = query.is('condition_grade', null)
@@ -215,7 +251,7 @@ export async function getItemStatusCounts(filters: Omit<ItemFilters, 'status'> =
       .from('items')
       .select('*', { head: true, count: 'exact' })
 
-    if (filters.search) query = query.ilike('item_code', `%${filters.search}%`)
+    if (filters.search) query = applySearchFilter(query, filters.search, gCodeItemIds) as typeof query
     if (filters.grade) {
       if (filters.grade === 'UNGRADED') {
         query = query.is('condition_grade', null)
@@ -238,7 +274,7 @@ export async function getItemStatusCounts(filters: Omit<ItemFilters, 'status'> =
       .select('*', { head: true, count: 'exact' })
       .eq('is_live_selling', true)
 
-    if (filters.search) query = query.ilike('item_code', `%${filters.search}%`)
+    if (filters.search) query = applySearchFilter(query, filters.search, gCodeItemIds) as typeof query
     if (filters.grade) {
       if (filters.grade === 'UNGRADED') {
         query = query.is('condition_grade', null)
