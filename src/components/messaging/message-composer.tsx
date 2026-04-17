@@ -8,9 +8,17 @@ import { cn } from '@/lib/utils'
 import type { MessageAttachment } from '@/lib/types'
 import { useUploadAttachment } from '@/hooks/use-messaging'
 import { getAttachmentSignedUrl } from '@/services/messaging'
+import {
+  compressImageForMessaging,
+  IMAGE_MAX_INPUT_SIZE_MB,
+} from '@/lib/image-compression'
 
 const MAX_ATTACHMENTS = 5
-const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+// Non-image files (PDFs, docs, etc.) are uploaded as-is.
+const MAX_NON_IMAGE_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+// Images are compressed client-side before upload — larger inputs are fine,
+// the compression step handles it.
+const MAX_IMAGE_INPUT_SIZE = IMAGE_MAX_INPUT_SIZE_MB * 1024 * 1024
 
 interface MessageComposerProps {
   onSend: (content: string, attachments?: MessageAttachment[]) => void
@@ -36,6 +44,7 @@ export const MessageComposer = memo(function MessageComposer({
   const [content, setContent] = useState('')
   const [attachments, setAttachments] = useState<MessageAttachment[]>([])
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
+  const [isCompressing, setIsCompressing] = useState(false)
   const [showSlashMenu, setShowSlashMenu] = useState(false)
   const [slashFilter, setSlashFilter] = useState('')
   const [highlightedIndex, setHighlightedIndex] = useState(0)
@@ -125,18 +134,41 @@ export const MessageComposer = memo(function MessageComposer({
       }
 
       for (const file of files) {
-        if (file.size > MAX_FILE_SIZE) {
-          toast.error(`"${file.name}" exceeds the 10MB limit`)
+        const isImage = file.type.startsWith('image/')
+        const inputLimit = isImage ? MAX_IMAGE_INPUT_SIZE : MAX_NON_IMAGE_FILE_SIZE
+
+        if (file.size > inputLimit) {
+          toast.error(
+            `"${file.name}" exceeds the ${inputLimit / 1024 / 1024}MB limit`,
+          )
           continue
         }
 
         try {
+          let fileToUpload = file
+          if (isImage) {
+            setIsCompressing(true)
+            try {
+              fileToUpload = await compressImageForMessaging(file)
+            } catch (err) {
+              toast.error(
+                err instanceof Error ? err.message : `Failed to compress ${file.name}`,
+              )
+              continue
+            } finally {
+              setIsCompressing(false)
+            }
+          }
+
           const pathPrefix = conversationId ?? 'draft'
-          const attachment = await uploadAttachment.mutateAsync({ file, pathPrefix })
+          const attachment = await uploadAttachment.mutateAsync({
+            file: fileToUpload,
+            pathPrefix,
+          })
           setAttachments((prev) => [...prev, attachment])
 
           // Generate thumbnail for images
-          if (file.type.startsWith('image/')) {
+          if (isImage) {
             try {
               const signedUrl = await getAttachmentSignedUrl(attachment.file_url)
               setThumbnails((prev) => ({ ...prev, [attachment.file_url]: signedUrl }))
@@ -192,7 +224,8 @@ export const MessageComposer = memo(function MessageComposer({
   )
 
   const isUploading = uploadAttachment.isPending
-  const canSend = (content.trim() || attachments.length > 0) && !isLoading && !isUploading
+  const isBusy = isUploading || isCompressing
+  const canSend = (content.trim() || attachments.length > 0) && !isLoading && !isBusy
 
   return (
     <div ref={composerRef} className="border-t" data-composer>
@@ -269,7 +302,7 @@ export const MessageComposer = memo(function MessageComposer({
           onClick={handleSend}
           disabled={!canSend}
         >
-          {isUploading ? (
+          {isBusy ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <Send className="h-4 w-4" />
@@ -294,13 +327,17 @@ export const MessageComposer = memo(function MessageComposer({
               size="sm"
               className="h-7 gap-1 px-2 text-xs text-muted-foreground"
               onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading || attachments.length >= MAX_ATTACHMENTS}
+              disabled={isBusy || attachments.length >= MAX_ATTACHMENTS}
             >
-              <Paperclip className="h-3.5 w-3.5" />
-              Attach
+              {isCompressing ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Paperclip className="h-3.5 w-3.5" />
+              )}
+              {isCompressing ? 'Compressing...' : 'Attach'}
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Attach file (max 10MB, up to 5)</TooltipContent>
+          <TooltipContent>Images are auto-compressed. Max 5 attachments.</TooltipContent>
         </Tooltip>
 
         <Tooltip>

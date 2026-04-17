@@ -151,6 +151,33 @@ Deno.serve(async (req) => {
     }
     console.log('Inserted message:', msg.id);
 
+    // Server-side attachment size guard — belt-and-suspenders in case client
+    // compression is bypassed. Rejects any single attachment over 2 MB.
+    const MAX_ATTACHMENT_BYTES = 2 * 1024 * 1024;
+    if (inputAttachments && inputAttachments.length > 0) {
+      for (const att of inputAttachments) {
+        if (att.size_bytes && att.size_bytes > MAX_ATTACHMENT_BYTES) {
+          // Mark message as FAILED immediately instead of trying to send
+          await supabase
+            .from('messages')
+            .update({
+              status: 'FAILED',
+              error_details: {
+                reason: 'attachment_too_large',
+                filename: att.filename,
+                size_bytes: att.size_bytes,
+                max_bytes: MAX_ATTACHMENT_BYTES,
+              },
+            })
+            .eq('id', msg.id);
+          return jsonResponse({
+            error: `Attachment "${att.filename}" is too large (${(att.size_bytes / 1024 / 1024).toFixed(1)}MB > 2MB). Please compress before uploading.`,
+            message_id: msg.id,
+          });
+        }
+      }
+    }
+
     // Fetch attachment files from Storage and convert to base64 for Missive
     const missiveAttachments: Array<{ base64_data: string; filename: string }> = [];
     if (inputAttachments && inputAttachments.length > 0) {
