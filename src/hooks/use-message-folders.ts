@@ -28,7 +28,9 @@ export function useMoveConversationToFolder() {
       qc.setQueriesData({ queryKey: queryKeys.messaging.conversations() }, (old: unknown) => {
         if (!Array.isArray(old)) return old
         return old.map((conv: Record<string, unknown>) =>
-          conv.id === conversationId ? { ...conv, folder_id: folderId } : conv
+          conv.id === conversationId
+            ? { ...conv, folder_id: folderId, is_archived: false }
+            : conv
         )
       })
       return { previousQueries }

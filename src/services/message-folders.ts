@@ -67,7 +67,7 @@ export async function moveConversationToFolder(
 ): Promise<void> {
   const { error } = await supabase
     .from('conversations')
-    .update({ folder_id: folderId })
+    .update({ folder_id: folderId, is_archived: false })
     .eq('id', conversationId)
 
   if (error) throw error
