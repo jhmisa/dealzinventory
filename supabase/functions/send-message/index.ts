@@ -187,6 +187,13 @@ Deno.serve(async (req) => {
     let missiveMessageId: string | null = null;
     let sendError: { missive_status?: number; missive_error?: string; attempted_at: string; retry_count: number } | null = null;
 
+    // Hard timeout on the Missive call — prevents the message from being stuck
+    // in SENDING forever if Missive hangs. Layer 2 (pg_cron sweep) is a backstop
+    // for anything this misses (Edge Function killed, DB update failure, etc.).
+    const MISSIVE_TIMEOUT_MS = 20_000;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), MISSIVE_TIMEOUT_MS);
+
     try {
       if (!MISSIVE_API_TOKEN) {
         throw new Error('MISSIVE_API_TOKEN not configured');
@@ -218,6 +225,7 @@ Deno.serve(async (req) => {
           Authorization: `Bearer ${MISSIVE_API_TOKEN}`,
         },
         body: JSON.stringify({ drafts: draftPayload }),
+        signal: controller.signal,
       });
 
       if (!missiveRes.ok) {
@@ -236,11 +244,16 @@ Deno.serve(async (req) => {
       }
     } catch (fetchErr) {
       console.error('Missive fetch error:', fetchErr);
+      const isTimeout = fetchErr instanceof Error && fetchErr.name === 'AbortError';
       sendError = {
-        missive_error: fetchErr instanceof Error ? fetchErr.message : 'Network error',
+        missive_error: isTimeout
+          ? `Missive API timeout after ${MISSIVE_TIMEOUT_MS / 1000}s`
+          : (fetchErr instanceof Error ? fetchErr.message : 'Network error'),
         attempted_at: new Date().toISOString(),
         retry_count: 0,
       };
+    } finally {
+      clearTimeout(timeoutId);
     }
 
     // Update message status based on Missive response
