@@ -162,7 +162,7 @@ Deno.serve(async (req) => {
     });
 
     const startTime = Date.now();
-    const MAX_ELAPSED_MS = 120_000; // Break before 150s Edge Function timeout
+    const MAX_ELAPSED_MS = 50_000; // Break well before browser/gateway timeout
     let timedOut = false;
     let conversationsProcessed = 0;
 
