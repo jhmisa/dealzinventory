@@ -100,10 +100,10 @@ Deno.serve(async (req) => {
     if (input.conversation_id) {
       convQuery = convQuery.eq('id', input.conversation_id);
     }
-    if (input.batch_size) {
-      const offset = input.batch_offset ?? 0;
-      convQuery = convQuery.range(offset, offset + input.batch_size - 1);
-    }
+    // Default batch_size to 100 to avoid gateway timeout on UI invocations
+    const batchSize = input.batch_size ?? 100;
+    const offset = input.batch_offset ?? 0;
+    convQuery = convQuery.range(offset, offset + batchSize - 1);
     const { data: conversations, error: convError } = await convQuery;
     if (convError) {
       return jsonResponse({ error: `conversations query failed: ${convError.message}` });
