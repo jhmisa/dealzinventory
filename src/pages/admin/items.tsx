@@ -383,7 +383,16 @@ export default function ItemListPage() {
     if (categoryFilter && categoryFilter !== 'all' && item.product_models?.categories?.name !== categoryFilter) return false
     if (brandFilter && brandFilter !== 'all' && (item.brand ?? item.product_models?.brand) !== brandFilter) return false
     if (debouncedDescSearch) {
-      const desc = buildShortDescription(item, item.product_models?.categories?.description_fields ?? []) || ''
+      const descFields = item.product_models?.categories?.description_fields ?? []
+      let desc = ''
+      if (descFields.length > 0) {
+        const resolvedValues: Record<string, unknown> = {}
+        for (const key of descFields) {
+          resolvedValues[key] = (item as Record<string, unknown>)[key] ?? (item.product_models as Record<string, unknown> | null)?.[key]
+        }
+        desc = buildShortDescription(resolvedValues, descFields)
+      }
+      if (!desc) desc = item.supplier_description || ''
       if (!desc.toLowerCase().includes(debouncedDescSearch.toLowerCase())) return false
     }
     if (debouncedConditionSearch) {
