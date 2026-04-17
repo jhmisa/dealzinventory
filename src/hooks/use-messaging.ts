@@ -439,7 +439,8 @@ export interface MessageSyncProgress {
   errors: number
 }
 
-const SYNC_BATCH_SIZE = 10
+const SYNC_BATCH_SIZE = 5
+const SYNC_MAX_ITERATIONS = 200
 
 export function useRunMessageSync() {
   const queryClient = useQueryClient()
@@ -459,19 +460,31 @@ export function useRunMessageSync() {
       const allInserted: MessageSyncResult['inserted'] = []
       const allErrors: MessageSyncResult['errors'] = []
 
-      // eslint-disable-next-line no-constant-condition
-      while (true) {
-        const { data, error } = await supabase.functions.invoke('backfill-missive-inbound', {
-          body: {
-            since,
-            batch_size: SYNC_BATCH_SIZE,
-            batch_offset: offset,
-            // Only write status on the last batch
-            write_status: false,
-          },
-        })
-        if (error) throw error
-        const batch = data as MessageSyncResult
+      for (let iteration = 0; iteration < SYNC_MAX_ITERATIONS; iteration++) {
+        let batch: MessageSyncResult
+        try {
+          const { data, error } = await supabase.functions.invoke('backfill-missive-inbound', {
+            body: {
+              since,
+              batch_size: SYNC_BATCH_SIZE,
+              batch_offset: offset,
+              // Only write status on the last batch
+              write_status: false,
+            },
+          })
+          if (error) throw error
+          batch = data as MessageSyncResult
+        } catch (err) {
+          // Log batch error and try next batch instead of aborting entirely
+          console.error(`Sync batch at offset ${offset} failed:`, err)
+          totalErrors++
+          allErrors.push({
+            conversation_id: `batch_offset_${offset}`,
+            error: err instanceof Error ? err.message : String(err),
+          })
+          offset += SYNC_BATCH_SIZE
+          continue
+        }
 
         totalInserted += batch.inserted_count
         totalSkipped += batch.skipped_count

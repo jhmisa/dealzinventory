@@ -103,6 +103,13 @@ Deno.serve(async (req) => {
     // Default batch_size to 25 to avoid gateway timeout on UI/cron invocations
     const batchSize = input.batch_size ?? 25;
     const offset = input.batch_offset ?? 0;
+
+    // Count total matching conversations so the client knows how many batches remain
+    const { count: totalCount } = await supabase
+      .from('conversations')
+      .select('id', { count: 'exact', head: true })
+      .not('missive_conversation_id', 'is', null);
+
     convQuery = convQuery.range(offset, offset + batchSize - 1);
     const { data: conversations, error: convError } = await convQuery;
     if (convError) {
@@ -320,7 +327,12 @@ Deno.serve(async (req) => {
       inserted_count: inserted.length,
       skipped_count: skipped.length,
       error_count: errors.length,
-      conversations_remaining: timedOut ? validConversations.length - conversationsProcessed : 0,
+      conversations_remaining: (() => {
+        const remaining = Math.max(0, (totalCount ?? 0) - offset - (conversations?.length ?? 0));
+        return timedOut
+          ? remaining + (validConversations.length - conversationsProcessed)
+          : remaining;
+      })(),
       inserted,
       skipped,
       errors,
@@ -333,6 +345,7 @@ Deno.serve(async (req) => {
         : errors.length > 0
           ? 'error'          // only errors, no recoveries
           : 'ok';           // nothing to recover, no errors
+      const remainingForStatus = Math.max(0, (totalCount ?? 0) - offset - (conversations?.length ?? 0));
       await supabase.from('system_settings').upsert(
         {
           key: 'messaging_last_sync',
@@ -341,7 +354,9 @@ Deno.serve(async (req) => {
             checked_at: new Date().toISOString(),
             since: new Date(sinceMs).toISOString(),
             conversations_scanned: conversations?.length ?? 0,
-            conversations_remaining: timedOut ? validConversations.length - conversationsProcessed : 0,
+            conversations_remaining: timedOut
+              ? remainingForStatus + (validConversations.length - conversationsProcessed)
+              : remainingForStatus,
             inserted_count: inserted.length,
             error_count: errors.length,
             inserted_preview: inserted.slice(0, 5),

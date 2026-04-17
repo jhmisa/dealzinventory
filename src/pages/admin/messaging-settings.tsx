@@ -1165,7 +1165,7 @@ function MessageSyncCard() {
 
   const handleSync = () => {
     const since = windowToSince(window)
-    setProgress(null)
+    setProgress({ scanned: 0, total: 0, recovered: 0, errors: 0 })
     runSync.mutate(
       {
         since,
@@ -1287,11 +1287,11 @@ function MessageSyncCard() {
           </Button>
         </div>
 
-        {runSync.isPending && progress && progress.total > 0 && (
+        {runSync.isPending && progress !== null && (
           <div className="space-y-1.5">
-            <Progress value={(progress.scanned / progress.total) * 100} />
+            <Progress value={progress.total > 0 ? (progress.scanned / progress.total) * 100 : undefined} />
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>{progress.scanned} / {progress.total} conversations</span>
+              <span>{progress.total > 0 ? `${progress.scanned} / ${progress.total} conversations` : 'Starting sync...'}</span>
               <span>
                 {progress.recovered > 0 && `${progress.recovered} recovered · `}
                 {progress.scanned - progress.recovered} synced
