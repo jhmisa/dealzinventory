@@ -111,7 +111,7 @@ export function useAddOrderLineItem() {
   return useMutation({
     mutationFn: ({ orderId, item }: {
       orderId: string
-      item: { item_id: string | null; description: string; quantity: number; unit_price: number; discount: number }
+      item: { item_id: string | null; accessory_id?: string | null; description: string; quantity: number; unit_price: number; discount: number }
     }) => ordersService.addOrderLineItem(orderId, item),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.orders.all })

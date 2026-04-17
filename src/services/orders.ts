@@ -404,6 +404,7 @@ export async function updateOrderLineItem(
 
 export async function addOrderLineItem(orderId: string, item: {
   item_id: string | null
+  accessory_id?: string | null
   description: string
   quantity: number
   unit_price: number
@@ -423,6 +424,17 @@ export async function addOrderLineItem(orderId: string, item: {
       .from('items')
       .update({ item_status: 'RESERVED' as Item['item_status'] })
       .eq('id', item.item_id)
+  }
+
+  // Decrement accessory stock
+  if (item.accessory_id) {
+    const { data: newQty } = await supabase.rpc('decrement_accessory_stock', {
+      p_accessory_id: item.accessory_id,
+      p_quantity: item.quantity,
+    })
+    if (newQty === null) {
+      throw new Error('Insufficient stock for accessory. Please refresh and try again.')
+    }
   }
 
   return data

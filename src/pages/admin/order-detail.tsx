@@ -30,6 +30,7 @@ import {
   useStampInvoicePrinted,
   useCheckYamatoTracking,
 } from '@/hooks/use-orders'
+import { useAvailableAccessories } from '@/hooks/use-accessories'
 import * as ordersService from '@/services/orders'
 import { printInvoice } from '@/components/orders/invoice-pdf'
 import { useAuth } from '@/hooks/use-auth'
@@ -187,6 +188,7 @@ export default function OrderDetailPage() {
 
   const { data: availableData, isLoading: searchLoading } = useAvailableItems({ search: debouncedSearch })
   const searchResults = availableData?.items ?? []
+  const { data: accessoryResults, isLoading: accessorySearchLoading } = useAvailableAccessories(debouncedSearch)
 
   if (isLoading) return <FormSkeleton fields={6} />
   if (!order) return <div className="text-center py-12 text-muted-foreground">Order not found.</div>
@@ -432,6 +434,36 @@ export default function OrderDetailPage() {
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to add item')
+    }
+  }
+
+  async function handleAddAccessoryItem(acc: { id: string; accessory_code: string; name: string; brand: string | null; selling_price: number }) {
+    try {
+      const description = acc.brand ? `${acc.brand} ${acc.name}` : acc.name
+      await addLineItem.mutateAsync({
+        orderId: order.id,
+        item: {
+          item_id: null,
+          accessory_id: acc.id,
+          description,
+          quantity: 1,
+          unit_price: acc.selling_price ?? 0,
+          discount: 0,
+        },
+      })
+      await recalcTotal.mutateAsync(order.id)
+      setAddItemSearch('')
+      setDebouncedSearch('')
+      setShowSearchDropdown(false)
+      toast.success(`Added ${acc.accessory_code}`)
+
+      if (order.order_status === 'PACKED') {
+        await ordersService.resetOrderPacking(order.id)
+        await statusMutation.mutateAsync({ id: order.id, status: 'CONFIRMED' })
+        toast.warning('Order reverted to Confirmed — packing checklist reset')
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to add accessory')
     }
   }
 
@@ -1121,7 +1153,7 @@ export default function OrderDetailPage() {
                         <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
                           className="pl-8 h-8 text-sm"
-                          placeholder="Search by P-code or product name to add..."
+                          placeholder="Search P-code, A-code, or product name to add..."
                           value={addItemSearch}
                           onChange={(e) => {
                             setAddItemSearch(e.target.value)
@@ -1135,44 +1167,79 @@ export default function OrderDetailPage() {
                       </div>
                       {showSearchDropdown && debouncedSearch && (
                         <div className="absolute z-50 mt-1 w-full bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto">
-                          {searchResults.length === 0 ? (
+                          {(searchLoading && accessorySearchLoading) ? (
+                            <div className="px-3 py-2 text-sm text-muted-foreground">Searching...</div>
+                          ) : searchResults.length === 0 && (!accessoryResults || accessoryResults.length === 0) ? (
                             <div className="px-3 py-2 text-sm text-muted-foreground">
-                              {searchLoading ? 'Searching...' : 'No available items found'}
+                              No items or accessories found
                             </div>
                           ) : (
-                            searchResults.map((item) => {
-                              const pm = item.product_models as { brand: string; model_name: string } | null
-                              const alreadyAdded = existingItemIds.has(item.id)
-                              return (
-                                <button
-                                  key={item.id}
-                                  type="button"
-                                  disabled={alreadyAdded || addLineItem.isPending}
-                                  className={cn(
-                                    'w-full flex items-center justify-between px-3 py-2 text-sm text-left hover:bg-muted transition-colors',
-                                    alreadyAdded && 'opacity-50 cursor-not-allowed',
-                                  )}
-                                  onClick={() => handleAddInventoryItem({
-                                    id: item.id,
-                                    item_code: item.item_code,
-                                    condition_grade: item.condition_grade,
-                                    selling_price: item.selling_price,
-                                    product_models: pm,
-                                  })}
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <CodeDisplay code={item.item_code} />
-                                    <GradeBadge grade={item.condition_grade} />
+                            <>
+                              {searchResults.map((item) => {
+                                const pm = item.product_models as { brand: string; model_name: string } | null
+                                const alreadyAdded = existingItemIds.has(item.id)
+                                return (
+                                  <button
+                                    key={item.id}
+                                    type="button"
+                                    disabled={alreadyAdded || addLineItem.isPending}
+                                    className={cn(
+                                      'w-full flex items-center justify-between px-3 py-2 text-sm text-left hover:bg-muted transition-colors',
+                                      alreadyAdded && 'opacity-50 cursor-not-allowed',
+                                    )}
+                                    onClick={() => handleAddInventoryItem({
+                                      id: item.id,
+                                      item_code: item.item_code,
+                                      condition_grade: item.condition_grade,
+                                      selling_price: item.selling_price,
+                                      product_models: pm,
+                                    })}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <CodeDisplay code={item.item_code} />
+                                      <GradeBadge grade={item.condition_grade} />
+                                      <span className="text-muted-foreground">
+                                        {pm ? `${pm.brand} ${pm.model_name}` : '—'}
+                                      </span>
+                                    </div>
                                     <span className="text-muted-foreground">
-                                      {pm ? `${pm.brand} ${pm.model_name}` : '—'}
+                                      {item.selling_price ? formatPrice(item.selling_price) : '—'}
                                     </span>
-                                  </div>
-                                  <span className="text-muted-foreground">
-                                    {item.selling_price ? formatPrice(item.selling_price) : '—'}
-                                  </span>
-                                </button>
-                              )
-                            })
+                                  </button>
+                                )
+                              })}
+                              {accessoryResults && accessoryResults.length > 0 && (
+                                <>
+                                  {searchResults.length > 0 && (
+                                    <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground bg-muted/50 border-t">
+                                      Accessories
+                                    </div>
+                                  )}
+                                  {accessoryResults.map((acc) => (
+                                    <button
+                                      key={`acc-${acc.id}`}
+                                      type="button"
+                                      disabled={addLineItem.isPending}
+                                      className="w-full flex items-center justify-between px-3 py-2 text-sm text-left hover:bg-muted transition-colors"
+                                      onClick={() => handleAddAccessoryItem(acc)}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <CodeDisplay code={acc.accessory_code} />
+                                        <span className="text-muted-foreground">
+                                          {acc.brand ? `${acc.brand} ${acc.name}` : acc.name}
+                                        </span>
+                                        <span className="text-xs text-muted-foreground">
+                                          {acc.stock_quantity} in stock
+                                        </span>
+                                      </div>
+                                      <span className="text-muted-foreground">
+                                        {formatPrice(acc.selling_price ?? 0)}
+                                      </span>
+                                    </button>
+                                  ))}
+                                </>
+                              )}
+                            </>
                           )}
                         </div>
                       )}
