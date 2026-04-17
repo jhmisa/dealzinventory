@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Progress } from '@/components/ui/progress'
 import {
   Select,
   SelectContent,
@@ -45,6 +46,7 @@ import {
   useUpdateSystemSetting,
   useMessageSyncStatus,
   useRunMessageSync,
+  type MessageSyncProgress,
 } from '@/hooks/use-messaging'
 import { useCustomers } from '@/hooks/use-customers'
 import type { AiProvider, MessagingTemplate, MessagingTemplateInsert, KnowledgeBaseEntry, TestAIMessage, TestAIResponse } from '@/lib/types'
@@ -1157,32 +1159,39 @@ function timeAgo(iso: string): string {
 
 function MessageSyncCard() {
   const [window, setWindow] = useState('24h')
+  const [progress, setProgress] = useState<MessageSyncProgress | null>(null)
   const { data: syncStatus, isLoading: loadingStatus } = useMessageSyncStatus()
   const runSync = useRunMessageSync()
 
   const handleSync = () => {
     const since = windowToSince(window)
-    runSync.mutate(since, {
-      onSuccess: (result) => {
-        const partial = result.conversations_remaining > 0
-          ? ` (partial scan — ${result.conversations_remaining} conversations remaining)`
-          : ''
-        if (result.inserted_count > 0 && result.error_count > 0) {
-          toast.success(
-            `Recovered ${result.inserted_count} message(s) (${result.error_count} conversation(s) had errors)${partial}`
-          )
-        } else if (result.inserted_count > 0) {
-          toast.success(`Recovered ${result.inserted_count} missing message(s)${partial}`)
-        } else if (result.error_count > 0) {
-          toast.error(`Sync completed with ${result.error_count} error(s)${partial}`)
-        } else {
-          toast.success(`All messages are synced${partial}`)
-        }
+    setProgress(null)
+    runSync.mutate(
+      {
+        since,
+        onProgress: setProgress,
       },
-      onError: (err) => {
-        toast.error(`Sync failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      {
+        onSuccess: (result) => {
+          setProgress(null)
+          if (result.inserted_count > 0 && result.error_count > 0) {
+            toast.success(
+              `Recovered ${result.inserted_count} message(s) (${result.error_count} conversation(s) had errors)`
+            )
+          } else if (result.inserted_count > 0) {
+            toast.success(`Recovered ${result.inserted_count} missing message(s)`)
+          } else if (result.error_count > 0) {
+            toast.error(`Sync completed with ${result.error_count} error(s)`)
+          } else {
+            toast.success(`All messages are synced`)
+          }
+        },
+        onError: (err) => {
+          setProgress(null)
+          toast.error(`Sync failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
+        },
       },
-    })
+    )
   }
 
   return (
@@ -1277,6 +1286,20 @@ function MessageSyncCard() {
             {runSync.isPending ? 'Syncing...' : 'Run sync now'}
           </Button>
         </div>
+
+        {runSync.isPending && progress && progress.total > 0 && (
+          <div className="space-y-1.5">
+            <Progress value={(progress.scanned / progress.total) * 100} />
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>{progress.scanned} / {progress.total} conversations</span>
+              <span>
+                {progress.recovered > 0 && `${progress.recovered} recovered · `}
+                {progress.scanned - progress.recovered} synced
+                {progress.errors > 0 && ` · ${progress.errors} errors`}
+              </span>
+            </div>
+          </div>
+        )}
 
         <p className="text-xs text-muted-foreground">
           Automatic sync runs every 15 minutes. Use this button if you suspect messages are missing.

@@ -432,15 +432,100 @@ export interface MessageSyncResult {
   errors: Array<{ conversation_id: string; error: string }>
 }
 
+export interface MessageSyncProgress {
+  scanned: number
+  total: number
+  recovered: number
+  errors: number
+}
+
+const SYNC_BATCH_SIZE = 10
+
 export function useRunMessageSync() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (since: string): Promise<MessageSyncResult> => {
-      const { data, error } = await supabase.functions.invoke('backfill-missive-inbound', {
-        body: { since, write_status: true },
-      })
-      if (error) throw error
-      return data as MessageSyncResult
+    mutationFn: async ({
+      since,
+      onProgress,
+    }: {
+      since: string
+      onProgress?: (progress: MessageSyncProgress) => void
+    }): Promise<MessageSyncResult> => {
+      let offset = 0
+      let totalInserted = 0
+      let totalSkipped = 0
+      let totalErrors = 0
+      let totalScanned = 0
+      const allInserted: MessageSyncResult['inserted'] = []
+      const allErrors: MessageSyncResult['errors'] = []
+
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { data, error } = await supabase.functions.invoke('backfill-missive-inbound', {
+          body: {
+            since,
+            batch_size: SYNC_BATCH_SIZE,
+            batch_offset: offset,
+            // Only write status on the last batch
+            write_status: false,
+          },
+        })
+        if (error) throw error
+        const batch = data as MessageSyncResult
+
+        totalInserted += batch.inserted_count
+        totalSkipped += batch.skipped_count
+        totalErrors += batch.error_count
+        totalScanned += batch.conversations_scanned
+        allInserted.push(...batch.inserted)
+        allErrors.push(...batch.errors)
+
+        const total = offset + batch.conversations_scanned + batch.conversations_remaining
+        onProgress?.({
+          scanned: offset + batch.conversations_scanned,
+          total,
+          recovered: totalInserted,
+          errors: totalErrors,
+        })
+
+        if (batch.conversations_remaining === 0) break
+        offset += batch.conversations_scanned
+      }
+
+      // Write aggregated sync status to system_settings
+      const status = totalInserted > 0
+        ? 'recovered'
+        : totalErrors > 0
+          ? 'error'
+          : 'ok'
+      await supabase.from('system_settings').upsert(
+        {
+          key: 'messaging_last_sync',
+          value: JSON.stringify({
+            status,
+            checked_at: new Date().toISOString(),
+            since,
+            conversations_scanned: totalScanned,
+            conversations_remaining: 0,
+            inserted_count: totalInserted,
+            error_count: totalErrors,
+            inserted_preview: allInserted.slice(0, 5),
+            errors_preview: allErrors.slice(0, 3),
+          }),
+        },
+        { onConflict: 'key' },
+      )
+
+      return {
+        ok: true,
+        inserted_count: totalInserted,
+        skipped_count: totalSkipped,
+        error_count: totalErrors,
+        conversations_scanned: totalScanned,
+        conversations_remaining: 0,
+        inserted: allInserted,
+        errors: allErrors,
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({

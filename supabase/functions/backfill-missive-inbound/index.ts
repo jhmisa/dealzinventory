@@ -100,8 +100,8 @@ Deno.serve(async (req) => {
     if (input.conversation_id) {
       convQuery = convQuery.eq('id', input.conversation_id);
     }
-    // Default batch_size to 100 to avoid gateway timeout on UI invocations
-    const batchSize = input.batch_size ?? 100;
+    // Default batch_size to 25 to avoid gateway timeout on UI/cron invocations
+    const batchSize = input.batch_size ?? 25;
     const offset = input.batch_offset ?? 0;
     convQuery = convQuery.range(offset, offset + batchSize - 1);
     const { data: conversations, error: convError } = await convQuery;
@@ -162,7 +162,7 @@ Deno.serve(async (req) => {
     });
 
     const startTime = Date.now();
-    const MAX_ELAPSED_MS = 50_000; // Break well before browser/gateway timeout
+    const MAX_ELAPSED_MS = 30_000; // Break well before gateway ~60s timeout
     let timedOut = false;
     let conversationsProcessed = 0;
 
