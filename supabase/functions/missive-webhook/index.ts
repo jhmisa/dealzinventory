@@ -128,6 +128,93 @@ async function matchCustomer(
   return null;
 }
 
+// ---------- Background tasks ----------
+//
+// Missive API calls (contact name resolution and attachment fetching) are
+// moved here so the webhook always returns 200 within ~100ms. If Missive
+// is slow or down, we still ACK the webhook — preventing Missive from
+// pausing its delivery queue (which caused the 4-hour blackout on 2026-04-16).
+
+async function backgroundEnrichMessage(
+  missiveMessageId: string,
+  messageDbId: string,
+  conversationDbId: string,
+  missiveConversationId: string,
+  needsContactName: boolean,
+) {
+  try {
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    );
+
+    // 1. Resolve contact name from Missive API (if webhook payload didn't have it)
+    if (needsContactName && MISSIVE_API_TOKEN) {
+      try {
+        const convRes = await fetch(`${MISSIVE_API_URL}/conversations/${missiveConversationId}`, {
+          headers: { Authorization: `Bearer ${MISSIVE_API_TOKEN}` },
+        });
+        if (convRes.ok) {
+          const convData = await convRes.json();
+          const convDetail = convData?.conversations ?? convData?.conversation;
+          let resolvedName: string | null =
+            convDetail?.subject
+            ?? convDetail?.latest_subject
+            ?? (convDetail?.contacts ?? []).find((c: { name?: string }) => c.name)?.name
+            ?? (convDetail?.authors ?? []).find((a: { name?: string }) => a.name && a.name !== 'Dealz K.K.')?.name
+            ?? null;
+          if (resolvedName?.startsWith('Message from ')) {
+            resolvedName = resolvedName.slice('Message from '.length);
+          }
+          if (resolvedName) {
+            await supabase
+              .from('conversations')
+              .update({ contact_name: resolvedName })
+              .eq('id', conversationDbId);
+            console.log('Background: resolved contact name:', resolvedName);
+          }
+        }
+      } catch (e) {
+        console.warn('Background: failed to fetch conversation from Missive API:', e);
+      }
+    }
+
+    // 2. Fetch full message from Missive API to get attachments
+    if (MISSIVE_API_TOKEN) {
+      try {
+        const msgRes = await fetch(`${MISSIVE_API_URL}/messages/${missiveMessageId}`, {
+          headers: { Authorization: `Bearer ${MISSIVE_API_TOKEN}` },
+        });
+        if (msgRes.ok) {
+          const msgData = await msgRes.json();
+          const rawAttachments = msgData?.messages?.attachments ?? msgData?.message?.attachments ?? [];
+          const attachments = rawAttachments
+            .filter((a: { url?: string }) => a.url)
+            .map((a: { url: string; filename?: string; media_type?: string; sub_type?: string; size?: number }) => ({
+              file_url: a.url,
+              filename: a.filename ?? 'attachment',
+              mime_type: a.media_type && a.sub_type ? `${a.media_type}/${a.sub_type}` : 'application/octet-stream',
+              ...(a.size ? { size_bytes: a.size } : {}),
+            }));
+          if (attachments.length > 0) {
+            await supabase
+              .from('messages')
+              .update({ attachments })
+              .eq('id', messageDbId);
+            console.log('Background: attached', attachments.length, 'file(s) to message', messageDbId);
+          }
+        } else {
+          console.warn('Background: Missive message fetch failed:', msgRes.status);
+        }
+      } catch (e) {
+        console.warn('Background: failed to fetch message attachments from Missive:', e);
+      }
+    }
+  } catch (e) {
+    console.error('Background enrichment failed:', e);
+  }
+}
+
 // ---------- Main handler ----------
 
 Deno.serve(async (req) => {
@@ -181,7 +268,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: true, skipped: true });
     }
 
-    // Customer matching
+    // Customer matching (DB only — no external API calls)
     const customer = await matchCustomer(
       supabase,
       conversation.id,
@@ -189,38 +276,12 @@ Deno.serve(async (req) => {
       message.from_field?.address,
     );
 
-    // Resolve contact name — try webhook payload fields first
-    let resolvedContactName: string | null = message.from_field?.name
+    // Resolve contact name from webhook payload fields only — the Missive API
+    // fallback is deferred to the background task so we can return 200 fast.
+    const resolvedContactName: string | null = message.from_field?.name
       ?? conversation.subject
       ?? (conversation.authors ?? []).find((a: { name?: string }) => a.name && a.name !== 'Dealz K.K.')?.name
       ?? null;
-
-    // For FB Messenger, webhook payload often lacks contact name — fetch from Missive API
-    if (!resolvedContactName && MISSIVE_API_TOKEN) {
-      try {
-        const convRes = await fetch(`${MISSIVE_API_URL}/conversations/${conversation.id}`, {
-          headers: { Authorization: `Bearer ${MISSIVE_API_TOKEN}` },
-        });
-        if (convRes.ok) {
-          const convData = await convRes.json();
-          const convDetail = convData?.conversations ?? convData?.conversation;
-          // Missive stores FB contact names in the conversation subject or contact list
-          resolvedContactName =
-            convDetail?.subject
-            ?? convDetail?.latest_subject
-            ?? (convDetail?.contacts ?? []).find((c: { name?: string }) => c.name)?.name
-            ?? (convDetail?.authors ?? []).find((a: { name?: string }) => a.name && a.name !== 'Dealz K.K.')?.name
-            ?? null;
-          // Strip "Message from " prefix if present
-          if (resolvedContactName?.startsWith('Message from ')) {
-            resolvedContactName = resolvedContactName.slice('Message from '.length);
-          }
-          console.log('Missive API contact resolve:', resolvedContactName);
-        }
-      } catch (e) {
-        console.warn('Failed to fetch conversation from Missive API:', e);
-      }
-    }
 
     // Look up Inbox folder for auto-unarchive
     const { data: inboxFolder } = await supabase
@@ -260,43 +321,17 @@ Deno.serve(async (req) => {
       ? message.body.replace(/<[^>]+>/g, '').trim()
       : message.preview ?? '';
 
-    // Fetch full message from Missive API to get attachments
-    // (webhook payloads don't include attachments)
-    let attachments: Array<{ file_url: string; filename: string; mime_type: string; size_bytes?: number }> = [];
-    if (MISSIVE_API_TOKEN) {
-      try {
-        const msgRes = await fetch(`${MISSIVE_API_URL}/messages/${message.id}`, {
-          headers: { Authorization: `Bearer ${MISSIVE_API_TOKEN}` },
-        });
-        if (msgRes.ok) {
-          const msgData = await msgRes.json();
-          const rawAttachments = msgData?.messages?.attachments ?? msgData?.message?.attachments ?? [];
-          attachments = rawAttachments
-            .filter((a: { url?: string }) => a.url)
-            .map((a: { url: string; filename?: string; media_type?: string; sub_type?: string; size?: number }) => ({
-              file_url: a.url,
-              filename: a.filename ?? 'attachment',
-              mime_type: a.media_type && a.sub_type ? `${a.media_type}/${a.sub_type}` : 'application/octet-stream',
-              ...(a.size ? { size_bytes: a.size } : {}),
-            }));
-        } else {
-          console.warn('Missive API fetch failed:', msgRes.status);
-        }
-      } catch (e) {
-        console.warn('Failed to fetch message attachments from Missive:', e);
-      }
-    }
-
-    // Store inbound message
-    const { error: msgError } = await supabase.from('messages').insert({
+    // Store inbound message (without attachments — background task adds them)
+    const { data: insertedMsg, error: msgError } = await supabase.from('messages').insert({
       conversation_id: conv.id,
       missive_message_id: message.id,
       role: 'customer' as const,
       content,
       status: 'SENT' as const,
       message_type: 'REPLY' as const,
-      ...(attachments.length > 0 ? { attachments } : {}),
-    });
+    })
+    .select('id')
+    .single();
 
     if (msgError) throw msgError;
 
@@ -326,6 +361,21 @@ Deno.serve(async (req) => {
           .eq('id', conv.id);
       }
     }
+
+    // --- Background enrichment ---
+    // Fetch contact name (if not resolved from webhook payload) and
+    // message attachments from the Missive API. This runs AFTER we
+    // return 200 to Missive, so even if Missive's API is slow/down,
+    // the webhook handler never blocks.
+    EdgeRuntime.waitUntil(
+      backgroundEnrichMessage(
+        message.id,
+        insertedMsg.id,
+        conv.id,
+        conversation.id,
+        !resolvedContactName,
+      ),
+    );
 
     return jsonResponse({
       ok: true,
