@@ -29,6 +29,8 @@ import {
   useAddOrderLineItem,
   useStampInvoicePrinted,
   useCheckYamatoTracking,
+  useClearInvoicePrinted,
+  useClearDempyoPrinted,
 } from '@/hooks/use-orders'
 import { useAvailableAccessories } from '@/hooks/use-accessories'
 import * as ordersService from '@/services/orders'
@@ -137,6 +139,8 @@ export default function OrderDetailPage() {
   const recalcTotal = useRecalculateOrderTotal()
   const updateOrder = useUpdateOrder()
   const stampInvoice = useStampInvoicePrinted()
+  const clearInvoice = useClearInvoicePrinted()
+  const clearDempyo = useClearDempyoPrinted()
   const { data: auditLogs } = useOrderAuditLogs(id!)
   const queryClient = useQueryClient()
   const { data: surchargeRate } = useSystemSetting('credit_card_surcharge_pct')
@@ -727,15 +731,43 @@ export default function OrderDetailPage() {
             <div className="flex justify-between"><span className="text-muted-foreground">Total</span><PriceDisplay amount={order.total_price} /></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Created</span><span>{formatDateTime(order.created_at)}</span></div>
             {invoicePrintedAt && (
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Invoice Printed</span>
-                <span className="text-sm">{formatDateTime(invoicePrintedAt)}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">{formatDateTime(invoicePrintedAt)}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-muted-foreground hover:text-red-600"
+                    title="Mark as not printed (allow reprint)"
+                    onClick={() => clearInvoice.mutate([order.id], {
+                      onSuccess: () => toast.success('Invoice print status cleared'),
+                      onError: (err) => toast.error(err.message),
+                    })}
+                  >
+                    <Undo2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
             )}
             {dempyoPrintedAt && (
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Dempyo Printed</span>
-                <span className="text-sm">{formatDateTime(dempyoPrintedAt)}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">{formatDateTime(dempyoPrintedAt)}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-muted-foreground hover:text-red-600"
+                    title="Mark as not printed (allow reprint)"
+                    onClick={() => clearDempyo.mutate([order.id], {
+                      onSuccess: () => toast.success('Dempyo print status cleared'),
+                      onError: (err) => toast.error(err.message),
+                    })}
+                  >
+                    <Undo2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
             )}
             {orderNotes && (

@@ -207,6 +207,26 @@ export function useStampDempyoPrinted() {
   })
 }
 
+export function useClearInvoicePrinted() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (orderIds: string[]) => ordersService.clearInvoicePrinted(orderIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all })
+    },
+  })
+}
+
+export function useClearDempyoPrinted() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (orderIds: string[]) => ordersService.clearDempyoPrinted(orderIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all })
+    },
+  })
+}
+
 export function useCheckYamatoTracking() {
   const queryClient = useQueryClient()
   return useMutation({

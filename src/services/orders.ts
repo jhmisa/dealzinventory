@@ -602,6 +602,24 @@ export async function stampDempyoPrinted(orderIds: string[]) {
   if (error) throw error
 }
 
+export async function clearInvoicePrinted(orderIds: string[]) {
+  const { error } = await supabase
+    .from('orders')
+    .update({ invoice_printed_at: null })
+    .in('id', orderIds)
+
+  if (error) throw error
+}
+
+export async function clearDempyoPrinted(orderIds: string[]) {
+  const { error } = await supabase
+    .from('orders')
+    .update({ dempyo_printed_at: null })
+    .in('id', orderIds)
+
+  if (error) throw error
+}
+
 // --- Yamato Tracking Import ---
 
 export interface TrackingImportResult {

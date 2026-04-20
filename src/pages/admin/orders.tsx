@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useOrders, useConfirmedForInvoice, useConfirmedForDempyo, useStampInvoicePrinted, useStampDempyoPrinted, useRefreshAllYamatoStatuses } from '@/hooks/use-orders'
+import { useOrders, useConfirmedForInvoice, useConfirmedForDempyo, useStampInvoicePrinted, useStampDempyoPrinted, useClearInvoicePrinted, useClearDempyoPrinted, useRefreshAllYamatoStatuses } from '@/hooks/use-orders'
 import { usePersistedFilters } from '@/hooks/use-persisted-filters'
 import { useOffers, useCancelOffer } from '@/hooks/use-offers'
 import { ORDER_STATUSES, ORDER_SOURCES, OFFER_STATUSES, getYamatoStatusConfig } from '@/lib/constants'
@@ -44,6 +44,46 @@ type OrderRow = {
   delivery_box_count: number
   yamato_status: string | null
   delivery_issue_flag: boolean
+}
+
+function PrintStatusCell({ order }: { order: OrderRow }) {
+  const clearInvoice = useClearInvoicePrinted()
+  const clearDempyo = useClearDempyoPrinted()
+
+  return (
+    <div className="flex items-center gap-2 text-xs" onClick={(e) => e.stopPropagation()}>
+      {order.invoice_printed_at ? (
+        <button
+          type="button"
+          title="Click to mark invoice as not printed"
+          className="text-green-600 hover:text-red-600 hover:line-through transition-colors"
+          onClick={() => clearInvoice.mutate([order.id], {
+            onSuccess: () => toast.success('Invoice print status cleared'),
+            onError: (err: Error) => toast.error(err.message),
+          })}
+        >
+          ✓ Inv
+        </button>
+      ) : (
+        <span className="text-muted-foreground">— Inv</span>
+      )}
+      {order.dempyo_printed_at ? (
+        <button
+          type="button"
+          title="Click to mark dempyo as not printed"
+          className="text-green-600 hover:text-red-600 hover:line-through transition-colors"
+          onClick={() => clearDempyo.mutate([order.id], {
+            onSuccess: () => toast.success('Dempyo print status cleared'),
+            onError: (err: Error) => toast.error(err.message),
+          })}
+        >
+          ✓ 伝票
+        </button>
+      ) : (
+        <span className="text-muted-foreground">— 伝票</span>
+      )}
+    </div>
+  )
 }
 
 const STATUS_TABS = [
@@ -147,19 +187,7 @@ const columns: ColumnDef<OrderRow>[] = [
   {
     id: 'print_status',
     header: 'Printed',
-    cell: ({ row }) => {
-      const order = row.original
-      return (
-        <div className="flex items-center gap-2 text-xs">
-          <span title="Invoice" className={order.invoice_printed_at ? 'text-green-600' : 'text-muted-foreground'}>
-            {order.invoice_printed_at ? '\u2713 Inv' : '\u2014 Inv'}
-          </span>
-          <span title="Dempyo" className={order.dempyo_printed_at ? 'text-green-600' : 'text-muted-foreground'}>
-            {order.dempyo_printed_at ? '\u2713 \u4f1d\u7968' : '\u2014 \u4f1d\u7968'}
-          </span>
-        </div>
-      )
-    },
+    cell: ({ row }) => <PrintStatusCell order={row.original} />,
   },
   {
     accessorKey: 'created_at',
