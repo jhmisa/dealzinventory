@@ -34,7 +34,7 @@ export const inspectionSchema = z.object({
   condition_grade: z.enum(['S', 'A', 'B', 'C', 'D', 'J'], {
     required_error: 'Condition grade is required',
   }),
-  item_status: z.enum(['AVAILABLE', 'REPAIR', 'MISSING']),
+  item_status: z.enum(['AVAILABLE', 'REPAIR']),
   product_id: z.string().optional().or(z.literal('')),
   ac_adapter_status: z.enum(['CORRECT', 'INCORRECT', 'MISSING']).optional(),
 

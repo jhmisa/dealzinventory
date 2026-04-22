@@ -21,7 +21,7 @@ export type BulkIntakeFormValues = z.infer<typeof bulkIntakeSchema>
 
 export const itemEditSchema = z.object({
   condition_grade: z.enum(['S', 'A', 'B', 'C', 'D', 'J']).optional(),
-  item_status: z.enum(['INTAKE', 'AVAILABLE', 'REPAIR', 'MISSING']),
+  item_status: z.enum(['INTAKE', 'AVAILABLE', 'REPAIR']),
   product_id: z.string().optional().or(z.literal('')),
   ac_adapter_status: z.enum(['CORRECT', 'INCORRECT', 'MISSING']).optional(),
   specs_notes: z.string().optional().or(z.literal('')),

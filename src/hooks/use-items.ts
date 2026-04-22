@@ -100,6 +100,42 @@ export function useUpdateItem() {
   })
 }
 
+// --- Missing Item Workflow ---
+
+export function useMarkItemMissing() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, notes }: { id: string; notes: string }) =>
+      itemsService.markItemMissing(id, notes),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.items.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all })
+    },
+  })
+}
+
+export function useMarkItemFound() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => itemsService.markItemFound(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.items.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all })
+    },
+  })
+}
+
+export function useUpdateMissingNotes() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, notes }: { id: string; notes: string }) =>
+      itemsService.updateMissingNotes(id, notes),
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.items.detail(vars.id) })
+    },
+  })
+}
+
 // --- Live Selling ---
 
 export function useToggleLiveSelling() {

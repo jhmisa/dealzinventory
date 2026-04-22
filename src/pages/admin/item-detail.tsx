@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, ClipboardEdit, Copy, Lock, Printer, QrCode, Send, Unlock, Undo2, Trash2 } from 'lucide-react'
+import { ArrowLeft, AlertTriangle, ClipboardEdit, Copy, Eye, Lock, Printer, QrCode, Send, Unlock, Undo2, Trash2 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { FormSkeleton, StatusBadge, GradeBadge, CodeDisplay } from '@/components/shared'
-import { useItem } from '@/hooks/use-items'
+import { useItem, useMarkItemMissing, useMarkItemFound, useUpdateMissingNotes } from '@/hooks/use-items'
 import {
   SupplierDescriptionBanner,
   EditableSpecsCard,
@@ -59,6 +59,12 @@ export default function ItemDetailPage() {
   const [removalReason, setRemovalReason] = useState<string>('')
   const [removalReasonText, setRemovalReasonText] = useState('')
   const [removalNotes, setRemovalNotes] = useState('')
+  const [showMissingDialog, setShowMissingDialog] = useState(false)
+  const [missingNotes, setMissingNotes] = useState('')
+  const [editingMissingNotes, setEditingMissingNotes] = useState('')
+  const markMissing = useMarkItemMissing()
+  const markFound = useMarkItemFound()
+  const updateMissingNotes = useUpdateMissingNotes()
   const { data: activeOffer } = useActiveOfferForItem(id!)
   const cancelOffer = useCancelOffer()
   const createSupplierReturn = useCreateSupplierReturn()
@@ -169,6 +175,27 @@ export default function ItemDetailPage() {
                 Return to Supplier
               </Button>
             )}
+            {(['INTAKE', 'AVAILABLE', 'REPAIR', 'RESERVED', 'SOLD'] as string[]).includes(item.item_status) && (
+              <Button variant="outline" onClick={() => { setMissingNotes(''); setShowMissingDialog(true) }}>
+                <AlertTriangle className="h-4 w-4 mr-2" />
+                Mark Missing
+              </Button>
+            )}
+            {item.item_status === 'MISSING' && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  markFound.mutate(item.id, {
+                    onSuccess: () => toast.success('Item sent back to INTAKE for re-inspection.'),
+                    onError: (err) => toast.error(err.message),
+                  })
+                }}
+                disabled={markFound.isPending}
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                {markFound.isPending ? 'Finding...' : 'Found'}
+              </Button>
+            )}
             {(['INTAKE', 'AVAILABLE', 'REPAIR', 'MISSING'] as string[]).includes(item.item_status) && (
               <Button variant="outline" onClick={() => setShowRemovalDialog(true)}>
                 <Trash2 className="h-4 w-4 mr-2" />
@@ -272,6 +299,43 @@ export default function ItemDetailPage() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Missing banner */}
+      {item.item_status === 'MISSING' && (
+        <div className="border border-red-300 bg-red-50 rounded-lg p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-red-600" />
+            <span className="font-medium text-red-800">
+              Missing since {item.missing_since ? new Date(item.missing_since).toLocaleDateString() : 'unknown'}
+            </span>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-red-800">Search Notes</label>
+            <Textarea
+              defaultValue={item.missing_notes ?? ''}
+              onChange={(e) => setEditingMissingNotes(e.target.value)}
+              placeholder="Document search efforts..."
+              className="bg-white"
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={updateMissingNotes.isPending}
+              onClick={() => {
+                updateMissingNotes.mutate(
+                  { id: item.id, notes: editingMissingNotes },
+                  {
+                    onSuccess: () => toast.success('Missing notes saved'),
+                    onError: (err) => toast.error(err.message),
+                  },
+                )
+              }}
+            >
+              {updateMissingNotes.isPending ? 'Saving...' : 'Save Notes'}
+            </Button>
+          </div>
+        </div>
       )}
 
       {/* Collapsible QR code */}
@@ -397,6 +461,52 @@ export default function ItemDetailPage() {
                 }}
               >
                 {createSupplierReturn.isPending ? 'Creating...' : 'Create Return'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mark Missing Dialog */}
+      <Dialog open={showMissingDialog} onOpenChange={setShowMissingDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mark Item Missing</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Item: <span className="font-mono font-medium text-foreground">{item.item_code}</span>
+            </p>
+            <div>
+              <label className="text-sm font-medium">Where was this last seen?</label>
+              <Textarea
+                value={missingNotes}
+                onChange={(e) => setMissingNotes(e.target.value)}
+                placeholder="Describe where the item was last seen (min 5 characters)..."
+                className="mt-1"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowMissingDialog(false)}>
+                Cancel
+              </Button>
+              <Button
+                disabled={missingNotes.length < 5 || markMissing.isPending}
+                onClick={() => {
+                  markMissing.mutate(
+                    { id: item.id, notes: missingNotes },
+                    {
+                      onSuccess: () => {
+                        toast.success('Item marked as missing')
+                        setShowMissingDialog(false)
+                        setMissingNotes('')
+                      },
+                      onError: (err) => toast.error(err.message),
+                    },
+                  )
+                }}
+              >
+                {markMissing.isPending ? 'Saving...' : 'Mark Missing'}
               </Button>
             </div>
           </div>

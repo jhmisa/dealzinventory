@@ -1,5 +1,19 @@
 import { supabase } from '@/lib/supabase'
 
+export async function getStaleMissingItems() {
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+
+  const { data, error } = await supabase
+    .from('items')
+    .select('id, item_code, missing_since, missing_notes, product_models(brand, model_name)')
+    .eq('item_status', 'MISSING')
+    .lt('missing_since', sevenDaysAgo)
+    .order('missing_since', { ascending: true })
+
+  if (error) throw error
+  return data ?? []
+}
+
 export async function getDashboardStats() {
   const [itemsResult, intakeResult, recentResult] = await Promise.all([
     supabase.from('items').select('item_status'),

@@ -457,6 +457,8 @@ export const AUDIT_FIELD_LABELS: Record<string, string> = {
   imei: 'IMEI',
   imei2: 'IMEI 2',
   kaitori_request_id: 'Kaitori Request',
+  missing_since: 'Missing Since',
+  missing_notes: 'Missing Notes',
 }
 
 // --- Supplier Returns ---

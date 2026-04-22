@@ -3,7 +3,7 @@ import { Package, CheckCircle, Wrench, AlertTriangle, Plus, ClipboardList, QrCod
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { PageHeader, StatusBadge, GradeBadge, CodeDisplay, CardSkeleton } from '@/components/shared'
-import { useDashboardStats } from '@/hooks/use-dashboard'
+import { useDashboardStats, useStaleMissingItems } from '@/hooks/use-dashboard'
 import { ITEM_STATUSES } from '@/lib/constants'
 import { formatDateTime } from '@/lib/utils'
 
@@ -21,6 +21,7 @@ const STATUS_ICONS: Record<string, React.ComponentType<{ className?: string }>> 
 export default function DashboardPage() {
   const navigate = useNavigate()
   const { data: stats, isLoading } = useDashboardStats()
+  const { data: staleMissing } = useStaleMissingItems()
 
   return (
     <div className="space-y-6">
@@ -51,6 +52,41 @@ export default function DashboardPage() {
           })
         )}
       </div>
+
+      {/* Stale missing items alert */}
+      {staleMissing && staleMissing.length > 0 && (
+        <Card className="border-red-300 bg-red-50">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-red-800 flex items-center gap-2 text-base">
+              <AlertTriangle className="h-4 w-4" />
+              Items Missing 7+ Days ({staleMissing.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1">
+            {staleMissing.map((item) => {
+              const pm = item.product_models as { brand: string; model_name: string } | null
+              const daysMissing = item.missing_since
+                ? Math.floor((Date.now() - new Date(item.missing_since).getTime()) / (1000 * 60 * 60 * 24))
+                : null
+              return (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between py-1.5 cursor-pointer hover:bg-red-100 rounded px-2"
+                  onClick={() => navigate(`/admin/items/${item.id}`)}
+                >
+                  <div className="flex items-center gap-3">
+                    <CodeDisplay code={item.item_code} />
+                    <span className="text-sm">{pm ? `${pm.brand} ${pm.model_name}` : '—'}</span>
+                  </div>
+                  {daysMissing != null && (
+                    <span className="text-xs text-red-600 font-medium">{daysMissing} days</span>
+                  )}
+                </div>
+              )
+            })}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="cursor-pointer hover:border-primary/50" onClick={() => navigate('/admin/items/intake')}>

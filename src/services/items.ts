@@ -501,6 +501,52 @@ export async function getAvailableBrands(): Promise<string[]> {
   return (data ?? []).map((row: { brand: string }) => row.brand)
 }
 
+// --- Missing Item Workflow ---
+
+export async function markItemMissing(id: string, notes: string) {
+  const { data, error } = await supabase
+    .from('items')
+    .update({
+      item_status: 'MISSING',
+      missing_since: new Date().toISOString(),
+      missing_notes: notes,
+    })
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data as Item
+}
+
+export async function markItemFound(id: string) {
+  const { data, error } = await supabase
+    .from('items')
+    .update({
+      item_status: 'INTAKE',
+      missing_since: null,
+      missing_notes: null,
+    })
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data as Item
+}
+
+export async function updateMissingNotes(id: string, notes: string) {
+  const { data, error } = await supabase
+    .from('items')
+    .update({ missing_notes: notes })
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data as Item
+}
+
 export async function getIntakeItems() {
   const { data, error } = await supabase
     .from('items')

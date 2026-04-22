@@ -8,3 +8,10 @@ export function useDashboardStats() {
     queryFn: () => dashboardService.getDashboardStats(),
   })
 }
+
+export function useStaleMissingItems() {
+  return useQuery({
+    queryKey: [...queryKeys.dashboard.all, 'stale-missing'] as const,
+    queryFn: () => dashboardService.getStaleMissingItems(),
+  })
+}

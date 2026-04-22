@@ -1357,7 +1357,6 @@ export default function InspectItemPage() {
                   <SelectContent>
                     <SelectItem value="AVAILABLE">Available</SelectItem>
                     <SelectItem value="REPAIR">Repair</SelectItem>
-                    <SelectItem value="MISSING">Missing</SelectItem>
                   </SelectContent>
                 </Select>
                 {fieldState.error && (
@@ -1417,7 +1416,6 @@ export default function InspectItemPage() {
               <SelectContent>
                 <SelectItem value="AVAILABLE">Available</SelectItem>
                 <SelectItem value="REPAIR">Repair</SelectItem>
-                <SelectItem value="MISSING">Missing</SelectItem>
               </SelectContent>
             </Select>
           )}
