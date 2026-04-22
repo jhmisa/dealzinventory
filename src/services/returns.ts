@@ -42,6 +42,60 @@ export async function createReturnRequest(input: CreateReturnInput) {
   return data as { return_code: string; return_request_id: string }
 }
 
+// --- Admin Create (direct insert, bypasses edge function) ---
+
+interface CreateAdminReturnInput {
+  order_id: string
+  customer_id: string
+  reason_category: string
+  description: string
+  items: { order_item_id: string; item_id?: string | null; reason_note?: string }[]
+}
+
+export async function createAdminReturn(input: CreateAdminReturnInput) {
+  // Generate return code
+  const { data: returnCode, error: codeError } = await supabase.rpc('generate_code', {
+    prefix: 'RET',
+    seq_name: 'ret_code_seq',
+  })
+  if (codeError) throw codeError
+
+  // Insert return request
+  const { data: returnRequest, error: insertError } = await supabase
+    .from('return_requests')
+    .insert({
+      return_code: returnCode as string,
+      order_id: input.order_id,
+      customer_id: input.customer_id,
+      return_status: 'SUBMITTED' as ReturnStatus,
+      reason_category: input.reason_category as ReturnReasonCategory,
+      customer_description: input.description,
+    })
+    .select()
+    .single()
+
+  if (insertError) throw insertError
+
+  // Insert return request items
+  const itemRows = input.items.map((item) => ({
+    return_request_id: (returnRequest as ReturnRequest).id,
+    order_item_id: item.order_item_id,
+    item_id: item.item_id ?? null,
+    reason_note: item.reason_note ?? null,
+  }))
+
+  const { error: itemsError } = await supabase
+    .from('return_request_items')
+    .insert(itemRows)
+
+  if (itemsError) throw itemsError
+
+  return {
+    return_code: returnCode as string,
+    return_request_id: (returnRequest as ReturnRequest).id,
+  }
+}
+
 // --- Queries ---
 
 interface ReturnFilters {

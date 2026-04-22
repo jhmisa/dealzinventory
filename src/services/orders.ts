@@ -127,15 +127,22 @@ export async function updateOrderStatus(id: string, status: string) {
   return updateOrder(id, { order_status: status as Order['order_status'] })
 }
 
-export async function cancelOrder(orderId: string) {
+export async function cancelOrder(
+  orderId: string,
+  cancellationCategory?: string,
+  cancellationNotes?: string,
+) {
   // Get all line items in this order
   const { data: orderItems } = await supabase
     .from('order_items')
     .select('item_id, accessory_id, quantity')
     .eq('order_id', orderId)
 
-  // Update order status to CANCELLED
-  const order = await updateOrder(orderId, { order_status: 'CANCELLED' as Order['order_status'] })
+  // Update order status to CANCELLED with reason
+  const updates: OrderUpdate = { order_status: 'CANCELLED' as Order['order_status'] }
+  if (cancellationCategory) updates.cancellation_category = cancellationCategory
+  if (cancellationNotes) updates.cancellation_notes = cancellationNotes
+  const order = await updateOrder(orderId, updates)
 
   // Revert all inventory items to AVAILABLE
   const itemIds = (orderItems ?? [])

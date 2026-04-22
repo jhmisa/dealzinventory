@@ -42,6 +42,17 @@ export function useCreateReturnRequest() {
   })
 }
 
+export function useCreateAdminReturn() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: returnsService.createAdminReturn,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.returns.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all })
+    },
+  })
+}
+
 export function useUpdateReturnStatus() {
   const queryClient = useQueryClient()
   return useMutation({

@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Check, Circle, Package, Pencil, X, Plus, History, Truck, Search, Loader2, Printer, RefreshCw, AlertTriangle, ExternalLink, Undo2 } from 'lucide-react'
+import { ArrowLeft, Check, Circle, Package, Pencil, X, Plus, History, Truck, Search, Loader2, Printer, RefreshCw, AlertTriangle, ExternalLink, Undo2, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,6 +14,9 @@ import {
   ConfirmDialog,
   FormSkeleton,
 } from '@/components/shared'
+import { CancelOrderDialog } from '@/components/orders/cancel-order-dialog'
+import { AdminReturnDialog } from '@/components/orders/admin-return-dialog'
+import type { ReturnableItem } from '@/components/orders/admin-return-dialog'
 import { AddressDisplay } from '@/components/shared/address-display'
 import { useCustomerAddresses } from '@/hooks/use-customer-addresses'
 import {
@@ -39,7 +42,8 @@ import { useAuth } from '@/hooks/use-auth'
 import { useSystemSetting } from '@/hooks/use-settings'
 import { useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/query-keys'
-import { ORDER_STATUSES, ORDER_SOURCES, YAMATO_TIME_SLOTS, YAMATO_TRACKING_URL, PAYMENT_METHODS, getPaymentMethodLabel, getYamatoStatusConfig, requiresPaymentConfirmation } from '@/lib/constants'
+import { ORDER_STATUSES, ORDER_SOURCES, YAMATO_TIME_SLOTS, YAMATO_TRACKING_URL, PAYMENT_METHODS, getPaymentMethodLabel, getYamatoStatusConfig, requiresPaymentConfirmation, getCancellationCategoryLabel } from '@/lib/constants'
+import { useCreateAdminReturn } from '@/hooks/use-returns'
 import { formatDateTime, formatPrice, cn, buildShortDescription } from '@/lib/utils'
 import { useState, useRef, useEffect } from 'react'
 import type { ShippingAddress } from '@/lib/address-types'
@@ -150,6 +154,8 @@ export default function OrderDetailPage() {
   const [cancelOpen, setCancelOpen] = useState(false)
   const [advanceOpen, setAdvanceOpen] = useState(false)
   const [revertOpen, setRevertOpen] = useState(false)
+  const [returnOpen, setReturnOpen] = useState(false)
+  const createAdminReturn = useCreateAdminReturn()
   const [isEditing, setIsEditing] = useState(false)
   const [editingItems, setEditingItems] = useState<Record<string, EditingItem>>({})
   const [editShippingCost, setEditShippingCost] = useState(1000)
@@ -209,7 +215,8 @@ export default function OrderDetailPage() {
   const sourceCfg = ORDER_SOURCES.find(s => s.value === order.order_source)
   const nextStatus = getNextStatus(order.order_status)
   const prevStatus = getPrevStatus(order.order_status)
-  const canCancel = order.order_status !== 'SHIPPED' && order.order_status !== 'DELIVERED' && order.order_status !== 'CANCELLED'
+  const canCancel = order.order_status !== 'DELIVERED' && order.order_status !== 'CANCELLED'
+  const canCreateReturn = order.order_status === 'SHIPPED' || order.order_status === 'DELIVERED'
   const canEdit = EDITABLE_STATUSES.includes(order.order_status)
   const needsPaymentProof = requiresPaymentConfirmation(order.payment_method) && order.order_status === 'PENDING'
   const confirmedPaymentTotal = paymentConfirmations.reduce((sum, c) => sum + c.amount, 0)
@@ -398,11 +405,38 @@ export default function OrderDetailPage() {
     )
   }
 
-  function handleCancel() {
-    cancelMutation.mutate(order!.id, {
-      onSuccess: () => { toast.success('Order cancelled'); setCancelOpen(false) },
-      onError: (err) => toast.error(`Failed: ${err.message}`),
-    })
+  function handleCancel(category: string, notes: string) {
+    cancelMutation.mutate(
+      { orderId: order!.id, cancellationCategory: category, cancellationNotes: notes || undefined },
+      {
+        onSuccess: () => { toast.success('Order cancelled'); setCancelOpen(false) },
+        onError: (err) => toast.error(`Failed: ${err.message}`),
+      },
+    )
+  }
+
+  function handleCreateReturn(data: {
+    reason_category: string
+    description: string
+    items: { order_item_id: string; item_id?: string | null }[]
+  }) {
+    createAdminReturn.mutate(
+      {
+        order_id: order!.id,
+        customer_id: order!.customer_id,
+        reason_category: data.reason_category,
+        description: data.description,
+        items: data.items,
+      },
+      {
+        onSuccess: (result) => {
+          toast.success(`Return ${result.return_code} created`)
+          setReturnOpen(false)
+          navigate(`/admin/returns/${result.return_request_id}`)
+        },
+        onError: (err) => toast.error(`Failed: ${err.message}`),
+      },
+    )
   }
 
   // IDs of inventory items already in the order (to prevent duplicates)
@@ -619,6 +653,12 @@ export default function OrderDetailPage() {
                   )}
                 </div>
               )}
+              {!isEditing && canCreateReturn && (
+                <Button variant="outline" size="sm" onClick={() => setReturnOpen(true)}>
+                  <RotateCcw className="h-4 w-4 mr-1" />
+                  Create Return
+                </Button>
+              )}
               {!isEditing && canCancel && (
                 <Button variant="destructive" size="sm" onClick={() => setCancelOpen(true)}>
                   Cancel Order
@@ -677,8 +717,16 @@ export default function OrderDetailPage() {
             })}
           </div>
           {order.order_status === 'CANCELLED' && (
-            <div className="mt-4 text-center">
+            <div className="mt-4 text-center space-y-1">
               <StatusBadge label="Cancelled" color="bg-red-100 text-red-800 border-red-300" />
+              {(order as Record<string, unknown>).cancellation_category && (
+                <div className="text-sm text-muted-foreground">
+                  Reason: {getCancellationCategoryLabel((order as Record<string, unknown>).cancellation_category as string)}
+                  {(order as Record<string, unknown>).cancellation_notes && (
+                    <span className="ml-1">— {(order as Record<string, unknown>).cancellation_notes as string}</span>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </CardContent>
@@ -1437,14 +1485,21 @@ export default function OrderDetailPage() {
         isLoading={statusMutation.isPending}
       />
 
-      <ConfirmDialog
+      <CancelOrderDialog
         open={cancelOpen}
         onOpenChange={setCancelOpen}
-        title="Cancel Order"
-        description={`Are you sure you want to cancel order ${order.order_code}? This action cannot be undone. Reserved items will be returned to available stock.`}
+        orderCode={order.order_code}
         onConfirm={handleCancel}
-        isLoading={cancelMutation.isPending}
-        variant="destructive"
+        isPending={cancelMutation.isPending}
+      />
+
+      <AdminReturnDialog
+        open={returnOpen}
+        onOpenChange={setReturnOpen}
+        orderCode={order.order_code}
+        orderItems={orderItems as ReturnableItem[]}
+        onConfirm={handleCreateReturn}
+        isPending={createAdminReturn.isPending}
       />
 
       <ConfirmDialog

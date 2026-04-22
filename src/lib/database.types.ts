@@ -1,4 +1,3 @@
-Initialising login role...
 export type Json =
   | string
   | number
@@ -13,33 +12,214 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
+      accessories: {
+        Row: {
+          accessory_code: string
+          active: boolean
+          brand: string | null
+          category_id: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_live_selling: boolean
+          low_stock_threshold: number
+          name: string
+          selling_price: number
+          shop_visible: boolean
+          stock_quantity: number
+          updated_at: string
+        }
+        Insert: {
+          accessory_code: string
+          active?: boolean
+          brand?: string | null
+          category_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_live_selling?: boolean
+          low_stock_threshold?: number
+          name: string
+          selling_price: number
+          shop_visible?: boolean
+          stock_quantity?: number
+          updated_at?: string
+        }
+        Update: {
+          accessory_code?: string
+          active?: boolean
+          brand?: string | null
+          category_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_live_selling?: boolean
+          low_stock_threshold?: number
+          name?: string
+          selling_price?: number
+          shop_visible?: boolean
+          stock_quantity?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accessories_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      accessory_media: {
+        Row: {
+          accessory_id: string
+          created_at: string
+          file_url: string
+          id: string
+          media_type: string
+          sort_order: number
+        }
+        Insert: {
+          accessory_id: string
+          created_at?: string
+          file_url: string
+          id?: string
+          media_type?: string
+          sort_order?: number
+        }
+        Update: {
+          accessory_id?: string
+          created_at?: string
+          file_url?: string
+          id?: string
+          media_type?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accessory_media_accessory_id_fkey"
+            columns: ["accessory_id"]
+            isOneToOne: false
+            referencedRelation: "accessories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      accessory_stock_adjustments: {
+        Row: {
+          accessory_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          quantity: number
+          reason: Database["public"]["Enums"]["accessory_adjustment_reason"]
+          supplier_id: string | null
+        }
+        Insert: {
+          accessory_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          quantity: number
+          reason: Database["public"]["Enums"]["accessory_adjustment_reason"]
+          supplier_id?: string | null
+        }
+        Update: {
+          accessory_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          quantity?: number
+          reason?: Database["public"]["Enums"]["accessory_adjustment_reason"]
+          supplier_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accessory_stock_adjustments_accessory_id_fkey"
+            columns: ["accessory_id"]
+            isOneToOne: false
+            referencedRelation: "accessories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accessory_stock_adjustments_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      accessory_stock_entries: {
+        Row: {
+          accessory_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          quantity: number
+          receipt_id: string | null
+          received_at: string
+          supplier_id: string | null
+          total_cost: number
+          unit_cost: number
+        }
+        Insert: {
+          accessory_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          quantity: number
+          receipt_id?: string | null
+          received_at?: string
+          supplier_id?: string | null
+          total_cost: number
+          unit_cost: number
+        }
+        Update: {
+          accessory_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          quantity?: number
+          receipt_id?: string | null
+          received_at?: string
+          supplier_id?: string | null
+          total_cost?: number
+          unit_cost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accessory_stock_entries_accessory_id_fkey"
+            columns: ["accessory_id"]
+            isOneToOne: false
+            referencedRelation: "accessories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accessory_stock_entries_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "intake_receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accessory_stock_entries_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_configurations: {
         Row: {
           api_endpoint_url: string
@@ -118,6 +298,113 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_providers: {
+        Row: {
+          api_key_encrypted: string
+          created_at: string
+          id: string
+          is_active: boolean
+          model_id: string
+          name: string
+          provider: string
+          purpose: string
+        }
+        Insert: {
+          api_key_encrypted: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          model_id: string
+          name: string
+          provider: string
+          purpose?: string
+        }
+        Update: {
+          api_key_encrypted?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          model_id?: string
+          name?: string
+          provider?: string
+          purpose?: string
+        }
+        Relationships: []
+      }
+      automated_message_queue: {
+        Row: {
+          content: string | null
+          conversation_id: string | null
+          created_at: string
+          customer_id: string | null
+          error_details: Json | null
+          id: string
+          message_type: Database["public"]["Enums"]["message_type"]
+          order_id: string | null
+          processed_at: string | null
+          scheduled_at: string
+          status: Database["public"]["Enums"]["queue_status"]
+          template_id: string | null
+        }
+        Insert: {
+          content?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          customer_id?: string | null
+          error_details?: Json | null
+          id?: string
+          message_type: Database["public"]["Enums"]["message_type"]
+          order_id?: string | null
+          processed_at?: string | null
+          scheduled_at?: string
+          status?: Database["public"]["Enums"]["queue_status"]
+          template_id?: string | null
+        }
+        Update: {
+          content?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          customer_id?: string | null
+          error_details?: Json | null
+          id?: string
+          message_type?: Database["public"]["Enums"]["message_type"]
+          order_id?: string | null
+          processed_at?: string | null
+          scheduled_at?: string
+          status?: Database["public"]["Enums"]["queue_status"]
+          template_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automated_message_queue_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automated_message_queue_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automated_message_queue_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automated_message_queue_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "messaging_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categories: {
         Row: {
           created_at: string
@@ -150,6 +437,84 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      conversations: {
+        Row: {
+          ai_enabled: boolean
+          assigned_staff_id: string | null
+          channel: Database["public"]["Enums"]["message_channel"]
+          contact_avatar_url: string | null
+          contact_name: string | null
+          contact_platform_id: string | null
+          created_at: string
+          customer_id: string | null
+          draft_pending_since: string | null
+          folder_id: string | null
+          id: string
+          is_archived: boolean
+          last_message_at: string | null
+          missive_conversation_id: string
+          needs_human_review: boolean
+          unmatched_contact: boolean
+          unread_count: number
+          updated_at: string
+        }
+        Insert: {
+          ai_enabled?: boolean
+          assigned_staff_id?: string | null
+          channel?: Database["public"]["Enums"]["message_channel"]
+          contact_avatar_url?: string | null
+          contact_name?: string | null
+          contact_platform_id?: string | null
+          created_at?: string
+          customer_id?: string | null
+          draft_pending_since?: string | null
+          folder_id?: string | null
+          id?: string
+          is_archived?: boolean
+          last_message_at?: string | null
+          missive_conversation_id: string
+          needs_human_review?: boolean
+          unmatched_contact?: boolean
+          unread_count?: number
+          updated_at?: string
+        }
+        Update: {
+          ai_enabled?: boolean
+          assigned_staff_id?: string | null
+          channel?: Database["public"]["Enums"]["message_channel"]
+          contact_avatar_url?: string | null
+          contact_name?: string | null
+          contact_platform_id?: string | null
+          created_at?: string
+          customer_id?: string | null
+          draft_pending_since?: string | null
+          folder_id?: string | null
+          id?: string
+          is_archived?: boolean
+          last_message_at?: string | null
+          missive_conversation_id?: string
+          needs_human_review?: boolean
+          unmatched_contact?: boolean
+          unread_count?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "message_folders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       customer_addresses: {
         Row: {
@@ -201,6 +566,7 @@ export type Database = {
           created_at: string
           customer_code: string
           email: string | null
+          fb_name: string | null
           first_name: string | null
           id: string
           id_document_url: string | null
@@ -208,6 +574,7 @@ export type Database = {
           id_verified_at: string | null
           is_seller: boolean
           last_name: string
+          missive_contact_id: string | null
           phone: string | null
           pin_hash: string
           shipping_address: Json | null
@@ -221,6 +588,7 @@ export type Database = {
           created_at?: string
           customer_code: string
           email?: string | null
+          fb_name?: string | null
           first_name?: string | null
           id?: string
           id_document_url?: string | null
@@ -228,6 +596,7 @@ export type Database = {
           id_verified_at?: string | null
           is_seller?: boolean
           last_name: string
+          missive_contact_id?: string | null
           phone?: string | null
           pin_hash: string
           shipping_address?: Json | null
@@ -241,6 +610,7 @@ export type Database = {
           created_at?: string
           customer_code?: string
           email?: string | null
+          fb_name?: string | null
           first_name?: string | null
           id?: string
           id_document_url?: string | null
@@ -248,6 +618,7 @@ export type Database = {
           id_verified_at?: string | null
           is_seller?: boolean
           last_name?: string
+          missive_contact_id?: string | null
           phone?: string | null
           pin_hash?: string
           shipping_address?: Json | null
@@ -414,6 +785,131 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      inventory_snapshot_items: {
+        Row: {
+          additional_costs: number
+          brand: string | null
+          condition_grade: string | null
+          created_at: string
+          id: string
+          item_code: string
+          item_status: string
+          item_type: string
+          model_name: string | null
+          purchase_price: number
+          snapshot_id: string
+          source_type: string | null
+          stock_quantity: number | null
+          total_cost: number
+          unit_cost: number | null
+        }
+        Insert: {
+          additional_costs?: number
+          brand?: string | null
+          condition_grade?: string | null
+          created_at?: string
+          id?: string
+          item_code: string
+          item_status: string
+          item_type?: string
+          model_name?: string | null
+          purchase_price?: number
+          snapshot_id: string
+          source_type?: string | null
+          stock_quantity?: number | null
+          total_cost?: number
+          unit_cost?: number | null
+        }
+        Update: {
+          additional_costs?: number
+          brand?: string | null
+          condition_grade?: string | null
+          created_at?: string
+          id?: string
+          item_code?: string
+          item_status?: string
+          item_type?: string
+          model_name?: string | null
+          purchase_price?: number
+          snapshot_id?: string
+          source_type?: string | null
+          stock_quantity?: number | null
+          total_cost?: number
+          unit_cost?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_snapshot_items_snapshot_id_fkey"
+            columns: ["snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_snapshots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_snapshots: {
+        Row: {
+          created_at: string
+          generated_at: string
+          generated_by: string | null
+          grand_total: number
+          id: string
+          period_label: string
+          snapshot_date: string
+          summary_by_brand: Json
+          summary_by_grade: Json
+          summary_by_source: Json
+          summary_by_status: Json
+          total_accessory_skus: number
+          total_accessory_units: number
+          total_accessory_value: number
+          total_additional_costs: number
+          total_inventory_value: number
+          total_items: number
+          total_purchase_cost: number
+        }
+        Insert: {
+          created_at?: string
+          generated_at?: string
+          generated_by?: string | null
+          grand_total: number
+          id?: string
+          period_label: string
+          snapshot_date: string
+          summary_by_brand: Json
+          summary_by_grade: Json
+          summary_by_source: Json
+          summary_by_status: Json
+          total_accessory_skus: number
+          total_accessory_units: number
+          total_accessory_value: number
+          total_additional_costs: number
+          total_inventory_value: number
+          total_items: number
+          total_purchase_cost: number
+        }
+        Update: {
+          created_at?: string
+          generated_at?: string
+          generated_by?: string | null
+          grand_total?: number
+          id?: string
+          period_label?: string
+          snapshot_date?: string
+          summary_by_brand?: Json
+          summary_by_grade?: Json
+          summary_by_source?: Json
+          summary_by_status?: Json
+          total_accessory_skus?: number
+          total_accessory_units?: number
+          total_accessory_value?: number
+          total_additional_costs?: number
+          total_inventory_value?: number
+          total_items?: number
+          total_purchase_cost?: number
+        }
+        Relationships: []
       }
       item_audit_logs: {
         Row: {
@@ -624,6 +1120,7 @@ export type Database = {
           inspected_by: string | null
           inspection_checklist: Json | null
           intake_receipt_id: string | null
+          is_live_selling: boolean
           is_unlocked: boolean | null
           item_code: string
           item_status: Database["public"]["Enums"]["item_status"]
@@ -683,6 +1180,7 @@ export type Database = {
           inspected_by?: string | null
           inspection_checklist?: Json | null
           intake_receipt_id?: string | null
+          is_live_selling?: boolean
           is_unlocked?: boolean | null
           item_code: string
           item_status?: Database["public"]["Enums"]["item_status"]
@@ -742,6 +1240,7 @@ export type Database = {
           inspected_by?: string | null
           inspection_checklist?: Json | null
           intake_receipt_id?: string | null
+          is_live_selling?: boolean
           is_unlocked?: boolean | null
           item_code?: string
           item_status?: Database["public"]["Enums"]["item_status"]
@@ -987,8 +1486,209 @@ export type Database = {
           },
         ]
       }
+      knowledge_base: {
+        Row: {
+          category: string
+          content: string
+          created_at: string
+          entry_type: Database["public"]["Enums"]["kb_entry_type"]
+          id: string
+          is_active: boolean
+          sort_order: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          content: string
+          created_at?: string
+          entry_type?: Database["public"]["Enums"]["kb_entry_type"]
+          id?: string
+          is_active?: boolean
+          sort_order?: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          content?: string
+          created_at?: string
+          entry_type?: Database["public"]["Enums"]["kb_entry_type"]
+          id?: string
+          is_active?: boolean
+          sort_order?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      message_folders: {
+        Row: {
+          created_at: string
+          icon: string
+          id: string
+          is_system: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          icon?: string
+          id?: string
+          is_system?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          icon?: string
+          id?: string
+          is_system?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      messages: {
+        Row: {
+          ai_confidence: number | null
+          ai_context_summary: string | null
+          attachments: Json | null
+          content: string
+          conversation_id: string
+          created_at: string
+          error_details: Json | null
+          id: string
+          message_type: Database["public"]["Enums"]["message_type"]
+          missive_message_id: string | null
+          role: Database["public"]["Enums"]["message_role"]
+          sent_by: string | null
+          status: Database["public"]["Enums"]["message_status"]
+        }
+        Insert: {
+          ai_confidence?: number | null
+          ai_context_summary?: string | null
+          attachments?: Json | null
+          content: string
+          conversation_id: string
+          created_at?: string
+          error_details?: Json | null
+          id?: string
+          message_type?: Database["public"]["Enums"]["message_type"]
+          missive_message_id?: string | null
+          role: Database["public"]["Enums"]["message_role"]
+          sent_by?: string | null
+          status?: Database["public"]["Enums"]["message_status"]
+        }
+        Update: {
+          ai_confidence?: number | null
+          ai_context_summary?: string | null
+          attachments?: Json | null
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          error_details?: Json | null
+          id?: string
+          message_type?: Database["public"]["Enums"]["message_type"]
+          missive_message_id?: string | null
+          role?: Database["public"]["Enums"]["message_role"]
+          sent_by?: string | null
+          status?: Database["public"]["Enums"]["message_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messaging_persona: {
+        Row: {
+          created_at: string
+          greeting_template: string | null
+          id: string
+          is_active: boolean
+          language_style: string
+          name: string
+          system_prompt: string
+          updated_at: string
+          use_emojis: boolean
+        }
+        Insert: {
+          created_at?: string
+          greeting_template?: string | null
+          id?: string
+          is_active?: boolean
+          language_style?: string
+          name?: string
+          system_prompt: string
+          updated_at?: string
+          use_emojis?: boolean
+        }
+        Update: {
+          created_at?: string
+          greeting_template?: string | null
+          id?: string
+          is_active?: boolean
+          language_style?: string
+          name?: string
+          system_prompt?: string
+          updated_at?: string
+          use_emojis?: boolean
+        }
+        Relationships: []
+      }
+      messaging_templates: {
+        Row: {
+          attachments: Json | null
+          content_en: string
+          content_ja: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          message_type: Database["public"]["Enums"]["message_type"]
+          name: string
+          updated_at: string
+          variables: string[]
+        }
+        Insert: {
+          attachments?: Json | null
+          content_en: string
+          content_ja: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          message_type: Database["public"]["Enums"]["message_type"]
+          name: string
+          updated_at?: string
+          variables?: string[]
+        }
+        Update: {
+          attachments?: Json | null
+          content_en?: string
+          content_ja?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          message_type?: Database["public"]["Enums"]["message_type"]
+          name?: string
+          updated_at?: string
+          variables?: string[]
+        }
+        Relationships: []
+      }
       offer_items: {
         Row: {
+          accessory_id: string | null
           added_by: string
           created_at: string
           description: string
@@ -999,6 +1699,7 @@ export type Database = {
           unit_price: number
         }
         Insert: {
+          accessory_id?: string | null
           added_by?: string
           created_at?: string
           description: string
@@ -1009,6 +1710,7 @@ export type Database = {
           unit_price: number
         }
         Update: {
+          accessory_id?: string | null
           added_by?: string
           created_at?: string
           description?: string
@@ -1019,6 +1721,13 @@ export type Database = {
           unit_price?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "offer_items_accessory_id_fkey"
+            columns: ["accessory_id"]
+            isOneToOne: false
+            referencedRelation: "accessories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "offer_items_item_id_fkey"
             columns: ["item_id"]
@@ -1151,6 +1860,7 @@ export type Database = {
       }
       order_items: {
         Row: {
+          accessory_id: string | null
           description: string | null
           discount: number
           id: string
@@ -1162,6 +1872,7 @@ export type Database = {
           unit_price: number
         }
         Insert: {
+          accessory_id?: string | null
           description?: string | null
           discount?: number
           id?: string
@@ -1173,6 +1884,7 @@ export type Database = {
           unit_price?: number
         }
         Update: {
+          accessory_id?: string | null
           description?: string | null
           discount?: number
           id?: string
@@ -1184,6 +1896,13 @@ export type Database = {
           unit_price?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "order_items_accessory_id_fkey"
+            columns: ["accessory_id"]
+            isOneToOne: false
+            referencedRelation: "accessories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "order_items_item_id_fkey"
             columns: ["item_id"]
@@ -1202,6 +1921,8 @@ export type Database = {
       }
       orders: {
         Row: {
+          cancellation_category: string | null
+          cancellation_notes: string | null
           created_at: string
           customer_id: string
           delivery_box_count: number
@@ -1220,6 +1941,7 @@ export type Database = {
           payment_method: string | null
           payment_method_code: number | null
           quantity: number
+          review_requested_at: string | null
           sell_group_id: string | null
           shipped_date: string | null
           shipping_address: string
@@ -1231,6 +1953,8 @@ export type Database = {
           yamato_status: string | null
         }
         Insert: {
+          cancellation_category?: string | null
+          cancellation_notes?: string | null
           created_at?: string
           customer_id: string
           delivery_box_count?: number
@@ -1249,6 +1973,7 @@ export type Database = {
           payment_method?: string | null
           payment_method_code?: number | null
           quantity: number
+          review_requested_at?: string | null
           sell_group_id?: string | null
           shipped_date?: string | null
           shipping_address: string
@@ -1260,6 +1985,8 @@ export type Database = {
           yamato_status?: string | null
         }
         Update: {
+          cancellation_category?: string | null
+          cancellation_notes?: string | null
           created_at?: string
           customer_id?: string
           delivery_box_count?: number
@@ -1278,6 +2005,7 @@ export type Database = {
           payment_method?: string | null
           payment_method_code?: number | null
           quantity?: number
+          review_requested_at?: string | null
           sell_group_id?: string | null
           shipped_date?: string | null
           shipping_address?: string
@@ -1790,6 +2518,7 @@ export type Database = {
       }
       staff_profiles: {
         Row: {
+          avatar_url: string | null
           created_at: string
           display_name: string
           email: string
@@ -1799,6 +2528,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          avatar_url?: string | null
           created_at?: string
           display_name: string
           email: string
@@ -1808,6 +2538,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          avatar_url?: string | null
           created_at?: string
           display_name?: string
           email?: string
@@ -1848,6 +2579,36 @@ export type Database = {
         }
         Relationships: []
       }
+      system_alerts: {
+        Row: {
+          alert_type: string
+          created_at: string
+          details: Json | null
+          id: string
+          message: string
+          resolved: boolean
+          resolved_at: string | null
+        }
+        Insert: {
+          alert_type: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          message: string
+          resolved?: boolean
+          resolved_at?: string | null
+        }
+        Update: {
+          alert_type?: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          message?: string
+          resolved?: boolean
+          resolved_at?: string | null
+        }
+        Relationships: []
+      }
       system_settings: {
         Row: {
           description: string | null
@@ -1880,6 +2641,17 @@ export type Database = {
         Returns: boolean
       }
       check_yamato_tracking: { Args: never; Returns: undefined }
+      create_accessory_intake_batch: {
+        Args: {
+          p_date_received: string
+          p_invoice_file_url: string
+          p_line_items: Json
+          p_notes: string
+          p_supplier_contact_snapshot: string
+          p_supplier_id: string
+        }
+        Returns: Json
+      }
       create_intake_batch: {
         Args: {
           p_date_received: string
@@ -1909,19 +2681,88 @@ export type Database = {
           trigger_name: string
         }[]
       }
+      decrement_accessory_stock: {
+        Args: { p_accessory_id: string; p_quantity: number }
+        Returns: number
+      }
       expire_pending_offers: { Args: never; Returns: undefined }
+      fail_stale_sending_messages: { Args: never; Returns: number }
       generate_code: {
         Args: { prefix: string; seq_name: string }
         Returns: string
+      }
+      generate_inventory_snapshot: {
+        Args: { p_date?: string }
+        Returns: string
+      }
+      generate_pending_drafts: { Args: never; Returns: undefined }
+      get_available_brands: {
+        Args: never
+        Returns: {
+          brand: string
+        }[]
+      }
+      get_awaiting_reply_counts: {
+        Args: never
+        Returns: {
+          count: number
+          folder_id: string
+        }[]
+      }
+      increment_accessory_stock: {
+        Args: { p_accessory_id: string; p_quantity: number }
+        Returns: number
       }
       match_product_model: { Args: { p_description: string }; Returns: string }
       parse_specs_from_description: {
         Args: { p_description: string }
         Returns: Json
       }
+      process_message_queue: { Args: never; Returns: undefined }
+      queue_review_requests: { Args: never; Returns: undefined }
+      search_available_inventory: {
+        Args: {
+          filter_brand?: string
+          filter_category_id?: string
+          price_max?: number
+          price_min?: number
+          result_limit?: number
+          search_query: string
+        }
+        Returns: {
+          brand: string
+          color: string
+          condition_grade: string
+          condition_notes: string
+          cpu: string
+          first_item_display_url: string
+          first_item_thumb_url: string
+          first_product_media_url: string
+          gpu: string
+          hero_media_url: string
+          id: string
+          item_code: string
+          model_name: string
+          model_number: string
+          os_family: string
+          product_id: string
+          ram_gb: string
+          screen_size: number
+          selling_price: number
+          storage_gb: string
+          year: number
+        }[]
+      }
+      trigger_message_sync: { Args: never; Returns: undefined }
     }
     Enums: {
       ac_adapter_status: "CORRECT" | "INCORRECT" | "MISSING"
+      accessory_adjustment_reason:
+        | "DEFECTIVE"
+        | "RETURNED_TO_SUPPLIER"
+        | "DAMAGED"
+        | "WRITE_OFF"
+        | "CORRECTION"
       battery_condition: "GOOD" | "FAIR" | "POOR"
       body_condition: "GOOD" | "FAIR" | "POOR" | "DAMAGED"
       condition_grade: "S" | "A" | "B" | "C" | "D" | "J"
@@ -1954,8 +2795,13 @@ export type Database = {
         | "PAID"
         | "REJECTED"
         | "CANCELLED"
+      kb_entry_type: "knowledge" | "guardrail"
       media_role: "hero" | "gallery" | "video"
       media_type: "image" | "video"
+      message_channel: "facebook" | "email" | "sms"
+      message_role: "customer" | "assistant" | "staff" | "system"
+      message_status: "DRAFT" | "SENDING" | "SENT" | "FAILED" | "REJECTED"
+      message_type: "REPLY" | "REVIEW_REQUEST" | "DELIVERY_ALERT"
       offer_status: "PENDING" | "CLAIMED" | "EXPIRED" | "CANCELLED"
       order_source: "SHOP" | "LIVE_SELLING" | "WALK_IN" | "FB" | "YOUTUBE"
       order_status:
@@ -1966,10 +2812,15 @@ export type Database = {
         | "DELIVERED"
         | "CANCELLED"
       product_status: "DRAFT" | "ACTIVE"
+      queue_status: "PENDING" | "PROCESSING" | "SENT" | "FAILED"
       screen_condition: "GOOD" | "FAIR" | "POOR" | "CRACKED"
       source_type: "AUCTION" | "WHOLESALE" | "KAITORI"
       staff_role: "ADMIN" | "VA" | "IT" | "LIVE_SELLER"
-      supplier_type: "auction" | "wholesaler" | "individual_kaitori"
+      supplier_type:
+        | "auction"
+        | "wholesaler"
+        | "individual_kaitori"
+        | "accessory"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2095,12 +2946,16 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       ac_adapter_status: ["CORRECT", "INCORRECT", "MISSING"],
+      accessory_adjustment_reason: [
+        "DEFECTIVE",
+        "RETURNED_TO_SUPPLIER",
+        "DAMAGED",
+        "WRITE_OFF",
+        "CORRECTION",
+      ],
       battery_condition: ["GOOD", "FAIR", "POOR"],
       body_condition: ["GOOD", "FAIR", "POOR", "DAMAGED"],
       condition_grade: ["S", "A", "B", "C", "D", "J"],
@@ -2136,8 +2991,13 @@ export const Constants = {
         "REJECTED",
         "CANCELLED",
       ],
+      kb_entry_type: ["knowledge", "guardrail"],
       media_role: ["hero", "gallery", "video"],
       media_type: ["image", "video"],
+      message_channel: ["facebook", "email", "sms"],
+      message_role: ["customer", "assistant", "staff", "system"],
+      message_status: ["DRAFT", "SENDING", "SENT", "FAILED", "REJECTED"],
+      message_type: ["REPLY", "REVIEW_REQUEST", "DELIVERY_ALERT"],
       offer_status: ["PENDING", "CLAIMED", "EXPIRED", "CANCELLED"],
       order_source: ["SHOP", "LIVE_SELLING", "WALK_IN", "FB", "YOUTUBE"],
       order_status: [
@@ -2149,12 +3009,16 @@ export const Constants = {
         "CANCELLED",
       ],
       product_status: ["DRAFT", "ACTIVE"],
+      queue_status: ["PENDING", "PROCESSING", "SENT", "FAILED"],
       screen_condition: ["GOOD", "FAIR", "POOR", "CRACKED"],
       source_type: ["AUCTION", "WHOLESALE", "KAITORI"],
       staff_role: ["ADMIN", "VA", "IT", "LIVE_SELLER"],
-      supplier_type: ["auction", "wholesaler", "individual_kaitori"],
+      supplier_type: [
+        "auction",
+        "wholesaler",
+        "individual_kaitori",
+        "accessory",
+      ],
     },
   },
 } as const
-A new version of Supabase CLI is available: v2.84.2 (currently installed v2.75.0)
-We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli

@@ -326,6 +326,21 @@ export function getOfferStatusConfig(status: OfferStatus) {
   return OFFER_STATUSES.find(s => s.value === status) ?? { value: status, label: status, color: 'bg-gray-100 text-gray-800 border-gray-300' }
 }
 
+// --- Order Cancellation ---
+
+export const CANCELLATION_CATEGORIES = [
+  { value: 'CUSTOMER_REFUSED', label: 'Customer Did Not Accept' },
+  { value: 'WRONG_ITEM', label: 'Wrong Item Sent' },
+  { value: 'HARDWARE_PROBLEM', label: 'Hardware Problem' },
+  { value: 'OTHER', label: 'Others' },
+] as const
+
+export type CancellationCategory = typeof CANCELLATION_CATEGORIES[number]['value']
+
+export function getCancellationCategoryLabel(value: string | null | undefined): string {
+  return CANCELLATION_CATEGORIES.find(c => c.value === value)?.label ?? '—'
+}
+
 // --- Returns ---
 
 export type ReturnStatus = 'SUBMITTED' | 'APPROVED' | 'SHIPPED_BACK' | 'RECEIVED' | 'INSPECTING' | 'RESOLVED' | 'REJECTED' | 'CANCELLED'
