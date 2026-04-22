@@ -209,52 +209,17 @@ export type KaitoriMediaRole = Enums['kaitori_media_role']
 export type IntakeAdjustmentType = Enums['intake_adjustment_type']
 export type OfferStatus = Enums['offer_status']
 
-// Manually defined until DB types are regenerated
-export type SupplierReturnStatus = 'REQUESTED' | 'RETURNED' | 'RESOLVED'
-export type SupplierReturnResolution = 'EXCHANGE' | 'REFUND'
-export type RefundPaymentMethod = 'BANK_TRANSFER' | 'CASH'
-export type InventoryRemovalReason = 'MISSING' | 'OFFICE_USE' | 'DAMAGED' | 'GIFTED' | 'OTHER'
-export type InventoryRemovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
+export type SupplierReturnStatus = Enums['supplier_return_status']
+export type SupplierReturnResolution = Enums['supplier_return_resolution']
+export type RefundPaymentMethod = Enums['refund_payment_method']
+export type InventoryRemovalReason = Enums['inventory_removal_reason']
+export type InventoryRemovalStatus = Enums['inventory_removal_status']
 
-export interface SupplierReturn {
-  id: string
-  return_code: string
-  item_id: string
-  supplier_id: string
-  intake_receipt_id: string | null
-  receipt_file_url: string | null
-  reason: string
-  return_status: SupplierReturnStatus
-  resolution: SupplierReturnResolution | null
-  refund_amount: number | null
-  refund_payment_method: RefundPaymentMethod | null
-  refund_received: boolean
-  refund_received_at: string | null
-  staff_notes: string | null
-  requested_by: string | null
-  requested_at: string
-  returned_at: string | null
-  resolved_at: string | null
-  created_at: string
-  updated_at: string
-}
+export type SupplierReturn = Tables['supplier_returns']['Row']
+export type SupplierReturnInsert = Tables['supplier_returns']['Insert']
 
-export interface InventoryRemoval {
-  id: string
-  removal_code: string
-  item_id: string
-  reason: InventoryRemovalReason
-  reason_text: string | null
-  notes: string | null
-  removal_status: InventoryRemovalStatus
-  requested_by: string | null
-  approved_by: string | null
-  requested_at: string
-  decided_at: string | null
-  rejection_reason: string | null
-  created_at: string
-  updated_at: string
-}
+export type InventoryRemoval = Tables['inventory_removals']['Row']
+export type InventoryRemovalInsert = Tables['inventory_removals']['Insert']
 
 // Joined / composite types used across the app
 export type ItemWithRelations = Item & {

@@ -405,6 +405,24 @@ export type Database = {
           },
         ]
       }
+      canonical_brands: {
+        Row: {
+          canonical_name: string
+          id: string
+          lower_name: string
+        }
+        Insert: {
+          canonical_name: string
+          id?: string
+          lower_name: string
+        }
+        Update: {
+          canonical_name?: string
+          id?: string
+          lower_name?: string
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           created_at: string
@@ -782,6 +800,65 @@ export type Database = {
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_removals: {
+        Row: {
+          approved_by: string | null
+          created_at: string
+          decided_at: string | null
+          id: string
+          item_id: string
+          notes: string | null
+          reason: Database["public"]["Enums"]["inventory_removal_reason"]
+          reason_text: string | null
+          rejection_reason: string | null
+          removal_code: string
+          removal_status: Database["public"]["Enums"]["inventory_removal_status"]
+          requested_at: string
+          requested_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          approved_by?: string | null
+          created_at?: string
+          decided_at?: string | null
+          id?: string
+          item_id: string
+          notes?: string | null
+          reason: Database["public"]["Enums"]["inventory_removal_reason"]
+          reason_text?: string | null
+          rejection_reason?: string | null
+          removal_code: string
+          removal_status?: Database["public"]["Enums"]["inventory_removal_status"]
+          requested_at?: string
+          requested_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          approved_by?: string | null
+          created_at?: string
+          decided_at?: string | null
+          id?: string
+          item_id?: string
+          notes?: string | null
+          reason?: Database["public"]["Enums"]["inventory_removal_reason"]
+          reason_text?: string | null
+          rejection_reason?: string | null
+          removal_code?: string
+          removal_status?: Database["public"]["Enums"]["inventory_removal_status"]
+          requested_at?: string
+          requested_by?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_removals_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
             referencedColumns: ["id"]
           },
         ]
@@ -2549,6 +2626,109 @@ export type Database = {
         }
         Relationships: []
       }
+      supplier_returns: {
+        Row: {
+          created_at: string
+          id: string
+          intake_receipt_id: string | null
+          item_id: string
+          reason: string
+          receipt_file_url: string | null
+          refund_amount: number | null
+          refund_payment_method:
+            | Database["public"]["Enums"]["refund_payment_method"]
+            | null
+          refund_received: boolean | null
+          refund_received_at: string | null
+          requested_at: string
+          requested_by: string | null
+          resolution:
+            | Database["public"]["Enums"]["supplier_return_resolution"]
+            | null
+          resolved_at: string | null
+          return_code: string
+          return_status: Database["public"]["Enums"]["supplier_return_status"]
+          returned_at: string | null
+          staff_notes: string | null
+          supplier_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          intake_receipt_id?: string | null
+          item_id: string
+          reason: string
+          receipt_file_url?: string | null
+          refund_amount?: number | null
+          refund_payment_method?:
+            | Database["public"]["Enums"]["refund_payment_method"]
+            | null
+          refund_received?: boolean | null
+          refund_received_at?: string | null
+          requested_at?: string
+          requested_by?: string | null
+          resolution?:
+            | Database["public"]["Enums"]["supplier_return_resolution"]
+            | null
+          resolved_at?: string | null
+          return_code: string
+          return_status?: Database["public"]["Enums"]["supplier_return_status"]
+          returned_at?: string | null
+          staff_notes?: string | null
+          supplier_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          intake_receipt_id?: string | null
+          item_id?: string
+          reason?: string
+          receipt_file_url?: string | null
+          refund_amount?: number | null
+          refund_payment_method?:
+            | Database["public"]["Enums"]["refund_payment_method"]
+            | null
+          refund_received?: boolean | null
+          refund_received_at?: string | null
+          requested_at?: string
+          requested_by?: string | null
+          resolution?:
+            | Database["public"]["Enums"]["supplier_return_resolution"]
+            | null
+          resolved_at?: string | null
+          return_code?: string
+          return_status?: Database["public"]["Enums"]["supplier_return_status"]
+          returned_at?: string | null
+          staff_notes?: string | null
+          supplier_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_returns_intake_receipt_id_fkey"
+            columns: ["intake_receipt_id"]
+            isOneToOne: false
+            referencedRelation: "intake_receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_returns_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_returns_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suppliers: {
         Row: {
           contact_info: string | null
@@ -2714,6 +2894,7 @@ export type Database = {
         Returns: number
       }
       match_product_model: { Args: { p_description: string }; Returns: string }
+      normalize_brand: { Args: { input: string }; Returns: string }
       parse_specs_from_description: {
         Args: { p_description: string }
         Returns: Json
@@ -2768,6 +2949,13 @@ export type Database = {
       condition_grade: "S" | "A" | "B" | "C" | "D" | "J"
       device_category: "IPHONE" | "ANDROID" | "COMPUTER" | "TABLET" | "OTHER"
       intake_adjustment_type: "VOIDED" | "RETURNED" | "REFUNDED" | "MISSING"
+      inventory_removal_reason:
+        | "MISSING"
+        | "OFFICE_USE"
+        | "DAMAGED"
+        | "GIFTED"
+        | "OTHER"
+      inventory_removal_status: "PENDING" | "APPROVED" | "REJECTED"
       item_status:
         | "INTAKE"
         | "AVAILABLE"
@@ -2775,6 +2963,8 @@ export type Database = {
         | "MISSING"
         | "RESERVED"
         | "SOLD"
+        | "SUPPLIER_RETURN"
+        | "REMOVED"
       kaitori_delivery_method: "SHIP" | "WALK_IN"
       kaitori_media_role:
         | "front"
@@ -2813,9 +3003,12 @@ export type Database = {
         | "CANCELLED"
       product_status: "DRAFT" | "ACTIVE"
       queue_status: "PENDING" | "PROCESSING" | "SENT" | "FAILED"
+      refund_payment_method: "BANK_TRANSFER" | "CASH"
       screen_condition: "GOOD" | "FAIR" | "POOR" | "CRACKED"
       source_type: "AUCTION" | "WHOLESALE" | "KAITORI"
       staff_role: "ADMIN" | "VA" | "IT" | "LIVE_SELLER"
+      supplier_return_resolution: "EXCHANGE" | "REFUND"
+      supplier_return_status: "REQUESTED" | "RETURNED" | "RESOLVED"
       supplier_type:
         | "auction"
         | "wholesaler"
@@ -2961,6 +3154,14 @@ export const Constants = {
       condition_grade: ["S", "A", "B", "C", "D", "J"],
       device_category: ["IPHONE", "ANDROID", "COMPUTER", "TABLET", "OTHER"],
       intake_adjustment_type: ["VOIDED", "RETURNED", "REFUNDED", "MISSING"],
+      inventory_removal_reason: [
+        "MISSING",
+        "OFFICE_USE",
+        "DAMAGED",
+        "GIFTED",
+        "OTHER",
+      ],
+      inventory_removal_status: ["PENDING", "APPROVED", "REJECTED"],
       item_status: [
         "INTAKE",
         "AVAILABLE",
@@ -2968,6 +3169,8 @@ export const Constants = {
         "MISSING",
         "RESERVED",
         "SOLD",
+        "SUPPLIER_RETURN",
+        "REMOVED",
       ],
       kaitori_delivery_method: ["SHIP", "WALK_IN"],
       kaitori_media_role: [
@@ -3010,9 +3213,12 @@ export const Constants = {
       ],
       product_status: ["DRAFT", "ACTIVE"],
       queue_status: ["PENDING", "PROCESSING", "SENT", "FAILED"],
+      refund_payment_method: ["BANK_TRANSFER", "CASH"],
       screen_condition: ["GOOD", "FAIR", "POOR", "CRACKED"],
       source_type: ["AUCTION", "WHOLESALE", "KAITORI"],
       staff_role: ["ADMIN", "VA", "IT", "LIVE_SELLER"],
+      supplier_return_resolution: ["EXCHANGE", "REFUND"],
+      supplier_return_status: ["REQUESTED", "RETURNED", "RESOLVED"],
       supplier_type: [
         "auction",
         "wholesaler",
