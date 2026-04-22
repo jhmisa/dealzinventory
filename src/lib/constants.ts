@@ -330,8 +330,7 @@ export function getOfferStatusConfig(status: OfferStatus) {
 
 export const CANCELLATION_CATEGORIES = [
   { value: 'CUSTOMER_REFUSED', label: 'Customer Did Not Accept' },
-  { value: 'WRONG_ITEM', label: 'Wrong Item Sent' },
-  { value: 'HARDWARE_PROBLEM', label: 'Hardware Problem' },
+  { value: 'WRONG_ADDRESS', label: 'Wrong Address' },
   { value: 'OTHER', label: 'Others' },
 ] as const
 
