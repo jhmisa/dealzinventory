@@ -1145,9 +1145,11 @@ export default function OrderDetailPage() {
                           </div>
                         )
                       })() : oi.accessories ? (
-                        <div className="flex items-center gap-2">
-                          <CodeDisplay code={oi.accessories.accessory_code} className="text-[28px]" />
-                          <span className="text-sm text-muted-foreground truncate">{oi.description}</span>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <CodeDisplay code={oi.accessories.accessory_code} className="text-[28px]" />
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-0.5 pl-0.5">{oi.description}</p>
                         </div>
                       ) : (
                         <div className="flex items-center gap-2">
