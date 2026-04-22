@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Package, CheckCircle, Wrench, AlertTriangle, Plus, ClipboardList, QrCode, Lock, ShoppingBag } from 'lucide-react'
+import { Package, CheckCircle, Wrench, AlertTriangle, Plus, ClipboardList, QrCode, Lock, ShoppingBag, Undo2, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { PageHeader, StatusBadge, GradeBadge, CodeDisplay, CardSkeleton } from '@/components/shared'
@@ -14,6 +14,8 @@ const STATUS_ICONS: Record<string, React.ComponentType<{ className?: string }>> 
   REPAIR: Wrench,
   MISSING: AlertTriangle,
   SOLD: ShoppingBag,
+  SUPPLIER_RETURN: Undo2,
+  REMOVED: Trash2,
 }
 
 export default function DashboardPage() {
