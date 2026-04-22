@@ -123,6 +123,7 @@ interface OrderItemRow {
   packed_at: string | null
   packed_by: string | null
   items: { id: string; item_code: string; condition_grade: string; item_status: string } | null
+  accessories: { id: string; accessory_code: string; name: string; brand: string | null } | null
 }
 
 interface EditingItem {
@@ -1143,7 +1144,12 @@ export default function OrderDetailPage() {
                             )}
                           </div>
                         )
-                      })() : (
+                      })() : oi.accessories ? (
+                        <div className="flex items-center gap-2">
+                          <CodeDisplay code={oi.accessories.accessory_code} className="text-[28px]" />
+                          <span className="text-sm text-muted-foreground truncate">{oi.description}</span>
+                        </div>
+                      ) : (
                         <div className="flex items-center gap-2">
                           <span className="text-sm">{oi.description ?? 'Custom item'}</span>
                           <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">(custom)</span>
