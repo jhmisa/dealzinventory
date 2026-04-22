@@ -24,7 +24,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { processImage, tryProcessVideo, VIDEO_SPECS, getImageFormat } from '@/lib/media'
+import { processImage, tryProcessVideo, extractThumbnailFromVideo, VIDEO_SPECS, getImageFormat } from '@/lib/media'
 import { supabase } from '@/lib/supabase'
 import { useUpdateItem, useAddItemMedia, useUpdateItemMedia, useDeleteItemMedia } from '@/hooks/use-items'
 import { cn } from '@/lib/utils'
@@ -166,6 +166,7 @@ export function UnifiedGalleryCard({ item, productMedia, itemMedia }: UnifiedGal
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const videoInputRef = useRef<HTMLInputElement>(null)
+  const rawVideoInputRef = useRef<HTMLInputElement>(null)
   const videoCameraInputRef = useRef<HTMLInputElement>(null)
   const [imageUploads, setImageUploads] = useState<{ fileName: string; stage: string; progress: number }[]>([])
 
@@ -306,6 +307,84 @@ export function UnifiedGalleryCard({ item, productMedia, itemMedia }: UnifiedGal
           ? err
           : JSON.stringify(err) ?? 'Unknown error'
       toast.error(`Video processing failed: ${message}`)
+    } finally {
+      setVideoProcessing(false)
+      setVideoProgress(0)
+    }
+  }
+
+  async function handleRawVideoFile(file: File) {
+    setVideoProcessing(true)
+    setVideoProgress(0)
+
+    try {
+      setVideoProgress(10)
+
+      // Extract thumbnail without processing the video
+      let thumbnail: Blob
+      try {
+        thumbnail = await extractThumbnailFromVideo(file)
+      } catch {
+        console.warn('[video] Raw thumbnail extraction failed, using placeholder')
+        // Create a simple placeholder
+        const canvas = document.createElement('canvas')
+        canvas.width = 256
+        canvas.height = 256
+        const ctx = canvas.getContext('2d')!
+        ctx.fillStyle = '#1a1a1a'
+        ctx.fillRect(0, 0, 256, 256)
+        ctx.fillStyle = '#ffffff'
+        ctx.beginPath()
+        ctx.moveTo(96, 64)
+        ctx.lineTo(96, 192)
+        ctx.lineTo(192, 128)
+        ctx.closePath()
+        ctx.fill()
+        thumbnail = await new Promise<Blob>((resolve, reject) =>
+          canvas.toBlob((b) => b ? resolve(b) : reject(new Error('toBlob failed')), 'image/jpeg', 0.8),
+        )
+      }
+
+      setVideoProgress(30)
+
+      const ext = file.name.split('.').pop() ?? 'mp4'
+      const id = crypto.randomUUID()
+      const videoContentType = file.type || (ext === 'webm' ? 'video/webm' : 'video/mp4')
+      const filePath = `items/${item.id}/${id}.${ext}`
+
+      const { error } = await supabase.storage.from(BUCKET).upload(filePath, file, {
+        contentType: videoContentType,
+        upsert: false,
+      })
+      if (error) throw error
+
+      setVideoProgress(70)
+
+      // Upload thumbnail
+      const { extension: imgExt } = getImageFormat()
+      const thumbPath = `items/${item.id}/${id}_thumb.${imgExt}`
+      const thumbContentType = imgExt === 'webp' ? 'image/webp' : 'image/jpeg'
+      await supabase.storage.from(BUCKET).upload(thumbPath, thumbnail, {
+        contentType: thumbContentType,
+        upsert: false,
+      })
+
+      setVideoProgress(90)
+
+      const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(filePath)
+      const { data: thumbUrlData } = supabase.storage.from(BUCKET).getPublicUrl(thumbPath)
+
+      addMedia.mutate(
+        { itemId: item.id, fileUrl: urlData.publicUrl, mediaType: 'video', thumbnailUrl: thumbUrlData.publicUrl },
+        {
+          onSuccess: () => toast.success('Raw video uploaded'),
+          onError: (err) => toast.error(`Failed to save: ${err.message}`),
+        },
+      )
+    } catch (err) {
+      console.error('[video] handleRawVideoFile failed:', err)
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      toast.error(`Raw video upload failed: ${message}`)
     } finally {
       setVideoProcessing(false)
       setVideoProgress(0)
@@ -704,6 +783,26 @@ export function UnifiedGalleryCard({ item, productMedia, itemMedia }: UnifiedGal
                 onChange={(e) => {
                   const files = e.target.files
                   if (files?.[0]) handleVideoFile(files[0])
+                  e.target.value = ''
+                }}
+              />
+            </div>
+
+            {/* Upload a raw video file (no processing) */}
+            <div
+              className="border-2 border-dashed rounded-lg px-4 py-2 cursor-pointer transition-colors border-muted-foreground/25 hover:border-primary/50 flex items-center gap-3"
+              onClick={() => rawVideoInputRef.current?.click()}
+            >
+              <Upload className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <p className="text-sm text-muted-foreground">Upload raw video (no crop)</p>
+              <input
+                ref={rawVideoInputRef}
+                type="file"
+                accept="video/*"
+                className="hidden"
+                onChange={(e) => {
+                  const files = e.target.files
+                  if (files?.[0]) handleRawVideoFile(files[0])
                   e.target.value = ''
                 }}
               />

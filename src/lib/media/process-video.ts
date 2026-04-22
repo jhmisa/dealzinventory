@@ -135,7 +135,7 @@ async function extractThumbnail(ffmpeg: FFmpeg, inputFile: string): Promise<Blob
   }
 }
 
-async function extractThumbnailFromVideo(file: File | Blob): Promise<Blob> {
+export async function extractThumbnailFromVideo(file: File | Blob): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const video = document.createElement('video')
     video.preload = 'metadata'
