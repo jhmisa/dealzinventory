@@ -62,8 +62,8 @@ export default function ItemDetailPage() {
     resolvedValues[key] = (item as Record<string, unknown>)[key] ?? (pm as Record<string, unknown> | null)?.[key]
   }
   const description = descriptionFields.length > 0
-    ? buildShortDescription(resolvedValues, descriptionFields) || undefined
-    : (brand && modelName ? `${brand} ${modelName}${color ? ` (${color})` : ''}` : undefined)
+    ? buildShortDescription(resolvedValues, descriptionFields) || item.supplier_description || undefined
+    : (brand && modelName ? `${brand} ${modelName}${color ? ` (${color})` : ''}` : (item.supplier_description || undefined))
 
   const statusConfig = ITEM_STATUSES.find((s) => s.value === item.item_status)
 

@@ -770,7 +770,11 @@ export default function ItemListPage() {
         if (r._kind === 'accessory') return null
         const pm = r.product_models
         const descFields = pm?.categories?.description_fields ?? []
-        const desc = buildShortDescription(r, descFields) || undefined
+        const resolvedValues: Record<string, unknown> = {}
+        for (const key of descFields) {
+          resolvedValues[key] = (r as Record<string, unknown>)[key] ?? (pm as Record<string, unknown> | null)?.[key]
+        }
+        const desc = buildShortDescription(resolvedValues, descFields) || r.supplier_description || undefined
         return (
           <Button
             variant="ghost"
@@ -1033,9 +1037,14 @@ export default function ItemListPage() {
       header: 'Actions',
       size: 40,
       cell: ({ row }) => {
-        const pm = row.original.product_models
+        const r = row.original
+        const pm = r.product_models
         const descFields = pm?.categories?.description_fields ?? []
-        const desc = buildShortDescription(row.original, descFields) || undefined
+        const resolvedValues: Record<string, unknown> = {}
+        for (const key of descFields) {
+          resolvedValues[key] = (r as Record<string, unknown>)[key] ?? (pm as Record<string, unknown> | null)?.[key]
+        }
+        const desc = buildShortDescription(resolvedValues, descFields) || r.supplier_description || undefined
         return (
           <Button
             variant="ghost"
@@ -1044,7 +1053,7 @@ export default function ItemListPage() {
             title="Print label"
             onClick={(e) => {
               e.stopPropagation()
-              printItemLabel({ item_code: row.original.item_code, description: desc })
+              printItemLabel({ item_code: r.item_code, description: desc })
             }}
           >
             <Printer className="h-3.5 w-3.5" />
