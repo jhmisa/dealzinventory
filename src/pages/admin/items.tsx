@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Plus, Printer, QrCode, Pencil, Copy, AlertTriangle, Image, Play, Star } from 'lucide-react'
+import { Plus, Printer, QrCode, Pencil, Copy, AlertTriangle, Image, Play, Star, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -95,6 +95,38 @@ const STATUS_TABS = [
   ...ITEM_STATUSES.map((s) => ({ value: s.value, label: s.label })),
   { value: 'LIVE_SELLING', label: 'LiveSelling' },
 ]
+
+const SORT_OPTIONS = [
+  { value: 'date-desc', label: 'Date (Newest)' },
+  { value: 'date-asc', label: 'Date (Oldest)' },
+  { value: 'code-asc', label: 'Code (Low → High)' },
+  { value: 'code-desc', label: 'Code (High → Low)' },
+  { value: 'description-asc', label: 'Description (A → Z)' },
+  { value: 'description-desc', label: 'Description (Z → A)' },
+  { value: 'buy_price-asc', label: 'Buy Price (Low → High)' },
+  { value: 'buy_price-desc', label: 'Buy Price (High → Low)' },
+  { value: 'sell_price-asc', label: 'Sell Price (Low → High)' },
+  { value: 'sell_price-desc', label: 'Sell Price (High → Low)' },
+] as const
+
+function getItemDescription(item: ItemRow): string {
+  const pm = item.product_models
+  const descFields = pm?.categories?.description_fields
+  if (descFields && descFields.length > 0) {
+    const resolvedValues: Record<string, unknown> = {}
+    for (const key of descFields) {
+      resolvedValues[key] = (item as Record<string, unknown>)[key] ?? (pm as Record<string, unknown> | null)?.[key]
+    }
+    return buildShortDescription(resolvedValues, descFields) || item.supplier_description || ''
+  }
+  const { brand, model_name, cpu, ram_gb, storage_gb, screen_size } = item
+  const modelName = brand && model_name
+    ? `${brand} ${model_name}`
+    : pm ? `${pm.brand} ${pm.model_name}` : null
+  const screenVal = screen_size ?? pm?.screen_size
+  const parts = [modelName, cpu, ram_gb, storage_gb, screenVal ? `${screenVal}"` : null].filter(Boolean)
+  return parts.length > 0 ? parts.join(' / ') : (item.supplier_description || '')
+}
 
 const accessoryColumns: ColumnDef<AccessoryRow>[] = [
   {
@@ -314,6 +346,8 @@ export default function ItemListPage() {
   const priceFrom = getParam('priceFrom')
   const priceTo = getParam('priceTo')
   const noSellFilter = getParam('noSell')
+  const sortBy = getParam('sortBy') || 'date'
+  const sortDir = getParam('sortDir', 'desc') || 'desc'
 
   const setSearch = useCallback((v: string) => setParam('q', v), [setParam])
   const setStatusTab = useCallback((v: string) => setParam('status', v, 'all'), [setParam])
@@ -325,6 +359,28 @@ export default function ItemListPage() {
   const setPriceFrom = useCallback((v: string) => setParam('priceFrom', v), [setParam])
   const setPriceTo = useCallback((v: string) => setParam('priceTo', v), [setParam])
   const setNoSellFilter = useCallback((v: string) => setParam('noSell', v), [setParam])
+
+  const setSortValue = useCallback((combined: string) => {
+    const [field, dir] = combined.split('-')
+    setParam('sortBy', field, 'date')
+    setParam('sortDir', dir, 'desc')
+  }, [setParam])
+
+  const hasActiveFilters = !!(search || gradeFilter || categoryFilter || brandFilter || descriptionSearch || conditionSearch || priceFrom || priceTo || noSellFilter || (sortBy && sortBy !== 'date') || (sortDir && sortDir !== 'desc'))
+
+  const clearAllFilters = useCallback(() => {
+    setParam('q', '')
+    setParam('grade', '')
+    setParam('category', '')
+    setParam('brand', '')
+    setParam('desc', '')
+    setParam('condition', '')
+    setParam('priceFrom', '')
+    setParam('priceTo', '')
+    setParam('noSell', '')
+    setParam('sortBy', '', 'date')
+    setParam('sortDir', '', 'desc')
+  }, [setParam])
 
   const debouncedSearch = useDebounce(search, 400)
   const debouncedDescSearch = useDebounce(descriptionSearch, 400)
@@ -412,11 +468,57 @@ export default function ItemListPage() {
     return true
   })
 
+  // Sort helper for InventoryRow (works for both items and accessories)
+  const sortInventoryRows = useCallback((arr: InventoryRow[]): InventoryRow[] => {
+    const sorted = [...arr]
+    const dir = sortDir === 'asc' ? 1 : -1
+    sorted.sort((a, b) => {
+      switch (sortBy) {
+        case 'code': {
+          const codeA = a._kind === 'item' ? a.item_code : a.accessory_code
+          const codeB = b._kind === 'item' ? b.item_code : b.accessory_code
+          return dir * codeA.localeCompare(codeB)
+        }
+        case 'description': {
+          const descA = a._kind === 'item' ? getItemDescription(a) : [a.brand, a.name].filter(Boolean).join(' ')
+          const descB = b._kind === 'item' ? getItemDescription(b) : [b.brand, b.name].filter(Boolean).join(' ')
+          return dir * descA.localeCompare(descB)
+        }
+        case 'buy_price': {
+          const priceA = a._kind === 'item' ? (a.purchase_price ?? 0) : 0
+          const priceB = b._kind === 'item' ? (b.purchase_price ?? 0) : 0
+          return dir * (priceA - priceB)
+        }
+        case 'sell_price': return dir * ((Number(a.selling_price) || 0) - (Number(b.selling_price) || 0))
+        case 'date':
+        default: return dir * (new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+      }
+    })
+    return sorted
+  }, [sortBy, sortDir])
+
+  // Apply client-side sorting
+  const sortedItems = useMemo(() => {
+    const sorted = [...filteredItems]
+    const dir = sortDir === 'asc' ? 1 : -1
+    sorted.sort((a, b) => {
+      switch (sortBy) {
+        case 'code': return dir * a.item_code.localeCompare(b.item_code)
+        case 'description': return dir * getItemDescription(a).localeCompare(getItemDescription(b))
+        case 'buy_price': return dir * ((a.purchase_price ?? 0) - (b.purchase_price ?? 0))
+        case 'sell_price': return dir * ((a.selling_price ?? 0) - (b.selling_price ?? 0))
+        case 'date':
+        default: return dir * (new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+      }
+    })
+    return sorted
+  }, [filteredItems, sortBy, sortDir])
+
   // Build merged unified data when in unified mode
   const unifiedData: InventoryRow[] = useMemo(() => {
     if (!showUnified || inventoryType === 'products') return []
     if (inventoryType === 'accessories') {
-      return ((unifiedAccessories ?? []) as AccessoryRow[])
+      const filtered = ((unifiedAccessories ?? []) as AccessoryRow[])
         .filter((acc) => {
           if (debouncedDescSearch) {
             const accDesc = [acc.brand, acc.name, acc.description].filter(Boolean).join(' ')
@@ -434,9 +536,10 @@ export default function ItemListPage() {
           return true
         })
         .map((a) => ({ ...a, _kind: 'accessory' as const }))
+      return sortInventoryRows(filtered)
     }
     // inventoryType === 'all': merge both
-    const taggedItems: InventoryRow[] = filteredItems.map((i) => ({ ...i, _kind: 'item' as const }))
+    const taggedItems: InventoryRow[] = sortedItems.map((i) => ({ ...i, _kind: 'item' as const }))
     const taggedAcc: InventoryRow[] = ((unifiedAccessories ?? []) as AccessoryRow[])
       .filter((acc) => {
         // Apply client-side filters that also apply to accessories
@@ -456,10 +559,8 @@ export default function ItemListPage() {
         return true
       })
       .map((a) => ({ ...a, _kind: 'accessory' as const }))
-    return [...taggedItems, ...taggedAcc].sort(
-      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    )
-  }, [showUnified, inventoryType, filteredItems, unifiedAccessories, categoryFilter, brandFilter, priceFrom, priceTo, debouncedDescSearch, debouncedConditionSearch])
+    return sortInventoryRows([...taggedItems, ...taggedAcc])
+  }, [showUnified, inventoryType, sortedItems, unifiedAccessories, categoryFilter, brandFilter, priceFrom, priceTo, debouncedDescSearch, debouncedConditionSearch, sortInventoryRows])
 
   // Unified loading state
   const unifiedIsLoading = showUnified
@@ -1278,6 +1379,16 @@ export default function ItemListPage() {
                 ))}
               </SelectContent>
             </Select>
+            <Select value={`${sortBy}-${sortDir}`} onValueChange={setSortValue}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Sort by..." />
+              </SelectTrigger>
+              <SelectContent>
+                {SORT_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Additional Filters */}
@@ -1338,6 +1449,12 @@ export default function ItemListPage() {
               />
               <Label htmlFor="no-sell-price" className="text-sm font-normal cursor-pointer">No Sell Price</Label>
             </div>
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={clearAllFilters} className="text-muted-foreground hover:text-foreground">
+                <X className="h-3.5 w-3.5 mr-1" />
+                Clear
+              </Button>
+            )}
           </div>
 
           {unifiedIsLoading ? (
@@ -1381,7 +1498,7 @@ export default function ItemListPage() {
           ) : (
             <DataTable
               columns={columns}
-              data={filteredItems}
+              data={sortedItems}
               columnVisibility={columnVisibility}
               enableColumnResizing
               onRowClick={(row) => navigate(`/admin/items/${row.id}`)}
