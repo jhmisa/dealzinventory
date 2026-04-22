@@ -163,6 +163,20 @@ export const queryKeys = {
     detail: (id: string) => [...queryKeys.staffProfiles.details(), id] as const,
     me: () => [...queryKeys.staffProfiles.all, 'me'] as const,
   },
+  supplierReturns: {
+    all: ['supplier-returns'] as const,
+    lists: () => [...queryKeys.supplierReturns.all, 'list'] as const,
+    list: (filters: Record<string, unknown>) => [...queryKeys.supplierReturns.lists(), filters] as const,
+    details: () => [...queryKeys.supplierReturns.all, 'detail'] as const,
+    detail: (id: string) => [...queryKeys.supplierReturns.details(), id] as const,
+  },
+  inventoryRemovals: {
+    all: ['inventory-removals'] as const,
+    lists: () => [...queryKeys.inventoryRemovals.all, 'list'] as const,
+    list: (filters: Record<string, unknown>) => [...queryKeys.inventoryRemovals.lists(), filters] as const,
+    details: () => [...queryKeys.inventoryRemovals.all, 'detail'] as const,
+    detail: (id: string) => [...queryKeys.inventoryRemovals.details(), id] as const,
+  },
   messaging: {
     all: ['messaging'] as const,
     conversations: () => [...queryKeys.messaging.all, 'conversations'] as const,

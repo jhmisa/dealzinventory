@@ -1,4 +1,4 @@
-import type { ConditionGrade, ItemStatus, SourceType, SupplierType, ProductStatus, AcAdapterStatus, OrderStatus, OrderSource, KaitoriStatus, KaitoriDeliveryMethod, KaitoriPaymentMethod, BatteryCondition, ScreenCondition, BodyCondition, KaitoriMediaRole, IntakeAdjustmentType, OfferStatus } from './types'
+import type { ConditionGrade, ItemStatus, SourceType, SupplierType, ProductStatus, AcAdapterStatus, OrderStatus, OrderSource, KaitoriStatus, KaitoriDeliveryMethod, KaitoriPaymentMethod, BatteryCondition, ScreenCondition, BodyCondition, KaitoriMediaRole, IntakeAdjustmentType, OfferStatus, SupplierReturnStatus, SupplierReturnResolution, RefundPaymentMethod, InventoryRemovalReason, InventoryRemovalStatus } from './types'
 
 // --- Device Category Groupings ---
 
@@ -90,6 +90,8 @@ export const ITEM_STATUSES: { value: ItemStatus; label: string; color: string }[
   { value: 'REPAIR', label: 'Repair', color: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
   { value: 'MISSING', label: 'Missing', color: 'bg-red-100 text-red-800 border-red-300' },
   { value: 'SOLD', label: 'Sold', color: 'bg-purple-100 text-purple-800 border-purple-300' },
+  { value: 'SUPPLIER_RETURN', label: 'Supplier Return', color: 'bg-orange-100 text-orange-800 border-orange-300' },
+  { value: 'REMOVED', label: 'Removed', color: 'bg-slate-100 text-slate-800 border-slate-300' },
 ]
 
 export const SOURCE_TYPES: { value: SourceType; label: string }[] = [
@@ -455,4 +457,50 @@ export const AUDIT_FIELD_LABELS: Record<string, string> = {
   imei: 'IMEI',
   imei2: 'IMEI 2',
   kaitori_request_id: 'Kaitori Request',
+}
+
+// --- Supplier Returns ---
+
+export const SUPPLIER_RETURN_STATUSES: { value: SupplierReturnStatus; label: string; color: string }[] = [
+  { value: 'REQUESTED', label: 'Requested', color: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
+  { value: 'RETURNED', label: 'Returned', color: 'bg-blue-100 text-blue-800 border-blue-300' },
+  { value: 'RESOLVED', label: 'Resolved', color: 'bg-green-100 text-green-800 border-green-300' },
+]
+
+export const SUPPLIER_RETURN_RESOLUTIONS: { value: SupplierReturnResolution; label: string; color: string }[] = [
+  { value: 'EXCHANGE', label: 'Exchange', color: 'bg-blue-100 text-blue-800 border-blue-300' },
+  { value: 'REFUND', label: 'Refund', color: 'bg-green-100 text-green-800 border-green-300' },
+]
+
+export const REFUND_PAYMENT_METHODS: { value: RefundPaymentMethod; label: string }[] = [
+  { value: 'BANK_TRANSFER', label: 'Bank Transfer (振込)' },
+  { value: 'CASH', label: 'Cash (現金)' },
+]
+
+export function getSupplierReturnStatusConfig(status: SupplierReturnStatus) {
+  return SUPPLIER_RETURN_STATUSES.find(s => s.value === status) ?? { value: status, label: status, color: 'bg-gray-100 text-gray-800 border-gray-300' }
+}
+
+// --- Inventory Removals ---
+
+export const INVENTORY_REMOVAL_STATUSES: { value: InventoryRemovalStatus; label: string; color: string }[] = [
+  { value: 'PENDING', label: 'Pending', color: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
+  { value: 'APPROVED', label: 'Approved', color: 'bg-green-100 text-green-800 border-green-300' },
+  { value: 'REJECTED', label: 'Rejected', color: 'bg-red-100 text-red-800 border-red-300' },
+]
+
+export const INVENTORY_REMOVAL_REASONS: { value: InventoryRemovalReason; label: string }[] = [
+  { value: 'MISSING', label: 'Missing' },
+  { value: 'OFFICE_USE', label: 'Office Use' },
+  { value: 'DAMAGED', label: 'Damaged' },
+  { value: 'GIFTED', label: 'Gifted' },
+  { value: 'OTHER', label: 'Other' },
+]
+
+export function getRemovalStatusConfig(status: InventoryRemovalStatus) {
+  return INVENTORY_REMOVAL_STATUSES.find(s => s.value === status) ?? { value: status, label: status, color: 'bg-gray-100 text-gray-800 border-gray-300' }
+}
+
+export function getRemovalReasonLabel(reason: InventoryRemovalReason) {
+  return INVENTORY_REMOVAL_REASONS.find(r => r.value === reason)?.label ?? reason
 }

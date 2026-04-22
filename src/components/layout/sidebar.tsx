@@ -24,6 +24,8 @@ import {
   Settings,
   MessageSquare,
   ChevronRight,
+  Undo2,
+  Trash2,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { useNeedsReviewCount } from '@/hooks/use-messaging'
@@ -68,6 +70,8 @@ const navSections: NavSection[] = [
       { title: 'Items', href: '/admin/items', icon: Package },
       { title: 'New Intake', href: '/admin/items/intake', icon: Box },
       { title: 'Receiving Reports', href: '/admin/receiving-reports', icon: FileText },
+      { title: 'Supplier Returns', href: '/admin/supplier-returns', icon: Undo2 },
+      { title: 'Removals', href: '/admin/inventory-removals', icon: Trash2 },
       { title: 'QR Scanner', href: '/admin/items/scan', icon: ScanLine },
       { title: 'Inspection', href: '/admin/inspection', icon: ClipboardCheck },
     ],

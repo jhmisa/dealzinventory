@@ -1,10 +1,24 @@
 import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, ClipboardEdit, Copy, Lock, Printer, QrCode, Send, Unlock } from 'lucide-react'
+import { ArrowLeft, ClipboardEdit, Copy, Lock, Printer, QrCode, Send, Unlock, Undo2, Trash2 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { FormSkeleton, StatusBadge, GradeBadge, CodeDisplay } from '@/components/shared'
 import { useItem } from '@/hooks/use-items'
 import {
@@ -17,6 +31,9 @@ import {
 } from '@/components/items/item-detail'
 import { ITEM_STATUSES } from '@/lib/constants'
 import { useActiveOfferForItem, useCancelOffer } from '@/hooks/use-offers'
+import { useCreateSupplierReturn } from '@/hooks/use-supplier-returns'
+import { useCreateInventoryRemoval } from '@/hooks/use-inventory-removals'
+import { INVENTORY_REMOVAL_REASONS } from '@/lib/constants'
 import { CreateOfferDialog } from '@/components/offers'
 import { formatPrice, buildShortDescription } from '@/lib/utils'
 import { resolveSoldTo } from '@/lib/item-sale'
@@ -36,8 +53,16 @@ export default function ItemDetailPage() {
   const [showQr, setShowQr] = useState(false)
   const [showOfferDialog, setShowOfferDialog] = useState(false)
   const [unlocked, setUnlocked] = useState(false)
+  const [showSupplierReturnDialog, setShowSupplierReturnDialog] = useState(false)
+  const [supplierReturnReason, setSupplierReturnReason] = useState('')
+  const [showRemovalDialog, setShowRemovalDialog] = useState(false)
+  const [removalReason, setRemovalReason] = useState<string>('')
+  const [removalReasonText, setRemovalReasonText] = useState('')
+  const [removalNotes, setRemovalNotes] = useState('')
   const { data: activeOffer } = useActiveOfferForItem(id!)
   const cancelOffer = useCancelOffer()
+  const createSupplierReturn = useCreateSupplierReturn()
+  const createRemoval = useCreateInventoryRemoval()
 
   if (isLoading) {
     return <FormSkeleton fields={6} />
@@ -136,6 +161,18 @@ export default function ItemDetailPage() {
               <Button onClick={() => navigate(`/admin/inspection/${item.id}`)}>
                 <ClipboardEdit className="h-4 w-4 mr-2" />
                 Inspect
+              </Button>
+            )}
+            {(['INTAKE', 'AVAILABLE', 'REPAIR'] as string[]).includes(item.item_status) && item.supplier_id && (
+              <Button variant="outline" onClick={() => setShowSupplierReturnDialog(true)}>
+                <Undo2 className="h-4 w-4 mr-2" />
+                Return to Supplier
+              </Button>
+            )}
+            {(['INTAKE', 'AVAILABLE', 'REPAIR', 'MISSING'] as string[]).includes(item.item_status) && (
+              <Button variant="outline" onClick={() => setShowRemovalDialog(true)}>
+                <Trash2 className="h-4 w-4 mr-2" />
+                Remove
               </Button>
             )}
           </div>
@@ -308,6 +345,146 @@ export default function ItemDetailPage() {
         onOpenChange={setShowOfferDialog}
         item={item as Item & { product_models?: ProductModel | null }}
       />
+
+      {/* Supplier Return Dialog */}
+      <Dialog open={showSupplierReturnDialog} onOpenChange={setShowSupplierReturnDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Return to Supplier</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">
+                Item: <span className="font-mono font-medium text-foreground">{item.item_code}</span>
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Supplier: <span className="font-medium text-foreground">{supplier?.supplier_name ?? '—'}</span>
+              </p>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Problem Description</label>
+              <Textarea
+                value={supplierReturnReason}
+                onChange={(e) => setSupplierReturnReason(e.target.value)}
+                placeholder="Describe the problem (min 10 characters)..."
+                className="mt-1"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowSupplierReturnDialog(false)}>
+                Cancel
+              </Button>
+              <Button
+                disabled={supplierReturnReason.length < 10 || createSupplierReturn.isPending}
+                onClick={() => {
+                  createSupplierReturn.mutate(
+                    {
+                      item_id: item.id,
+                      supplier_id: item.supplier_id!,
+                      intake_receipt_id: item.intake_receipt_id ?? undefined,
+                      reason: supplierReturnReason,
+                    },
+                    {
+                      onSuccess: (data) => {
+                        toast.success(`Supplier return ${data.return_code} created`)
+                        setShowSupplierReturnDialog(false)
+                        setSupplierReturnReason('')
+                        navigate(`/admin/supplier-returns/${data.id}`)
+                      },
+                      onError: (err) => toast.error(err.message),
+                    },
+                  )
+                }}
+              >
+                {createSupplierReturn.isPending ? 'Creating...' : 'Create Return'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Inventory Removal Dialog */}
+      <Dialog open={showRemovalDialog} onOpenChange={setShowRemovalDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove from Inventory</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Item: <span className="font-mono font-medium text-foreground">{item.item_code}</span>
+            </p>
+            <div>
+              <label className="text-sm font-medium">Reason</label>
+              <Select value={removalReason} onValueChange={setRemovalReason}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select a reason" />
+                </SelectTrigger>
+                <SelectContent>
+                  {INVENTORY_REMOVAL_REASONS.map((r) => (
+                    <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {removalReason === 'OTHER' && (
+              <div>
+                <label className="text-sm font-medium">Specify Reason</label>
+                <Textarea
+                  value={removalReasonText}
+                  onChange={(e) => setRemovalReasonText(e.target.value)}
+                  placeholder="Describe the reason..."
+                  className="mt-1"
+                />
+              </div>
+            )}
+            <div>
+              <label className="text-sm font-medium">Notes</label>
+              <Textarea
+                value={removalNotes}
+                onChange={(e) => setRemovalNotes(e.target.value)}
+                placeholder="Add notes (min 5 characters)..."
+                className="mt-1"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowRemovalDialog(false)}>
+                Cancel
+              </Button>
+              <Button
+                disabled={
+                  !removalReason
+                  || removalNotes.length < 5
+                  || (removalReason === 'OTHER' && removalReasonText.length < 5)
+                  || createRemoval.isPending
+                }
+                onClick={() => {
+                  createRemoval.mutate(
+                    {
+                      item_id: item.id,
+                      reason: removalReason as 'MISSING' | 'OFFICE_USE' | 'DAMAGED' | 'GIFTED' | 'OTHER',
+                      reason_text: removalReasonText || undefined,
+                      notes: removalNotes,
+                    },
+                    {
+                      onSuccess: (data) => {
+                        toast.success(`Removal request ${data.removal_code} created (pending approval)`)
+                        setShowRemovalDialog(false)
+                        setRemovalReason('')
+                        setRemovalReasonText('')
+                        setRemovalNotes('')
+                        navigate(`/admin/inventory-removals/${data.id}`)
+                      },
+                      onError: (err) => toast.error(err.message),
+                    },
+                  )
+                }}
+              >
+                {createRemoval.isPending ? 'Requesting...' : 'Request Removal'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
