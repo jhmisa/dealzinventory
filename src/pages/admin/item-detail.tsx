@@ -389,7 +389,7 @@ export default function ItemDetailPage() {
                         toast.success(`Supplier return ${data.return_code} created`)
                         setShowSupplierReturnDialog(false)
                         setSupplierReturnReason('')
-                        navigate(`/admin/supplier-returns/${data.id}`)
+                        navigate(`/admin/inventory-returns/supplier/${data.id}`)
                       },
                       onError: (err) => toast.error(err.message),
                     },
@@ -472,7 +472,7 @@ export default function ItemDetailPage() {
                         setRemovalReason('')
                         setRemovalReasonText('')
                         setRemovalNotes('')
-                        navigate(`/admin/inventory-removals/${data.id}`)
+                        navigate(`/admin/inventory-returns/removals/${data.id}`)
                       },
                       onError: (err) => toast.error(err.message),
                     },

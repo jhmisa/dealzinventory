@@ -70,9 +70,8 @@ const MessagesPage = lazy(() => import('@/pages/admin/messages'))
 const MessagingSettingsPage = lazy(() => import('@/pages/admin/messaging-settings'))
 const AccessoryDetailPage = lazy(() => import('@/pages/admin/accessory-detail'))
 const InventoryReportPage = lazy(() => import('@/pages/admin/inventory-report'))
-const SupplierReturnsPage = lazy(() => import('@/pages/admin/supplier-returns'))
+const InventoryReturnsPage = lazy(() => import('@/pages/admin/inventory-returns'))
 const SupplierReturnDetailPage = lazy(() => import('@/pages/admin/supplier-return-detail'))
-const InventoryRemovalsPage = lazy(() => import('@/pages/admin/inventory-removals'))
 const InventoryRemovalDetailPage = lazy(() => import('@/pages/admin/inventory-removal-detail'))
 const ShopAccessoryDetailPage = lazy(() => import('@/pages/shop/accessory-detail'))
 
@@ -154,10 +153,13 @@ export const router = createBrowserRouter([
           { path: 'customers/:id', element: lazyElement(CustomerDetailPage) },
           { path: 'receiving-reports', element: lazyElement(ReceivingReportsPage) },
           { path: 'receiving-reports/:id', element: lazyElement(ReceivingReportDetailPage) },
-          { path: 'supplier-returns', element: lazyElement(SupplierReturnsPage) },
-          { path: 'supplier-returns/:id', element: lazyElement(SupplierReturnDetailPage) },
-          { path: 'inventory-removals', element: lazyElement(InventoryRemovalsPage) },
-          { path: 'inventory-removals/:id', element: lazyElement(InventoryRemovalDetailPage) },
+          { path: 'inventory-returns', element: lazyElement(InventoryReturnsPage) },
+          { path: 'inventory-returns/supplier/:id', element: lazyElement(SupplierReturnDetailPage) },
+          { path: 'inventory-returns/removals/:id', element: lazyElement(InventoryRemovalDetailPage) },
+          { path: 'supplier-returns', element: <Navigate to="/admin/inventory-returns?tab=supplier" replace /> },
+          { path: 'supplier-returns/:id', element: <Navigate to="/admin/inventory-returns?tab=supplier" replace /> },
+          { path: 'inventory-removals', element: <Navigate to="/admin/inventory-returns?tab=removals" replace /> },
+          { path: 'inventory-removals/:id', element: <Navigate to="/admin/inventory-returns?tab=removals" replace /> },
           { path: 'reports', element: lazyElement(ReportsPage) },
           { path: 'reports/inventory', element: lazyElement(InventoryReportPage) },
           { path: 'returns', element: lazyElement(AdminReturnsPage) },
