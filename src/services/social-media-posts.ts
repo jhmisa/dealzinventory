@@ -71,13 +71,41 @@ export interface MediaItem {
   url: string
   thumbnail_url: string | null
   media_type: string
-  source: 'Product' | 'Item'
+  source: 'Product' | 'Item' | 'Accessory'
 }
 
-export async function getItemMedia(itemId: string, productId?: string | null): Promise<MediaItem[]> {
+export type MediaSourceType = 'item' | 'accessory' | 'sell_group'
+
+export async function getMediaForSource(
+  sourceType: MediaSourceType,
+  sourceId: string,
+  productId?: string | null,
+  accessoryId?: string | null,
+): Promise<MediaItem[]> {
   const results: MediaItem[] = []
 
-  // Product media (shared model photos/videos)
+  if (sourceType === 'accessory' && accessoryId) {
+    // Accessory media
+    const { data: accMedia } = await supabase
+      .from('accessory_media')
+      .select('file_url, media_type, sort_order')
+      .eq('accessory_id', accessoryId)
+      .order('sort_order')
+
+    if (accMedia) {
+      for (const m of accMedia) {
+        results.push({
+          url: m.file_url,
+          thumbnail_url: null,
+          media_type: m.media_type ?? 'image',
+          source: 'Accessory',
+        })
+      }
+    }
+    return results
+  }
+
+  // For items and sell groups, fetch product media + item media
   if (productId) {
     const { data: productMedia } = await supabase
       .from('product_media')
@@ -97,21 +125,50 @@ export async function getItemMedia(itemId: string, productId?: string | null): P
     }
   }
 
-  // Item-specific media (raw/vertical videos, extra photos)
-  const { data: itemMedia } = await supabase
-    .from('item_media')
-    .select('file_url, media_type, sort_order, thumbnail_url')
-    .eq('item_id', itemId)
-    .order('sort_order')
+  if (sourceType === 'item') {
+    const { data: itemMedia } = await supabase
+      .from('item_media')
+      .select('file_url, media_type, sort_order, thumbnail_url')
+      .eq('item_id', sourceId)
+      .order('sort_order')
 
-  if (itemMedia) {
-    for (const m of itemMedia) {
-      results.push({
-        url: m.file_url,
-        thumbnail_url: m.thumbnail_url ?? null,
-        media_type: m.media_type ?? 'image',
-        source: 'Item',
-      })
+    if (itemMedia) {
+      for (const m of itemMedia) {
+        results.push({
+          url: m.file_url,
+          thumbnail_url: m.thumbnail_url ?? null,
+          media_type: m.media_type ?? 'image',
+          source: 'Item',
+        })
+      }
+    }
+  }
+
+  if (sourceType === 'sell_group') {
+    // For sell groups, get media from the first item in the group
+    const { data: sgItems } = await supabase
+      .from('sell_group_items')
+      .select('item_id')
+      .eq('sell_group_id', sourceId)
+      .limit(1)
+
+    if (sgItems?.[0]) {
+      const { data: itemMedia } = await supabase
+        .from('item_media')
+        .select('file_url, media_type, sort_order, thumbnail_url')
+        .eq('item_id', sgItems[0].item_id)
+        .order('sort_order')
+
+      if (itemMedia) {
+        for (const m of itemMedia) {
+          results.push({
+            url: m.file_url,
+            thumbnail_url: m.thumbnail_url ?? null,
+            media_type: m.media_type ?? 'image',
+            source: 'Item',
+          })
+        }
+      }
     }
   }
 

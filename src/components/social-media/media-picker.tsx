@@ -1,19 +1,22 @@
-import { Check, Film, Image } from 'lucide-react'
+import { Check, Film } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useItemMedia } from '@/hooks/use-social-media-posts'
+import { useSourceMedia } from '@/hooks/use-social-media-posts'
 import { Badge } from '@/components/ui/badge'
+import type { MediaSourceType } from '@/services/social-media-posts'
 
 interface MediaPickerProps {
-  itemId: string | undefined
+  sourceType: MediaSourceType | undefined
+  sourceId: string | undefined
   productId: string | null | undefined
+  accessoryId: string | null | undefined
   selected: string[]
   onSelectionChange: (urls: string[]) => void
 }
 
-export function MediaPicker({ itemId, productId, selected, onSelectionChange }: MediaPickerProps) {
-  const { data: media = [], isLoading } = useItemMedia(itemId, productId)
+export function MediaPicker({ sourceType, sourceId, productId, accessoryId, selected, onSelectionChange }: MediaPickerProps) {
+  const { data: media = [], isLoading } = useSourceMedia(sourceType, sourceId, productId, accessoryId)
 
-  if (!itemId) {
+  if (!sourceId) {
     return (
       <p className="text-sm text-muted-foreground py-4">
         Select an item first to see available media.

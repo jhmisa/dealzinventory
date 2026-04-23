@@ -50,10 +50,15 @@ export function useDeleteSocialMediaPost() {
   })
 }
 
-export function useItemMedia(itemId: string | undefined, productId?: string | null) {
+export function useSourceMedia(
+  sourceType: socialMediaPostService.MediaSourceType | undefined,
+  sourceId: string | undefined,
+  productId?: string | null,
+  accessoryId?: string | null,
+) {
   return useQuery({
-    queryKey: queryKeys.socialMediaPosts.itemMedia(itemId ?? '', productId ?? undefined),
-    queryFn: () => socialMediaPostService.getItemMedia(itemId!, productId),
-    enabled: !!itemId,
+    queryKey: queryKeys.socialMediaPosts.itemMedia(sourceId ?? '', productId ?? undefined),
+    queryFn: () => socialMediaPostService.getMediaForSource(sourceType!, sourceId!, productId, accessoryId),
+    enabled: !!sourceType && !!sourceId,
   })
 }

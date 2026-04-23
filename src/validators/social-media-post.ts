@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 export const socialMediaPostSchema = z.object({
-  item_id: z.string().uuid('Select an item'),
+  item_id: z.string().uuid('Select an item, accessory, or sell group'),
   item_code: z.string().optional(),
   platform: z.string().default('facebook'),
   caption: z.string().optional().nullable(),

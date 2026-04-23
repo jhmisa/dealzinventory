@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Input } from '@/components/ui/input'
 import { socialMediaPostSchema, type SocialMediaPostFormValues } from '@/validators/social-media-post'
-import { ItemSearchInput } from './item-search-input'
+import { ItemSearchInput, type SearchResult, type SearchResultType } from './item-search-input'
 import { MediaPicker } from './media-picker'
 import { useCreateSocialMediaPost } from '@/hooks/use-social-media-posts'
 import type { SocialPostStatus } from '@/lib/types'
@@ -26,6 +26,9 @@ interface PostFormDialogProps {
 
 export function PostFormDialog({ open, onOpenChange }: PostFormDialogProps) {
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
+  const [selectedAccessoryId, setSelectedAccessoryId] = useState<string | null>(null)
+  const [selectedSourceType, setSelectedSourceType] = useState<SearchResultType | undefined>()
+  const [selectedLabel, setSelectedLabel] = useState<string | undefined>()
   const createMutation = useCreateSocialMediaPost()
 
   const form = useForm<SocialMediaPostFormValues>({
@@ -63,6 +66,9 @@ export function PostFormDialog({ open, onOpenChange }: PostFormDialogProps) {
             toast.success(status === 'queued' ? 'Post queued' : 'Draft saved')
             form.reset()
             setSelectedProductId(null)
+            setSelectedAccessoryId(null)
+            setSelectedSourceType(undefined)
+            setSelectedLabel(undefined)
             onOpenChange(false)
           },
           onError: (err) => toast.error(`Failed: ${err.message}`),
@@ -79,16 +85,20 @@ export function PostFormDialog({ open, onOpenChange }: PostFormDialogProps) {
         </DialogHeader>
 
         <div className="space-y-4 pt-2">
-          {/* Item Search */}
+          {/* Item / Accessory / Sell Group Search */}
           <div className="space-y-1.5">
-            <Label>Item (P-code)</Label>
+            <Label>Item / Accessory / Sell Group</Label>
             <ItemSearchInput
               value={itemId}
-              onSelect={(item) => {
-                form.setValue('item_id', item.id, { shouldValidate: true })
-                form.setValue('item_code', item.item_code)
+              selectedLabel={selectedLabel}
+              onSelect={(result: SearchResult) => {
+                form.setValue('item_id', result.id, { shouldValidate: true })
+                form.setValue('item_code', result.code)
                 form.setValue('media_urls', [])
-                setSelectedProductId(item.product_id)
+                setSelectedProductId(result.product_id)
+                setSelectedAccessoryId(result.accessory_id)
+                setSelectedSourceType(result.type)
+                setSelectedLabel(`${result.code} — ${result.label}`)
               }}
             />
             {form.formState.errors.item_id && (
@@ -105,8 +115,10 @@ export function PostFormDialog({ open, onOpenChange }: PostFormDialogProps) {
               )}
             </Label>
             <MediaPicker
-              itemId={itemId || undefined}
+              sourceType={selectedSourceType}
+              sourceId={itemId || undefined}
               productId={selectedProductId}
+              accessoryId={selectedAccessoryId}
               selected={mediaUrls}
               onSelectionChange={(urls) => form.setValue('media_urls', urls, { shouldValidate: true })}
             />
