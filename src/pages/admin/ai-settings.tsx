@@ -43,6 +43,7 @@ export default function AiSettingsPage() {
     invoice_parsing: 'Invoice Parsing',
     image_enhancement: 'Image Enhancement',
     general: 'General',
+    social_media: 'Social Media',
   }
 
   return (

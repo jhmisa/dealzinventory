@@ -73,6 +73,7 @@ const InventoryReportPage = lazy(() => import('@/pages/admin/inventory-report'))
 const InventoryReturnsPage = lazy(() => import('@/pages/admin/inventory-returns'))
 const SupplierReturnDetailPage = lazy(() => import('@/pages/admin/supplier-return-detail'))
 const InventoryRemovalDetailPage = lazy(() => import('@/pages/admin/inventory-removal-detail'))
+const SocialMediaPage = lazy(() => import('@/pages/admin/social-media'))
 const ShopAccessoryDetailPage = lazy(() => import('@/pages/shop/accessory-detail'))
 
 function lazyElement(Component: React.LazyExoticComponent<ComponentType>) {
@@ -164,6 +165,7 @@ export const router = createBrowserRouter([
           { path: 'reports/inventory', element: lazyElement(InventoryReportPage) },
           { path: 'returns', element: lazyElement(AdminReturnsPage) },
           { path: 'returns/:id', element: lazyElement(AdminReturnDetailPage) },
+          { path: 'social-media', element: lazyElement(SocialMediaPage) },
           { path: 'messages', element: lazyElement(MessagesPage) },
           { path: 'suppliers', element: lazyElement(SupplierListPage) },
           { path: 'settings/messaging', element: adminElement(MessagingSettingsPage) },

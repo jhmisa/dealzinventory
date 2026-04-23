@@ -177,6 +177,20 @@ export const queryKeys = {
     details: () => [...queryKeys.inventoryRemovals.all, 'detail'] as const,
     detail: (id: string) => [...queryKeys.inventoryRemovals.details(), id] as const,
   },
+  customerReviews: {
+    all: ['customer-reviews'] as const,
+    lists: () => [...queryKeys.customerReviews.all, 'list'] as const,
+    list: () => [...queryKeys.customerReviews.lists()] as const,
+    detail: (id: string) => [...queryKeys.customerReviews.all, 'detail', id] as const,
+  },
+  socialMediaPosts: {
+    all: ['social-media-posts'] as const,
+    lists: () => [...queryKeys.socialMediaPosts.all, 'list'] as const,
+    list: (filters: Record<string, unknown>) => [...queryKeys.socialMediaPosts.lists(), filters] as const,
+    details: () => [...queryKeys.socialMediaPosts.all, 'detail'] as const,
+    detail: (id: string) => [...queryKeys.socialMediaPosts.details(), id] as const,
+    itemMedia: (itemId: string, productId?: string) => [...queryKeys.socialMediaPosts.all, 'item-media', itemId, productId] as const,
+  },
   messaging: {
     all: ['messaging'] as const,
     conversations: () => [...queryKeys.messaging.all, 'conversations'] as const,

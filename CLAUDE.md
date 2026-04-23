@@ -314,6 +314,33 @@ claude mcp add-json github '{
 
 ---
 
+### Blotato MCP (Social Media)
+
+Lets Claude Code schedule and upload social media posts via Blotato. Used by the `/post` command.
+
+**Setup (run in terminal, not inside Claude Code):**
+
+```bash
+claude mcp add blotato \
+  --transport http \
+  --url "https://mcp.blotato.com/mcp" \
+  --header "blotato-api-key: <BLOTATO_API_KEY>" \
+  -s project
+```
+
+Get your API key from the Blotato dashboard: Settings → API.
+
+**Key tools available:**
+- Upload media to connected social accounts
+- Schedule posts using `useNextFreeSlot` for optimal timing
+- List connected social accounts and platforms
+
+**Docs:**
+- MCP docs: https://help.blotato.com/api/mcp
+- API reference: https://help.blotato.com/api/llm
+
+---
+
 ### Verify MCP Connections
 
 After setup, verify both servers are connected:

@@ -20,6 +20,7 @@ import {
   Tags,
   MapPin,
   RotateCcw,
+  Share2,
   Columns3,
   Settings,
   MessageSquare,
@@ -94,6 +95,7 @@ const navSections: NavSection[] = [
     label: 'Messaging',
     items: [
       { title: 'Messages', href: '/admin/messages', icon: MessageSquare },
+      { title: 'Social Media', href: '/admin/social-media', icon: Share2 },
     ],
   },
   {

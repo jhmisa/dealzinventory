@@ -221,6 +221,75 @@ export type SupplierReturnInsert = Tables['supplier_returns']['Insert']
 export type InventoryRemoval = Tables['inventory_removals']['Row']
 export type InventoryRemovalInsert = Tables['inventory_removals']['Insert']
 
+export type CustomerReview = Tables['customer_reviews']['Row']
+export type CustomerReviewInsert = Tables['customer_reviews']['Insert']
+export type CustomerReviewUpdate = Tables['customer_reviews']['Update']
+
+// Social Media Posts — manually defined until DB types are regenerated
+export type SocialPostStatus = 'draft' | 'queued' | 'processing' | 'published' | 'failed'
+export type SocialScheduleType = 'now' | 'next_slot' | 'scheduled'
+
+export interface SocialMediaPost {
+  id: string
+  item_id: string | null
+  item_code: string | null
+  post_type: string
+  platform: string
+  caption: string | null
+  media_urls: string[]
+  account_id: string | null
+  page_id: string | null
+  schedule_type: SocialScheduleType
+  scheduled_at: string | null
+  status: SocialPostStatus
+  blotato_submission_id: string | null
+  blotato_post_url: string | null
+  error_message: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+  published_at: string | null
+}
+
+export interface SocialMediaPostInsert {
+  item_id?: string | null
+  item_code?: string | null
+  post_type?: string
+  platform?: string
+  caption?: string | null
+  media_urls?: string[]
+  account_id?: string | null
+  page_id?: string | null
+  schedule_type?: SocialScheduleType
+  scheduled_at?: string | null
+  status?: SocialPostStatus
+}
+
+export interface SocialMediaPostUpdate {
+  caption?: string | null
+  media_urls?: string[]
+  schedule_type?: SocialScheduleType
+  scheduled_at?: string | null
+  status?: SocialPostStatus
+  blotato_submission_id?: string | null
+  blotato_post_url?: string | null
+  error_message?: string | null
+  published_at?: string | null
+}
+
+export interface SocialMediaPostWithItem extends SocialMediaPost {
+  items: {
+    id: string
+    item_code: string
+    product_models: {
+      brand: string
+      model_name: string
+    } | null
+    condition_grade: string | null
+    selling_price: number | null
+  } | null
+}
+
 // Joined / composite types used across the app
 export type ItemWithRelations = Item & {
   suppliers: Supplier | null

@@ -1,4 +1,3 @@
-Initialising login role...
 export type Json =
   | string
   | number
@@ -12,31 +11,6 @@ export type Database = {
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.1"
-  }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
   }
   public: {
     Tables: {
@@ -597,6 +571,47 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_reviews: {
+        Row: {
+          created_at: string
+          customer_name: string
+          customer_quote: string
+          generated_caption: string | null
+          id: string
+          item_code: string | null
+          item_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_name: string
+          customer_quote: string
+          generated_caption?: string | null
+          id?: string
+          item_code?: string | null
+          item_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_name?: string
+          customer_quote?: string
+          generated_caption?: string | null
+          id?: string
+          item_code?: string | null
+          item_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_reviews_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
             referencedColumns: ["id"]
           },
         ]
@@ -2625,6 +2640,80 @@ export type Database = {
           },
         ]
       }
+      social_media_posts: {
+        Row: {
+          account_id: string | null
+          blotato_post_url: string | null
+          blotato_submission_id: string | null
+          caption: string | null
+          created_at: string
+          created_by: string | null
+          error_message: string | null
+          id: string
+          item_code: string | null
+          item_id: string | null
+          media_urls: string[]
+          page_id: string | null
+          platform: string
+          post_type: string
+          published_at: string | null
+          schedule_type: Database["public"]["Enums"]["social_schedule_type"]
+          scheduled_at: string | null
+          status: Database["public"]["Enums"]["social_post_status"]
+          updated_at: string
+        }
+        Insert: {
+          account_id?: string | null
+          blotato_post_url?: string | null
+          blotato_submission_id?: string | null
+          caption?: string | null
+          created_at?: string
+          created_by?: string | null
+          error_message?: string | null
+          id?: string
+          item_code?: string | null
+          item_id?: string | null
+          media_urls?: string[]
+          page_id?: string | null
+          platform?: string
+          post_type?: string
+          published_at?: string | null
+          schedule_type?: Database["public"]["Enums"]["social_schedule_type"]
+          scheduled_at?: string | null
+          status?: Database["public"]["Enums"]["social_post_status"]
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string | null
+          blotato_post_url?: string | null
+          blotato_submission_id?: string | null
+          caption?: string | null
+          created_at?: string
+          created_by?: string | null
+          error_message?: string | null
+          id?: string
+          item_code?: string | null
+          item_id?: string | null
+          media_urls?: string[]
+          page_id?: string | null
+          platform?: string
+          post_type?: string
+          published_at?: string | null
+          schedule_type?: Database["public"]["Enums"]["social_schedule_type"]
+          scheduled_at?: string | null
+          status?: Database["public"]["Enums"]["social_post_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_media_posts_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       staff_profiles: {
         Row: {
           avatar_url: string | null
@@ -3037,6 +3126,13 @@ export type Database = {
       queue_status: "PENDING" | "PROCESSING" | "SENT" | "FAILED"
       refund_payment_method: "BANK_TRANSFER" | "CASH"
       screen_condition: "GOOD" | "FAIR" | "POOR" | "CRACKED"
+      social_post_status:
+        | "draft"
+        | "queued"
+        | "processing"
+        | "published"
+        | "failed"
+      social_schedule_type: "now" | "next_slot" | "scheduled"
       source_type: "AUCTION" | "WHOLESALE" | "KAITORI"
       staff_role: "ADMIN" | "VA" | "IT" | "LIVE_SELLER"
       supplier_return_resolution: "EXCHANGE" | "REFUND"
@@ -3171,9 +3267,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       ac_adapter_status: ["CORRECT", "INCORRECT", "MISSING"],
@@ -3250,6 +3343,14 @@ export const Constants = {
       queue_status: ["PENDING", "PROCESSING", "SENT", "FAILED"],
       refund_payment_method: ["BANK_TRANSFER", "CASH"],
       screen_condition: ["GOOD", "FAIR", "POOR", "CRACKED"],
+      social_post_status: [
+        "draft",
+        "queued",
+        "processing",
+        "published",
+        "failed",
+      ],
+      social_schedule_type: ["now", "next_slot", "scheduled"],
       source_type: ["AUCTION", "WHOLESALE", "KAITORI"],
       staff_role: ["ADMIN", "VA", "IT", "LIVE_SELLER"],
       supplier_return_resolution: ["EXCHANGE", "REFUND"],
