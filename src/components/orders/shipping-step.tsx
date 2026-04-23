@@ -43,7 +43,8 @@ export function ShippingStep({
   onDeliveryTimeCodeChange,
 }: ShippingStepProps) {
   const [showNewForm, setShowNewForm] = useState(false)
-  const [newLabel, setNewLabel] = useState('')
+  const [labelType, setLabelType] = useState<'home' | 'office' | 'custom'>('home')
+  const [newLabel, setNewLabel] = useState('Home Address')
   const [newCareOf, setNewCareOf] = useState('')
   const [newAddress, setNewAddress] = useState<ShippingAddress | null>(null)
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null)
@@ -113,7 +114,8 @@ export function ShippingStep({
       onAddressSelect(newAddress, newCareOf || null)
       setSelectedAddressId(saved.id)
       setShowNewForm(false)
-      setNewLabel('')
+      setLabelType('home')
+      setNewLabel('Home Address')
       setNewCareOf('')
       setNewAddress(null)
     } catch (err) {
@@ -180,11 +182,32 @@ export function ShippingStep({
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-sm">Label *</Label>
-                  <Input
-                    placeholder='e.g. "Home", "Office"'
-                    value={newLabel}
-                    onChange={(e) => setNewLabel(e.target.value)}
-                  />
+                  <Select
+                    value={labelType}
+                    onValueChange={(v: 'home' | 'office' | 'custom') => {
+                      setLabelType(v)
+                      if (v === 'home') setNewLabel('Home Address')
+                      else if (v === 'office') setNewLabel('Office Address')
+                      else setNewLabel('')
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="home">Home Address</SelectItem>
+                      <SelectItem value="office">Office Address</SelectItem>
+                      <SelectItem value="custom">Custom</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {labelType === 'custom' && (
+                    <Input
+                      placeholder="Enter custom label"
+                      value={newLabel}
+                      onChange={(e) => setNewLabel(e.target.value)}
+                      className="mt-1.5"
+                    />
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-sm">C/O (Care of)</Label>

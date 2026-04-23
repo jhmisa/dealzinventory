@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Check, Clock, LogIn, ShoppingBag, UserPlus, X } from 'lucide-react'
+import { AlertTriangle, Check, Clock, LogIn, Plus, Search, ShoppingBag, UserPlus, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,9 +17,17 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 import { ShippingStep } from '@/components/orders/shipping-step'
 import { CustomerAuthContext, useCustomerAuthProvider } from '@/hooks/use-customer-auth'
 import { useOfferByCode, useClaimOffer, useOfferRealtimeSync, useAddItemByCode } from '@/hooks/use-offers'
+import { useAvailableAccessories } from '@/hooks/use-accessories'
 import { ImageGallery } from '@/components/shared/image-gallery'
 import type { GalleryImage } from '@/components/shared/image-gallery'
 import { CONDITION_GRADES, PAYMENT_METHODS } from '@/lib/constants'
@@ -345,6 +353,94 @@ type OfferItemRow = {
   } | null
 }
 
+// --- Add Products Dialog ---
+
+function AddProductsDialog({ offerId, addItemByCode }: {
+  offerId: string
+  addItemByCode: ReturnType<typeof useAddItemByCode>
+}) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(timer)
+  }, [search])
+
+  const { data: results, isLoading } = useAvailableAccessories(debouncedSearch)
+
+  const handleAdd = useCallback((code: string) => {
+    addItemByCode.mutate(
+      { offerId, code },
+      {
+        onSuccess: () => toast.success(`Added ${code}`),
+        onError: (err) => toast.error(err.message),
+      },
+    )
+  }, [offerId, addItemByCode])
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setSearch(''); setDebouncedSearch('') } }}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm">
+          <Plus className="h-4 w-4 mr-1" />
+          Add More Products
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Add Products</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by name or enter an A-code directly"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+              autoFocus
+            />
+          </div>
+          <div className="max-h-64 overflow-y-auto space-y-2">
+            {!debouncedSearch && (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Search by name or enter an A-code directly
+              </p>
+            )}
+            {debouncedSearch && isLoading && (
+              <p className="text-sm text-muted-foreground text-center py-4">Searching...</p>
+            )}
+            {debouncedSearch && !isLoading && results?.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">No products found</p>
+            )}
+            {results?.map((item) => (
+              <div key={item.id} className="flex items-center justify-between gap-3 p-2 border rounded-md">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{item.name}</p>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span className="font-mono">{item.accessory_code}</span>
+                    <span>{formatPrice(item.price)}</span>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={addItemByCode.isPending}
+                  onClick={() => handleAdd(item.accessory_code)}
+                >
+                  Add
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // --- Main Claim Page (inner, with auth context available) ---
 
 function OfferClaimInner() {
@@ -362,8 +458,6 @@ function OfferClaimInner() {
   const [deliveryTimeCode, setDeliveryTimeCode] = useState<string | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<string | null>(null)
   const [orderCreated, setOrderCreated] = useState<{ orderCode: string } | null>(null)
-  const [addACode, setAddACode] = useState('')
-  const [addingACode, setAddingACode] = useState(false)
 
   // Subscribe to realtime changes so staff edits appear instantly
   useOfferRealtimeSync(offer?.id)
@@ -503,8 +597,11 @@ function OfferClaimInner() {
 
         {/* Items List */}
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Items</CardTitle>
+            {offer.offer_status === 'PENDING' && (
+              <AddProductsDialog offerId={offer.id} addItemByCode={addItemByCode} />
+            )}
           </CardHeader>
           <CardContent className="space-y-3">
             {offerItems.map((oi) => {
@@ -601,63 +698,6 @@ function OfferClaimInner() {
           </CardContent>
         </Card>
 
-        {/* Add Accessory by A-code */}
-        {offer.offer_status === 'PENDING' && (
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground mb-2">Add an accessory by entering its A-code:</p>
-              <div className="flex gap-2">
-                <Input
-                  value={addACode}
-                  onChange={(e) => setAddACode(e.target.value)}
-                  placeholder="A000001"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && addACode.trim()) {
-                      setAddingACode(true)
-                      addItemByCode.mutate(
-                        { offerId: offer.id, code: addACode.trim() },
-                        {
-                          onSuccess: () => {
-                            toast.success(`Added ${addACode.trim()}`)
-                            setAddACode('')
-                            setAddingACode(false)
-                          },
-                          onError: (err) => {
-                            toast.error(err.message)
-                            setAddingACode(false)
-                          },
-                        },
-                      )
-                    }
-                  }}
-                />
-                <Button
-                  size="sm"
-                  disabled={addingACode || !addACode.trim()}
-                  onClick={() => {
-                    setAddingACode(true)
-                    addItemByCode.mutate(
-                      { offerId: offer.id, code: addACode.trim() },
-                      {
-                        onSuccess: () => {
-                          toast.success(`Added ${addACode.trim()}`)
-                          setAddACode('')
-                          setAddingACode(false)
-                        },
-                        onError: (err) => {
-                          toast.error(err.message)
-                          setAddingACode(false)
-                        },
-                      },
-                    )
-                  }}
-                >
-                  {addingACode ? 'Adding...' : 'Add'}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Staff Notes */}
         {offer.notes && (
@@ -782,6 +822,25 @@ function OfferClaimInner() {
                 ))}
               </CardContent>
             </Card>
+
+            {/* Validation Feedback */}
+            {(() => {
+              const missing: string[] = []
+              if (offerItems.length === 0) missing.push('No items in this offer')
+              if (!selectedAddress) missing.push('Please select a shipping address')
+              if (!paymentMethod) missing.push('Please choose a payment method')
+              if (missing.length === 0) return null
+              return (
+                <div className="border border-amber-300 bg-amber-50 rounded-lg p-3 space-y-1">
+                  {missing.map((msg) => (
+                    <div key={msg} className="flex items-center gap-2 text-sm text-amber-800">
+                      <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
+                      <span>{msg}</span>
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
 
             {/* Confirm Button */}
             <Button
