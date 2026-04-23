@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Dialog,
@@ -44,7 +45,7 @@ import {
   useAvailableItems,
   useUpdateSellGroup,
   useDeleteSellGroup,
-  useAssignItem,
+  useBulkAssignItems,
   useRemoveItem,
 } from '@/hooks/use-sell-groups'
 import { useProductModels } from '@/hooks/use-product-models'
@@ -65,13 +66,14 @@ export default function SellGroupDetailPage() {
 
   const updateMutation = useUpdateSellGroup()
   const deleteMutation = useDeleteSellGroup()
-  const assignMutation = useAssignItem()
+  const bulkAssignMutation = useBulkAssignItems()
   const removeMutation = useRemoveItem()
 
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pickerSearch, setPickerSearch] = useState('')
+  const [pickerSelectedIds, setPickerSelectedIds] = useState<Set<string>>(new Set())
 
   const form = useForm<SellGroupFormValues>({
     resolver: zodResolver(sellGroupSchema),
@@ -107,14 +109,27 @@ export default function SellGroupDetailPage() {
     })
   }
 
-  function handleAssign(itemId: string) {
-    assignMutation.mutate(
-      { sellGroupId: sg!.id, itemId },
+  function handleBulkAssign() {
+    if (pickerSelectedIds.size === 0) return
+    bulkAssignMutation.mutate(
+      { sellGroupId: sg!.id, itemIds: Array.from(pickerSelectedIds) },
       {
-        onSuccess: () => toast.success('Item assigned'),
+        onSuccess: () => {
+          toast.success(`${pickerSelectedIds.size} item${pickerSelectedIds.size !== 1 ? 's' : ''} assigned`)
+          setPickerSelectedIds(new Set())
+        },
         onError: (err) => toast.error(`Failed: ${err.message}`),
       },
     )
+  }
+
+  function togglePickerItem(id: string) {
+    setPickerSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
 
   function handleRemove(sellGroupItemId: string) {
@@ -249,7 +264,7 @@ export default function SellGroupDetailPage() {
       </Card>
 
       {/* Available Items Picker Dialog */}
-      <Dialog open={pickerOpen} onOpenChange={(open) => { setPickerOpen(open); if (!open) setPickerSearch('') }}>
+      <Dialog open={pickerOpen} onOpenChange={(open) => { setPickerOpen(open); if (!open) { setPickerSearch(''); setPickerSelectedIds(new Set()) } }}>
         <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>
@@ -286,11 +301,34 @@ export default function SellGroupDetailPage() {
                 </p>
               ) : (
                 <div className="space-y-1">
+                  {/* Select All Header */}
+                  <div className="flex items-center gap-3 px-3 py-2 border-b">
+                    <Checkbox
+                      checked={filtered.length > 0 && filtered.every((item) => pickerSelectedIds.has(item.id))}
+                      onCheckedChange={() => {
+                        const allSelected = filtered.every((item) => pickerSelectedIds.has(item.id))
+                        if (allSelected) {
+                          setPickerSelectedIds(new Set())
+                        } else {
+                          setPickerSelectedIds(new Set(filtered.map((item) => item.id)))
+                        }
+                      }}
+                    />
+                    <span className="text-xs font-medium text-muted-foreground uppercase">Select all</span>
+                  </div>
                   {filtered.map((item) => {
                     const aiPm = item.product_models as { brand: string; model_name: string; short_description: string | null } | null
                     return (
-                      <div key={item.id} className="flex items-center justify-between px-3 py-2 border rounded hover:bg-muted/50">
-                        <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        key={item.id}
+                        className={`flex items-center gap-3 px-3 py-2 border rounded hover:bg-muted/50 cursor-pointer ${pickerSelectedIds.has(item.id) ? 'bg-muted/30' : ''}`}
+                        onClick={() => togglePickerItem(item.id)}
+                      >
+                        <Checkbox
+                          checked={pickerSelectedIds.has(item.id)}
+                          onCheckedChange={() => togglePickerItem(item.id)}
+                        />
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
                           <CodeDisplay code={item.item_code} />
                           <GradeBadge grade={item.condition_grade} />
                           <span className="text-sm truncate">
@@ -300,15 +338,6 @@ export default function SellGroupDetailPage() {
                             <PriceDisplay amount={(item as { selling_price: number }).selling_price} />
                           )}
                         </div>
-                        <Button
-                          size="sm"
-                          className="ml-2 flex-shrink-0"
-                          onClick={() => handleAssign(item.id)}
-                          disabled={assignMutation.isPending}
-                        >
-                          <Plus className="h-3 w-3 mr-1" />
-                          Assign
-                        </Button>
                       </div>
                     )
                   })}
@@ -316,6 +345,18 @@ export default function SellGroupDetailPage() {
               )
             })()}
           </div>
+          {/* Bulk Assign Footer */}
+          {pickerSelectedIds.size > 0 && (
+            <div className="border-t pt-3 flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">{pickerSelectedIds.size} item{pickerSelectedIds.size !== 1 ? 's' : ''} selected</span>
+              <Button
+                onClick={handleBulkAssign}
+                disabled={bulkAssignMutation.isPending}
+              >
+                {bulkAssignMutation.isPending ? 'Assigning...' : `Assign Selected (${pickerSelectedIds.size})`}
+              </Button>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

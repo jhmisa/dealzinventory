@@ -161,3 +161,84 @@ export async function removeItemFromSellGroup(sellGroupItemId: string) {
 
   if (error) throw error
 }
+
+// Get all AVAILABLE items not yet assigned to any sell group or order (for new sell group creation)
+interface UnassignedItemFilters {
+  search?: string
+  grade?: string
+}
+
+export async function getUnassignedAvailableItems(filters: UnassignedItemFilters = {}) {
+  let query = supabase
+    .from('items')
+    .select(`
+      id, item_code, condition_grade, item_status, selling_price, product_id,
+      product_models(id, brand, model_name, color, cpu, ram_gb, storage_gb)
+    `)
+    .eq('item_status', 'AVAILABLE')
+    .neq('condition_grade', 'J')
+    .order('item_code', { ascending: false })
+
+  if (filters.grade) {
+    query = query.eq('condition_grade', filters.grade)
+  }
+
+  if (filters.search) {
+    const s = filters.search
+    query = query.or(`item_code.ilike.%${s}%,product_models.brand.ilike.%${s}%,product_models.model_name.ilike.%${s}%`)
+  }
+
+  const { data, error } = await query
+
+  if (error) throw error
+
+  // Filter out items already in any sell group or order
+  const [{ data: assignedItems }, { data: orderedItems }] = await Promise.all([
+    supabase.from('sell_group_items').select('item_id'),
+    supabase.from('order_items').select('item_id'),
+  ])
+
+  const excludedIds = new Set([
+    ...(assignedItems ?? []).map(a => a.item_id),
+    ...(orderedItems ?? []).map(o => o.item_id),
+  ])
+
+  return (data ?? []).filter(item => !excludedIds.has(item.id))
+}
+
+// Create a sell group and assign items in one action
+export async function createSellGroupWithItems(
+  sg: SellGroupInsert,
+  itemIds: string[],
+) {
+  const { data, error } = await supabase
+    .from('sell_groups')
+    .insert(sg)
+    .select()
+    .single()
+
+  if (error) throw error
+
+  const sellGroup = data as SellGroup
+
+  if (itemIds.length > 0) {
+    const { error: assignError } = await supabase
+      .from('sell_group_items')
+      .insert(itemIds.map(itemId => ({ sell_group_id: sellGroup.id, item_id: itemId })))
+
+    if (assignError) throw assignError
+  }
+
+  return sellGroup
+}
+
+// Bulk assign multiple items to a sell group
+export async function bulkAssignItems(sellGroupId: string, itemIds: string[]) {
+  if (itemIds.length === 0) return
+
+  const { error } = await supabase
+    .from('sell_group_items')
+    .insert(itemIds.map(itemId => ({ sell_group_id: sellGroupId, item_id: itemId })))
+
+  if (error) throw error
+}

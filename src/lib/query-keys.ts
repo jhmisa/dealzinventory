@@ -35,6 +35,7 @@ export const queryKeys = {
     detail: (id: string) => [...queryKeys.sellGroups.details(), id] as const,
     items: (id: string) => [...queryKeys.sellGroups.all, 'items', id] as const,
     available: (id: string) => [...queryKeys.sellGroups.all, 'available', id] as const,
+    unassigned: (filters: Record<string, unknown>) => [...queryKeys.sellGroups.all, 'unassigned', filters] as const,
   },
   orders: {
     all: ['orders'] as const,

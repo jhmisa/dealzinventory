@@ -100,3 +100,41 @@ export function useRemoveItem() {
     },
   })
 }
+
+interface UnassignedItemFilters {
+  search?: string
+  grade?: string
+}
+
+export function useUnassignedItems(filters: UnassignedItemFilters = {}) {
+  return useQuery({
+    queryKey: queryKeys.sellGroups.unassigned(filters),
+    queryFn: () => sellGroupsService.getUnassignedAvailableItems(filters),
+  })
+}
+
+export function useCreateSellGroupWithItems() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ sg, itemIds }: { sg: Omit<SellGroupInsert, 'sell_group_code'>; itemIds: string[] }) => {
+      const code = await sellGroupsService.generateSellGroupCode()
+      return sellGroupsService.createSellGroupWithItems({ ...sg, sell_group_code: code }, itemIds)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.sellGroups.all })
+    },
+  })
+}
+
+export function useBulkAssignItems() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ sellGroupId, itemIds }: { sellGroupId: string; itemIds: string[] }) =>
+      sellGroupsService.bulkAssignItems(sellGroupId, itemIds),
+    onSuccess: (_, { sellGroupId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.sellGroups.items(sellGroupId) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.sellGroups.available(sellGroupId) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.sellGroups.lists() })
+    },
+  })
+}
