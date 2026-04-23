@@ -226,8 +226,27 @@ export type CustomerReviewInsert = Tables['customer_reviews']['Insert']
 export type CustomerReviewUpdate = Tables['customer_reviews']['Update']
 
 // Social Media Posts — manually defined until DB types are regenerated
-export type SocialPostStatus = 'draft' | 'queued' | 'processing' | 'published' | 'failed'
+export type SocialPostStatus = 'draft' | 'queued' | 'processing' | 'scheduled' | 'published' | 'failed'
 export type SocialScheduleType = 'now' | 'next_slot' | 'scheduled'
+
+export interface SocialMediaPostItemSpecs {
+  brand?: string | null
+  model_name?: string | null
+  model_number?: string | null
+  part_number?: string | null
+  year?: number | null
+  ram_gb?: number | null
+  storage_gb?: number | null
+  cpu?: string | null
+  gpu?: string | null
+  screen_size?: string | null
+  color?: string | null
+  os_family?: string | null
+  other_features?: string | null
+  condition_grade?: string | null
+  selling_price?: number | null
+  condition_notes?: string | null
+}
 
 export interface SocialMediaPost {
   id: string
@@ -249,6 +268,7 @@ export interface SocialMediaPost {
   created_at: string
   updated_at: string
   published_at: string | null
+  item_specs: SocialMediaPostItemSpecs
 }
 
 export interface SocialMediaPostInsert {

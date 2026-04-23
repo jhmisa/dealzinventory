@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import type { SocialMediaPostWithItem, SocialPostStatus } from '@/lib/types'
 import { KanbanColumn } from './kanban-column'
 
-const COLUMNS: SocialPostStatus[] = ['draft', 'queued', 'published', 'failed']
+const COLUMNS: SocialPostStatus[] = ['draft', 'queued', 'scheduled', 'published', 'failed']
 
 interface KanbanBoardProps {
   posts: SocialMediaPostWithItem[]
@@ -17,6 +17,7 @@ export function KanbanBoard({ posts, onQueue, onDelete, onRetry }: KanbanBoardPr
       draft: [],
       queued: [],
       processing: [],
+      scheduled: [],
       published: [],
       failed: [],
     }

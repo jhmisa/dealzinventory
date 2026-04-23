@@ -36,9 +36,45 @@ export async function getSocialMediaPost(id: string) {
 export async function createSocialMediaPost(post: SocialMediaPostInsert) {
   const { data: { user } } = await supabase.auth.getUser()
 
+  // Fetch item specs for embedding
+  let itemSpecs = {}
+  if (post.item_id) {
+    const { data: item } = await supabase
+      .from('items')
+      .select(`
+        condition_grade, selling_price, color, condition_notes,
+        ram_gb, storage_gb, cpu, gpu, os_family,
+        product_models(brand, model_name, model_number, part_number, year, screen_size, other_features)
+      `)
+      .eq('id', post.item_id)
+      .single()
+
+    if (item) {
+      const pm = item.product_models as Record<string, unknown> | null
+      itemSpecs = {
+        brand: pm?.brand ?? null,
+        model_name: pm?.model_name ?? null,
+        model_number: pm?.model_number ?? null,
+        part_number: pm?.part_number ?? null,
+        year: pm?.year ?? null,
+        ram_gb: item.ram_gb,
+        storage_gb: item.storage_gb,
+        cpu: item.cpu,
+        gpu: item.gpu,
+        screen_size: pm?.screen_size ?? null,
+        color: item.color,
+        os_family: item.os_family,
+        other_features: pm?.other_features ?? null,
+        condition_grade: item.condition_grade,
+        selling_price: item.selling_price,
+        condition_notes: item.condition_notes,
+      }
+    }
+  }
+
   const { data, error } = await supabase
     .from('social_media_posts')
-    .insert({ ...post, created_by: user?.id ?? null })
+    .insert({ ...post, created_by: user?.id ?? null, item_specs: itemSpecs })
     .select()
     .single()
 

@@ -5,6 +5,7 @@ const statusConfig: Record<SocialPostStatus, { label: string; color: string }> =
   draft: { label: 'Draft', color: 'bg-muted' },
   queued: { label: 'Queued', color: 'bg-blue-100 dark:bg-blue-950' },
   processing: { label: 'Processing', color: 'bg-yellow-100 dark:bg-yellow-950' },
+  scheduled: { label: 'Scheduled', color: 'bg-purple-100 dark:bg-purple-950' },
   published: { label: 'Published', color: 'bg-green-100 dark:bg-green-950' },
   failed: { label: 'Failed', color: 'bg-red-100 dark:bg-red-950' },
 }
