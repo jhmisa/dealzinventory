@@ -12,10 +12,12 @@ import { useSystemSetting, useUpdateSystemSetting } from '@/hooks/use-settings'
 export default function GeneralSettingsPage() {
   const { data: surchargeValue, isLoading } = useSystemSetting('credit_card_surcharge_pct')
   const { data: shopEnabledValue, isLoading: shopLoading } = useSystemSetting('shop_enabled')
+  const { data: hideNoPriceValue, isLoading: hideNoPriceLoading } = useSystemSetting('shop_hide_no_price')
   const updateSetting = useUpdateSystemSetting()
   const [surcharge, setSurcharge] = useState('')
 
   const shopEnabled = shopEnabledValue !== 'false'
+  const hideNoPrice = hideNoPriceValue !== 'false'
 
   useEffect(() => {
     if (surchargeValue !== undefined && surchargeValue !== null) {
@@ -68,6 +70,22 @@ export default function GeneralSettingsPage() {
               }}
             />
             <Label>{shopEnabled ? 'Shop is live' : 'Shop is disabled'}</Label>
+          </div>
+          <div className="flex items-center gap-3 mt-4">
+            <Switch
+              checked={hideNoPrice}
+              disabled={hideNoPriceLoading}
+              onCheckedChange={(checked) => {
+                updateSetting.mutate(
+                  { key: 'shop_hide_no_price', value: checked ? 'true' : 'false' },
+                  {
+                    onSuccess: () => toast.success(checked ? 'Items without price will be hidden' : 'All items will be shown'),
+                    onError: (err) => toast.error(err.message),
+                  },
+                )
+              }}
+            />
+            <Label>{hideNoPrice ? 'Hiding items without a selling price' : 'Showing all items regardless of price'}</Label>
           </div>
         </CardContent>
       </Card>

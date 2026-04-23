@@ -77,7 +77,7 @@ export async function getInventoryRemoval(id: string) {
       *,
       items(
         id, item_code, brand, model_name, color, condition_grade,
-        purchase_price, serial_number, item_status,
+        purchase_price, item_status,
         product_models(brand, model_name, color, cpu, ram_gb, storage_gb)
       )
     `)

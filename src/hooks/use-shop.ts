@@ -70,6 +70,13 @@ export function useShopEnabled() {
   })
 }
 
+export function useShopHideNoPrice() {
+  return useQuery({
+    queryKey: queryKeys.shop.hideNoPrice(),
+    queryFn: () => shopService.getShopHideNoPrice(),
+  })
+}
+
 export function useShopAccessories(filters: { search?: string; categoryId?: string; sort?: string } = {}) {
   return useQuery({
     queryKey: queryKeys.shop.accessories(filters),

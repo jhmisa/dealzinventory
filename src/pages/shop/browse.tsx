@@ -20,7 +20,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet'
 import { Label } from '@/components/ui/label'
-import { useShopItems, useShopSellGroups, useShopBrands, useShopCategories, useShopEnabled, useShopAccessories } from '@/hooks/use-shop'
+import { useShopItems, useShopSellGroups, useShopBrands, useShopCategories, useShopEnabled, useShopAccessories, useShopHideNoPrice } from '@/hooks/use-shop'
 import { CONDITION_GRADES } from '@/lib/constants'
 import { formatPrice, cn } from '@/lib/utils'
 import type { Accessory, AccessoryMedia } from '@/lib/types'
@@ -38,6 +38,7 @@ export default function ShopBrowsePage() {
   const [sort, setSort] = useState<SortOption>('newest')
 
   const { data: shopEnabled } = useShopEnabled()
+  const { data: hideNoPrice } = useShopHideNoPrice()
 
   const filters = {
     search: search || undefined,
@@ -45,6 +46,7 @@ export default function ShopBrowsePage() {
     grade: grade === 'all' ? undefined : grade,
     category: category === 'all' ? undefined : category,
     sort,
+    hideNoPrice: hideNoPrice ?? false,
   }
 
   const { data: items, isLoading: itemsLoading } = useShopItems(filters)

@@ -55,7 +55,7 @@ export default function InventoryRemovalDetailPage() {
   const item = removal.items as {
     id: string; item_code: string; brand: string | null; model_name: string | null
     color: string | null; condition_grade: string | null; purchase_price: number | null
-    serial_number: string | null; item_status: string
+    item_status: string
     product_models: { brand: string | null; model_name: string | null; color: string | null; cpu: string | null; ram_gb: string | null; storage_gb: string | null } | null
   } | null
   const status = removal.removal_status as string
@@ -152,12 +152,6 @@ export default function InventoryRemovalDetailPage() {
                     <p className="text-xs text-muted-foreground">Color</p>
                     <p className="text-sm">{item.color ?? item.product_models?.color ?? '—'}</p>
                   </div>
-                  {item.serial_number && (
-                    <div>
-                      <p className="text-xs text-muted-foreground">Serial Number</p>
-                      <p className="text-sm font-mono">{item.serial_number}</p>
-                    </div>
-                  )}
                   <div>
                     <p className="text-xs text-muted-foreground">Purchase Price</p>
                     <p className="text-sm font-medium">{item.purchase_price != null ? formatPrice(item.purchase_price) : '—'}</p>

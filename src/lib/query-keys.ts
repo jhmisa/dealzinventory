@@ -63,6 +63,7 @@ export const queryKeys = {
     brands: () => [...queryKeys.shop.all, 'brands'] as const,
     categories: () => [...queryKeys.shop.all, 'categories'] as const,
     enabled: () => [...queryKeys.shop.all, 'enabled'] as const,
+    hideNoPrice: () => [...queryKeys.shop.all, 'hide-no-price'] as const,
     accessories: (filters: Record<string, unknown>) => [...queryKeys.shop.all, 'accessories', filters] as const,
   },
   kaitori: {

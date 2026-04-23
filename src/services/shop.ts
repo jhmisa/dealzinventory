@@ -8,6 +8,7 @@ export interface ShopFilters {
   minPrice?: number
   maxPrice?: number
   sort?: 'price_asc' | 'price_desc' | 'newest'
+  hideNoPrice?: boolean
 }
 
 // ---------- Unified shop listing type ----------
@@ -40,6 +41,10 @@ export async function getShopItems(filters: ShopFilters = {}) {
     `)
     .eq('item_status', 'AVAILABLE')
     .neq('condition_grade', 'J')
+
+  if (filters.hideNoPrice) {
+    query = query.not('selling_price', 'is', null)
+  }
 
   if (filters.grade) {
     query = query.eq('condition_grade', filters.grade)
@@ -98,6 +103,10 @@ export async function getShopSellGroups(filters: ShopFilters = {}) {
       sell_group_items(count)
     `)
     .eq('active', true)
+
+  if (filters.hideNoPrice) {
+    query = query.not('base_price', 'is', null)
+  }
 
   if (filters.grade) {
     query = query.eq('condition_grade', filters.grade)
@@ -203,6 +212,18 @@ export async function getShopEnabled(): Promise<boolean> {
     .single()
 
   if (error) return true // Default to enabled
+  return data.value !== 'false'
+}
+
+// Check if items without a selling price should be hidden
+export async function getShopHideNoPrice(): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('system_settings')
+    .select('value')
+    .eq('key', 'shop_hide_no_price')
+    .single()
+
+  if (error) return true // Default to hiding
   return data.value !== 'false'
 }
 
