@@ -127,6 +127,11 @@ export function AddressForm({ value, onChange, required = false }: AddressFormPr
       onChange(null)
       return
     }
+    // Address Line 1 is required for a valid address
+    if (!addressLine1.trim()) {
+      onChange(null)
+      return
+    }
     const addr: ShippingAddressJP = {
       country: 'JP',
       postal_code: postalCode.replace(/-/g, ''),
@@ -144,6 +149,11 @@ export function AddressForm({ value, onChange, required = false }: AddressFormPr
 
   const emitIntl = useCallback(() => {
     if (!intlLine1 && !intlCity && !required) {
+      onChange(null)
+      return
+    }
+    // Address Line 1 is required for a valid address
+    if (!intlLine1.trim()) {
       onChange(null)
       return
     }
@@ -325,12 +335,13 @@ export function AddressForm({ value, onChange, required = false }: AddressFormPr
 
           {/* Address Lines */}
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Address Line 1 (番地)</Label>
+            <Label className="text-xs text-muted-foreground">Address Line 1 (番地) *</Label>
             <Input
               placeholder="1-2-3"
               value={addressLine1}
               onChange={(e) => setAddressLine1(e.target.value)}
               onBlur={handleBlurJP}
+              required
             />
           </div>
           <div className="space-y-1">
@@ -347,12 +358,13 @@ export function AddressForm({ value, onChange, required = false }: AddressFormPr
         /* International address (WooCommerce/PayPal style) */
         <div className="space-y-3 rounded-lg border p-3">
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Address Line 1</Label>
+            <Label className="text-xs text-muted-foreground">Address Line 1 *</Label>
             <Input
               placeholder="123 Main Street"
               value={intlLine1}
               onChange={(e) => setIntlLine1(e.target.value)}
               onBlur={handleBlurIntl}
+              required
             />
           </div>
           <div className="space-y-1">
