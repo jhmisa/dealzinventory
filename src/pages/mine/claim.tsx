@@ -602,6 +602,7 @@ function MineClaimInner() {
               {(() => {
                 const missing: string[] = []
                 if (!selectedAddress) missing.push('Please select a shipping address')
+                if (!deliveryTimeCode) missing.push('Please choose a delivery time')
                 if (!paymentMethod) missing.push('Please choose a payment method')
                 if (missing.length === 0) return null
                 return (
@@ -621,7 +622,7 @@ function MineClaimInner() {
                 className="w-full"
                 size="lg"
                 onClick={handleConfirmOrder}
-                disabled={claimMine.isPending || !selectedAddress || !paymentMethod}
+                disabled={claimMine.isPending || !selectedAddress || !deliveryTimeCode || !paymentMethod}
               >
                 {claimMine.isPending ? 'Confirming...' : `Confirm Order — ${formatPrice(product.price)}`}
               </Button>
