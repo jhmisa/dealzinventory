@@ -29,6 +29,24 @@ export interface ShopListing {
 // ---------- Individual items (P-codes) ----------
 
 export async function getShopItems(filters: ShopFilters = {}) {
+  // Exclude items that belong to an active sell group (they appear via the group listing)
+  const { data: activeSGs } = await supabase
+    .from('sell_groups')
+    .select('id')
+    .eq('active', true)
+
+  const activeSGIds = (activeSGs ?? []).map(sg => sg.id)
+
+  let excludeIds: string[] = []
+  if (activeSGIds.length > 0) {
+    const { data: sgItemRows } = await supabase
+      .from('sell_group_items')
+      .select('item_id')
+      .in('sell_group_id', activeSGIds)
+
+    excludeIds = (sgItemRows ?? []).map(r => r.item_id)
+  }
+
   let query = supabase
     .from('items')
     .select(`
@@ -41,6 +59,10 @@ export async function getShopItems(filters: ShopFilters = {}) {
     `)
     .eq('item_status', 'AVAILABLE')
     .neq('condition_grade', 'J')
+
+  if (excludeIds.length > 0) {
+    query = query.not('id', 'in', `(${excludeIds.join(',')})`)
+  }
 
   if (filters.hideNoPrice) {
     query = query.not('selling_price', 'is', null)
