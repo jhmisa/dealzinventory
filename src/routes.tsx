@@ -41,6 +41,7 @@ const ItemsColumnSettingsPage = lazy(() => import('@/pages/admin/items-column-se
 const PostalCodesPage = lazy(() => import('@/pages/admin/postal-codes'))
 const MediaStudioPage = lazy(() => import('@/pages/admin/media-studio'))
 const OfferClaimPage = lazy(() => import('@/pages/offer/claim'))
+const MineClaimPage = lazy(() => import('@/pages/mine/claim'))
 const ShopBrowsePage = lazy(() => import('@/pages/shop/browse'))
 const ShopProductDetailPage = lazy(() => import('@/pages/shop/product-detail'))
 const ShopItemDetailPage = lazy(() => import('@/pages/shop/item-detail'))
@@ -192,6 +193,10 @@ export const router = createBrowserRouter([
   {
     path: '/offer/:offerCode',
     element: lazyElement(OfferClaimPage),
+  },
+  {
+    path: '/mine/:code?',
+    element: lazyElement(MineClaimPage),
   },
   {
     path: '/order/:sellGroupCode',

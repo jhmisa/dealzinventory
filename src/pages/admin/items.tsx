@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Plus, Printer, QrCode, Pencil, Copy, AlertTriangle, Image, Play, Star, X } from 'lucide-react'
+import { Plus, Printer, QrCode, Pencil, Copy, AlertTriangle, Image, Play, Star, X, Link2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -719,6 +719,19 @@ export default function ItemListPage() {
                     variant="ghost"
                     size="icon"
                     className="h-6 w-6"
+                    title="Copy Mine link"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      navigator.clipboard.writeText(`${window.location.origin}/mine/${r.accessory_code}`)
+                      toast.success('Mine link copied')
+                    }}
+                  >
+                    <Link2 className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
                     title="Showcase Photos"
                     onClick={(e) => { e.stopPropagation(); openShowcase(r.accessory_code, 'photos') }}
                   >
@@ -756,6 +769,19 @@ export default function ItemListPage() {
                   <CodeDisplay code={r.sell_group_code} />
                   <GradeBadge grade={r.condition_grade as ConditionGrade} />
                   <Badge variant="secondary" className="text-xs">{r._sg_item_count} item{r._sg_item_count !== 1 ? 's' : ''}</Badge>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    title="Copy Mine link"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      navigator.clipboard.writeText(`${window.location.origin}/mine/${r.sell_group_code}`)
+                      toast.success('Mine link copied')
+                    }}
+                  >
+                    <Link2 className="h-3 w-3" />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -845,6 +871,19 @@ export default function ItemListPage() {
                   }}
                 >
                   <Copy className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  title="Copy Mine link"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    navigator.clipboard.writeText(`${window.location.origin}/mine/${r.item_code}`)
+                    toast.success('Mine link copied')
+                  }}
+                >
+                  <Link2 className="h-3 w-3" />
                 </Button>
                 <Button
                   variant="ghost"
@@ -1111,6 +1150,19 @@ export default function ItemListPage() {
                   }}
                 >
                   <Copy className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  title="Copy Mine link"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    navigator.clipboard.writeText(`${window.location.origin}/mine/${r.item_code}`)
+                    toast.success('Mine link copied')
+                  }}
+                >
+                  <Link2 className="h-3 w-3" />
                 </Button>
                 <Button
                   variant="ghost"
