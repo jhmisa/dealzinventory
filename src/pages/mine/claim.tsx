@@ -310,6 +310,7 @@ function MineClaimInner() {
   const authState = useCustomerAuthProvider()
   const { customer, isAuthenticated, isLoading: authLoading, login, register, logout } = authState
 
+  const [showClaimFlow, setShowClaimFlow] = useState(false)
   const [authStep, setAuthStep] = useState<AuthStep>('choose')
   const [selectedAddress, setSelectedAddress] = useState<{ address: ShippingAddress; careOf?: string | null } | null>(null)
   const [deliveryDate, setDeliveryDate] = useState<string | null>(null)
@@ -488,8 +489,17 @@ function MineClaimInner() {
             <Button className="w-full" size="lg" disabled>
               Unavailable
             </Button>
+          ) : !isAuthenticated && !showClaimFlow ? (
+            <Button
+              className="w-full text-lg font-bold py-6"
+              size="lg"
+              onClick={() => setShowClaimFlow(true)}
+            >
+              <ShoppingBag className="h-5 w-5 mr-2" />
+              Claim Now
+            </Button>
           ) : !isAuthenticated ? (
-            <>
+            <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-300">
               {authStep === 'choose' && (
                 <Card>
                   <CardContent className="p-6 space-y-3">
@@ -532,7 +542,7 @@ function MineClaimInner() {
                   onRegister={register}
                 />
               )}
-            </>
+            </div>
           ) : (
             <>
               {/* Logged-in indicator */}

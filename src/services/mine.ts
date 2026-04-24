@@ -66,8 +66,22 @@ async function getClaimableItem(code: string): Promise<ClaimableProduct | null> 
     const specParts = [pm?.cpu, pm?.ram_gb, pm?.storage_gb, pm?.screen_size ? `${pm.screen_size}"` : null].filter(Boolean)
     const subtitle = pm?.short_description || specParts.join(' / ') || ''
 
-    // Combine product media and item media
+    // Fetch photo group media (primary product shots)
+    let photoGroupMedia: { id: string; file_url: string; media_type: string; sort_order: number }[] = []
+    if (item.photo_group_id) {
+      const { data: pgm } = await supabase
+        .from('photo_group_media')
+        .select('id, file_url, media_type, sort_order')
+        .eq('photo_group_id', item.photo_group_id)
+        .order('sort_order')
+      photoGroupMedia = pgm ?? []
+    }
+
+    // Combine media: photo_group_media > item_media > product_media (fallback)
     const media: GalleryImage[] = []
+    for (const m of photoGroupMedia) {
+      media.push({ id: m.id, url: m.file_url, mediaType: m.media_type === 'video' ? 'video' : 'image' })
+    }
     const itemMedia = (item.item_media ?? []) as { id: string; file_url: string; media_type: string; sort_order: number; visible: boolean }[]
     const visibleItemMedia = itemMedia.filter(m => m.visible !== false).sort((a, b) => a.sort_order - b.sort_order)
     for (const m of visibleItemMedia) {
@@ -113,10 +127,26 @@ async function getClaimableSellGroup(code: string): Promise<ClaimableProduct | n
     const specParts = [pm?.cpu, pm?.ram_gb, pm?.storage_gb, pm?.screen_size ? `${pm.screen_size}"` : null].filter(Boolean)
     const subtitle = pm?.short_description || specParts.join(' / ') || ''
 
+    // Fetch photo group media (primary product shots)
+    let photoGroupMedia: { id: string; file_url: string; media_type: string; sort_order: number }[] = []
+    if (sg.photo_group_id) {
+      const { data: pgm } = await supabase
+        .from('photo_group_media')
+        .select('id, file_url, media_type, sort_order')
+        .eq('photo_group_id', sg.photo_group_id)
+        .order('sort_order')
+      photoGroupMedia = pgm ?? []
+    }
+
+    // Combine media: photo_group_media > product_media (fallback)
+    const media: GalleryImage[] = []
+    for (const m of photoGroupMedia) {
+      media.push({ id: m.id, url: m.file_url, mediaType: m.media_type === 'video' ? 'video' : 'image' })
+    }
     const productMedia = (pm?.product_media ?? []).sort((a, b) => a.sort_order - b.sort_order)
-    const media: GalleryImage[] = productMedia.map(m => ({
-      id: m.id, url: m.file_url, mediaType: m.media_type === 'video' ? 'video' : 'image',
-    }))
+    for (const m of productMedia) {
+      media.push({ id: m.id, url: m.file_url, mediaType: m.media_type === 'video' ? 'video' : 'image' })
+    }
 
     // Count available items in the sell group
     const items = (sg.sell_group_items ?? []) as { items: { id: string; item_status: string; condition_grade: string } | null }[]
