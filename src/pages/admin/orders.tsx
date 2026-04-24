@@ -44,6 +44,8 @@ type OrderRow = {
   delivery_box_count: number
   yamato_status: string | null
   delivery_issue_flag: boolean
+  receiver_first_name: string | null
+  receiver_last_name: string | null
 }
 
 function PrintStatusCell({ order }: { order: OrderRow }) {
@@ -108,10 +110,20 @@ const columns: ColumnDef<OrderRow>[] = [
     cell: ({ row }) => {
       const c = row.original.customers
       if (!c) return '—'
+      const receiverName = [row.original.receiver_first_name, row.original.receiver_last_name].filter(Boolean).join(' ')
       return (
         <div>
-          <span>{formatCustomerName(c)}</span>
-          <span className="ml-2 text-xs text-muted-foreground">{c.customer_code}</span>
+          {receiverName ? (
+            <>
+              <span>{receiverName}</span>
+              <span className="ml-2 text-xs text-muted-foreground">{formatCustomerName(c)}</span>
+            </>
+          ) : (
+            <>
+              <span>{formatCustomerName(c)}</span>
+              <span className="ml-2 text-xs text-muted-foreground">{c.customer_code}</span>
+            </>
+          )}
         </div>
       )
     },

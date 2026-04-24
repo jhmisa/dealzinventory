@@ -22,6 +22,19 @@ export async function getOrders(filters: OrderFilters = {}) {
     matchingCustomerIds = customers?.map((c) => c.id) ?? []
   }
 
+  // Also search by receiver name on orders directly
+  let receiverOrderIds: string[] | null = null
+  if (filters.search) {
+    const term = filters.search
+    const { data: receiverOrders } = await supabase
+      .from('orders')
+      .select('id')
+      .or(
+        `receiver_first_name.ilike.%${term}%,receiver_last_name.ilike.%${term}%`
+      )
+    receiverOrderIds = receiverOrders?.map((o) => o.id) ?? []
+  }
+
   let query = supabase
     .from('orders')
     .select(`
@@ -36,14 +49,15 @@ export async function getOrders(filters: OrderFilters = {}) {
     .order('created_at', { ascending: false })
 
   if (filters.search) {
-    // Match orders by order_code OR by customer
+    // Match orders by order_code, customer, or receiver name
+    const orParts = [`order_code.ilike.%${filters.search}%`]
     if (matchingCustomerIds && matchingCustomerIds.length > 0) {
-      query = query.or(
-        `order_code.ilike.%${filters.search}%,customer_id.in.(${matchingCustomerIds.join(',')})`
-      )
-    } else {
-      query = query.ilike('order_code', `%${filters.search}%`)
+      orParts.push(`customer_id.in.(${matchingCustomerIds.join(',')})`)
     }
+    if (receiverOrderIds && receiverOrderIds.length > 0) {
+      orParts.push(`id.in.(${receiverOrderIds.join(',')})`)
+    }
+    query = query.or(orParts.join(','))
   }
   if (filters.status) {
     query = query.eq('order_status', filters.status)
@@ -303,6 +317,9 @@ interface ManualOrderInput {
   delivery_time_code?: string | null
   notes?: string | null
   shipping_cost: number
+  receiver_first_name?: string | null
+  receiver_last_name?: string | null
+  receiver_phone?: string | null
   items: {
     item_id: string | null
     accessory_id?: string | null
@@ -336,6 +353,9 @@ export async function createManualOrder(input: ManualOrderInput) {
       delivery_time_code: input.delivery_time_code ?? null,
       notes: input.notes ?? null,
       shipping_cost: input.shipping_cost,
+      receiver_first_name: input.receiver_first_name ?? null,
+      receiver_last_name: input.receiver_last_name ?? null,
+      receiver_phone: input.receiver_phone ?? null,
       sell_group_id: null,
     })
     .select()

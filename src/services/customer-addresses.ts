@@ -22,6 +22,15 @@ export async function createCustomerAddress(address: CustomerAddressInsert) {
       .eq('customer_id', address.customer_id)
   }
 
+  // Auto-generate label if not provided
+  if (!address.label) {
+    const { count } = await supabase
+      .from('customer_addresses')
+      .select('id', { count: 'exact', head: true })
+      .eq('customer_id', address.customer_id)
+    address.label = `Address ${(count ?? 0) + 1}`
+  }
+
   const { data, error } = await supabase
     .from('customer_addresses')
     .insert(address)

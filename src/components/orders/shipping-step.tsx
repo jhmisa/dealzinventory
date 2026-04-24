@@ -20,16 +20,28 @@ import { Plus, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { ShippingAddress } from '@/lib/address-types'
 import type { Customer } from '@/lib/types'
+import { formatCustomerName } from '@/lib/utils'
+
+interface ReceiverInfo {
+  receiverFirstName?: string | null
+  receiverLastName?: string | null
+  receiverPhone?: string | null
+}
 
 interface ShippingStepProps {
   customer: Customer
   orderSource: string
-  selectedAddress: { address: ShippingAddress; careOf?: string | null } | null
-  onAddressSelect: (address: ShippingAddress, careOf?: string | null) => void
+  selectedAddress: { address: ShippingAddress } & ReceiverInfo | null
+  onAddressSelect: (address: ShippingAddress, receiver?: ReceiverInfo) => void
   deliveryDate: string | null
   onDeliveryDateChange: (date: string | null) => void
   deliveryTimeCode: string | null
   onDeliveryTimeCodeChange: (code: string | null) => void
+}
+
+function formatReceiverName(receiver: ReceiverInfo): string | undefined {
+  const parts = [receiver.receiverFirstName, receiver.receiverLastName].filter(Boolean)
+  return parts.length > 0 ? parts.join(' ') : undefined
 }
 
 export function ShippingStep({
@@ -43,9 +55,10 @@ export function ShippingStep({
   onDeliveryTimeCodeChange,
 }: ShippingStepProps) {
   const [showNewForm, setShowNewForm] = useState(false)
-  const [labelType, setLabelType] = useState<'home' | 'office' | 'custom'>('home')
-  const [newLabel, setNewLabel] = useState('Home Address')
-  const [newCareOf, setNewCareOf] = useState('')
+  const [receiverType, setReceiverType] = useState<'same' | 'new'>('same')
+  const [newReceiverFirstName, setNewReceiverFirstName] = useState('')
+  const [newReceiverLastName, setNewReceiverLastName] = useState('')
+  const [newReceiverPhone, setNewReceiverPhone] = useState('')
   const [newAddress, setNewAddress] = useState<ShippingAddress | null>(null)
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null)
 
@@ -55,14 +68,23 @@ export function ShippingStep({
   const isWalkIn = orderSource === 'WALK_IN'
 
   // Build address list: saved addresses + legacy fallback
-  const addressOptions: { id: string; label: string; careOf?: string | null; address: ShippingAddress }[] = []
+  const addressOptions: {
+    id: string
+    label: string
+    receiverFirstName?: string | null
+    receiverLastName?: string | null
+    receiverPhone?: string | null
+    address: ShippingAddress
+  }[] = []
 
   if (savedAddresses) {
     for (const addr of savedAddresses) {
       addressOptions.push({
         id: addr.id,
         label: addr.label,
-        careOf: addr.care_of,
+        receiverFirstName: addr.receiver_first_name,
+        receiverLastName: addr.receiver_last_name,
+        receiverPhone: addr.receiver_phone,
         address: addr.address as unknown as ShippingAddress,
       })
     }
@@ -82,7 +104,6 @@ export function ShippingStep({
       addressOptions.push({
         id: '__legacy__',
         label: 'Primary Address',
-        careOf: null,
         address: legacyAddr,
       })
     }
@@ -95,28 +116,42 @@ export function ShippingStep({
     setSelectedAddressId(id)
     const option = addressOptions.find((a) => a.id === id)
     if (option) {
-      onAddressSelect(option.address, option.careOf)
+      onAddressSelect(option.address, {
+        receiverFirstName: option.receiverFirstName,
+        receiverLastName: option.receiverLastName,
+        receiverPhone: option.receiverPhone,
+      })
     }
   }
 
   const handleSaveNewAddress = async () => {
-    if (!newAddress || !newLabel) return
+    if (!newAddress) return
+
+    const hasReceiver = receiverType === 'new' && (newReceiverFirstName || newReceiverLastName)
+    const label = `Address ${addressOptions.length + 1}`
 
     try {
       const saved = await createAddress.mutateAsync({
         customer_id: customer.id,
-        label: newLabel,
-        care_of: newCareOf || null,
+        label,
         address: newAddress as unknown as Record<string, unknown>,
         is_default: addressOptions.length === 0,
+        receiver_first_name: hasReceiver ? (newReceiverFirstName || null) : null,
+        receiver_last_name: hasReceiver ? (newReceiverLastName || null) : null,
+        receiver_phone: hasReceiver ? (newReceiverPhone || null) : null,
       })
 
-      onAddressSelect(newAddress, newCareOf || null)
+      onAddressSelect(newAddress, {
+        receiverFirstName: hasReceiver ? (newReceiverFirstName || null) : null,
+        receiverLastName: hasReceiver ? (newReceiverLastName || null) : null,
+        receiverPhone: hasReceiver ? (newReceiverPhone || null) : null,
+      })
       setSelectedAddressId(saved.id)
       setShowNewForm(false)
-      setLabelType('home')
-      setNewLabel('Home Address')
-      setNewCareOf('')
+      setReceiverType('same')
+      setNewReceiverFirstName('')
+      setNewReceiverLastName('')
+      setNewReceiverPhone('')
       setNewAddress(null)
     } catch (err) {
       toast.error('Failed to save address. Please try again.')
@@ -143,27 +178,33 @@ export function ShippingStep({
         <CardContent className="space-y-4">
           {addressOptions.length > 0 && (
             <RadioGroup value={selectedAddressId ?? ''} onValueChange={handleAddressSelect}>
-              {addressOptions.map((option) => (
-                <div key={option.id} className="flex items-start gap-3 p-3 rounded-md border hover:bg-accent/50 transition-colors">
-                  <RadioGroupItem value={option.id} id={option.id} className="mt-1" />
-                  <label htmlFor={option.id} className="flex-1 cursor-pointer">
-                    <p className="font-medium text-sm">{option.label}</p>
-                    {option.careOf && (
-                      <p className="text-sm text-muted-foreground">C/O {option.careOf}</p>
-                    )}
-                    <div className="mt-1 grid grid-cols-2 gap-3">
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-0.5">Japanese</p>
-                        <AddressDisplay address={option.address} format="jp" />
+              {addressOptions.map((option) => {
+                const receiverName = formatReceiverName({
+                  receiverFirstName: option.receiverFirstName,
+                  receiverLastName: option.receiverLastName,
+                })
+                return (
+                  <div key={option.id} className="flex items-start gap-3 p-3 rounded-md border hover:bg-accent/50 transition-colors">
+                    <RadioGroupItem value={option.id} id={option.id} className="mt-1" />
+                    <label htmlFor={option.id} className="flex-1 cursor-pointer">
+                      <p className="font-medium text-sm">{option.label}</p>
+                      {receiverName && (
+                        <p className="text-sm text-muted-foreground">Receiver: {receiverName}</p>
+                      )}
+                      <div className="mt-1 grid grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-0.5">Japanese</p>
+                          <AddressDisplay address={option.address} format="jp" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-0.5">English</p>
+                          <AddressDisplay address={option.address} format="en" />
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-0.5">English</p>
-                        <AddressDisplay address={option.address} format="en" />
-                      </div>
-                    </div>
-                  </label>
-                </div>
-              ))}
+                    </label>
+                  </div>
+                )
+              })}
             </RadioGroup>
           )}
 
@@ -179,45 +220,59 @@ export function ShippingStep({
             </Button>
           ) : (
             <div className="border rounded-md p-4 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-sm">Label *</Label>
-                  <Select
-                    value={labelType}
-                    onValueChange={(v: 'home' | 'office' | 'custom') => {
-                      setLabelType(v)
-                      if (v === 'home') setNewLabel('Home Address')
-                      else if (v === 'office') setNewLabel('Office Address')
-                      else setNewLabel('')
-                    }}
+              {/* Receiver section — only show radio when customer already has addresses */}
+              {addressOptions.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Receiver</Label>
+                  <RadioGroup
+                    value={receiverType}
+                    onValueChange={(v: 'same' | 'new') => setReceiverType(v)}
+                    className="flex gap-4"
                   >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="home">Home Address</SelectItem>
-                      <SelectItem value="office">Office Address</SelectItem>
-                      <SelectItem value="custom">Custom</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {labelType === 'custom' && (
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="same" id="receiver-same" />
+                      <label htmlFor="receiver-same" className="text-sm cursor-pointer">
+                        Same as account holder ({formatCustomerName(customer)})
+                      </label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="new" id="receiver-new" />
+                      <label htmlFor="receiver-new" className="text-sm cursor-pointer">
+                        Different receiver
+                      </label>
+                    </div>
+                  </RadioGroup>
+                </div>
+              )}
+
+              {receiverType === 'new' && (
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">First Name</Label>
                     <Input
-                      placeholder="Enter custom label"
-                      value={newLabel}
-                      onChange={(e) => setNewLabel(e.target.value)}
-                      className="mt-1.5"
+                      placeholder="First name"
+                      value={newReceiverFirstName}
+                      onChange={(e) => setNewReceiverFirstName(e.target.value)}
                     />
-                  )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">Last Name</Label>
+                    <Input
+                      placeholder="Last name"
+                      value={newReceiverLastName}
+                      onChange={(e) => setNewReceiverLastName(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">Phone</Label>
+                    <Input
+                      placeholder="Phone number"
+                      value={newReceiverPhone}
+                      onChange={(e) => setNewReceiverPhone(e.target.value)}
+                    />
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-sm">C/O (Care of)</Label>
-                  <Input
-                    placeholder="Recipient name if different"
-                    value={newCareOf}
-                    onChange={(e) => setNewCareOf(e.target.value)}
-                  />
-                </div>
-              </div>
+              )}
 
               <AddressForm
                 value={newAddress}
@@ -229,7 +284,7 @@ export function ShippingStep({
                   type="button"
                   size="sm"
                   onClick={handleSaveNewAddress}
-                  disabled={!newLabel || !newAddress || createAddress.isPending}
+                  disabled={!newAddress || createAddress.isPending}
                 >
                   {createAddress.isPending && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
                   Save Address

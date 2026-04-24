@@ -537,32 +537,38 @@ export type Database = {
       customer_addresses: {
         Row: {
           address: Json
-          care_of: string | null
           created_at: string
           customer_id: string
           id: string
           is_default: boolean
           label: string
+          receiver_first_name: string | null
+          receiver_last_name: string | null
+          receiver_phone: string | null
           updated_at: string
         }
         Insert: {
           address: Json
-          care_of?: string | null
           created_at?: string
           customer_id: string
           id?: string
           is_default?: boolean
           label: string
+          receiver_first_name?: string | null
+          receiver_last_name?: string | null
+          receiver_phone?: string | null
           updated_at?: string
         }
         Update: {
           address?: Json
-          care_of?: string | null
           created_at?: string
           customer_id?: string
           id?: string
           is_default?: boolean
           label?: string
+          receiver_first_name?: string | null
+          receiver_last_name?: string | null
+          receiver_phone?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -2065,6 +2071,9 @@ export type Database = {
           payment_method: string | null
           payment_method_code: number | null
           quantity: number
+          receiver_first_name: string | null
+          receiver_last_name: string | null
+          receiver_phone: string | null
           review_requested_at: string | null
           sell_group_id: string | null
           shipped_date: string | null
@@ -2097,6 +2106,9 @@ export type Database = {
           payment_method?: string | null
           payment_method_code?: number | null
           quantity: number
+          receiver_first_name?: string | null
+          receiver_last_name?: string | null
+          receiver_phone?: string | null
           review_requested_at?: string | null
           sell_group_id?: string | null
           shipped_date?: string | null
@@ -2129,6 +2141,9 @@ export type Database = {
           payment_method?: string | null
           payment_method_code?: number | null
           quantity?: number
+          receiver_first_name?: string | null
+          receiver_last_name?: string | null
+          receiver_phone?: string | null
           review_requested_at?: string | null
           sell_group_id?: string | null
           shipped_date?: string | null
@@ -2655,6 +2670,7 @@ export type Database = {
           id: string
           item_code: string | null
           item_id: string | null
+          item_specs: Json | null
           media_urls: string[]
           page_id: string | null
           platform: string
@@ -2676,6 +2692,7 @@ export type Database = {
           id?: string
           item_code?: string | null
           item_id?: string | null
+          item_specs?: Json | null
           media_urls?: string[]
           page_id?: string | null
           platform?: string
@@ -2697,6 +2714,7 @@ export type Database = {
           id?: string
           item_code?: string | null
           item_id?: string | null
+          item_specs?: Json | null
           media_urls?: string[]
           page_id?: string | null
           platform?: string
@@ -3058,6 +3076,37 @@ export type Database = {
           year: number
         }[]
       }
+      search_customers_with_receivers: {
+        Args: { query: string }
+        Returns: {
+          bank_account_holder: string | null
+          bank_account_number: string | null
+          bank_branch: string | null
+          bank_name: string | null
+          created_at: string
+          customer_code: string
+          email: string | null
+          fb_name: string | null
+          first_name: string | null
+          id: string
+          id_document_url: string | null
+          id_verified: boolean
+          id_verified_at: string | null
+          is_seller: boolean
+          last_name: string
+          missive_contact_id: string | null
+          phone: string | null
+          pin_hash: string
+          shipping_address: Json | null
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "customers"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       trigger_message_sync: { Args: never; Returns: undefined }
     }
     Enums: {
@@ -3133,6 +3182,7 @@ export type Database = {
         | "draft"
         | "queued"
         | "processing"
+        | "scheduled"
         | "published"
         | "failed"
       social_schedule_type: "now" | "next_slot" | "scheduled"
@@ -3350,6 +3400,7 @@ export const Constants = {
         "draft",
         "queued",
         "processing",
+        "scheduled",
         "published",
         "failed",
       ],

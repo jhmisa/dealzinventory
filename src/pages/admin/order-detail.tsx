@@ -540,13 +540,14 @@ export default function OrderDetailPage() {
   }
 
   // Build address options from customer_addresses + legacy fallback
-  const addressOptions: { id: string; label: string; careOf?: string | null; address: ShippingAddress }[] = []
+  const addressOptions: { id: string; label: string; receiverName?: string | null; address: ShippingAddress }[] = []
   if (customerAddresses) {
     for (const addr of customerAddresses) {
+      const rName = [addr.receiver_first_name, addr.receiver_last_name].filter(Boolean).join(' ') || null
       addressOptions.push({
         id: addr.id,
         label: addr.label,
-        careOf: addr.care_of,
+        receiverName: rName,
         address: addr.address as unknown as ShippingAddress,
       })
     }
@@ -559,10 +560,17 @@ export default function OrderDetailPage() {
         legacyAddr = typeof legacyRaw === 'string' ? JSON.parse(legacyRaw) : legacyRaw as unknown as ShippingAddress
       } catch { /* skip */ }
       if (legacyAddr) {
-        addressOptions.push({ id: '__legacy__', label: 'Primary Address', careOf: null, address: legacyAddr })
+        addressOptions.push({ id: '__legacy__', label: 'Primary Address', receiverName: null, address: legacyAddr })
       }
     }
   }
+
+  // Receiver info from order snapshot
+  const orderReceiverName = [
+    (order as Record<string, unknown>).receiver_first_name as string | null,
+    (order as Record<string, unknown>).receiver_last_name as string | null,
+  ].filter(Boolean).join(' ') || null
+  const orderReceiverPhone = (order as Record<string, unknown>).receiver_phone as string | null
 
   async function handlePickAddress(addr: ShippingAddress) {
     try {
@@ -836,10 +844,21 @@ export default function OrderDetailPage() {
           <CardContent className="space-y-2 text-sm">
             {customer ? (
               <>
-                <div className="flex justify-between"><span className="text-muted-foreground">Code</span><CodeDisplay code={customer.customer_code} /></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Name</span><span>{formatCustomerName(customer)}</span></div>
+                {orderReceiverName ? (
+                  <>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Receiver</span><span className="font-medium">{orderReceiverName}</span></div>
+                    {orderReceiverPhone && <div className="flex justify-between"><span className="text-muted-foreground">Phone</span><span>{orderReceiverPhone}</span></div>}
+                    <div className="flex justify-between"><span className="text-muted-foreground">Account Holder</span><span className="text-muted-foreground text-xs">{formatCustomerName(customer)} ({customer.customer_code})</span></div>
+                    {!orderReceiverPhone && customer.phone && <div className="flex justify-between"><span className="text-muted-foreground">Phone</span><span>{customer.phone}</span></div>}
+                  </>
+                ) : (
+                  <>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Code</span><CodeDisplay code={customer.customer_code} /></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Name</span><span>{formatCustomerName(customer)}</span></div>
+                    {customer.phone && <div className="flex justify-between"><span className="text-muted-foreground">Phone</span><span>{customer.phone}</span></div>}
+                  </>
+                )}
                 {customer.email && <div className="flex justify-between"><span className="text-muted-foreground">Email</span><span>{customer.email}</span></div>}
-                {customer.phone && <div className="flex justify-between"><span className="text-muted-foreground">Phone</span><span>{customer.phone}</span></div>}
               </>
             ) : (
               <p className="text-muted-foreground">—</p>
@@ -869,8 +888,8 @@ export default function OrderDetailPage() {
                       disabled={updateOrder.isPending}
                     >
                       <p className="font-medium text-xs">{option.label}</p>
-                      {option.careOf && (
-                        <p className="text-xs text-muted-foreground">C/O {option.careOf}</p>
+                      {option.receiverName && (
+                        <p className="text-xs text-muted-foreground">Receiver: {option.receiverName}</p>
                       )}
                       <div className="mt-1">
                         <AddressDisplay address={option.address} format="jp" />

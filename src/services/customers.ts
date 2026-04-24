@@ -8,18 +8,20 @@ interface CustomerFilters {
 }
 
 export async function getCustomers(filters: CustomerFilters = {}) {
-  let query = supabase
+  if (filters.search) {
+    // Search customers + receiver names on addresses via RPC
+    const { data, error } = await supabase.rpc('search_customers_with_receivers', {
+      query: filters.search,
+    })
+    if (error) throw error
+    return data ?? []
+  }
+
+  const { data, error } = await supabase
     .from('customers')
     .select('*')
     .order('created_at', { ascending: false })
 
-  if (filters.search) {
-    query = query.or(
-      `last_name.ilike.%${filters.search}%,first_name.ilike.%${filters.search}%,email.ilike.%${filters.search}%,customer_code.ilike.%${filters.search}%`
-    )
-  }
-
-  const { data, error } = await query
   if (error) throw error
   return data ?? []
 }

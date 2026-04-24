@@ -21,7 +21,9 @@ export default function CreateOrderPage() {
 
   // Section 2: Shipping
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(null)
-  const [careOf, setCareOf] = useState<string | null>(null)
+  const [receiverFirstName, setReceiverFirstName] = useState<string | null>(null)
+  const [receiverLastName, setReceiverLastName] = useState<string | null>(null)
+  const [receiverPhone, setReceiverPhone] = useState<string | null>(null)
   // Default delivery date to earliest allowed (respects 4PM JST cutoff + Mon–Fri processing)
   const [deliveryDate, setDeliveryDate] = useState<string | null>(getEarliestDeliveryDate())
   const [deliveryTimeCode, setDeliveryTimeCode] = useState<string | null>(null)
@@ -32,9 +34,11 @@ export default function CreateOrderPage() {
   const [orderSource, setOrderSource] = useState<string>('SHOP')
   const [notes, setNotes] = useState('')
 
-  const handleAddressSelect = (address: ShippingAddress, co?: string | null) => {
+  const handleAddressSelect = (address: ShippingAddress, receiver?: { receiverFirstName?: string | null; receiverLastName?: string | null; receiverPhone?: string | null }) => {
     setShippingAddress(address)
-    setCareOf(co ?? null)
+    setReceiverFirstName(receiver?.receiverFirstName ?? null)
+    setReceiverLastName(receiver?.receiverLastName ?? null)
+    setReceiverPhone(receiver?.receiverPhone ?? null)
   }
 
   const canSubmit =
@@ -56,6 +60,9 @@ export default function CreateOrderPage() {
         delivery_time_code: deliveryTimeCode,
         notes: notes || null,
         shipping_cost: shippingCost,
+        receiver_first_name: receiverFirstName,
+        receiver_last_name: receiverLastName,
+        receiver_phone: receiverPhone,
         items: lineItems.map((li) => ({
           item_id: li.item_id,
           accessory_id: li.accessory_id ?? null,
@@ -89,7 +96,9 @@ export default function CreateOrderPage() {
             setCustomer(c)
             if (!c) {
               setShippingAddress(null)
-              setCareOf(null)
+              setReceiverFirstName(null)
+              setReceiverLastName(null)
+              setReceiverPhone(null)
             }
           }}
         />
@@ -102,7 +111,7 @@ export default function CreateOrderPage() {
           <ShippingStep
             customer={customer}
             orderSource={orderSource}
-            selectedAddress={shippingAddress ? { address: shippingAddress, careOf } : null}
+            selectedAddress={shippingAddress ? { address: shippingAddress, receiverFirstName, receiverLastName, receiverPhone } : null}
             onAddressSelect={handleAddressSelect}
             deliveryDate={deliveryDate}
             onDeliveryDateChange={setDeliveryDate}

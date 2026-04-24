@@ -453,7 +453,7 @@ function OfferClaimInner() {
   const { customer, isAuthenticated, isLoading: authLoading, login, register, logout } = authState
 
   const [authStep, setAuthStep] = useState<AuthStep>('choose')
-  const [selectedAddress, setSelectedAddress] = useState<{ address: ShippingAddress; careOf?: string | null } | null>(null)
+  const [selectedAddress, setSelectedAddress] = useState<{ address: ShippingAddress; receiverFirstName?: string | null; receiverLastName?: string | null; receiverPhone?: string | null } | null>(null)
   const [deliveryDate, setDeliveryDate] = useState<string | null>(null)
   const [deliveryTimeCode, setDeliveryTimeCode] = useState<string | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<string | null>(null)
@@ -786,7 +786,7 @@ function OfferClaimInner() {
               customer={customer as Customer}
               orderSource="FB"
               selectedAddress={selectedAddress}
-              onAddressSelect={(addr, careOf) => setSelectedAddress({ address: addr, careOf })}
+              onAddressSelect={(addr, receiver) => setSelectedAddress({ address: addr, ...receiver })}
               deliveryDate={deliveryDate}
               onDeliveryDateChange={setDeliveryDate}
               deliveryTimeCode={deliveryTimeCode}

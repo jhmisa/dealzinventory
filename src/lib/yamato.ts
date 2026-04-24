@@ -32,6 +32,9 @@ interface DempyoOrder {
   delivery_date: string | null
   delivery_time_code: string | null
   delivery_box_count: number
+  receiver_first_name: string | null
+  receiver_last_name: string | null
+  receiver_phone: string | null
   customers: DempyoCustomer | null
   order_items: DempyoOrderItem[]
 }
@@ -227,12 +230,15 @@ function writeOrderRows(
   for (let i = 0; i < rowCount; i++) {
     const r = startRow + i
 
-    // D: Recipient name
-    const name = customer ? formatCustomerName(customer) : ''
+    // D: Recipient name — use receiver name when present, fallback to customer
+    const receiverName = order.receiver_first_name || order.receiver_last_name
+      ? [order.receiver_first_name, order.receiver_last_name].filter(Boolean).join(' ')
+      : null
+    const name = receiverName ?? (customer ? formatCustomerName(customer) : '')
     writeCell(ws, r, 'D', name)
 
-    // F: Phone
-    writeCell(ws, r, 'F', formatPhone(customer?.phone ?? null))
+    // F: Phone — use receiver phone when present, fallback to customer
+    writeCell(ws, r, 'F', formatPhone(order.receiver_phone ?? customer?.phone ?? null))
 
     // H: English address reference
     writeCell(ws, r, 'H', buildEnglishRef(addr))
