@@ -53,7 +53,7 @@ import {
   KAITORI_PAYMENT_METHODS,
   KAITORI_DELIVERY_METHODS,
 } from '@/lib/constants'
-import { formatPrice, formatDateTime, cn } from '@/lib/utils'
+import { formatPrice, formatDateTime, formatCustomerName, cn } from '@/lib/utils'
 import type { KaitoriStatus } from '@/lib/types'
 
 // Status flow visual
@@ -323,7 +323,7 @@ export default function KaitoriDetailPage() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              <div><span className="text-muted-foreground block">Name</span>{customer.last_name} {customer.first_name ?? ''}</div>
+              <div><span className="text-muted-foreground block">Name</span>{formatCustomerName(customer)}</div>
               <div><span className="text-muted-foreground block">Code</span><CodeDisplay code={customer.customer_code} /></div>
               <div><span className="text-muted-foreground block">Email</span>{customer.email}</div>
               <div><span className="text-muted-foreground block">Phone</span>{customer.phone ?? '—'}</div>

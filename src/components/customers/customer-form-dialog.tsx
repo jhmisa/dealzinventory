@@ -107,13 +107,13 @@ export function CustomerFormDialog({
             <div className="grid grid-cols-2 gap-3">
               <FormField
                 control={form.control}
-                name="last_name"
+                name="first_name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Last Name *</FormLabel>
+                    <FormLabel>First Name</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="TANAKA"
+                        placeholder="TARO"
                         {...field}
                         onChange={(e) => field.onChange(e.target.value.toUpperCase())}
                         className="uppercase"
@@ -125,13 +125,13 @@ export function CustomerFormDialog({
               />
               <FormField
                 control={form.control}
-                name="first_name"
+                name="last_name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>First Name</FormLabel>
+                    <FormLabel>Last Name *</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="TARO"
+                        placeholder="TANAKA"
                         {...field}
                         onChange={(e) => field.onChange(e.target.value.toUpperCase())}
                         className="uppercase"

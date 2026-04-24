@@ -50,7 +50,7 @@ async function resolveTemplateVariables(
       .eq('id', item.customer_id)
       .single();
     if (customer) {
-      vars.customer_name = `${customer.last_name} ${customer.first_name ?? ''}`.trim();
+      vars.customer_name = `${customer.first_name ?? ''} ${customer.last_name}`.trim();
       vars.customer_code = customer.customer_code;
     }
   }

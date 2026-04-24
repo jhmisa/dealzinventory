@@ -44,7 +44,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/query-keys'
 import { ORDER_STATUSES, ORDER_SOURCES, YAMATO_TIME_SLOTS, YAMATO_TRACKING_URL, PAYMENT_METHODS, getPaymentMethodLabel, getYamatoStatusConfig, requiresPaymentConfirmation, getCancellationCategoryLabel } from '@/lib/constants'
 import { useCreateAdminReturn } from '@/hooks/use-returns'
-import { formatDateTime, formatPrice, cn, buildShortDescription } from '@/lib/utils'
+import { formatDateTime, formatPrice, formatCustomerName, cn, buildShortDescription } from '@/lib/utils'
 import { useState, useRef, useEffect } from 'react'
 import type { ShippingAddress } from '@/lib/address-types'
 import { usePaymentConfirmations } from '@/hooks/use-payment-confirmations'
@@ -837,7 +837,7 @@ export default function OrderDetailPage() {
             {customer ? (
               <>
                 <div className="flex justify-between"><span className="text-muted-foreground">Code</span><CodeDisplay code={customer.customer_code} /></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Name</span><span>{customer.last_name} {customer.first_name ?? ''}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Name</span><span>{formatCustomerName(customer)}</span></div>
                 {customer.email && <div className="flex justify-between"><span className="text-muted-foreground">Email</span><span>{customer.email}</span></div>}
                 {customer.phone && <div className="flex justify-between"><span className="text-muted-foreground">Phone</span><span>{customer.phone}</span></div>}
               </>

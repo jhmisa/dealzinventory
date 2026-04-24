@@ -11,7 +11,7 @@ import {
 import { useReturns } from '@/hooks/use-returns'
 import { usePersistedFilters } from '@/hooks/use-persisted-filters'
 import { RETURN_STATUSES, RETURN_REASONS } from '@/lib/constants'
-import { formatDateTime, cn } from '@/lib/utils'
+import { formatDateTime, cn, formatCustomerName } from '@/lib/utils'
 
 type ReturnRow = {
   id: string
@@ -58,7 +58,7 @@ const columns: ColumnDef<ReturnRow>[] = [
       if (!c) return '—'
       return (
         <div>
-          <span>{`${c.last_name} ${c.first_name ?? ''}`.trim()}</span>
+          <span>{formatCustomerName(c)}</span>
           <span className="ml-2 text-xs text-muted-foreground">{c.customer_code}</span>
         </div>
       )

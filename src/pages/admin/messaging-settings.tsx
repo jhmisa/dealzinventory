@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Plus, Trash2, Check, Bot, Sparkles, FileText, Pencil, ShieldAlert, BookOpen, FlaskConical, Send, ChevronUp, ChevronDown, RotateCcw, Power, RefreshCw, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { formatCustomerName } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -956,11 +957,11 @@ export default function MessagingSettingsPage() {
                     className="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2"
                     onClick={() => {
                       setSelectedCustomerId(c.id)
-                      setCustomerSearch(`${c.customer_code} — ${c.last_name} ${c.first_name ?? ''}`)
+                      setCustomerSearch(`${c.customer_code} — ${formatCustomerName(c)}`)
                     }}
                   >
                     <Badge variant="outline" className="shrink-0">{c.customer_code}</Badge>
-                    <span>{c.last_name} {c.first_name ?? ''}</span>
+                    <span>{formatCustomerName(c)}</span>
                   </button>
                 ))}
               </div>

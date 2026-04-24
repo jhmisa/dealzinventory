@@ -9,7 +9,7 @@ import { DataTable, SearchBar, PageHeader, CodeDisplay, TableSkeleton, EmptyStat
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ShieldCheck } from 'lucide-react'
-import { formatDate } from '@/lib/utils'
+import { formatDate, formatCustomerName } from '@/lib/utils'
 import { CustomerFormDialog } from '@/components/customers/customer-form-dialog'
 import type { Customer } from '@/lib/types'
 import type { AdminCreateCustomerFormValues } from '@/validators/customer'
@@ -30,7 +30,7 @@ const columns: ColumnDef<Customer>[] = [
     header: 'Name',
     cell: ({ row }) => (
       <span>
-        {row.original.last_name} {row.original.first_name}
+        {formatCustomerName(row.original)}
       </span>
     ),
   },

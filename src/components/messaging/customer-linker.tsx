@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { supabase } from '@/lib/supabase'
 import type { Customer } from '@/lib/types'
+import { formatCustomerName } from '@/lib/utils'
 import { toast } from 'sonner'
 
 interface CustomerLinkerProps {
@@ -96,7 +97,7 @@ export function CustomerLinker({ onLink, isLoading, trigger }: CustomerLinkerPro
               >
                 <div className="min-w-0">
                   <div>
-                    <span className="font-medium">{c.last_name} {c.first_name ?? ''}</span>
+                    <span className="font-medium">{formatCustomerName(c)}</span>
                     <span className="ml-2 text-xs text-muted-foreground">{c.customer_code}</span>
                   </div>
                   <div className="text-xs text-muted-foreground">

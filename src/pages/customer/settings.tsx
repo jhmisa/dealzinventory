@@ -95,10 +95,10 @@ function ProfileSection() {
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="last_name"
+                name="first_name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Last Name</FormLabel>
+                    <FormLabel>First Name</FormLabel>
                     <FormControl>
                       <Input {...field} />
                     </FormControl>
@@ -108,10 +108,10 @@ function ProfileSection() {
               />
               <FormField
                 control={form.control}
-                name="first_name"
+                name="last_name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>First Name</FormLabel>
+                    <FormLabel>Last Name</FormLabel>
                     <FormControl>
                       <Input {...field} />
                     </FormControl>

@@ -1,7 +1,7 @@
 import { memo, useRef, useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { User, AlertCircle, RotateCw, Bot, UserCheck, FileIcon, ExternalLink, X, Archive, ArchiveRestore } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, formatCustomerName } from '@/lib/utils'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
@@ -244,7 +244,7 @@ export const ConversationThread = memo(function ConversationThread({
   }
 
   const customerName = conversation.customers
-    ? `${conversation.customers.last_name} ${conversation.customers.first_name ?? ''}`.trim()
+    ? formatCustomerName(conversation.customers)
     : conversation.contact_name || 'Unknown Contact'
 
   // Get composer API for inserting content from panels

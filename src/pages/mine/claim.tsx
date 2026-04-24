@@ -23,7 +23,7 @@ import { useClaimableByCode, useClaimMine } from '@/hooks/use-mine'
 import { ImageGallery } from '@/components/shared/image-gallery'
 import { CodeInput } from '@/components/mine/code-input'
 import { CONDITION_GRADES, PAYMENT_METHODS } from '@/lib/constants'
-import { formatPrice, cn } from '@/lib/utils'
+import { formatPrice, cn, formatCustomerName } from '@/lib/utils'
 import type { ShippingAddress } from '@/lib/address-types'
 import type { Customer } from '@/lib/types'
 
@@ -188,12 +188,12 @@ function RegisterForm({ onSuccess, onBack, isLoading, onRegister }: {
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="last_name"
+                name="first_name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Last Name *</FormLabel>
+                    <FormLabel>First Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="Tanaka" {...field} />
+                      <Input placeholder="Taro" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -201,12 +201,12 @@ function RegisterForm({ onSuccess, onBack, isLoading, onRegister }: {
               />
               <FormField
                 control={form.control}
-                name="first_name"
+                name="last_name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>First Name</FormLabel>
+                    <FormLabel>Last Name *</FormLabel>
                     <FormControl>
-                      <Input placeholder="Taro" {...field} />
+                      <Input placeholder="Tanaka" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -538,7 +538,7 @@ function MineClaimInner() {
               {/* Logged-in indicator */}
               <div className="flex items-center justify-between text-sm bg-green-50 border border-green-200 rounded-lg px-4 py-2">
                 <span className="text-green-800">
-                  Logged in as <span className="font-medium">{customer!.last_name} {customer!.first_name ?? ''}</span>
+                  Logged in as <span className="font-medium">{formatCustomerName(customer!)}</span>
                   {customer!.email && <span className="text-green-600 ml-1">({customer!.email})</span>}
                 </span>
                 <Button variant="ghost" size="sm" className="text-green-700 hover:text-green-900 h-auto py-1" onClick={logout}>

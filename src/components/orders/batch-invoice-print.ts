@@ -1,4 +1,4 @@
-import { formatDate } from '@/lib/utils'
+import { formatDate, formatCustomerName } from '@/lib/utils'
 import {
   isJPAddress,
   isLegacyAddress,
@@ -151,7 +151,7 @@ function escapeHtml(str: string): string {
 function buildInvoicePageHtml(order: BatchInvoiceOrder, salesAgent: string, isLast: boolean): string {
   const customer = order.customers
   const customerName = customer
-    ? [customer.last_name, customer.first_name].filter(Boolean).join(' ')
+    ? formatCustomerName(customer)
     : '—'
 
   const orderItems = order.order_items ?? []

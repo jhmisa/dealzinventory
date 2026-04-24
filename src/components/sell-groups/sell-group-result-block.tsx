@@ -13,7 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { CodeDisplay, GradeBadge, StatusBadge, PriceDisplay } from '@/components/shared'
-import { formatDate } from '@/lib/utils'
+import { formatDate, formatCustomerName } from '@/lib/utils'
 import type { SellGroupByCode } from '@/services/sell-groups'
 import type { ConditionGrade } from '@/lib/types'
 
@@ -157,7 +157,7 @@ export function SellGroupResultBlock({ sellGroup, onShowcase, showLiveSellingTog
                   const order = item.order_items?.[0]?.orders
                   const customer = order?.customers
                   const customerName = customer
-                    ? [customer.first_name, customer.last_name].filter(Boolean).join(' ')
+                    ? formatCustomerName(customer)
                     : null
 
                   return (

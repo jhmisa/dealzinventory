@@ -32,7 +32,7 @@ import { useItemListColumnSettings } from '@/hooks/use-settings'
 import { usePersistedFilters } from '@/hooks/use-persisted-filters'
 import { useDebounce } from '@/hooks/use-debounce'
 import { ITEM_STATUSES, CONDITION_GRADES } from '@/lib/constants'
-import { formatDate, formatPrice, cn, buildShortDescription } from '@/lib/utils'
+import { formatDate, formatPrice, cn, buildShortDescription, formatCustomerName } from '@/lib/utils'
 import { toast } from 'sonner'
 import { printItemLabel } from '@/components/items/label-print'
 import { resolveSoldTo } from '@/lib/item-sale'
@@ -999,10 +999,9 @@ export default function ItemListPage() {
         if (r._kind !== 'item') return <span className="text-xs text-muted-foreground">—</span>
         const soldTo = resolveSoldTo(r.order_items)
         if (!soldTo) return <span className="text-xs text-muted-foreground">—</span>
-        const fullName = `${soldTo.customer.last_name} ${soldTo.customer.first_name ?? ''}`.trim()
         return (
           <div onClick={(e) => e.stopPropagation()} className="text-sm leading-tight">
-            <Link to={`/admin/customers/${soldTo.customer.id}`} className="font-medium text-primary hover:underline">{fullName}</Link>
+            <Link to={`/admin/customers/${soldTo.customer.id}`} className="font-medium text-primary hover:underline">{formatCustomerName(soldTo.customer)}</Link>
             <div className="text-xs text-muted-foreground">
               {soldTo.customer.customer_code} ·{' '}
               <Link to={`/admin/orders/${soldTo.orderId}`} className="hover:underline">{soldTo.orderCode}</Link>
@@ -1276,14 +1275,13 @@ export default function ItemListPage() {
       cell: ({ row }) => {
         const soldTo = resolveSoldTo(row.original.order_items)
         if (!soldTo) return <span className="text-xs text-muted-foreground">—</span>
-        const fullName = `${soldTo.customer.last_name} ${soldTo.customer.first_name ?? ''}`.trim()
         return (
           <div onClick={(e) => e.stopPropagation()} className="text-sm leading-tight">
             <Link
               to={`/admin/customers/${soldTo.customer.id}`}
               className="font-medium text-primary hover:underline"
             >
-              {fullName}
+              {formatCustomerName(soldTo.customer)}
             </Link>
             <div className="text-xs text-muted-foreground">
               {soldTo.customer.customer_code} ·{' '}

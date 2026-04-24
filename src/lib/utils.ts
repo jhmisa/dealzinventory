@@ -12,6 +12,10 @@ export function formatPrice(yen: number | null | undefined): string {
   return `¥${yen.toLocaleString('ja-JP')}`
 }
 
+export function formatCustomerName(customer: { last_name: string; first_name?: string | null }): string {
+  return `${customer.first_name ?? ''} ${customer.last_name}`.trim()
+}
+
 export function formatCode(code: string): string {
   return code
 }

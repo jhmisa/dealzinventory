@@ -35,7 +35,7 @@ import { useCreateSupplierReturn } from '@/hooks/use-supplier-returns'
 import { useCreateInventoryRemoval } from '@/hooks/use-inventory-removals'
 import { INVENTORY_REMOVAL_REASONS } from '@/lib/constants'
 import { CreateOfferDialog } from '@/components/offers'
-import { formatPrice, buildShortDescription } from '@/lib/utils'
+import { formatPrice, buildShortDescription, formatCustomerName } from '@/lib/utils'
 import { resolveSoldTo } from '@/lib/item-sale'
 import { printItemLabel } from '@/components/items/label-print'
 import { toast } from 'sonner'
@@ -281,7 +281,7 @@ export default function ItemDetailPage() {
                   to={`/admin/customers/${soldTo.customer.id}`}
                   className="text-sm font-semibold text-primary hover:underline"
                 >
-                  {`${soldTo.customer.last_name} ${soldTo.customer.first_name ?? ''}`.trim()}
+                  {formatCustomerName(soldTo.customer)}
                 </Link>
               </div>
               <div>

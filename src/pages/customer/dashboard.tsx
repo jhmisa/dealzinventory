@@ -6,7 +6,7 @@ import { useCustomerAuth } from '@/hooks/use-customer-auth'
 import { useCustomerOrders, useCustomerKaitoriRequests } from '@/hooks/use-customers'
 import { StatusBadge, CodeDisplay, PriceDisplay, TableSkeleton } from '@/components/shared'
 import { ORDER_STATUSES, KAITORI_STATUSES } from '@/lib/constants'
-import { formatDate } from '@/lib/utils'
+import { formatDate, formatCustomerName } from '@/lib/utils'
 
 export default function CustomerDashboardPage() {
   const { customer } = useCustomerAuth()
@@ -20,7 +20,7 @@ export default function CustomerDashboardPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">
-          Welcome, {customer?.last_name} {customer?.first_name}
+          Welcome, {customer ? formatCustomerName(customer) : ''}
         </h1>
         <p className="text-muted-foreground">Manage your orders, sales, and account settings.</p>
       </div>

@@ -16,7 +16,7 @@ import { useOrders, useConfirmedForInvoice, useConfirmedForDempyo, useStampInvoi
 import { usePersistedFilters } from '@/hooks/use-persisted-filters'
 import { useOffers, useCancelOffer } from '@/hooks/use-offers'
 import { ORDER_STATUSES, ORDER_SOURCES, OFFER_STATUSES, getYamatoStatusConfig } from '@/lib/constants'
-import { formatDateTime, formatPrice, cn } from '@/lib/utils'
+import { formatDateTime, formatPrice, formatCustomerName, cn } from '@/lib/utils'
 import { printBatchInvoices } from '@/components/orders/batch-invoice-print'
 import { validateOrders, generateDempyoXlsx, downloadBlob, generateDempyoFilename } from '@/lib/yamato'
 import { YamatoTrackingImportDialog } from '@/components/orders/yamato-tracking-import-dialog'
@@ -110,7 +110,7 @@ const columns: ColumnDef<OrderRow>[] = [
       if (!c) return '—'
       return (
         <div>
-          <span>{`${c.last_name} ${c.first_name ?? ''}`.trim()}</span>
+          <span>{formatCustomerName(c)}</span>
           <span className="ml-2 text-xs text-muted-foreground">{c.customer_code}</span>
         </div>
       )
@@ -301,7 +301,7 @@ export default function OrderListPage() {
           c?.customer_code,
           c?.first_name,
           c?.last_name,
-          c ? `${c.last_name} ${c.first_name ?? ''}`.trim() : null,
+          c ? formatCustomerName(c) : null,
           c?.email,
           c?.phone,
           o.orders?.order_code,
@@ -348,7 +348,7 @@ export default function OrderListPage() {
       cell: ({ row }) => {
         const c = row.original.customers
         const ord = row.original.orders
-        const fullName = c ? `${c.last_name} ${c.first_name ?? ''}`.trim() : null
+        const fullName = c ? formatCustomerName(c) : null
         const contactParts = [c?.email, c?.phone].filter(Boolean) as string[]
         return (
           <div onClick={(e) => e.stopPropagation()} className="text-xs leading-snug space-y-0.5 min-w-[240px]">

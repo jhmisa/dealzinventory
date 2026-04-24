@@ -14,7 +14,7 @@ import { PageHeader, CodeDisplay, StatusBadge, ManualCodeInput } from '@/compone
 import { QRScannerCamera } from '@/components/shared/media'
 import { usePackableOrders, usePackOrderItem, useUpdateOrderStatus, useUpdateOrder } from '@/hooks/use-orders'
 import { useAuth } from '@/hooks/use-auth'
-import { cn } from '@/lib/utils'
+import { cn, formatCustomerName } from '@/lib/utils'
 
 type PackingItem = {
   id: string
@@ -155,7 +155,7 @@ export default function PackingStationPage() {
                   const c = o.customers as { last_name: string; first_name: string | null } | null
                   return (
                     <SelectItem key={o.id} value={o.id}>
-                      {o.order_code} — {c ? `${c.last_name} ${c.first_name ?? ''}`.trim() : '?'} ({(o.order_items as PackingItem[]).length} items)
+                      {o.order_code} — {c ? formatCustomerName(c) : '?'} ({(o.order_items as PackingItem[]).length} items)
                     </SelectItem>
                   )
                 })}

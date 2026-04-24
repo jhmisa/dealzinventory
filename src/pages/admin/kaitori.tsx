@@ -6,7 +6,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useKaitoriRequests } from '@/hooks/use-kaitori'
 import { usePersistedFilters } from '@/hooks/use-persisted-filters'
 import { KAITORI_STATUSES, getKaitoriStatusConfig } from '@/lib/constants'
-import { formatPrice, formatDateTime } from '@/lib/utils'
+import { formatPrice, formatDateTime, formatCustomerName } from '@/lib/utils'
 import type { KaitoriStatus } from '@/lib/types'
 
 type KaitoriRow = {
@@ -32,7 +32,7 @@ const columns: ColumnDef<KaitoriRow>[] = [
     header: 'Seller',
     cell: ({ row }) => {
       const c = row.original.customers
-      return c ? `${c.last_name} ${c.first_name ?? ''}`.trim() : '—'
+      return c ? formatCustomerName(c) : '—'
     },
   },
   {

@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Loader2, Search, X } from 'lucide-react'
 import type { Customer } from '@/lib/types'
+import { formatCustomerName } from '@/lib/utils'
 
 interface CustomerPickerProps {
   selectedCustomer: Customer | null
@@ -36,7 +37,7 @@ export function CustomerPicker({ selectedCustomer, onSelect }: CustomerPickerPro
                   {selectedCustomer.customer_code}
                 </Badge>
                 <span className="font-medium">
-                  {selectedCustomer.last_name} {selectedCustomer.first_name ?? ''}
+                  {formatCustomerName(selectedCustomer)}
                 </span>
               </div>
               {selectedCustomer.email && (
@@ -100,7 +101,7 @@ export function CustomerPicker({ selectedCustomer, onSelect }: CustomerPickerPro
                     {customer.customer_code}
                   </span>
                   <span className="font-medium text-sm">
-                    {customer.last_name} {customer.first_name ?? ''}
+                    {formatCustomerName(customer)}
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground">

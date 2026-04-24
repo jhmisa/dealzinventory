@@ -60,7 +60,7 @@ import type { ReturnStatus, ReturnResolution } from '@/lib/constants'
 import { resolveReturnSchema } from '@/validators/return'
 import type { ResolveReturnFormValues } from '@/validators/return'
 import { getInvoiceSignedUrl } from '@/services/intake-receipts'
-import { formatDateTime, formatPrice, cn } from '@/lib/utils'
+import { formatDateTime, formatPrice, cn, formatCustomerName } from '@/lib/utils'
 
 export default function ReturnDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -258,7 +258,7 @@ export default function ReturnDetailPage() {
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <p className="text-muted-foreground">Name</p>
-                    <p className="font-medium">{`${customer.last_name} ${customer.first_name ?? ''}`.trim()}</p>
+                    <p className="font-medium">{formatCustomerName(customer)}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Customer Code</p>

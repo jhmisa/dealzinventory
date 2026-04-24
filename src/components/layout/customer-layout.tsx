@@ -1,7 +1,7 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { ShoppingBag, Package, HandCoins, RotateCcw, Settings, LogOut, Menu, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
+import { cn, formatCustomerName } from '@/lib/utils'
 import { useState } from 'react'
 import { useCustomerAuth } from '@/hooks/use-customer-auth'
 import { CustomerAuthContext, useCustomerAuthProvider } from '@/hooks/use-customer-auth'
@@ -54,7 +54,7 @@ function CustomerHeader() {
 
         <div className="flex items-center gap-2">
           <span className="hidden md:inline text-sm text-muted-foreground">
-            {customer?.last_name} {customer?.first_name}
+            {customer ? formatCustomerName(customer) : ''}
           </span>
           <Button variant="ghost" size="sm" onClick={handleLogout} className="hidden md:flex">
             <LogOut className="h-4 w-4 mr-2" />

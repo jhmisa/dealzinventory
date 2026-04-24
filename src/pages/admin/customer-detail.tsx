@@ -36,7 +36,7 @@ import {
   useResetCustomerPin,
 } from '@/hooks/use-customers'
 import { ORDER_STATUSES, KAITORI_STATUSES } from '@/lib/constants'
-import { formatDate, formatDateTime } from '@/lib/utils'
+import { formatDate, formatDateTime, formatCustomerName } from '@/lib/utils'
 import { useState } from 'react'
 import type { CustomerUpdate } from '@/lib/types'
 
@@ -179,7 +179,7 @@ export default function CustomerDetailPage() {
           </Link>
         </Button>
         <PageHeader
-          title={`${customer.last_name} ${customer.first_name ?? ''}`}
+          title={formatCustomerName(customer)}
           subtitle={<CodeDisplay code={customer.customer_code} />}
         />
         <div className="ml-auto flex items-center gap-2">

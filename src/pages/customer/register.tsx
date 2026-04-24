@@ -69,12 +69,12 @@ export default function CustomerRegisterPage() {
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
-                  name="last_name"
+                  name="first_name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Last Name *</FormLabel>
+                      <FormLabel>First Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="Tanaka" {...field} />
+                        <Input placeholder="Taro" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -82,12 +82,12 @@ export default function CustomerRegisterPage() {
                 />
                 <FormField
                   control={form.control}
-                  name="first_name"
+                  name="last_name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>First Name</FormLabel>
+                      <FormLabel>Last Name *</FormLabel>
                       <FormControl>
-                        <Input placeholder="Taro" {...field} />
+                        <Input placeholder="Tanaka" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

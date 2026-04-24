@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx'
+import { formatCustomerName } from '@/lib/utils'
 import {
   type ShippingAddress,
   type ShippingAddressJP,
@@ -227,9 +228,7 @@ function writeOrderRows(
     const r = startRow + i
 
     // D: Recipient name
-    const name = [customer?.first_name, customer?.last_name]
-      .filter(Boolean)
-      .join(' ')
+    const name = customer ? formatCustomerName(customer) : ''
     writeCell(ws, r, 'D', name)
 
     // F: Phone

@@ -131,7 +131,7 @@ export function formatContextForPrompt(context: AIContext): string {
 
   if (context.customer) {
     const c = context.customer;
-    sections.push(`## Customer\n- Code: ${c.customer_code}\n- Name: ${c.last_name} ${c.first_name ?? ''}\n- Email: ${c.email ?? 'N/A'}\n- Phone: ${c.phone ?? 'N/A'}`);
+    sections.push(`## Customer\n- Code: ${c.customer_code}\n- Name: ${`${c.first_name ?? ''} ${c.last_name}`.trim()}\n- Email: ${c.email ?? 'N/A'}\n- Phone: ${c.phone ?? 'N/A'}`);
   } else {
     sections.push('## Customer\nUnknown — this is a new or unmatched contact. Use general knowledge only.');
   }

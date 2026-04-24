@@ -25,7 +25,7 @@ import {
   useOfferRealtimeSync,
 } from '@/hooks/use-offers'
 import { OFFER_STATUSES } from '@/lib/constants'
-import { formatDateTime, formatPrice, cn } from '@/lib/utils'
+import { formatDateTime, formatPrice, cn, formatCustomerName } from '@/lib/utils'
 
 type OfferItem = {
   id: string
@@ -223,7 +223,7 @@ export default function OfferDetailPage() {
           phone: string | null
         }
         const ord = offer.orders as { id: string; order_code: string } | null
-        const fullName = `${c.last_name} ${c.first_name ?? ''}`.trim()
+        const fullName = formatCustomerName(c)
         return (
           <Card className="border-green-300 bg-green-50/40">
             <CardHeader className="pb-2">

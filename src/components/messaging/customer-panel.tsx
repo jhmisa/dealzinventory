@@ -31,7 +31,7 @@ import { CustomerLinker } from '@/components/messaging/customer-linker'
 import { OrderDetailDialog } from '@/components/messaging/order-detail-dialog'
 import { useCustomerWithDetails } from '@/hooks/use-customers'
 import { ORDER_STATUSES, KAITORI_STATUSES } from '@/lib/constants'
-import { formatPrice, formatDate } from '@/lib/utils'
+import { formatPrice, formatDate, formatCustomerName } from '@/lib/utils'
 import type { ConversationWithRelations } from '@/lib/types'
 
 interface CustomerPanelProps {
@@ -84,7 +84,7 @@ export function CustomerPanel({
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4 text-muted-foreground shrink-0" />
                 <span className="text-sm font-medium">
-                  {customer.last_name} {customer.first_name ?? ''}
+                  {formatCustomerName(customer)}
                 </span>
               </div>
               <div className="space-y-1 text-sm text-muted-foreground">
@@ -252,7 +252,7 @@ export function CustomerPanel({
               <AlertDialogHeader>
                 <AlertDialogTitle>Unlink customer?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This will unlink <span className="font-medium text-foreground">{customer.last_name} {customer.first_name ?? ''}</span> ({customer.customer_code}) from this conversation. You can re-link a customer at any time.
+                  This will unlink <span className="font-medium text-foreground">{formatCustomerName(customer)}</span> ({customer.customer_code}) from this conversation. You can re-link a customer at any time.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>

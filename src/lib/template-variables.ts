@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { formatCustomerName } from '@/lib/utils'
 import type { Conversation } from '@/lib/types'
 
 export interface TemplateContext {
@@ -26,7 +27,7 @@ export async function resolveTemplateContext(
     .single()
 
   if (customer) {
-    ctx.customer_name = `${customer.last_name} ${customer.first_name ?? ''}`.trim()
+    ctx.customer_name = formatCustomerName(customer)
     ctx.customer_code = customer.customer_code
   }
 
