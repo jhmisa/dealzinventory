@@ -69,6 +69,8 @@ export interface BatchInvoiceOrder {
   shipping_cost: number | null
   notes: string | null
   created_at: string
+  receiver_first_name: string | null
+  receiver_last_name: string | null
   customers: OrderCustomer | null
   order_items: OrderItemData[]
   payment_method?: string | null
@@ -150,9 +152,10 @@ function escapeHtml(str: string): string {
 
 function buildInvoicePageHtml(order: BatchInvoiceOrder, salesAgent: string, isLast: boolean): string {
   const customer = order.customers
-  const customerName = customer
-    ? formatCustomerName(customer)
-    : '—'
+  const receiverName = order.receiver_first_name || order.receiver_last_name
+    ? [order.receiver_first_name, order.receiver_last_name].filter(Boolean).join(' ')
+    : null
+  const customerName = receiverName ?? (customer ? formatCustomerName(customer) : '—')
 
   const orderItems = order.order_items ?? []
 

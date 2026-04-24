@@ -63,6 +63,8 @@ interface InvoiceOrder {
   shipping_cost: number | null
   notes: string | null
   created_at: string
+  receiver_first_name: string | null
+  receiver_last_name: string | null
   customers: OrderCustomer | null
   order_items: OrderItemData[]
 }
@@ -155,9 +157,10 @@ function escapeHtml(str: string): string {
 
 function buildInvoiceHtml(order: InvoiceOrder, salesAgent: string, paymentMethod?: string | null, paymentConfirmations?: PaymentConfirmationInfo[]): string {
   const customer = order.customers
-  const customerName = customer
-    ? formatCustomerName(customer)
-    : '—'
+  const receiverName = order.receiver_first_name || order.receiver_last_name
+    ? [order.receiver_first_name, order.receiver_last_name].filter(Boolean).join(' ')
+    : null
+  const customerName = receiverName ?? (customer ? formatCustomerName(customer) : '—')
 
   const orderItems = order.order_items ?? []
 
