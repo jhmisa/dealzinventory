@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/dialog'
 import { PageHeader, SearchBar, DataTable, StatusBadge, GradeBadge, CodeDisplay, PriceDisplay, TableSkeleton } from '@/components/shared'
 import { useItems, useUpdateItem, useItemStatusCounts, useToggleLiveSelling } from '@/hooks/use-items'
-import { useSellGroupByCode, useToggleSellGroupLiveSelling, useLiveSellingSellGroups, useSellGroupLiveSellingCount } from '@/hooks/use-sell-groups'
+import { useSellGroupByCode, useToggleSellGroupLiveSelling, useLiveSellingSellGroups, useSellGroupLiveSellingCount, useSellGroupsForList, useSellGroupStatusCounts } from '@/hooks/use-sell-groups'
 import { SellGroupResultBlock } from '@/components/sell-groups/sell-group-result-block'
 import { useAccessories, useCreateAccessory, useAccessoryTabCounts, useToggleAccessoryLiveSelling, useAccessoryLiveSellingCount } from '@/hooks/use-accessories'
 import { useCategories } from '@/hooks/use-categories'
@@ -87,12 +87,13 @@ type InventoryRow =
   | (AccessoryRow & { _kind: 'accessory' })
   | (SellGroupRow & { _kind: 'sell-group' })
 
-type InventoryTypeFilter = 'all' | 'products' | 'accessories'
+type InventoryTypeFilter = 'all' | 'products' | 'accessories' | 'sell-groups'
 
 const INVENTORY_TYPE_OPTIONS = [
   { value: 'all', label: 'All' },
   { value: 'products', label: 'Products' },
   { value: 'accessories', label: 'Accessories' },
+  { value: 'sell-groups', label: 'Group Codes' },
 ] as const
 
 const INVENTORY_TABS = [
@@ -432,8 +433,8 @@ export default function ItemListPage() {
 
   // Should we show unified view? On All/AVAILABLE/LIVE_SELLING tabs within Items tab
   const showUnified = inventoryTab === 'items' && (statusTab === 'all' || statusTab === 'AVAILABLE' || statusTab === 'LIVE_SELLING')
-  const skipItemsFetch = showUnified && inventoryType === 'accessories'
-  const skipAccFetch = !showUnified || inventoryType === 'products'
+  const skipItemsFetch = showUnified && (inventoryType === 'accessories' || inventoryType === 'sell-groups')
+  const skipAccFetch = !showUnified || inventoryType === 'products' || inventoryType === 'sell-groups'
 
   // Fetch items filtered by active status tab
   const { data: allItems, isLoading } = useItems({
@@ -442,8 +443,18 @@ export default function ItemListPage() {
     isLiveSelling: statusTab === 'LIVE_SELLING' ? true : undefined,
   }, { enabled: !skipItemsFetch })
 
-  // Fetch live selling sell groups (only on LIVE_SELLING tab)
-  const { data: liveSellingSellGroups } = useLiveSellingSellGroups(statusTab === 'LIVE_SELLING')
+  // Fetch live selling sell groups (only on LIVE_SELLING tab when not filtering to sell-groups-only)
+  const { data: liveSellingSellGroups } = useLiveSellingSellGroups(statusTab === 'LIVE_SELLING' && inventoryType !== 'sell-groups')
+
+  // Fetch sell groups for the Group Codes filter or LIVE_SELLING tab sell-groups-only view
+  const { data: sellGroupsList, isLoading: sgListLoading } = useSellGroupsForList({
+    search: debouncedSearch || undefined,
+    grade: gradeFilter && gradeFilter !== 'all' ? gradeFilter : undefined,
+    ...(statusTab === 'LIVE_SELLING' ? { isLiveSelling: true } : {}),
+  }, { enabled: showUnified && inventoryType === 'sell-groups' })
+
+  // Sell group counts for tab badges
+  const { data: sgStatusCounts } = useSellGroupStatusCounts(baseFilters)
 
   // Fetch accessories for unified view
   const { data: unifiedAccessories, isLoading: unifiedAccLoading } = useAccessories({
@@ -536,9 +547,28 @@ export default function ItemListPage() {
     return sorted
   }, [filteredItems, sortBy, sortDir])
 
+  // Helper: convert sell group data to tagged InventoryRow[]
+  const tagSellGroups = useCallback((sgs: typeof liveSellingSellGroups | typeof sellGroupsList): InventoryRow[] => {
+    return (sgs ?? []).map((sg) => {
+      const pm = sg.product_models as Record<string, unknown> | null
+      const productMedia = ((pm?.product_media ?? []) as Array<{ file_url: string; sort_order: number }>).sort((a, b) => a.sort_order - b.sort_order)
+      const thumbnail = productMedia[0]?.file_url
+      let description = (pm?.short_description as string) || ''
+      if (!description && pm) {
+        const parts = [pm.brand, pm.model_name, pm.cpu, pm.ram_gb, pm.storage_gb, pm.screen_size ? `${pm.screen_size}"` : null, pm.color].filter(Boolean)
+        description = parts.join(' / ')
+      }
+      const itemCount = ((sg.sell_group_items as Array<{ count: number }> | null)?.[0] as { count: number } | undefined)?.count ?? 0
+      return { ...sg, _kind: 'sell-group' as const, _sg_description: description, _sg_thumbnail: thumbnail, _sg_item_count: itemCount }
+    })
+  }, [])
+
   // Build merged unified data when in unified mode
   const unifiedData: InventoryRow[] = useMemo(() => {
     if (!showUnified || inventoryType === 'products') return []
+    if (inventoryType === 'sell-groups') {
+      return sortInventoryRows(tagSellGroups(sellGroupsList))
+    }
     if (inventoryType === 'accessories') {
       const filtered = ((unifiedAccessories ?? []) as AccessoryRow[])
         .filter((acc) => {
@@ -560,11 +590,10 @@ export default function ItemListPage() {
         .map((a) => ({ ...a, _kind: 'accessory' as const }))
       return sortInventoryRows(filtered)
     }
-    // inventoryType === 'all': merge both
+    // inventoryType === 'all': merge all three
     const taggedItems: InventoryRow[] = sortedItems.map((i) => ({ ...i, _kind: 'item' as const }))
     const taggedAcc: InventoryRow[] = ((unifiedAccessories ?? []) as AccessoryRow[])
       .filter((acc) => {
-        // Apply client-side filters that also apply to accessories
         if (debouncedDescSearch) {
           const accDesc = [acc.brand, acc.name, acc.description].filter(Boolean).join(' ')
           if (!accDesc.toLowerCase().includes(debouncedDescSearch.toLowerCase())) return false
@@ -581,26 +610,15 @@ export default function ItemListPage() {
         return true
       })
       .map((a) => ({ ...a, _kind: 'accessory' as const }))
-    // Add live-selling sell groups on LIVE_SELLING tab
-    const taggedSellGroups: InventoryRow[] = statusTab === 'LIVE_SELLING' ? (liveSellingSellGroups ?? []).map((sg) => {
-      const pm = sg.product_models as Record<string, unknown> | null
-      const productMedia = ((pm?.product_media ?? []) as Array<{ file_url: string; sort_order: number }>).sort((a, b) => a.sort_order - b.sort_order)
-      const thumbnail = productMedia[0]?.file_url
-      let description = (pm?.short_description as string) || ''
-      if (!description && pm) {
-        const parts = [pm.brand, pm.model_name, pm.cpu, pm.ram_gb, pm.storage_gb, pm.screen_size ? `${pm.screen_size}"` : null, pm.color].filter(Boolean)
-        description = parts.join(' / ')
-      }
-      const itemCount = ((sg.sell_group_items as Array<{ count: number }> | null)?.[0] as { count: number } | undefined)?.count ?? 0
-      return { ...sg, _kind: 'sell-group' as const, _sg_description: description, _sg_thumbnail: thumbnail, _sg_item_count: itemCount }
-    }) : []
+    // Add sell groups on LIVE_SELLING tab (from live-selling query)
+    const taggedSellGroups = statusTab === 'LIVE_SELLING' ? tagSellGroups(liveSellingSellGroups) : []
 
     return sortInventoryRows([...taggedItems, ...taggedAcc, ...taggedSellGroups])
-  }, [showUnified, inventoryType, sortedItems, unifiedAccessories, liveSellingSellGroups, statusTab, categoryFilter, brandFilter, priceFrom, priceTo, debouncedDescSearch, debouncedConditionSearch, sortInventoryRows])
+  }, [showUnified, inventoryType, sortedItems, unifiedAccessories, sellGroupsList, liveSellingSellGroups, statusTab, categoryFilter, brandFilter, priceFrom, priceTo, debouncedDescSearch, debouncedConditionSearch, sortInventoryRows, tagSellGroups])
 
   // Unified loading state
   const unifiedIsLoading = showUnified
-    ? (inventoryType === 'accessories' ? unifiedAccLoading : inventoryType === 'products' ? isLoading : isLoading || unifiedAccLoading)
+    ? (inventoryType === 'sell-groups' ? sgListLoading : inventoryType === 'accessories' ? unifiedAccLoading : inventoryType === 'products' ? isLoading : isLoading || unifiedAccLoading)
     : isLoading
 
   // Helper to open showcase window for a code
@@ -1399,13 +1417,18 @@ export default function ItemListPage() {
               {STATUS_TABS.map((tab) => {
                 let count = statusCounts[tab.value] ?? 0
                 // Add accessory counts to All, Available, and LiveSelling tabs when not filtering to products-only
-                if (inventoryType !== 'products' && accTabCounts) {
+                if (inventoryType !== 'products' && inventoryType !== 'sell-groups' && accTabCounts) {
                   if (tab.value === 'all') count += accTabCounts.all
                   else if (tab.value === 'AVAILABLE') count += accTabCounts.available
                 }
+                // Add sell group counts
+                if (inventoryType !== 'products' && inventoryType !== 'accessories' && sgStatusCounts) {
+                  if (tab.value === 'all') count += sgStatusCounts.all
+                  else if (tab.value === 'AVAILABLE') count += sgStatusCounts.available
+                }
                 if (tab.value === 'LIVE_SELLING') {
-                  if (inventoryType !== 'products') count += accLiveSellingCount
-                  count += sgLiveSellingCount
+                  if (inventoryType !== 'products' && inventoryType !== 'sell-groups') count += accLiveSellingCount
+                  if (inventoryType !== 'products' && inventoryType !== 'accessories') count += sgLiveSellingCount
                 }
                 const isActive = statusTab === tab.value
                 return (
@@ -1463,7 +1486,7 @@ export default function ItemListPage() {
             <SearchBar
               value={search}
               onChange={setSearch}
-              placeholder={showUnified && inventoryType !== 'products' ? 'Search P-code, A-code, name...' : 'Search P-code...'}
+              placeholder={inventoryType === 'sell-groups' ? 'Search G-code...' : showUnified && inventoryType !== 'products' ? 'Search P-code, A-code, name...' : 'Search P-code...'}
               className="w-[140px]"
             />
             <Select value={gradeFilter} onValueChange={setGradeFilter}>
@@ -1581,6 +1604,13 @@ export default function ItemListPage() {
                 else if (row._kind === 'sell-group') { /* no-op for sell groups */ }
                 else navigate(`/admin/items/${row.id}`)
               }}
+            />
+          ) : showUnified && inventoryType === 'sell-groups' ? (
+            <DataTable
+              columns={unifiedColumns}
+              data={unifiedData}
+              enableColumnResizing
+              onRowClick={() => { /* no-op for sell groups */ }}
             />
           ) : showUnified && inventoryType === 'accessories' ? (
             <DataTable

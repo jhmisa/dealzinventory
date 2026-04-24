@@ -147,6 +147,21 @@ export function useBulkAssignItems() {
   })
 }
 
+export function useSellGroupsForList(filters: { search?: string; grade?: string; isLiveSelling?: boolean } = {}, options: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: queryKeys.sellGroups.list({ _type: 'list-view', ...filters }),
+    queryFn: () => sellGroupsService.getSellGroupsForList(filters),
+    enabled: options.enabled,
+  })
+}
+
+export function useSellGroupStatusCounts(filters: { search?: string; grade?: string } = {}) {
+  return useQuery({
+    queryKey: queryKeys.sellGroups.list({ _type: 'status-counts', ...filters }),
+    queryFn: () => sellGroupsService.getSellGroupStatusCounts(filters),
+  })
+}
+
 export function useToggleSellGroupLiveSelling() {
   const queryClient = useQueryClient()
   return useMutation({

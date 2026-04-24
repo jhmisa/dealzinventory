@@ -308,6 +308,73 @@ export async function toggleSellGroupLiveSelling(sellGroupId: string, value: boo
   if (error) throw error
 }
 
+// Fetch sell groups with full product info for the Items page Group Codes tab
+interface SellGroupListFilters {
+  search?: string
+  grade?: string
+  isLiveSelling?: boolean
+}
+
+export async function getSellGroupsForList(filters: SellGroupListFilters = {}) {
+  let query = supabase
+    .from('sell_groups')
+    .select(`
+      *,
+      product_models(
+        id, brand, model_name, color, short_description, cpu, ram_gb, storage_gb, screen_size, os_family,
+        categories(name, description_fields),
+        product_media(id, file_url, media_type, sort_order)
+      ),
+      sell_group_items(count)
+    `)
+    .order('created_at', { ascending: false })
+
+  if (filters.search) {
+    query = query.ilike('sell_group_code', `%${filters.search}%`)
+  }
+  if (filters.grade) {
+    query = query.eq('condition_grade', filters.grade)
+  }
+  if (filters.isLiveSelling !== undefined) {
+    query = query.eq('is_live_selling', filters.isLiveSelling)
+  }
+
+  const { data, error } = await query
+
+  if (error) throw error
+  return data ?? []
+}
+
+export type SellGroupListItem = Awaited<ReturnType<typeof getSellGroupsForList>>[number]
+
+// Count sell groups (optionally by status)
+export async function getSellGroupStatusCounts(filters: { search?: string; grade?: string } = {}) {
+  // Total count
+  let totalQuery = supabase
+    .from('sell_groups')
+    .select('id', { count: 'exact', head: true })
+  if (filters.search) totalQuery = totalQuery.ilike('sell_group_code', `%${filters.search}%`)
+  if (filters.grade) totalQuery = totalQuery.eq('condition_grade', filters.grade)
+
+  // Available (active) count
+  let availableQuery = supabase
+    .from('sell_groups')
+    .select('id', { count: 'exact', head: true })
+    .eq('active', true)
+  if (filters.search) availableQuery = availableQuery.ilike('sell_group_code', `%${filters.search}%`)
+  if (filters.grade) availableQuery = availableQuery.eq('condition_grade', filters.grade)
+
+  const [totalResult, availableResult] = await Promise.all([totalQuery, availableQuery])
+
+  if (totalResult.error) throw totalResult.error
+  if (availableResult.error) throw availableResult.error
+
+  return {
+    all: totalResult.count ?? 0,
+    available: availableResult.count ?? 0,
+  }
+}
+
 // Fetch sell groups marked for live selling with product info
 export async function getLiveSellingSellGroups() {
   const { data, error } = await supabase
