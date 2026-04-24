@@ -73,7 +73,9 @@ export async function getSnapshotItems(snapshotId: string) {
 }
 
 export async function generateSnapshot() {
-  const { data, error } = await supabase.rpc('generate_inventory_snapshot')
+  const { data, error } = await supabase.rpc('generate_inventory_snapshot', {
+    p_date: new Date().toISOString().split('T')[0],
+  })
 
   if (error) throw error
   return data as string
