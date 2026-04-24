@@ -17,6 +17,14 @@ export function useSellGroups(filters: SellGroupFilters = {}) {
   })
 }
 
+export function useSellGroupByCode(code: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.sellGroups.byCode(code ?? ''),
+    queryFn: () => sellGroupsService.getSellGroupByCode(code!),
+    enabled: !!code,
+  })
+}
+
 export function useSellGroup(id: string) {
   return useQuery({
     queryKey: queryKeys.sellGroups.detail(id),

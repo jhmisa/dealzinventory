@@ -24,6 +24,8 @@ import {
 } from '@/components/ui/dialog'
 import { PageHeader, SearchBar, DataTable, StatusBadge, GradeBadge, CodeDisplay, PriceDisplay, TableSkeleton } from '@/components/shared'
 import { useItems, useUpdateItem, useItemStatusCounts, useToggleLiveSelling } from '@/hooks/use-items'
+import { useSellGroupByCode } from '@/hooks/use-sell-groups'
+import { SellGroupResultBlock } from '@/components/sell-groups/sell-group-result-block'
 import { useAccessories, useCreateAccessory, useAccessoryTabCounts, useToggleAccessoryLiveSelling, useAccessoryLiveSellingCount } from '@/hooks/use-accessories'
 import { useCategories } from '@/hooks/use-categories'
 import { useItemListColumnSettings } from '@/hooks/use-settings'
@@ -385,6 +387,9 @@ export default function ItemListPage() {
   const debouncedSearch = useDebounce(search, 400)
   const debouncedDescSearch = useDebounce(descriptionSearch, 400)
   const debouncedConditionSearch = useDebounce(conditionSearch, 400)
+
+  const isGCodeSearch = /^G\d{3,}$/i.test(debouncedSearch?.trim() ?? '')
+  const { data: sellGroupResult, isLoading: sgLoading } = useSellGroupByCode(isGCodeSearch ? debouncedSearch?.trim() : undefined)
 
   const { data: columnSettings } = useItemListColumnSettings()
 
@@ -1457,7 +1462,15 @@ export default function ItemListPage() {
             )}
           </div>
 
-          {unifiedIsLoading ? (
+          {isGCodeSearch && sgLoading ? (
+            <TableSkeleton rows={4} columns={9} />
+          ) : isGCodeSearch && sellGroupResult ? (
+            <SellGroupResultBlock sellGroup={sellGroupResult} onShowcase={openShowcase} />
+          ) : isGCodeSearch && !sgLoading ? (
+            <div className="flex items-center justify-center py-12 text-muted-foreground">
+              No sell group found for "{debouncedSearch?.trim()}"
+            </div>
+          ) : unifiedIsLoading ? (
             <TableSkeleton rows={8} columns={Object.values(columnVisibility).filter(Boolean).length || 9} />
           ) : showUnified && inventoryType === 'all' ? (
             <DataTable

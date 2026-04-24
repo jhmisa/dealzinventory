@@ -93,6 +93,53 @@ export async function generateSellGroupCode(): Promise<string> {
   return data as string
 }
 
+// Fetch a sell group by G-code with deep joins (items, orders, customers, product media)
+export async function getSellGroupByCode(gCode: string) {
+  const { data: sg, error: sgError } = await supabase
+    .from('sell_groups')
+    .select(`
+      *,
+      product_models(
+        id, brand, model_name, color, short_description, cpu, ram_gb, storage_gb, screen_size, os_family,
+        categories(name, description_fields),
+        product_media(id, file_url, media_type, sort_order)
+      )
+    `)
+    .ilike('sell_group_code', gCode.trim())
+    .maybeSingle()
+
+  if (sgError) throw sgError
+  if (!sg) return null
+
+  // Fetch items in this sell group with order/customer info
+  const { data: sgi, error: sgiError } = await supabase
+    .from('sell_group_items')
+    .select(`
+      id, assigned_at,
+      items(
+        id, item_code, condition_grade, item_status, selling_price, purchase_price, discount, created_at,
+        suppliers(supplier_name),
+        product_models(brand, model_name, cpu, ram_gb, storage_gb, screen_size, categories(name, description_fields)),
+        order_items(
+          orders(id, order_code, order_status,
+            customers(id, customer_code, first_name, last_name)
+          )
+        )
+      )
+    `)
+    .eq('sell_group_id', sg.id)
+    .order('assigned_at', { ascending: false })
+
+  if (sgiError) throw sgiError
+
+  return {
+    ...sg,
+    sell_group_items: sgi ?? [],
+  }
+}
+
+export type SellGroupByCode = NonNullable<Awaited<ReturnType<typeof getSellGroupByCode>>>
+
 // Get items assigned to a sell group
 export async function getSellGroupItems(sellGroupId: string) {
   const { data, error } = await supabase
