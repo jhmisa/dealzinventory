@@ -2606,6 +2606,7 @@ export type Database = {
           condition_grade: Database["public"]["Enums"]["condition_grade"]
           created_at: string
           id: string
+          is_live_selling: boolean
           product_id: string
           sell_group_code: string
           updated_at: string
@@ -2616,6 +2617,7 @@ export type Database = {
           condition_grade: Database["public"]["Enums"]["condition_grade"]
           created_at?: string
           id?: string
+          is_live_selling?: boolean
           product_id: string
           sell_group_code: string
           updated_at?: string
@@ -2626,6 +2628,7 @@ export type Database = {
           condition_grade?: Database["public"]["Enums"]["condition_grade"]
           created_at?: string
           id?: string
+          is_live_selling?: boolean
           product_id?: string
           sell_group_code?: string
           updated_at?: string

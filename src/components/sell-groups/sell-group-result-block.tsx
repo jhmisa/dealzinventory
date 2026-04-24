@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronDown, ChevronRight, Image, Play } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Table,
   TableBody,
@@ -19,9 +20,11 @@ import type { ConditionGrade } from '@/lib/types'
 interface SellGroupResultBlockProps {
   sellGroup: SellGroupByCode
   onShowcase: (code: string, mode: 'photos' | 'videos') => void
+  showLiveSellingToggle?: boolean
+  onToggleLiveSelling?: (sellGroupId: string, value: boolean) => void
 }
 
-export function SellGroupResultBlock({ sellGroup, onShowcase }: SellGroupResultBlockProps) {
+export function SellGroupResultBlock({ sellGroup, onShowcase, showLiveSellingToggle, onToggleLiveSelling }: SellGroupResultBlockProps) {
   const [expanded, setExpanded] = useState(true)
   const navigate = useNavigate()
 
@@ -69,6 +72,17 @@ export function SellGroupResultBlock({ sellGroup, onShowcase }: SellGroupResultB
         className="flex items-center gap-3 px-4 py-3 bg-muted/50 cursor-pointer hover:bg-muted/80 transition-colors"
         onClick={() => setExpanded(!expanded)}
       >
+        {showLiveSellingToggle && (
+          <div onClick={(e) => e.stopPropagation()}>
+            <Checkbox
+              checked={!!(sellGroup as Record<string, unknown>).is_live_selling}
+              onCheckedChange={(checked) => {
+                onToggleLiveSelling?.(sellGroup.id, !!checked)
+              }}
+            />
+          </div>
+        )}
+
         <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0">
           {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </Button>

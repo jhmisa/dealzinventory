@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/dialog'
 import { PageHeader, SearchBar, DataTable, StatusBadge, GradeBadge, CodeDisplay, PriceDisplay, TableSkeleton } from '@/components/shared'
 import { useItems, useUpdateItem, useItemStatusCounts, useToggleLiveSelling } from '@/hooks/use-items'
-import { useSellGroupByCode } from '@/hooks/use-sell-groups'
+import { useSellGroupByCode, useToggleSellGroupLiveSelling, useLiveSellingSellGroups, useSellGroupLiveSellingCount } from '@/hooks/use-sell-groups'
 import { SellGroupResultBlock } from '@/components/sell-groups/sell-group-result-block'
 import { useAccessories, useCreateAccessory, useAccessoryTabCounts, useToggleAccessoryLiveSelling, useAccessoryLiveSellingCount } from '@/hooks/use-accessories'
 import { useCategories } from '@/hooks/use-categories'
@@ -36,7 +36,8 @@ import { formatDate, formatPrice, cn, buildShortDescription } from '@/lib/utils'
 import { toast } from 'sonner'
 import { printItemLabel } from '@/components/items/label-print'
 import { resolveSoldTo } from '@/lib/item-sale'
-import type { Accessory, AccessoryMedia } from '@/lib/types'
+import type { Accessory, AccessoryMedia, ConditionGrade } from '@/lib/types'
+import type { LiveSellingSellGroup } from '@/services/sell-groups'
 
 type ItemRow = {
   id: string
@@ -75,9 +76,16 @@ type AccessoryRow = Accessory & {
   accessory_media: AccessoryMedia[]
 }
 
+type SellGroupRow = LiveSellingSellGroup & {
+  _sg_description: string
+  _sg_thumbnail: string | undefined
+  _sg_item_count: number
+}
+
 type InventoryRow =
   | (ItemRow & { _kind: 'item' })
   | (AccessoryRow & { _kind: 'accessory' })
+  | (SellGroupRow & { _kind: 'sell-group' })
 
 type InventoryTypeFilter = 'all' | 'products' | 'accessories'
 
@@ -275,6 +283,7 @@ export default function ItemListPage() {
   const updateItem = useUpdateItem()
   const toggleLiveSelling = useToggleLiveSelling()
   const toggleAccessoryLiveSelling = useToggleAccessoryLiveSelling()
+  const toggleSellGroupLiveSelling = useToggleSellGroupLiveSelling()
   const { getParam, setParam } = usePersistedFilters('items-filters')
 
   // Inventory type tab (items vs accessories)
@@ -288,6 +297,7 @@ export default function ItemListPage() {
   // Accessory tab counts for badges
   const { data: accTabCounts } = useAccessoryTabCounts()
   const { data: accLiveSellingCount = 0 } = useAccessoryLiveSellingCount()
+  const { data: sgLiveSellingCount = 0 } = useSellGroupLiveSellingCount()
 
   // Accessories state
   const accSearch = getParam('accQ')
@@ -432,6 +442,9 @@ export default function ItemListPage() {
     isLiveSelling: statusTab === 'LIVE_SELLING' ? true : undefined,
   }, { enabled: !skipItemsFetch })
 
+  // Fetch live selling sell groups (only on LIVE_SELLING tab)
+  const { data: liveSellingSellGroups } = useLiveSellingSellGroups(statusTab === 'LIVE_SELLING')
+
   // Fetch accessories for unified view
   const { data: unifiedAccessories, isLoading: unifiedAccLoading } = useAccessories({
     search: debouncedSearch || undefined,
@@ -480,13 +493,13 @@ export default function ItemListPage() {
     sorted.sort((a, b) => {
       switch (sortBy) {
         case 'code': {
-          const codeA = a._kind === 'item' ? a.item_code : a.accessory_code
-          const codeB = b._kind === 'item' ? b.item_code : b.accessory_code
+          const codeA = a._kind === 'item' ? a.item_code : a._kind === 'accessory' ? a.accessory_code : a.sell_group_code
+          const codeB = b._kind === 'item' ? b.item_code : b._kind === 'accessory' ? b.accessory_code : b.sell_group_code
           return dir * codeA.localeCompare(codeB)
         }
         case 'description': {
-          const descA = a._kind === 'item' ? getItemDescription(a) : [a.brand, a.name].filter(Boolean).join(' ')
-          const descB = b._kind === 'item' ? getItemDescription(b) : [b.brand, b.name].filter(Boolean).join(' ')
+          const descA = a._kind === 'item' ? getItemDescription(a) : a._kind === 'accessory' ? [a.brand, a.name].filter(Boolean).join(' ') : a._sg_description
+          const descB = b._kind === 'item' ? getItemDescription(b) : b._kind === 'accessory' ? [b.brand, b.name].filter(Boolean).join(' ') : b._sg_description
           return dir * descA.localeCompare(descB)
         }
         case 'buy_price': {
@@ -494,7 +507,11 @@ export default function ItemListPage() {
           const priceB = b._kind === 'item' ? (b.purchase_price ?? 0) : 0
           return dir * (priceA - priceB)
         }
-        case 'sell_price': return dir * ((Number(a.selling_price) || 0) - (Number(b.selling_price) || 0))
+        case 'sell_price': {
+          const priceA = a._kind === 'sell-group' ? (a.base_price ?? 0) : (Number(a.selling_price) || 0)
+          const priceB = b._kind === 'sell-group' ? (b.base_price ?? 0) : (Number(b.selling_price) || 0)
+          return dir * (priceA - priceB)
+        }
         case 'date':
         default: return dir * (new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
       }
@@ -564,8 +581,22 @@ export default function ItemListPage() {
         return true
       })
       .map((a) => ({ ...a, _kind: 'accessory' as const }))
-    return sortInventoryRows([...taggedItems, ...taggedAcc])
-  }, [showUnified, inventoryType, sortedItems, unifiedAccessories, categoryFilter, brandFilter, priceFrom, priceTo, debouncedDescSearch, debouncedConditionSearch, sortInventoryRows])
+    // Add live-selling sell groups on LIVE_SELLING tab
+    const taggedSellGroups: InventoryRow[] = statusTab === 'LIVE_SELLING' ? (liveSellingSellGroups ?? []).map((sg) => {
+      const pm = sg.product_models as Record<string, unknown> | null
+      const productMedia = ((pm?.product_media ?? []) as Array<{ file_url: string; sort_order: number }>).sort((a, b) => a.sort_order - b.sort_order)
+      const thumbnail = productMedia[0]?.file_url
+      let description = (pm?.short_description as string) || ''
+      if (!description && pm) {
+        const parts = [pm.brand, pm.model_name, pm.cpu, pm.ram_gb, pm.storage_gb, pm.screen_size ? `${pm.screen_size}"` : null, pm.color].filter(Boolean)
+        description = parts.join(' / ')
+      }
+      const itemCount = ((sg.sell_group_items as Array<{ count: number }> | null)?.[0] as { count: number } | undefined)?.count ?? 0
+      return { ...sg, _kind: 'sell-group' as const, _sg_description: description, _sg_thumbnail: thumbnail, _sg_item_count: itemCount }
+    }) : []
+
+    return sortInventoryRows([...taggedItems, ...taggedAcc, ...taggedSellGroups])
+  }, [showUnified, inventoryType, sortedItems, unifiedAccessories, liveSellingSellGroups, statusTab, categoryFilter, brandFilter, priceFrom, priceTo, debouncedDescSearch, debouncedConditionSearch, sortInventoryRows])
 
   // Unified loading state
   const unifiedIsLoading = showUnified
@@ -605,6 +636,21 @@ export default function ItemListPage() {
                 onCheckedChange={(checked) => {
                   toggleAccessoryLiveSelling.mutate({
                     accessoryIds: [r.id],
+                    value: !!checked,
+                  })
+                }}
+              />
+            </div>
+          )
+        }
+        if (r._kind === 'sell-group') {
+          return (
+            <div onClick={(e) => e.stopPropagation()}>
+              <Checkbox
+                checked={!!r.is_live_selling}
+                onCheckedChange={(checked) => {
+                  toggleSellGroupLiveSelling.mutate({
+                    sellGroupId: r.id,
                     value: !!checked,
                   })
                 }}
@@ -671,6 +717,47 @@ export default function ItemListPage() {
                   </Button>
                 </div>
                 <div className="text-sm text-muted-foreground">{brandName || '—'}</div>
+              </div>
+            </div>
+          )
+        }
+        if (r._kind === 'sell-group') {
+          return (
+            <div className="flex items-center gap-3">
+              {r._sg_thumbnail ? (
+                <img
+                  src={r._sg_thumbnail}
+                  alt={r.sell_group_code}
+                  className="h-10 w-10 rounded border bg-muted flex-shrink-0 object-cover"
+                />
+              ) : (
+                <div className="h-10 w-10 rounded border bg-muted flex-shrink-0 flex items-center justify-center text-muted-foreground text-xs">—</div>
+              )}
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <CodeDisplay code={r.sell_group_code} />
+                  <GradeBadge grade={r.condition_grade as ConditionGrade} />
+                  <Badge variant="secondary" className="text-xs">{r._sg_item_count} item{r._sg_item_count !== 1 ? 's' : ''}</Badge>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    title="Showcase Photos"
+                    onClick={(e) => { e.stopPropagation(); openShowcase(r.sell_group_code, 'photos') }}
+                  >
+                    <Image className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    title="Showcase Videos"
+                    onClick={(e) => { e.stopPropagation(); openShowcase(r.sell_group_code, 'videos') }}
+                  >
+                    <Play className="h-3 w-3" />
+                  </Button>
+                </div>
+                <div className="text-sm text-muted-foreground truncate">{r._sg_description || '—'}</div>
               </div>
             </div>
           )
@@ -782,6 +869,9 @@ export default function ItemListPage() {
           if (qty <= threshold) return <Badge variant="outline" className="text-yellow-700 border-yellow-400 bg-yellow-50">Low Stock ({qty})</Badge>
           return <Badge variant="outline" className="text-green-700 border-green-400">In Stock ({qty})</Badge>
         }
+        if (r._kind === 'sell-group') {
+          return r.active ? <Badge variant="outline" className="text-green-700 border-green-400">Active</Badge> : <Badge variant="outline">Inactive</Badge>
+        }
         const config = ITEM_STATUSES.find((s) => s.value === r.item_status)
         return config ? <StatusBadge label={config.label} color={config.color} /> : r.item_status
       },
@@ -792,7 +882,8 @@ export default function ItemListPage() {
       size: 90,
       cell: ({ row }) => {
         const r = row.original
-        return r._kind === 'item' ? (r.suppliers?.supplier_name ?? '—') : '—'
+        if (r._kind !== 'item') return <span className="text-muted-foreground">—</span>
+        return r.suppliers?.supplier_name ?? '—'
       },
     },
     {
@@ -801,7 +892,8 @@ export default function ItemListPage() {
       size: 65,
       cell: ({ row }) => {
         const r = row.original
-        return r._kind === 'item' ? <PriceDisplay amount={r.purchase_price} /> : <span className="text-muted-foreground">—</span>
+        if (r._kind === 'item') return <PriceDisplay amount={r.purchase_price} />
+        return <span className="text-muted-foreground">—</span>
       },
     },
     {
@@ -811,6 +903,7 @@ export default function ItemListPage() {
       cell: ({ row }) => {
         const r = row.original
         if (r._kind === 'accessory') return <PriceDisplay amount={Number(r.selling_price)} />
+        if (r._kind === 'sell-group') return <PriceDisplay amount={r.base_price} />
         return (
           <EditPriceCell
             itemId={r.id}
@@ -828,7 +921,7 @@ export default function ItemListPage() {
       size: 65,
       cell: ({ row }) => {
         const r = row.original
-        if (r._kind === 'accessory') return <span className="text-muted-foreground">—</span>
+        if (r._kind !== 'item') return <span className="text-muted-foreground">—</span>
         return (
           <EditPriceCell
             itemId={r.id}
@@ -846,7 +939,7 @@ export default function ItemListPage() {
       size: 180,
       cell: ({ row }) => {
         const r = row.original
-        if (r._kind === 'accessory') return <span className="text-xs text-muted-foreground">—</span>
+        if (r._kind !== 'item') return <span className="text-xs text-muted-foreground">—</span>
         const soldTo = resolveSoldTo(r.order_items)
         if (!soldTo) return <span className="text-xs text-muted-foreground">—</span>
         const fullName = `${soldTo.customer.last_name} ${soldTo.customer.first_name ?? ''}`.trim()
@@ -873,7 +966,7 @@ export default function ItemListPage() {
       size: 40,
       cell: ({ row }) => {
         const r = row.original
-        if (r._kind === 'accessory') return null
+        if (r._kind !== 'item') return null
         const pm = r.product_models
         const descFields = pm?.categories?.description_fields ?? []
         const resolvedValues: Record<string, unknown> = {}
@@ -897,7 +990,7 @@ export default function ItemListPage() {
         )
       },
     },
-  ], [updateItem, openShowcase, showLiveSellingCheckbox, toggleLiveSelling, toggleAccessoryLiveSelling])
+  ], [updateItem, openShowcase, showLiveSellingCheckbox, toggleLiveSelling, toggleAccessoryLiveSelling, toggleSellGroupLiveSelling])
 
 
   const columns: ColumnDef<ItemRow>[] = [
@@ -1310,8 +1403,9 @@ export default function ItemListPage() {
                   if (tab.value === 'all') count += accTabCounts.all
                   else if (tab.value === 'AVAILABLE') count += accTabCounts.available
                 }
-                if (inventoryType !== 'products' && tab.value === 'LIVE_SELLING') {
-                  count += accLiveSellingCount
+                if (tab.value === 'LIVE_SELLING') {
+                  if (inventoryType !== 'products') count += accLiveSellingCount
+                  count += sgLiveSellingCount
                 }
                 const isActive = statusTab === tab.value
                 return (
@@ -1465,7 +1559,12 @@ export default function ItemListPage() {
           {isGCodeSearch && sgLoading ? (
             <TableSkeleton rows={4} columns={9} />
           ) : isGCodeSearch && sellGroupResult ? (
-            <SellGroupResultBlock sellGroup={sellGroupResult} onShowcase={openShowcase} />
+            <SellGroupResultBlock
+              sellGroup={sellGroupResult}
+              onShowcase={openShowcase}
+              showLiveSellingToggle={showLiveSellingCheckbox}
+              onToggleLiveSelling={(id, val) => toggleSellGroupLiveSelling.mutate({ sellGroupId: id, value: val })}
+            />
           ) : isGCodeSearch && !sgLoading ? (
             <div className="flex items-center justify-center py-12 text-muted-foreground">
               No sell group found for "{debouncedSearch?.trim()}"
@@ -1479,6 +1578,7 @@ export default function ItemListPage() {
               enableColumnResizing
               onRowClick={(row) => {
                 if (row._kind === 'accessory') navigate(`/admin/accessories/${row.id}`)
+                else if (row._kind === 'sell-group') { /* no-op for sell groups */ }
                 else navigate(`/admin/items/${row.id}`)
               }}
             />

@@ -146,3 +146,29 @@ export function useBulkAssignItems() {
     },
   })
 }
+
+export function useToggleSellGroupLiveSelling() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ sellGroupId, value }: { sellGroupId: string; value: boolean }) =>
+      sellGroupsService.toggleSellGroupLiveSelling(sellGroupId, value),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.sellGroups.all })
+    },
+  })
+}
+
+export function useLiveSellingSellGroups(enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.sellGroups.list({ _type: 'live-selling' }),
+    queryFn: () => sellGroupsService.getLiveSellingSellGroups(),
+    enabled,
+  })
+}
+
+export function useSellGroupLiveSellingCount() {
+  return useQuery({
+    queryKey: queryKeys.sellGroups.list({ _type: 'live-selling-count' }),
+    queryFn: () => sellGroupsService.getSellGroupLiveSellingCount(),
+  })
+}

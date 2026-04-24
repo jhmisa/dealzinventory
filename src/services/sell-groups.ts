@@ -297,3 +297,46 @@ export async function bulkAssignItems(sellGroupId: string, itemIds: string[]) {
 
   if (error) throw error
 }
+
+// Toggle live selling flag on a sell group
+export async function toggleSellGroupLiveSelling(sellGroupId: string, value: boolean) {
+  const { error } = await supabase
+    .from('sell_groups')
+    .update({ is_live_selling: value })
+    .eq('id', sellGroupId)
+
+  if (error) throw error
+}
+
+// Fetch sell groups marked for live selling with product info
+export async function getLiveSellingSellGroups() {
+  const { data, error } = await supabase
+    .from('sell_groups')
+    .select(`
+      *,
+      product_models(
+        id, brand, model_name, color, short_description, cpu, ram_gb, storage_gb, screen_size, os_family,
+        categories(name, description_fields),
+        product_media(id, file_url, media_type, sort_order)
+      ),
+      sell_group_items(count)
+    `)
+    .eq('is_live_selling', true)
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+  return data ?? []
+}
+
+export type LiveSellingSellGroup = Awaited<ReturnType<typeof getLiveSellingSellGroups>>[number]
+
+// Count of sell groups with is_live_selling = true
+export async function getSellGroupLiveSellingCount() {
+  const { count, error } = await supabase
+    .from('sell_groups')
+    .select('id', { count: 'exact', head: true })
+    .eq('is_live_selling', true)
+
+  if (error) throw error
+  return count ?? 0
+}
