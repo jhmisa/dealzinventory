@@ -540,7 +540,7 @@ export default function OrderDetailPage() {
   }
 
   // Build address options from customer_addresses + legacy fallback
-  const addressOptions: { id: string; label: string; receiverName?: string | null; address: ShippingAddress }[] = []
+  const addressOptions: { id: string; label: string; receiverName?: string | null; receiverFirstName?: string | null; receiverLastName?: string | null; address: ShippingAddress }[] = []
   if (customerAddresses) {
     for (const addr of customerAddresses) {
       const rName = [addr.receiver_first_name, addr.receiver_last_name].filter(Boolean).join(' ') || null
@@ -548,6 +548,8 @@ export default function OrderDetailPage() {
         id: addr.id,
         label: addr.label,
         receiverName: rName,
+        receiverFirstName: addr.receiver_first_name ?? null,
+        receiverLastName: addr.receiver_last_name ?? null,
         address: addr.address as unknown as ShippingAddress,
       })
     }
@@ -572,9 +574,16 @@ export default function OrderDetailPage() {
   ].filter(Boolean).join(' ') || null
   const orderReceiverPhone = (order as Record<string, unknown>).receiver_phone as string | null
 
-  async function handlePickAddress(addr: ShippingAddress) {
+  async function handlePickAddress(option: typeof addressOptions[number]) {
     try {
-      await updateOrder.mutateAsync({ id: order.id, updates: { shipping_address: JSON.stringify(addr) } })
+      await updateOrder.mutateAsync({
+        id: order.id,
+        updates: {
+          shipping_address: JSON.stringify(option.address),
+          receiver_first_name: option.receiverFirstName ?? null,
+          receiver_last_name: option.receiverLastName ?? null,
+        },
+      })
       setPickingAddress(false)
       toast.success('Shipping address updated')
     } catch (err) {
@@ -884,7 +893,7 @@ export default function OrderDetailPage() {
                       key={option.id}
                       type="button"
                       className="w-full text-left p-2 rounded-md border hover:bg-accent/50 transition-colors"
-                      onClick={() => handlePickAddress(option.address)}
+                      onClick={() => handlePickAddress(option)}
                       disabled={updateOrder.isPending}
                     >
                       <p className="font-medium text-xs">{option.label}</p>
