@@ -245,7 +245,7 @@ export default function SellGroupListPage() {
 
       {/* New Sell Group — Inventory-First Creation Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
+        <DialogContent className="sm:max-w-[85vw] max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>New Sell Group — Select Items</DialogTitle>
           </DialogHeader>

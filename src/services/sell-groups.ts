@@ -183,11 +183,6 @@ export async function getUnassignedAvailableItems(filters: UnassignedItemFilters
     query = query.eq('condition_grade', filters.grade)
   }
 
-  if (filters.search) {
-    const s = filters.search
-    query = query.or(`item_code.ilike.%${s}%,product_models.brand.ilike.%${s}%,product_models.model_name.ilike.%${s}%`)
-  }
-
   const { data, error } = await query
 
   if (error) throw error
@@ -203,7 +198,20 @@ export async function getUnassignedAvailableItems(filters: UnassignedItemFilters
     ...(orderedItems ?? []).map(o => o.item_id),
   ])
 
-  return (data ?? []).filter(item => !excludedIds.has(item.id))
+  let results = (data ?? []).filter(item => !excludedIds.has(item.id))
+
+  // Client-side search across item_code, brand, and model_name (Supabase .or() doesn't support foreign table columns)
+  if (filters.search) {
+    const s = filters.search.toLowerCase()
+    results = results.filter(item => {
+      const pm = item.product_models as { brand: string; model_name: string } | null
+      return item.item_code.toLowerCase().includes(s) ||
+        (pm?.brand ?? '').toLowerCase().includes(s) ||
+        (pm?.model_name ?? '').toLowerCase().includes(s)
+    })
+  }
+
+  return results
 }
 
 // Create a sell group and assign items in one action

@@ -265,7 +265,7 @@ export default function SellGroupDetailPage() {
 
       {/* Available Items Picker Dialog */}
       <Dialog open={pickerOpen} onOpenChange={(open) => { setPickerOpen(open); if (!open) { setPickerSearch(''); setPickerSelectedIds(new Set()) } }}>
-        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+        <DialogContent className="sm:max-w-[80vw] max-h-[80vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>
               Add Items — {pm ? `${pm.brand} ${pm.model_name}` : ''} Grade {sg.condition_grade}
