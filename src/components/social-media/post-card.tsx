@@ -25,7 +25,8 @@ export function PostCard({ post, onQueue, onDelete, onRetry }: PostCardProps) {
     ? `${item.product_models.brand} ${item.product_models.model_name}`
     : null
   const actions = statusActions[post.status]
-  const firstMedia = post.media_urls[0]
+  const mediaUrls = post.media_urls ?? []
+  const firstMedia = mediaUrls[0]
 
   return (
     <Card className="overflow-hidden">
@@ -64,7 +65,7 @@ export function PostCard({ post, onQueue, onDelete, onRetry }: PostCardProps) {
                 : new Date(post.scheduled_at!).toLocaleDateString()}
           </span>
           <span className="mx-1">·</span>
-          <span>{post.media_urls.length} media</span>
+          <span>{mediaUrls.length} media</span>
         </div>
 
         {post.caption && (
