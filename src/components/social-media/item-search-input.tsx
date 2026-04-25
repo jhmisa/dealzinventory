@@ -134,30 +134,38 @@ function useUnifiedSearch(search: string) {
 
       // Search sell groups — by code or product description
       {
-        // Find matching product IDs for description search
-        let matchingProductIds: string[] = []
+        // Find matching photo_group IDs for description search (via product_models)
+        let matchingPhotoGroupIds: string[] = []
         if (term && !/^[PGA]/i.test(term)) {
           const { data: matchingProducts } = await supabase
             .from('product_models')
             .select('id')
             .or(`brand.ilike.%${term}%,model_name.ilike.%${term}%`)
             .limit(50)
-          matchingProductIds = (matchingProducts ?? []).map((p) => p.id)
+          const productIds = (matchingProducts ?? []).map((p) => p.id)
+          if (productIds.length > 0) {
+            const { data: matchingPGs } = await supabase
+              .from('photo_groups')
+              .select('id')
+              .in('product_model_id', productIds)
+              .limit(50)
+            matchingPhotoGroupIds = (matchingPGs ?? []).map((pg) => pg.id)
+          }
         }
 
         let query = supabase
           .from('sell_groups')
           .select(`
-            id, sell_group_code, product_id, selling_price, condition_grade,
-            product_models(brand, model_name, short_description, product_media(file_url, sort_order))
+            id, sell_group_code, condition_grade, base_price,
+            photo_groups(product_model_id, product_models(brand, model_name, short_description, product_media(file_url, sort_order)))
           `)
           .eq('active', true)
           .order('sell_group_code', { ascending: false })
           .limit(10)
 
         if (term) {
-          if (matchingProductIds.length > 0) {
-            query = query.or(`sell_group_code.ilike.%${term}%,product_id.in.(${matchingProductIds.join(',')})`)
+          if (matchingPhotoGroupIds.length > 0) {
+            query = query.or(`sell_group_code.ilike.%${term}%,photo_group_id.in.(${matchingPhotoGroupIds.join(',')})`)
           } else {
             query = query.ilike('sell_group_code', `%${term}%`)
           }
@@ -166,20 +174,24 @@ function useUnifiedSearch(search: string) {
         const { data: sellGroups } = await query
         if (sellGroups) {
           for (const sg of sellGroups) {
-            const pm = sg.product_models as unknown as {
-              brand: string; model_name: string; short_description: string | null
-              product_media: { file_url: string; sort_order: number }[]
+            const pg = sg.photo_groups as unknown as {
+              product_model_id: string | null
+              product_models: {
+                brand: string; model_name: string; short_description: string | null
+                product_media: { file_url: string; sort_order: number }[]
+              } | null
             } | null
+            const pm = pg?.product_models ?? null
 
             results.push({
               id: sg.id,
               code: sg.sell_group_code,
               type: 'sell_group',
               label: pm ? `${pm.brand} ${pm.model_name}` : 'Unknown',
-              sublabel: sg.selling_price ? `¥${sg.selling_price.toLocaleString()}` : pm?.short_description ?? null,
+              sublabel: sg.base_price ? `¥${sg.base_price.toLocaleString()}` : pm?.short_description ?? null,
               thumbnail_url: pm?.product_media?.[0]?.file_url ?? null,
               grade: sg.condition_grade,
-              product_id: sg.product_id,
+              product_id: pg?.product_model_id ?? null,
               accessory_id: null,
             })
           }

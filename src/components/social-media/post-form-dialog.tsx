@@ -50,9 +50,10 @@ export function PostFormDialog({ open, onOpenChange }: PostFormDialogProps) {
 
   function handleSubmit(status: SocialPostStatus) {
     return form.handleSubmit((values) => {
+      const isSellGroup = values.item_code?.startsWith('G')
       createMutation.mutate(
         {
-          item_id: values.item_id,
+          item_id: isSellGroup ? null : values.item_id,
           item_code: values.item_code,
           platform: values.platform,
           caption: values.caption || null,

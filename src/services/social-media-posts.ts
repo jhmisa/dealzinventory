@@ -38,7 +38,35 @@ export async function createSocialMediaPost(post: SocialMediaPostInsert) {
 
   // Fetch item specs for embedding
   let itemSpecs = {}
-  if (post.item_id) {
+  const isSellGroup = post.item_code?.startsWith('G')
+
+  if (isSellGroup && post.item_code) {
+    // Sell group: fetch specs via photo_groups → product_models
+    const { data: sg } = await supabase
+      .from('sell_groups')
+      .select(`
+        condition_grade, base_price,
+        photo_groups(product_models(brand, model_name, model_number, part_number, year, screen_size, other_features))
+      `)
+      .eq('sell_group_code', post.item_code)
+      .single()
+
+    if (sg) {
+      const pg = sg.photo_groups as Record<string, unknown> | null
+      const pm = (pg?.product_models ?? null) as Record<string, unknown> | null
+      itemSpecs = {
+        brand: pm?.brand ?? null,
+        model_name: pm?.model_name ?? null,
+        model_number: pm?.model_number ?? null,
+        part_number: pm?.part_number ?? null,
+        year: pm?.year ?? null,
+        screen_size: pm?.screen_size ?? null,
+        other_features: pm?.other_features ?? null,
+        condition_grade: sg.condition_grade,
+        selling_price: sg.base_price,
+      }
+    }
+  } else if (post.item_id) {
     const { data: item } = await supabase
       .from('items')
       .select(`
@@ -72,9 +100,16 @@ export async function createSocialMediaPost(post: SocialMediaPostInsert) {
     }
   }
 
+  const insertData = {
+    ...post,
+    created_by: user?.id ?? null,
+    item_specs: itemSpecs,
+    ...(isSellGroup ? { item_id: null } : {}),
+  }
+
   const { data, error } = await supabase
     .from('social_media_posts')
-    .insert({ ...post, created_by: user?.id ?? null, item_specs: itemSpecs })
+    .insert(insertData)
     .select()
     .single()
 
