@@ -316,7 +316,7 @@ export default function SellGroupListPage() {
                         <td className="p-3">{pm ? `${pm.brand} ${pm.model_name} (${pm.color})` : '—'}</td>
                         <td className="p-3 text-muted-foreground">
                           {pm && (pm.cpu || pm.ram_gb || pm.storage_gb)
-                            ? `${pm.cpu ?? '?'} / ${pm.ram_gb ?? '?'}GB / ${pm.storage_gb ?? '?'}GB`
+                            ? `${pm.cpu ?? '?'} / ${pm.ram_gb ?? '?'} / ${pm.storage_gb ?? '?'}`
                             : '—'}
                         </td>
                         <td className="p-3"><GradeBadge grade={item.condition_grade} /></td>

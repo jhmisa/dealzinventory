@@ -249,12 +249,16 @@ export async function getUnassignedAvailableItems(filters: UnassignedItemFilters
 
   // Client-side search across item_code, brand, and model_name (Supabase .or() doesn't support foreign table columns)
   if (filters.search) {
-    const s = filters.search.toLowerCase()
+    const words = filters.search.toLowerCase().split(/\s+/).filter(Boolean)
     results = results.filter(item => {
-      const pm = item.product_models as { brand: string; model_name: string } | null
-      return item.item_code.toLowerCase().includes(s) ||
-        (pm?.brand ?? '').toLowerCase().includes(s) ||
-        (pm?.model_name ?? '').toLowerCase().includes(s)
+      const pm = item.product_models as { brand: string; model_name: string; color: string } | null
+      const text = [
+        item.item_code,
+        pm?.brand ?? '',
+        pm?.model_name ?? '',
+        pm?.color ?? '',
+      ].join(' ').toLowerCase()
+      return words.every(w => text.includes(w))
     })
   }
 
