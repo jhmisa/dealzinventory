@@ -15,6 +15,7 @@ const statusActions: Record<SocialPostStatus, string[]> = {
   draft: ['queue', 'delete'],
   queued: ['delete'],
   processing: [],
+  scheduled: [],
   published: [],
   failed: ['retry', 'delete'],
 }
