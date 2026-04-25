@@ -1,5 +1,7 @@
+import { useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/query-keys'
+import { supabase } from '@/lib/supabase'
 import * as itemsService from '@/services/items'
 import { searchAvailableAccessories } from '@/services/accessories'
 import type { ItemInsert, ItemUpdate } from '@/lib/types'
@@ -228,6 +230,37 @@ export function useAvailableBrands() {
     queryKey: [...queryKeys.items.all, 'available-brands'] as const,
     queryFn: () => itemsService.getAvailableBrands(),
   })
+}
+
+// --- Realtime Sync ---
+
+export function useItemsRealtimeSync() {
+  const queryClient = useQueryClient()
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('items-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'items' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: queryKeys.items.all })
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'orders' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: queryKeys.items.all })
+          queryClient.invalidateQueries({ queryKey: queryKeys.orders.all })
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [queryClient])
 }
 
 export function useDeleteItemMedia() {

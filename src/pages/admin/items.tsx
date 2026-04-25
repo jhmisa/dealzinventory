@@ -23,7 +23,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { PageHeader, SearchBar, DataTable, StatusBadge, GradeBadge, CodeDisplay, PriceDisplay, TableSkeleton } from '@/components/shared'
-import { useItems, useUpdateItem, useItemStatusCounts, useToggleLiveSelling } from '@/hooks/use-items'
+import { useItems, useUpdateItem, useItemStatusCounts, useToggleLiveSelling, useItemsRealtimeSync } from '@/hooks/use-items'
 import { useSellGroupByCode, useToggleSellGroupLiveSelling, useLiveSellingSellGroups, useSellGroupLiveSellingCount, useSellGroupsForList, useSellGroupStatusCounts } from '@/hooks/use-sell-groups'
 import { SellGroupResultBlock } from '@/components/sell-groups/sell-group-result-block'
 import { useAccessories, useCreateAccessory, useAccessoryTabCounts, useToggleAccessoryLiveSelling, useAccessoryLiveSellingCount } from '@/hooks/use-accessories'
@@ -281,6 +281,7 @@ function EditPriceCell({
 
 export default function ItemListPage() {
   const navigate = useNavigate()
+  useItemsRealtimeSync()
   const updateItem = useUpdateItem()
   const toggleLiveSelling = useToggleLiveSelling()
   const toggleAccessoryLiveSelling = useToggleAccessoryLiveSelling()
