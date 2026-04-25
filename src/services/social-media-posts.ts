@@ -41,19 +41,18 @@ export async function createSocialMediaPost(post: SocialMediaPostInsert) {
   const isSellGroup = post.item_code?.startsWith('G')
 
   if (isSellGroup && post.item_code) {
-    // Sell group: fetch specs via photo_groups → product_models
+    // Sell group: fetch specs via product_id → product_models
     const { data: sg } = await supabase
       .from('sell_groups')
       .select(`
         condition_grade, base_price,
-        photo_groups(product_models(brand, model_name, model_number, part_number, year, screen_size, other_features))
+        product_models(brand, model_name, model_number, part_number, year, screen_size, other_features)
       `)
       .eq('sell_group_code', post.item_code)
       .single()
 
     if (sg) {
-      const pg = sg.photo_groups as Record<string, unknown> | null
-      const pm = (pg?.product_models ?? null) as Record<string, unknown> | null
+      const pm = sg.product_models as Record<string, unknown> | null
       itemSpecs = {
         brand: pm?.brand ?? null,
         model_name: pm?.model_name ?? null,
