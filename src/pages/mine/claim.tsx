@@ -252,9 +252,8 @@ function LoginForm({ onSuccess, onBack, isLoading, onLogin }: {
     try {
       await onLogin(values.last_name, values.email_or_phone, values.pin)
       onSuccess()
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Login failed'
-      setLoginError(msg)
+    } catch {
+      setLoginError('Wrong email or PIN')
     }
   }
 
@@ -269,12 +268,6 @@ function LoginForm({ onSuccess, onBack, isLoading, onLogin }: {
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-            {loginError && (
-              <div className="flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
-                <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
-                {loginError}
-              </div>
-            )}
             <FormField
               control={form.control}
               name="last_name"
@@ -328,6 +321,11 @@ function LoginForm({ onSuccess, onBack, isLoading, onLogin }: {
                 Back
               </Button>
             </div>
+            {loginError && (
+              <p className="text-sm font-medium text-red-600 text-center">
+                Wrong email or PIN. Please try again.
+              </p>
+            )}
           </form>
         </Form>
       </CardContent>
@@ -392,12 +390,6 @@ function RegisterForm({ onSuccess, onBack, isLoading, onRegister }: {
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-            {registerError && (
-              <div className="flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
-                <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
-                {registerError}
-              </div>
-            )}
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -502,6 +494,11 @@ function RegisterForm({ onSuccess, onBack, isLoading, onRegister }: {
                 Back
               </Button>
             </div>
+            {registerError && (
+              <p className="text-sm font-medium text-red-600 text-center">
+                {registerError}
+              </p>
+            )}
           </form>
         </Form>
       </CardContent>
