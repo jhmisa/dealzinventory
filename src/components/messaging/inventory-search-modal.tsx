@@ -135,8 +135,8 @@ export const InventorySearchModal = memo(function InventorySearchModal({
           if (item.grade) lines.push(`Rank ${item.grade}`)
           if (item.price) lines.push(formatPrice(item.price))
           {
-            const shopUrl = getShopUrl()
-            lines.push(`Buy Now & View Photos: ${shopUrl}/mine/${item.code}`)
+            const baseUrl = import.meta.env.VITE_PUBLIC_SHOP_URL?.replace(/\/shop\/?$/, '') || window.location.origin
+            lines.push(`Buy Now & View Photos: ${baseUrl}/mine/${item.code}`)
           }
         } else if (item.type === 'sell_group') {
           lines.push(item.code)
