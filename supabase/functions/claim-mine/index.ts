@@ -140,42 +140,65 @@ Deno.serve(async (req) => {
       unitPrice = acc.selling_price;
     }
 
-    // Generate order code
-    const { data: orderCodeData, error: orderCodeError } = await supabase.rpc('generate_code', {
-      prefix: 'ORD',
-      seq_name: 'ord_code_seq',
-    });
-    if (orderCodeError) return jsonResponse({ error: `Failed to generate order code: ${orderCodeError.message}` });
-    const orderCode = orderCodeData as string;
+    const DEFAULT_SHIPPING_COST = 1000;
 
-    // Create order
-    const { data: order, error: orderError } = await supabase
+    // Check for an existing PENDING or CONFIRMED order for this customer
+    const { data: existingOrder } = await supabase
       .from('orders')
-      .insert({
-        order_code: orderCode,
-        customer_id,
-        order_source: 'FB',
-        order_status: 'CONFIRMED',
-        shipping_address,
-        quantity,
-        total_price: unitPrice * quantity,
-        delivery_date: delivery_date ?? null,
-        delivery_time_code: delivery_time_code ?? null,
-        payment_method: payment_method ?? null,
-        payment_method_code,
-        shipping_cost: 0,
-        sell_group_id: null,
-      })
-      .select()
-      .single();
+      .select('id, order_code, shipping_cost')
+      .eq('customer_id', customer_id)
+      .in('order_status', ['PENDING', 'CONFIRMED'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    if (orderError) return jsonResponse({ error: `Failed to create order: ${orderError.message}` });
+    let orderId: string;
+    let orderCode: string;
+    let isNewOrder = false;
+
+    if (existingOrder) {
+      // Add to existing order
+      orderId = existingOrder.id;
+      orderCode = existingOrder.order_code;
+    } else {
+      // Generate order code and create new order
+      const { data: orderCodeData, error: orderCodeError } = await supabase.rpc('generate_code', {
+        prefix: 'ORD',
+        seq_name: 'ord_code_seq',
+      });
+      if (orderCodeError) return jsonResponse({ error: `Failed to generate order code: ${orderCodeError.message}` });
+      orderCode = orderCodeData as string;
+
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          order_code: orderCode,
+          customer_id,
+          order_source: 'FB',
+          order_status: 'CONFIRMED',
+          shipping_address,
+          quantity,
+          total_price: unitPrice * quantity + DEFAULT_SHIPPING_COST,
+          delivery_date: delivery_date ?? null,
+          delivery_time_code: delivery_time_code ?? null,
+          payment_method: payment_method ?? null,
+          payment_method_code,
+          shipping_cost: DEFAULT_SHIPPING_COST,
+          sell_group_id: null,
+        })
+        .select()
+        .single();
+
+      if (orderError) return jsonResponse({ error: `Failed to create order: ${orderError.message}` });
+      orderId = order.id;
+      isNewOrder = true;
+    }
 
     // Create order item
     const { error: oiError } = await supabase
       .from('order_items')
       .insert({
-        order_id: order.id,
+        order_id: orderId,
         item_id: itemId,
         accessory_id: accessoryId,
         description,
@@ -185,13 +208,39 @@ Deno.serve(async (req) => {
       });
 
     if (oiError) {
-      // Rollback order
-      await supabase.from('orders').delete().eq('id', order.id);
+      // Rollback if new order
+      if (isNewOrder) {
+        await supabase.from('orders').delete().eq('id', orderId);
+      }
       // Check for unique constraint (double-claim)
       if (oiError.code === '23505') {
         return jsonResponse({ error: 'This item has already been claimed by another customer' });
       }
       return jsonResponse({ error: `Failed to create order item: ${oiError.message}` });
+    }
+
+    // Recalculate order totals (for existing orders with new items)
+    if (!isNewOrder) {
+      const { data: allItems } = await supabase
+        .from('order_items')
+        .select('unit_price, quantity, discount')
+        .eq('order_id', orderId);
+
+      if (allItems) {
+        const itemsTotal = allItems.reduce(
+          (sum, i) => sum + i.unit_price * i.quantity - (i.discount ?? 0), 0
+        );
+        const totalQty = allItems.reduce((sum, i) => sum + i.quantity, 0);
+        const shippingCost = (existingOrder.shipping_cost as number) ?? DEFAULT_SHIPPING_COST;
+
+        await supabase
+          .from('orders')
+          .update({
+            quantity: totalQty,
+            total_price: itemsTotal + shippingCost,
+          })
+          .eq('id', orderId);
+      }
     }
 
     // Reserve the item (P/G-code)
@@ -211,13 +260,15 @@ Deno.serve(async (req) => {
       });
       if (stockError || newQty === null) {
         // Rollback
-        await supabase.from('order_items').delete().eq('order_id', order.id);
-        await supabase.from('orders').delete().eq('id', order.id);
+        await supabase.from('order_items').delete().eq('order_id', orderId);
+        if (isNewOrder) {
+          await supabase.from('orders').delete().eq('id', orderId);
+        }
         return jsonResponse({ error: 'Insufficient stock for this accessory' });
       }
     }
 
-    return jsonResponse({ order_code: orderCode, order_id: order.id });
+    return jsonResponse({ order_code: orderCode, order_id: orderId });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal server error';
     return jsonResponse({ error: message });
