@@ -136,7 +136,7 @@ export const InventorySearchModal = memo(function InventorySearchModal({
           if (item.price) lines.push(formatPrice(item.price))
           {
             const shopUrl = getShopUrl()
-            lines.push(`View Full Specs & Photos: ${shopUrl}/item/${item.id}`)
+            lines.push(`Buy Now & View Photos: ${shopUrl}/mine/${item.code}`)
           }
         } else if (item.type === 'sell_group') {
           lines.push(item.code)
