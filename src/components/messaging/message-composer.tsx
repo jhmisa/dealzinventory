@@ -4,7 +4,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { cn } from '@/lib/utils'
+import { cn, convertEmoticonsToEmoji } from '@/lib/utils'
 import type { MessageAttachment } from '@/lib/types'
 import { useUploadAttachment } from '@/hooks/use-messaging'
 import { getAttachmentSignedUrl } from '@/services/messaging'
@@ -60,7 +60,8 @@ export const MessageComposer = memo(function MessageComposer({
   const handleSend = useCallback(() => {
     const trimmed = content.trim()
     if (!trimmed && attachments.length === 0) return
-    onSend(trimmed, attachments.length > 0 ? attachments : undefined)
+    const text = convertEmoticonsToEmoji(trimmed)
+    onSend(text, attachments.length > 0 ? attachments : undefined)
     setContent('')
     setAttachments([])
     setThumbnails({})

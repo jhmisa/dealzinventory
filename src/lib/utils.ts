@@ -53,3 +53,26 @@ export function buildShortDescription(
     .filter(Boolean)
     .join(' ')
 }
+
+const EMOTICON_MAP: [RegExp, string][] = [
+  [/(?<!\w):\)(?!\w)/g, '😊'],
+  [/(?<!\w);\)(?!\w)/g, '😉'],
+  [/(?<!\w):D(?!\w)/g, '😄'],
+  [/(?<!\w):\((?!\w)/g, '😞'],
+  [/(?<!\w):P(?!\w)/g, '😛'],
+  [/(?<!\w)<3(?!\w)/g, '❤️'],
+  [/(?<!\w):o(?!\w)/gi, '😮'],
+  [/(?<!\w)xD(?!\w)/gi, '😆'],
+  [/(?<!\w):\|(?!\w)/g, '😐'],
+  [/(?<!\w)>:\((?!\w)/g, '😠'],
+  [/(?<!\w):'\((?!\w)/g, '😢'],
+  [/(?<!\w)\^\^(?!\w)/g, '😊'],
+]
+
+export function convertEmoticonsToEmoji(text: string): string {
+  let result = text
+  for (const [pattern, emoji] of EMOTICON_MAP) {
+    result = result.replace(pattern, emoji)
+  }
+  return result
+}
