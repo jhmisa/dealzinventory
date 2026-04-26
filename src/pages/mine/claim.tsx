@@ -526,6 +526,8 @@ function MineClaimInner() {
   const [showClaimFlow, setShowClaimFlow] = useState(false)
   const [authStep, setAuthStep] = useState<AuthStep>('choose')
   const [checkoutStep, setCheckoutStep] = useState<1 | 2 | 3 | 4>(1)
+  // null = not chosen yet, 'existing' = add to existing order, 'new' = create new order
+  const [orderChoice, setOrderChoice] = useState<'existing' | 'new' | null>(null)
   const [selectedAddress, setSelectedAddress] = useState<{ address: ShippingAddress; receiverFirstName?: string | null; receiverLastName?: string | null; receiverPhone?: string | null } | null>(null)
   const [deliveryDate, setDeliveryDate] = useState<string | null>(null)
   const [deliveryTimeCode, setDeliveryTimeCode] = useState<string | null>(null)
@@ -603,8 +605,9 @@ function MineClaimInner() {
   const gradeInfo = product.grade ? CONDITION_GRADES.find(g => g.value === product.grade) : null
 
   function handleConfirmOrder() {
-    // For existing orders, use the order's existing address
-    const addressStr = hasExistingOrder
+    const addToExisting = orderChoice === 'existing' && hasExistingOrder
+
+    const addressStr = addToExisting
       ? (existingOrder!.shipping_address ?? '{}')
       : selectedAddress
         ? JSON.stringify(selectedAddress.address)
@@ -620,9 +623,10 @@ function MineClaimInner() {
         code: activeCode,
         customerId: customer!.id,
         shippingAddress: addressStr,
-        deliveryDate: hasExistingOrder ? existingOrder!.delivery_date : deliveryDate,
-        deliveryTimeCode: hasExistingOrder ? existingOrder!.delivery_time_code : deliveryTimeCode,
+        deliveryDate: addToExisting ? existingOrder!.delivery_date : deliveryDate,
+        deliveryTimeCode: addToExisting ? existingOrder!.delivery_time_code : deliveryTimeCode,
         paymentMethod: paymentMethod ?? undefined,
+        forceNewOrder: orderChoice === 'new',
       },
       {
         onSuccess: (data) => {
@@ -719,12 +723,17 @@ function MineClaimInner() {
             <>
               {/* Step indicator */}
               {(() => {
-                const steps = hasExistingOrder
+                const steps = hasExistingOrder && orderChoice === 'existing'
                   ? [
                       { step: 1 as const, label: 'Login' },
                       { step: 2 as const, label: 'Confirm' },
                     ]
-                  : [
+                  : hasExistingOrder && orderChoice === null
+                    ? [
+                        { step: 1 as const, label: 'Login' },
+                        { step: 2 as const, label: 'Choose' },
+                      ]
+                    : [
                       { step: 1 as const, label: 'Login' },
                       { step: 2 as const, label: 'Address' },
                       { step: 3 as const, label: 'Schedule' },
@@ -841,17 +850,63 @@ function MineClaimInner() {
                 </div>
               )}
 
-              {/* EXISTING ORDER: simplified add-to-order flow */}
-              {isAuthenticated && checkoutStep >= 2 && hasExistingOrder && (
+              {/* EXISTING ORDER: choice screen */}
+              {isAuthenticated && checkoutStep >= 2 && hasExistingOrder && orderChoice === null && (
+                <div className="space-y-3 animate-in fade-in duration-200">
+                  <p className="text-sm text-muted-foreground text-center">
+                    You already have an open order. What would you like to do?
+                  </p>
+
+                  {/* Option 1: Ship together */}
+                  <button
+                    onClick={() => setOrderChoice('existing')}
+                    className="w-full text-left rounded-xl border-2 border-blue-200 bg-blue-50/50 hover:border-blue-400 hover:bg-blue-50 p-4 transition-colors"
+                  >
+                    <div className="flex items-start gap-3">
+                      <Package className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-sm">
+                          Ship together with <span className="font-mono">{existingOrder!.order_code}</span>
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Same address and schedule — no extra delivery fee
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Option 2: New order */}
+                  <button
+                    onClick={() => {
+                      setOrderChoice('new')
+                      setCheckoutStep(2)
+                    }}
+                    className="w-full text-left rounded-xl border-2 border-muted hover:border-foreground/20 hover:bg-muted/50 p-4 transition-colors"
+                  >
+                    <div className="flex items-start gap-3">
+                      <ShoppingBag className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-sm">Create a new order</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Different address or delivery date — separate {formatPrice(1000)} delivery fee
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              )}
+
+              {/* EXISTING ORDER: confirmed add-to-order */}
+              {isAuthenticated && checkoutStep >= 2 && hasExistingOrder && orderChoice === 'existing' && (
                 <div className="space-y-4 animate-in fade-in duration-200">
                   <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4">
                     <Package className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
                     <div className="space-y-1">
                       <p className="text-sm font-medium text-blue-900">
-                        Adding to your existing order <span className="font-mono">{existingOrder!.order_code}</span>
+                        Adding to order <span className="font-mono">{existingOrder!.order_code}</span>
                       </p>
                       <p className="text-xs text-blue-700">
-                        This item will be added to your current order ({existingOrder!.item_count} item{existingOrder!.item_count !== 1 ? 's' : ''} so far).
+                        {existingOrder!.item_count} item{existingOrder!.item_count !== 1 ? 's' : ''} in this order so far.
                         Same address and delivery schedule.
                       </p>
                     </div>
@@ -865,11 +920,20 @@ function MineClaimInner() {
                   >
                     {claimMine.isPending ? 'Adding...' : `Add to Order — ${formatPrice(product.price)}`}
                   </Button>
+
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full text-muted-foreground"
+                    onClick={() => setOrderChoice(null)}
+                  >
+                    Change choice
+                  </Button>
                 </div>
               )}
 
-              {/* NEW ORDER: full steps 2-4 */}
-              {isAuthenticated && !hasExistingOrder && (
+              {/* NEW ORDER or no existing order: full steps 2-4 */}
+              {isAuthenticated && (!hasExistingOrder || orderChoice === 'new') && (
                 <>
                   {/* Step 2: Address */}
                   {checkoutStep === 2 && (

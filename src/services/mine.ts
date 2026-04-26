@@ -251,6 +251,7 @@ interface ClaimMineInput {
   deliveryDate?: string | null
   deliveryTimeCode?: string | null
   paymentMethod?: string
+  forceNewOrder?: boolean
 }
 
 export async function claimMine(input: ClaimMineInput) {
@@ -262,6 +263,7 @@ export async function claimMine(input: ClaimMineInput) {
       delivery_date: input.deliveryDate,
       delivery_time_code: input.deliveryTimeCode,
       payment_method: input.paymentMethod,
+      force_new_order: input.forceNewOrder ?? false,
     },
   })
 

@@ -13,6 +13,7 @@ interface ClaimMineInput {
   delivery_date?: string | null
   delivery_time_code?: string | null
   payment_method?: string
+  force_new_order?: boolean
 }
 
 Deno.serve(async (req) => {
@@ -34,6 +35,7 @@ Deno.serve(async (req) => {
       delivery_date,
       delivery_time_code,
       payment_method,
+      force_new_order,
     } = body;
 
     if (!code) return jsonResponse({ error: 'code is required' });
@@ -143,14 +145,19 @@ Deno.serve(async (req) => {
     const DEFAULT_SHIPPING_COST = 1000;
 
     // Check for an existing PENDING or CONFIRMED order for this customer
-    const { data: existingOrder } = await supabase
-      .from('orders')
-      .select('id, order_code, shipping_cost')
-      .eq('customer_id', customer_id)
-      .in('order_status', ['PENDING', 'CONFIRMED'])
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // Skip if customer explicitly wants a new order
+    let existingOrder: { id: string; order_code: string; shipping_cost: number } | null = null;
+    if (!force_new_order) {
+      const { data } = await supabase
+        .from('orders')
+        .select('id, order_code, shipping_cost')
+        .eq('customer_id', customer_id)
+        .in('order_status', ['PENDING', 'CONFIRMED'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      existingOrder = data;
+    }
 
     let orderId: string;
     let orderCode: string;
