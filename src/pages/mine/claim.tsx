@@ -522,7 +522,7 @@ function MineClaimInner() {
 
   const [showClaimFlow, setShowClaimFlow] = useState(false)
   const [authStep, setAuthStep] = useState<AuthStep>('choose')
-  const [checkoutStep, setCheckoutStep] = useState<1 | 2 | 3>(1)
+  const [checkoutStep, setCheckoutStep] = useState<1 | 2 | 3 | 4>(1)
   const [selectedAddress, setSelectedAddress] = useState<{ address: ShippingAddress; receiverFirstName?: string | null; receiverLastName?: string | null; receiverPhone?: string | null } | null>(null)
   const [deliveryDate, setDeliveryDate] = useState<string | null>(null)
   const [deliveryTimeCode, setDeliveryTimeCode] = useState<string | null>(null)
@@ -685,128 +685,146 @@ function MineClaimInner() {
               </div>
             )}
 
-            {/* CTA / Auth / Checkout — all in-place */}
+            {/* Buy Now CTA — only when wizard not started */}
             {!product.available ? (
               <Button className="w-full" size="lg" disabled>
                 Unavailable
               </Button>
-            ) : !isAuthenticated && !showClaimFlow ? (
+            ) : !showClaimFlow ? (
               <Button
                 className="w-full text-xl font-bold py-7 rounded-xl"
                 size="lg"
-                onClick={() => setShowClaimFlow(true)}
+                onClick={() => {
+                  setShowClaimFlow(true)
+                  // If already logged in, skip to step 2
+                  if (isAuthenticated) setCheckoutStep(2)
+                }}
               >
                 <ShoppingBag className="h-6 w-6 mr-2" />
                 Buy Now — {formatPrice(product.price)}
               </Button>
-            ) : !isAuthenticated && showClaimFlow ? (
-              <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-300">
-                {authStep === 'choose' && (
-                  <Card>
-                    <CardContent className="p-6 space-y-3">
-                      <p className="text-sm text-muted-foreground text-center">
-                        Log in to use a saved address, or create an account to get started.
-                      </p>
-                      <div className="flex gap-3">
-                        <Button
-                          className="flex-1"
-                          variant="outline"
-                          onClick={() => setAuthStep('login')}
-                        >
-                          <LogIn className="h-4 w-4 mr-2" />
-                          I have an account
-                        </Button>
-                        <Button
-                          className="flex-1"
-                          onClick={() => setAuthStep('register')}
-                        >
-                          <UserPlus className="h-4 w-4 mr-2" />
-                          Create an Account
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-                {authStep === 'login' && (
-                  <LoginForm
-                    onSuccess={() => {}}
-                    onBack={() => setAuthStep('choose')}
-                    isLoading={authLoading}
-                    onLogin={login}
-                  />
-                )}
-                {authStep === 'register' && (
-                  <RegisterForm
-                    onSuccess={() => {}}
-                    onBack={() => setAuthStep('choose')}
-                    isLoading={authLoading}
-                    onRegister={register}
-                  />
-                )}
-              </div>
             ) : null}
           </div>
 
-          {/* Checkout Flow (authenticated) — multi-step wizard */}
-          {product.available && isAuthenticated && (
+          {/* Multi-step checkout wizard */}
+          {product.available && showClaimFlow && (
             <>
-              {/* Logged-in indicator */}
-              <div className="flex items-center justify-between text-sm bg-green-50 border border-green-200 rounded-lg px-4 py-2">
-                <span className="text-green-800">
-                  Logged in as <span className="font-medium">{formatCustomerName(customer!)}</span>
-                  {customer!.email && <span className="text-green-600 ml-1">({customer!.email})</span>}
-                </span>
-                <Button variant="ghost" size="sm" className="text-green-700 hover:text-green-900 h-auto py-1" onClick={logout}>
-                  Log out
-                </Button>
-              </div>
-
               {/* Step indicator */}
               <div className="flex items-center gap-2">
                 {[
-                  { step: 1 as const, label: 'Address' },
-                  { step: 2 as const, label: 'Schedule' },
-                  { step: 3 as const, label: 'Payment' },
-                ].map(({ step, label }, idx) => (
-                  <div key={step} className="flex items-center gap-2 flex-1">
-                    <button
-                      onClick={() => {
-                        // Allow going back to completed steps
-                        if (step < checkoutStep) setCheckoutStep(step)
-                      }}
-                      className={cn(
-                        'flex items-center gap-1.5 text-sm font-medium transition-colors',
-                        step === checkoutStep
-                          ? 'text-primary'
-                          : step < checkoutStep
-                            ? 'text-green-600 cursor-pointer hover:text-green-700'
-                            : 'text-muted-foreground'
+                  { step: 1 as const, label: 'Login' },
+                  { step: 2 as const, label: 'Address' },
+                  { step: 3 as const, label: 'Schedule' },
+                  { step: 4 as const, label: 'Payment' },
+                ].map(({ step, label }, idx) => {
+                  const isCompleted = isAuthenticated
+                    ? (step === 1 || step < checkoutStep)
+                    : step < checkoutStep
+                  const isCurrent = isAuthenticated
+                    ? (step === 1 ? false : step === checkoutStep)
+                    : step === checkoutStep
+                  return (
+                    <div key={step} className="flex items-center gap-2 flex-1">
+                      <button
+                        onClick={() => {
+                          if (step === 1 && isAuthenticated) return
+                          if (isCompleted && step > 1) setCheckoutStep(step)
+                        }}
+                        className={cn(
+                          'flex items-center gap-1.5 text-sm font-medium transition-colors',
+                          isCurrent
+                            ? 'text-primary'
+                            : isCompleted
+                              ? 'text-green-600 cursor-pointer hover:text-green-700'
+                              : 'text-muted-foreground'
+                        )}
+                      >
+                        <span className={cn(
+                          'flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold border-2 transition-colors',
+                          isCurrent
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : isCompleted
+                              ? 'border-green-500 bg-green-500 text-white'
+                              : 'border-muted-foreground/30 text-muted-foreground'
+                        )}>
+                          {isCompleted ? <Check className="h-3 w-3" /> : step}
+                        </span>
+                        <span className="hidden sm:inline">{label}</span>
+                      </button>
+                      {idx < 3 && (
+                        <div className={cn(
+                          'flex-1 h-0.5 rounded-full',
+                          isCompleted ? 'bg-green-500' : 'bg-muted'
+                        )} />
                       )}
-                    >
-                      <span className={cn(
-                        'flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold border-2 transition-colors',
-                        step === checkoutStep
-                          ? 'border-primary bg-primary text-primary-foreground'
-                          : step < checkoutStep
-                            ? 'border-green-500 bg-green-500 text-white'
-                            : 'border-muted-foreground/30 text-muted-foreground'
-                      )}>
-                        {step < checkoutStep ? <Check className="h-3 w-3" /> : step}
-                      </span>
-                      <span className="hidden sm:inline">{label}</span>
-                    </button>
-                    {idx < 2 && (
-                      <div className={cn(
-                        'flex-1 h-0.5 rounded-full',
-                        step < checkoutStep ? 'bg-green-500' : 'bg-muted'
-                      )} />
-                    )}
-                  </div>
-                ))}
+                    </div>
+                  )
+                })}
               </div>
 
-              {/* Step 1: Address */}
-              {checkoutStep === 1 && (
+              {/* Step 1: Login / Register */}
+              {checkoutStep === 1 && !isAuthenticated && (
+                <div className="space-y-4 animate-in fade-in duration-200">
+                  {authStep === 'choose' && (
+                    <Card>
+                      <CardContent className="p-6 space-y-3">
+                        <p className="text-sm text-muted-foreground text-center">
+                          Log in to use a saved address, or create an account to get started.
+                        </p>
+                        <div className="flex gap-3">
+                          <Button
+                            className="flex-1"
+                            variant="outline"
+                            onClick={() => setAuthStep('login')}
+                          >
+                            <LogIn className="h-4 w-4 mr-2" />
+                            I have an account
+                          </Button>
+                          <Button
+                            className="flex-1"
+                            onClick={() => setAuthStep('register')}
+                          >
+                            <UserPlus className="h-4 w-4 mr-2" />
+                            Create an Account
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                  {authStep === 'login' && (
+                    <LoginForm
+                      onSuccess={() => setCheckoutStep(2)}
+                      onBack={() => setAuthStep('choose')}
+                      isLoading={authLoading}
+                      onLogin={login}
+                    />
+                  )}
+                  {authStep === 'register' && (
+                    <RegisterForm
+                      onSuccess={() => setCheckoutStep(2)}
+                      onBack={() => setAuthStep('choose')}
+                      isLoading={authLoading}
+                      onRegister={register}
+                    />
+                  )}
+                </div>
+              )}
+
+              {/* Logged-in indicator (steps 2-4) */}
+              {isAuthenticated && checkoutStep >= 2 && (
+                <div className="flex items-center justify-between text-sm bg-green-50 border border-green-200 rounded-lg px-4 py-2">
+                  <span className="text-green-800">
+                    Logged in as <span className="font-medium">{formatCustomerName(customer!)}</span>
+                    {customer!.email && <span className="text-green-600 ml-1">({customer!.email})</span>}
+                  </span>
+                  <Button variant="ghost" size="sm" className="text-green-700 hover:text-green-900 h-auto py-1" onClick={logout}>
+                    Log out
+                  </Button>
+                </div>
+              )}
+
+              {/* Step 2: Address */}
+              {checkoutStep === 2 && isAuthenticated && (
                 <div className="space-y-4 animate-in fade-in duration-200">
                   <ShippingStep
                     customer={customer as Customer}
@@ -822,7 +840,7 @@ function MineClaimInner() {
                   <Button
                     className="w-full"
                     size="lg"
-                    onClick={() => setCheckoutStep(2)}
+                    onClick={() => setCheckoutStep(3)}
                     disabled={!selectedAddress}
                   >
                     Next — Select Schedule
@@ -831,8 +849,8 @@ function MineClaimInner() {
                 </div>
               )}
 
-              {/* Step 2: Schedule */}
-              {checkoutStep === 2 && (
+              {/* Step 3: Schedule */}
+              {checkoutStep === 3 && isAuthenticated && (
                 <div className="space-y-4 animate-in fade-in duration-200">
                   <ShippingStep
                     customer={customer as Customer}
@@ -849,7 +867,7 @@ function MineClaimInner() {
                     <Button
                       variant="outline"
                       size="lg"
-                      onClick={() => setCheckoutStep(1)}
+                      onClick={() => setCheckoutStep(2)}
                     >
                       <ArrowLeft className="h-4 w-4 mr-2" />
                       Back
@@ -857,7 +875,7 @@ function MineClaimInner() {
                     <Button
                       className="flex-1"
                       size="lg"
-                      onClick={() => setCheckoutStep(3)}
+                      onClick={() => setCheckoutStep(4)}
                     >
                       Next — Payment
                       <ArrowRight className="h-4 w-4 ml-2" />
@@ -866,8 +884,8 @@ function MineClaimInner() {
                 </div>
               )}
 
-              {/* Step 3: Payment */}
-              {checkoutStep === 3 && (
+              {/* Step 4: Payment */}
+              {checkoutStep === 4 && isAuthenticated && (
                 <div className="space-y-4 animate-in fade-in duration-200">
                   <Card>
                     <CardHeader>
@@ -902,7 +920,7 @@ function MineClaimInner() {
                     <Button
                       variant="outline"
                       size="lg"
-                      onClick={() => setCheckoutStep(2)}
+                      onClick={() => setCheckoutStep(3)}
                     >
                       <ArrowLeft className="h-4 w-4 mr-2" />
                       Back
