@@ -34,6 +34,9 @@ interface BackfillInput {
   batch_size?: number;
   // Pagination: skip the first N conversations (use with batch_size for batching).
   batch_offset?: number;
+  // Sync tier: 'fast' (5-min cron, 1h lookback) or 'full' (6h cron, 48h lookback).
+  // Controls default lookback and batch size when since/batch_size are not explicit.
+  tier?: 'fast' | 'full';
 }
 
 interface MissiveMessageSummary {
@@ -76,9 +79,16 @@ Deno.serve(async (req) => {
       // Accept empty body; use defaults.
     }
 
+    // Tier-based defaults: fast (1h lookback, 50 batch) vs full (48h, 500 batch)
+    const tierDefaults = input.tier === 'full'
+      ? { lookbackMs: 48 * 60 * 60 * 1000, batchSize: 500 }
+      : input.tier === 'fast'
+        ? { lookbackMs: 60 * 60 * 1000, batchSize: 50 }
+        : { lookbackMs: 24 * 60 * 60 * 1000, batchSize: 25 };
+
     const sinceMs = input.since
       ? Date.parse(input.since)
-      : Date.now() - 24 * 60 * 60 * 1000;
+      : Date.now() - tierDefaults.lookbackMs;
     if (Number.isNaN(sinceMs)) {
       return jsonResponse({ error: 'Invalid `since` — must be ISO 8601 timestamp' });
     }
@@ -100,8 +110,8 @@ Deno.serve(async (req) => {
     if (input.conversation_id) {
       convQuery = convQuery.eq('id', input.conversation_id);
     }
-    // Default batch_size to 25 to avoid gateway timeout on UI/cron invocations
-    const batchSize = input.batch_size ?? 25;
+    // Default batch_size based on tier to avoid gateway timeout on UI/cron invocations
+    const batchSize = input.batch_size ?? tierDefaults.batchSize;
     const offset = input.batch_offset ?? 0;
 
     // Count total matching conversations so the client knows how many batches remain
@@ -200,8 +210,40 @@ Deno.serve(async (req) => {
         // determined by sender identity, not delivery status.
         // If we don't have contact_platform_id, fall back to "not our account"
         // heuristic: any unique from_field.id we haven't sent from.
-        const customerPsid = (conv as { contact_platform_id?: string | null })
+        let customerPsid = (conv as { contact_platform_id?: string | null })
           .contact_platform_id;
+
+        // PSID resolution fallback: if we don't have the customer's PSID,
+        // try to get it from the Missive conversation contacts endpoint.
+        if (!customerPsid && MISSIVE_API_TOKEN) {
+          try {
+            const convRes = await fetch(
+              `${MISSIVE_API_URL}/conversations/${conv.missive_conversation_id}`,
+              { headers: { Authorization: `Bearer ${MISSIVE_API_TOKEN}` } },
+            );
+            if (convRes.ok) {
+              const convData = await convRes.json();
+              const convDetail = convData?.conversations ?? convData?.conversation;
+              // Extract PSID from conversation contacts (the non-team participant)
+              const contacts = convDetail?.contacts ?? [];
+              const externalContact = contacts.find(
+                (c: { id?: string; name?: string }) => c.id && c.name !== 'Dealz K.K.',
+              );
+              if (externalContact?.id) {
+                customerPsid = externalContact.id;
+                // Persist so future syncs don't need to re-fetch
+                if (!dryRun) {
+                  await supabase
+                    .from('conversations')
+                    .update({ contact_platform_id: customerPsid })
+                    .eq('id', conv.id);
+                }
+              }
+            }
+          } catch (e) {
+            console.warn('PSID resolution failed for', conv.id, e);
+          }
+        }
 
         const candidates = summaries.filter((m) => {
           if ((m.created_at ?? 0) < sinceSec) return false;

@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Separator } from '@/components/ui/separator'
+import { SyncAlertIndicator } from '@/components/layout/sync-alert-indicator'
 
 export function TopHeader() {
   const { user, signOut, displayName } = useAuth()
@@ -15,6 +16,7 @@ export function TopHeader() {
       <SidebarTrigger className="-ml-1" />
       <Separator orientation="vertical" className="mr-2 h-4" />
       <div className="flex flex-1 items-center justify-end gap-2">
+        <SyncAlertIndicator />
         <Button variant="ghost" size="sm" asChild>
           <Link to="/admin/items/scan">
             <ScanLine className="mr-1 h-4 w-4" />

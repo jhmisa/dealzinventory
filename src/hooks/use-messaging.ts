@@ -258,6 +258,16 @@ export function useResolveAlert() {
   })
 }
 
+// ---------- Sync Health ----------
+
+export function useSyncHealth() {
+  return useQuery({
+    queryKey: [...queryKeys.messaging.all, 'sync-health'],
+    queryFn: () => messagingService.getMessageSyncHealth(),
+    refetchInterval: 60_000,
+  })
+}
+
 // ---------- Knowledge Base ----------
 
 export function useKnowledgeBase() {

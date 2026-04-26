@@ -215,12 +215,42 @@ async function backgroundEnrichMessage(
   }
 }
 
+// ---------- Webhook delivery logging ----------
+
+async function logWebhookDelivery(
+  missiveMessageId: string,
+  missiveConversationId: string | null,
+  status: 'success' | 'duplicate' | 'error',
+  errorMessage: string | null,
+  processingMs: number,
+) {
+  try {
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    );
+    await supabase.from('webhook_delivery_log').insert({
+      missive_message_id: missiveMessageId,
+      missive_conversation_id: missiveConversationId,
+      status,
+      error_message: errorMessage,
+      processing_ms: Math.round(processingMs),
+    });
+  } catch (e) {
+    console.warn('Failed to log webhook delivery:', e);
+  }
+}
+
 // ---------- Main handler ----------
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
+
+  const webhookStartMs = Date.now();
+  let logMissiveMessageId = '(unknown)';
+  let logMissiveConversationId: string | null = null;
 
   try {
     const rawBody = await req.text();
@@ -237,6 +267,9 @@ Deno.serve(async (req) => {
 
     const payload: MissiveWebhookPayload = JSON.parse(rawBody);
     const { conversation, message } = payload;
+
+    logMissiveMessageId = message?.id ?? '(unknown)';
+    logMissiveConversationId = conversation?.id ?? null;
 
     // Debug: log key payload fields to help diagnose missing contact names
     console.log('Webhook received:', JSON.stringify({
@@ -265,6 +298,8 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (existing) {
+      // Log duplicate delivery
+      EdgeRuntime.waitUntil(logWebhookDelivery(logMissiveMessageId, logMissiveConversationId, 'duplicate', null, Date.now() - webhookStartMs));
       return jsonResponse({ ok: true, skipped: true });
     }
 
@@ -377,6 +412,9 @@ Deno.serve(async (req) => {
       ),
     );
 
+    // Log successful delivery
+    EdgeRuntime.waitUntil(logWebhookDelivery(logMissiveMessageId, logMissiveConversationId, 'success', null, Date.now() - webhookStartMs));
+
     return jsonResponse({
       ok: true,
       conversation_id: conv.id,
@@ -384,8 +422,10 @@ Deno.serve(async (req) => {
       customer_id: customer?.id ?? null,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Internal server error';
-    return jsonResponse({ error: message });
+    const errMsg = err instanceof Error ? err.message : 'Internal server error';
+    // Log error delivery
+    EdgeRuntime.waitUntil(logWebhookDelivery(logMissiveMessageId, logMissiveConversationId, 'error', errMsg, Date.now() - webhookStartMs));
+    return jsonResponse({ error: errMsg });
   }
 });
 

@@ -47,6 +47,9 @@ import {
   useUpdateSystemSetting,
   useMessageSyncStatus,
   useRunMessageSync,
+  useSyncHealth,
+  useActiveAlerts,
+  useResolveAlert,
   type MessageSyncProgress,
 } from '@/hooks/use-messaging'
 import { useCustomers } from '@/hooks/use-customers'
@@ -1122,9 +1125,126 @@ export default function MessagingSettingsPage() {
         template={editTemplate}
       />
 
+      {/* Sync Health */}
+      <SyncHealthCard />
+
       {/* Message Sync */}
       <MessageSyncCard />
     </div>
+  )
+}
+
+// ---------- Sync Health Card ----------
+
+function SyncHealthCard() {
+  const { data: health, isLoading } = useSyncHealth()
+  const { data: alerts } = useActiveAlerts()
+  const resolveAlert = useResolveAlert()
+
+  const syncAlerts = (alerts ?? []).filter((a) =>
+    ['webhook_silent', 'webhook_errors', 'message_gap', 'sync_stale'].includes(a.alert_type),
+  )
+
+  const healthColor = health?.health === 'green'
+    ? 'bg-green-500'
+    : health?.health === 'yellow'
+      ? 'bg-yellow-500'
+      : 'bg-red-500'
+
+  const healthLabel = health?.health === 'green'
+    ? 'Healthy'
+    : health?.health === 'yellow'
+      ? 'Degraded'
+      : 'Unhealthy'
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="h-5 w-5" />
+            <div>
+              <CardTitle className="text-base">Sync Health</CardTitle>
+              <CardDescription>
+                Overview of webhook delivery, backfill status, and active alerts
+              </CardDescription>
+            </div>
+          </div>
+          {!isLoading && health && (
+            <div className="flex items-center gap-2">
+              <div className={`h-2.5 w-2.5 rounded-full ${healthColor}`} />
+              <span className="text-sm font-medium">{healthLabel}</span>
+            </div>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        ) : health ? (
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <div className="rounded-lg border p-3 space-y-1">
+              <p className="text-xs text-muted-foreground">Last webhook</p>
+              <p className="text-sm font-medium">
+                {health.lastWebhookAt ? timeAgo(health.lastWebhookAt) : 'Never'}
+              </p>
+            </div>
+            <div className="rounded-lg border p-3 space-y-1">
+              <p className="text-xs text-muted-foreground">Webhooks (1h)</p>
+              <p className="text-sm font-medium">
+                {health.webhookCountLastHour}
+                {health.webhookErrorsLastHour > 0 && (
+                  <span className="text-red-600 ml-1">({health.webhookErrorsLastHour} errors)</span>
+                )}
+              </p>
+            </div>
+            <div className="rounded-lg border p-3 space-y-1">
+              <p className="text-xs text-muted-foreground">Last backfill</p>
+              <p className="text-sm font-medium">
+                {health.lastSyncAt ? timeAgo(health.lastSyncAt) : 'Never'}
+              </p>
+            </div>
+            <div className="rounded-lg border p-3 space-y-1">
+              <p className="text-xs text-muted-foreground">Active alerts</p>
+              <p className="text-sm font-medium">
+                {health.activeAlertCount > 0 ? (
+                  <span className="text-red-600">{health.activeAlertCount}</span>
+                ) : (
+                  <span className="text-green-600">0</span>
+                )}
+              </p>
+            </div>
+          </div>
+        ) : null}
+
+        {syncAlerts.length > 0 && (
+          <div className="space-y-2">
+            {syncAlerts.map((alert) => (
+              <div
+                key={alert.id}
+                className="flex items-center justify-between rounded-lg border border-destructive/30 bg-destructive/5 p-3"
+              >
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-destructive" />
+                  <div>
+                    <p className="text-sm font-medium">{alert.message}</p>
+                    <p className="text-xs text-muted-foreground">{timeAgo(alert.created_at)}</p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => resolveAlert.mutate(alert.id)}
+                  disabled={resolveAlert.isPending}
+                >
+                  Dismiss
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
@@ -1303,7 +1423,7 @@ function MessageSyncCard() {
         )}
 
         <p className="text-xs text-muted-foreground">
-          Automatic sync runs every 15 minutes. Use this button if you suspect messages are missing.
+          Fast sync runs every 5 minutes (1h lookback). Full sweep runs every 6 hours (48h lookback). Use this button for manual recovery.
         </p>
       </CardContent>
     </Card>

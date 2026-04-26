@@ -528,6 +528,79 @@ export async function testAIReply(messages: TestAIMessage[], customerId?: string
 
 // ---------- Missive Health Check ----------
 
+// ---------- Sync Health ----------
+
+export interface SyncHealthStatus {
+  lastWebhookAt: string | null
+  webhookCountLastHour: number
+  webhookErrorsLastHour: number
+  lastSyncAt: string | null
+  lastSyncStatus: string | null
+  activeAlertCount: number
+  health: 'green' | 'yellow' | 'red'
+}
+
+export async function getMessageSyncHealth(): Promise<SyncHealthStatus> {
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+
+  const [webhookRecent, webhookErrors, lastWebhook, syncSetting, alertCount] = await Promise.all([
+    supabase
+      .from('webhook_delivery_log')
+      .select('id', { count: 'exact', head: true })
+      .gte('created_at', oneHourAgo),
+    supabase
+      .from('webhook_delivery_log')
+      .select('id', { count: 'exact', head: true })
+      .gte('created_at', oneHourAgo)
+      .eq('status', 'error'),
+    supabase
+      .from('webhook_delivery_log')
+      .select('created_at')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'messaging_last_sync')
+      .maybeSingle(),
+    supabase
+      .from('system_alerts')
+      .select('id', { count: 'exact', head: true })
+      .eq('resolved', false)
+      .in('alert_type', ['webhook_silent', 'webhook_errors', 'message_gap', 'sync_stale']),
+  ])
+
+  const webhookCount = webhookRecent.count ?? 0
+  const errorCount = webhookErrors.count ?? 0
+  const alerts = alertCount.count ?? 0
+
+  let lastSyncAt: string | null = null
+  let lastSyncStatus: string | null = null
+  if (syncSetting.data?.value) {
+    try {
+      const parsed = JSON.parse(syncSetting.data.value)
+      lastSyncAt = parsed.checked_at ?? null
+      lastSyncStatus = parsed.status ?? null
+    } catch { /* ignore */ }
+  }
+
+  // Health determination
+  let health: 'green' | 'yellow' | 'red' = 'green'
+  if (alerts > 0) health = 'red'
+  else if (errorCount > 0 || lastSyncStatus === 'error') health = 'yellow'
+
+  return {
+    lastWebhookAt: lastWebhook.data?.created_at ?? null,
+    webhookCountLastHour: webhookCount,
+    webhookErrorsLastHour: errorCount,
+    lastSyncAt,
+    lastSyncStatus,
+    activeAlertCount: alerts,
+    health,
+  }
+}
+
 export async function checkMissiveHealth(): Promise<{ connected: boolean; error?: string }> {
   try {
     const { data, error } = await supabase.functions.invoke('send-message', {
