@@ -676,11 +676,11 @@ function MineClaimInner() {
               </Button>
             ) : !isAuthenticated && !showClaimFlow ? (
               <Button
-                className="w-full text-base font-bold py-5"
+                className="w-full text-xl font-bold py-7 rounded-xl"
                 size="lg"
                 onClick={() => setShowClaimFlow(true)}
               >
-                <ShoppingBag className="h-5 w-5 mr-2" />
+                <ShoppingBag className="h-6 w-6 mr-2" />
                 Buy Now — {formatPrice(product.price)}
               </Button>
             ) : !isAuthenticated && showClaimFlow ? (
