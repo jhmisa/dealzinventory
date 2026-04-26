@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { AlertTriangle, Camera, Check, ChevronLeft, ChevronRight, LogIn, Play, ShoppingBag, UserPlus, Video, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, ArrowRight, Camera, Check, ChevronLeft, ChevronRight, LogIn, Play, ShoppingBag, UserPlus, Video, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -522,6 +522,7 @@ function MineClaimInner() {
 
   const [showClaimFlow, setShowClaimFlow] = useState(false)
   const [authStep, setAuthStep] = useState<AuthStep>('choose')
+  const [checkoutStep, setCheckoutStep] = useState<1 | 2 | 3>(1)
   const [selectedAddress, setSelectedAddress] = useState<{ address: ShippingAddress; receiverFirstName?: string | null; receiverLastName?: string | null; receiverPhone?: string | null } | null>(null)
   const [deliveryDate, setDeliveryDate] = useState<string | null>(null)
   const [deliveryTimeCode, setDeliveryTimeCode] = useState<string | null>(null)
@@ -746,7 +747,7 @@ function MineClaimInner() {
             ) : null}
           </div>
 
-          {/* Checkout Flow (authenticated) */}
+          {/* Checkout Flow (authenticated) — multi-step wizard */}
           {product.available && isAuthenticated && (
             <>
               {/* Logged-in indicator */}
@@ -760,76 +761,163 @@ function MineClaimInner() {
                 </Button>
               </div>
 
-              {/* Shipping Step */}
-              <ShippingStep
-                customer={customer as Customer}
-                orderSource="FB"
-                selectedAddress={selectedAddress}
-                onAddressSelect={(addr, receiver) => setSelectedAddress({ address: addr, ...receiver })}
-                deliveryDate={deliveryDate}
-                onDeliveryDateChange={setDeliveryDate}
-                deliveryTimeCode={deliveryTimeCode}
-                onDeliveryTimeCodeChange={setDeliveryTimeCode}
-              />
-
-              {/* Payment Method */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Payment Method</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {PAYMENT_METHODS.map((pm) => (
-                    <label
-                      key={pm.value}
+              {/* Step indicator */}
+              <div className="flex items-center gap-2">
+                {[
+                  { step: 1 as const, label: 'Address' },
+                  { step: 2 as const, label: 'Schedule' },
+                  { step: 3 as const, label: 'Payment' },
+                ].map(({ step, label }, idx) => (
+                  <div key={step} className="flex items-center gap-2 flex-1">
+                    <button
+                      onClick={() => {
+                        // Allow going back to completed steps
+                        if (step < checkoutStep) setCheckoutStep(step)
+                      }}
                       className={cn(
-                        'flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors',
-                        paymentMethod === pm.value
-                          ? 'border-primary bg-primary/5'
-                          : 'hover:bg-muted/50'
+                        'flex items-center gap-1.5 text-sm font-medium transition-colors',
+                        step === checkoutStep
+                          ? 'text-primary'
+                          : step < checkoutStep
+                            ? 'text-green-600 cursor-pointer hover:text-green-700'
+                            : 'text-muted-foreground'
                       )}
                     >
-                      <input
-                        type="radio"
-                        name="payment_method"
-                        value={pm.value}
-                        checked={paymentMethod === pm.value}
-                        onChange={() => setPaymentMethod(pm.value)}
-                        className="accent-primary"
-                      />
-                      <span className="text-sm font-medium">{pm.label}</span>
-                    </label>
-                  ))}
-                </CardContent>
-              </Card>
-
-              {/* Validation Feedback */}
-              {(() => {
-                const missing: string[] = []
-                if (!selectedAddress) missing.push('Please select a shipping address')
-                if (!deliveryTimeCode) missing.push('Please choose a delivery time')
-                if (!paymentMethod) missing.push('Please choose a payment method')
-                if (missing.length === 0) return null
-                return (
-                  <div className="border border-amber-300 bg-amber-50 rounded-lg p-3 space-y-1">
-                    {missing.map((msg) => (
-                      <div key={msg} className="flex items-center gap-2 text-sm text-amber-800">
-                        <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
-                        <span>{msg}</span>
-                      </div>
-                    ))}
+                      <span className={cn(
+                        'flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold border-2 transition-colors',
+                        step === checkoutStep
+                          ? 'border-primary bg-primary text-primary-foreground'
+                          : step < checkoutStep
+                            ? 'border-green-500 bg-green-500 text-white'
+                            : 'border-muted-foreground/30 text-muted-foreground'
+                      )}>
+                        {step < checkoutStep ? <Check className="h-3 w-3" /> : step}
+                      </span>
+                      <span className="hidden sm:inline">{label}</span>
+                    </button>
+                    {idx < 2 && (
+                      <div className={cn(
+                        'flex-1 h-0.5 rounded-full',
+                        step < checkoutStep ? 'bg-green-500' : 'bg-muted'
+                      )} />
+                    )}
                   </div>
-                )
-              })()}
+                ))}
+              </div>
 
-              {/* Confirm Button */}
-              <Button
-                className="w-full"
-                size="lg"
-                onClick={handleConfirmOrder}
-                disabled={claimMine.isPending || !selectedAddress || !deliveryTimeCode || !paymentMethod}
-              >
-                {claimMine.isPending ? 'Confirming...' : `Confirm Order — ${formatPrice(product.price)}`}
-              </Button>
+              {/* Step 1: Address */}
+              {checkoutStep === 1 && (
+                <div className="space-y-4 animate-in fade-in duration-200">
+                  <ShippingStep
+                    customer={customer as Customer}
+                    orderSource="FB"
+                    selectedAddress={selectedAddress}
+                    onAddressSelect={(addr, receiver) => setSelectedAddress({ address: addr, ...receiver })}
+                    deliveryDate={deliveryDate}
+                    onDeliveryDateChange={setDeliveryDate}
+                    deliveryTimeCode={deliveryTimeCode}
+                    onDeliveryTimeCodeChange={setDeliveryTimeCode}
+                    hideScheduling
+                  />
+                  <Button
+                    className="w-full"
+                    size="lg"
+                    onClick={() => setCheckoutStep(2)}
+                    disabled={!selectedAddress}
+                  >
+                    Next — Select Schedule
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+                </div>
+              )}
+
+              {/* Step 2: Schedule */}
+              {checkoutStep === 2 && (
+                <div className="space-y-4 animate-in fade-in duration-200">
+                  <ShippingStep
+                    customer={customer as Customer}
+                    orderSource="FB"
+                    selectedAddress={selectedAddress}
+                    onAddressSelect={(addr, receiver) => setSelectedAddress({ address: addr, ...receiver })}
+                    deliveryDate={deliveryDate}
+                    onDeliveryDateChange={setDeliveryDate}
+                    deliveryTimeCode={deliveryTimeCode}
+                    onDeliveryTimeCodeChange={setDeliveryTimeCode}
+                    hideAddress
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      onClick={() => setCheckoutStep(1)}
+                    >
+                      <ArrowLeft className="h-4 w-4 mr-2" />
+                      Back
+                    </Button>
+                    <Button
+                      className="flex-1"
+                      size="lg"
+                      onClick={() => setCheckoutStep(3)}
+                    >
+                      Next — Payment
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 3: Payment */}
+              {checkoutStep === 3 && (
+                <div className="space-y-4 animate-in fade-in duration-200">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Payment Method</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {PAYMENT_METHODS.map((pm) => (
+                        <label
+                          key={pm.value}
+                          className={cn(
+                            'flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors',
+                            paymentMethod === pm.value
+                              ? 'border-primary bg-primary/5'
+                              : 'hover:bg-muted/50'
+                          )}
+                        >
+                          <input
+                            type="radio"
+                            name="payment_method"
+                            value={pm.value}
+                            checked={paymentMethod === pm.value}
+                            onChange={() => setPaymentMethod(pm.value)}
+                            className="accent-primary"
+                          />
+                          <span className="text-sm font-medium">{pm.label}</span>
+                        </label>
+                      ))}
+                    </CardContent>
+                  </Card>
+
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      onClick={() => setCheckoutStep(2)}
+                    >
+                      <ArrowLeft className="h-4 w-4 mr-2" />
+                      Back
+                    </Button>
+                    <Button
+                      className="flex-1"
+                      size="lg"
+                      onClick={handleConfirmOrder}
+                      disabled={claimMine.isPending || !paymentMethod}
+                    >
+                      {claimMine.isPending ? 'Confirming...' : `Confirm Order — ${formatPrice(product.price)}`}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </>
           )}
 

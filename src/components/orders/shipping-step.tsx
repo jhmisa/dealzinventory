@@ -37,6 +37,10 @@ interface ShippingStepProps {
   onDeliveryDateChange: (date: string | null) => void
   deliveryTimeCode: string | null
   onDeliveryTimeCodeChange: (code: string | null) => void
+  /** Hide the address selection section */
+  hideAddress?: boolean
+  /** Hide the delivery scheduling section */
+  hideScheduling?: boolean
 }
 
 function formatReceiverName(receiver: ReceiverInfo): string | undefined {
@@ -53,6 +57,8 @@ export function ShippingStep({
   onDeliveryDateChange,
   deliveryTimeCode,
   onDeliveryTimeCodeChange,
+  hideAddress,
+  hideScheduling,
 }: ShippingStepProps) {
   const [showNewForm, setShowNewForm] = useState(false)
   const [receiverType, setReceiverType] = useState<'same' | 'new'>('same')
@@ -171,7 +177,7 @@ export function ShippingStep({
   return (
     <div className="space-y-4">
       {/* Address Selection */}
-      <Card>
+      {!hideAddress && <Card>
         <CardHeader>
           <CardTitle className="text-base">Shipping Address</CardTitle>
         </CardHeader>
@@ -301,10 +307,10 @@ export function ShippingStep({
             </div>
           )}
         </CardContent>
-      </Card>
+      </Card>}
 
       {/* Delivery Scheduling — hidden for WALK_IN */}
-      {!isWalkIn && (
+      {!isWalkIn && !hideScheduling && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Delivery Scheduling</CardTitle>
