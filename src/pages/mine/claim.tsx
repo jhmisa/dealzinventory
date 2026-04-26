@@ -669,7 +669,7 @@ function MineClaimInner() {
               </div>
             )}
 
-            {/* CTA */}
+            {/* CTA / Auth / Checkout — all in-place */}
             {!product.available ? (
               <Button className="w-full" size="lg" disabled>
                 Unavailable
@@ -681,63 +681,57 @@ function MineClaimInner() {
                 onClick={() => setShowClaimFlow(true)}
               >
                 <ShoppingBag className="h-5 w-5 mr-2" />
-                Claim Now — {formatPrice(product.price)}
+                Buy Now — {formatPrice(product.price)}
               </Button>
+            ) : !isAuthenticated && showClaimFlow ? (
+              <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-300">
+                {authStep === 'choose' && (
+                  <Card>
+                    <CardContent className="p-6 space-y-3">
+                      <p className="text-sm text-muted-foreground text-center">
+                        Log in to use a saved address, or create an account to get started.
+                      </p>
+                      <div className="flex gap-3">
+                        <Button
+                          className="flex-1"
+                          variant="outline"
+                          onClick={() => setAuthStep('login')}
+                        >
+                          <LogIn className="h-4 w-4 mr-2" />
+                          I have an account
+                        </Button>
+                        <Button
+                          className="flex-1"
+                          onClick={() => setAuthStep('register')}
+                        >
+                          <UserPlus className="h-4 w-4 mr-2" />
+                          Create an Account
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+                {authStep === 'login' && (
+                  <LoginForm
+                    onSuccess={() => {}}
+                    onBack={() => setAuthStep('choose')}
+                    isLoading={authLoading}
+                    onLogin={login}
+                  />
+                )}
+                {authStep === 'register' && (
+                  <RegisterForm
+                    onSuccess={() => {}}
+                    onBack={() => setAuthStep('choose')}
+                    isLoading={authLoading}
+                    onRegister={register}
+                  />
+                )}
+              </div>
             ) : null}
           </div>
 
-          {/* Media Gallery */}
-          {product.media.length > 0 && (
-            <ProductMediaGallery media={product.media} />
-          )}
-
-          {/* Auth / Checkout Flow */}
-          {product.available && !isAuthenticated && showClaimFlow ? (
-            <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-300">
-              {authStep === 'choose' && (
-                <Card>
-                  <CardContent className="p-6 space-y-3">
-                    <p className="text-sm text-muted-foreground text-center">
-                      Log in to use a saved address, or create an account to get started.
-                    </p>
-                    <div className="flex gap-3">
-                      <Button
-                        className="flex-1"
-                        variant="outline"
-                        onClick={() => setAuthStep('login')}
-                      >
-                        <LogIn className="h-4 w-4 mr-2" />
-                        I have an account
-                      </Button>
-                      <Button
-                        className="flex-1"
-                        onClick={() => setAuthStep('register')}
-                      >
-                        <UserPlus className="h-4 w-4 mr-2" />
-                        Create an Account
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-              {authStep === 'login' && (
-                <LoginForm
-                  onSuccess={() => {}}
-                  onBack={() => setAuthStep('choose')}
-                  isLoading={authLoading}
-                  onLogin={login}
-                />
-              )}
-              {authStep === 'register' && (
-                <RegisterForm
-                  onSuccess={() => {}}
-                  onBack={() => setAuthStep('choose')}
-                  isLoading={authLoading}
-                  onRegister={register}
-                />
-              )}
-            </div>
-          ) : null}
+          {/* Checkout Flow (authenticated) */}
           {product.available && isAuthenticated && (
             <>
               {/* Logged-in indicator */}
@@ -822,6 +816,11 @@ function MineClaimInner() {
                 {claimMine.isPending ? 'Confirming...' : `Confirm Order — ${formatPrice(product.price)}`}
               </Button>
             </>
+          )}
+
+          {/* Media Gallery */}
+          {product.media.length > 0 && (
+            <ProductMediaGallery media={product.media} />
           )}
         </div>
 
