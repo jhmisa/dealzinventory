@@ -207,11 +207,15 @@ export function useAvailableInventorySearch(query: string, filters: InventorySea
   return useQuery({
     queryKey: [...queryKeys.items.all, 'available-search', query, filters] as const,
     queryFn: async (): Promise<AvailableInventoryResult[]> => {
-      const [items, accessories, sellGroups] = await Promise.all([
+      // Use allSettled so one failing search doesn't break the others
+      const results = await Promise.allSettled([
         itemsService.searchAvailableItems(query, filters),
         hasQuery ? searchAvailableAccessories(query) : Promise.resolve([]),
         hasQuery ? itemsService.searchAvailableSellGroups(query, filters) : Promise.resolve([]),
       ])
+      const items = results[0].status === 'fulfilled' ? results[0].value : []
+      const accessories = results[1].status === 'fulfilled' ? results[1].value : []
+      const sellGroups = results[2].status === 'fulfilled' ? results[2].value : []
       // Sort: exact code matches first, then alphabetically
       const all = [...items, ...accessories as unknown as AvailableInventoryResult[], ...sellGroups]
       const q = query.toLowerCase()

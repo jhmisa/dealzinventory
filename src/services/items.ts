@@ -499,38 +499,53 @@ export async function searchAvailableSellGroups(query: string, filters: Inventor
   const trimmed = query.trim()
   if (trimmed.length < 2) return []
 
-  // Build query for sell groups that have at least one AVAILABLE item
-  let sgQuery = supabase
-    .from('sell_groups')
-    .select(`
-      id, sell_group_code, selling_price, condition_grade, active,
-      product_models!inner(brand, model_name, model_number, color, cpu, ram_gb, storage_gb, os_family, screen_size, year,
-        product_media(file_url, role, sort_order)
-      ),
-      sell_group_items!inner(
-        items!inner(item_status)
-      )
-    `)
-    .eq('active', true)
-    .eq('sell_group_items.items.item_status', 'AVAILABLE')
+  const selectStr = `
+    id, sell_group_code, selling_price, condition_grade, active,
+    product_models!inner(brand, model_name, model_number, color, cpu, ram_gb, storage_gb, os_family, screen_size, year,
+      product_media(file_url, role, sort_order)
+    ),
+    sell_group_items!inner(
+      items!inner(item_status)
+    )
+  `
 
-  // Search by G-code or product model name/brand
-  sgQuery = sgQuery.or(
-    `sell_group_code.ilike.%${trimmed}%,product_models.brand.ilike.%${trimmed}%,product_models.model_name.ilike.%${trimmed}%`
+  // PostgREST doesn't support foreign table columns inside .or(), so we run
+  // two queries: one for G-code match, one for brand/model match, then merge.
+  const buildBase = () => {
+    let q = supabase
+      .from('sell_groups')
+      .select(selectStr)
+      .eq('active', true)
+      .eq('sell_group_items.items.item_status', 'AVAILABLE')
+    if (filters.brand) q = q.eq('product_models.brand', filters.brand)
+    if (filters.priceMin != null) q = q.gte('selling_price', filters.priceMin)
+    if (filters.priceMax != null) q = q.lte('selling_price', filters.priceMax)
+    return q.order('sell_group_code').limit(20)
+  }
+
+  // Query 1: match by sell_group_code
+  const codeQuery = buildBase().ilike('sell_group_code', `%${trimmed}%`)
+
+  // Query 2: match by product brand or model name
+  const modelQuery = buildBase().or(
+    `brand.ilike.%${trimmed}%,model_name.ilike.%${trimmed}%`,
+    { referencedTable: 'product_models' }
   )
 
-  // Apply filters
-  if (filters.brand) sgQuery = sgQuery.eq('product_models.brand', filters.brand)
-  if (filters.priceMin != null) sgQuery = sgQuery.gte('selling_price', filters.priceMin)
-  if (filters.priceMax != null) sgQuery = sgQuery.lte('selling_price', filters.priceMax)
+  const [codeResult, modelResult] = await Promise.all([codeQuery, modelQuery])
 
-  sgQuery = sgQuery.order('sell_group_code').limit(20)
+  if (codeResult.error) throw codeResult.error
+  if (modelResult.error) throw modelResult.error
 
-  const { data, error } = await sgQuery
+  // Merge and deduplicate by id
+  const seen = new Set<string>()
+  const merged = [...(codeResult.data ?? []), ...(modelResult.data ?? [])].filter((sg) => {
+    if (seen.has(sg.id)) return false
+    seen.add(sg.id)
+    return true
+  })
 
-  if (error) throw error
-
-  return (data ?? []).map((sg) => {
+  return merged.map((sg) => {
     const pm = sg.product_models as {
       brand: string | null; model_name: string | null; model_number: string | null
       color: string | null; cpu: string | null; ram_gb: string | null
