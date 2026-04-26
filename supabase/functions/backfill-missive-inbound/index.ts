@@ -17,6 +17,37 @@ const corsHeaders = {
 const MISSIVE_API_TOKEN = Deno.env.get('MISSIVE_API_TOKEN') ?? '';
 const MISSIVE_API_URL = 'https://public.missiveapp.com/v1';
 
+/**
+ * Extract inline <img> src URLs from HTML body (Facebook Messenger images).
+ */
+function extractInlineImages(html: string): { file_url: string; filename: string; mime_type: string }[] {
+  const imgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
+  const images: { file_url: string; filename: string; mime_type: string }[] = [];
+  let match;
+  while ((match = imgRegex.exec(html)) !== null) {
+    const src = match[1];
+    if (src.startsWith('http://') || src.startsWith('https://')) {
+      const altMatch = match[0].match(/alt=["']([^"']*)["']/i);
+      const filename = altMatch?.[1] || src.split('/').pop()?.split('?')[0] || 'image';
+      images.push({ file_url: src, filename, mime_type: 'image/jpeg' });
+    }
+  }
+  return images;
+}
+
+/**
+ * Strip HTML tags and remove leftover Facebook image ID filenames.
+ */
+function stripHtmlAndImageFilenames(html: string): string {
+  return html
+    .replace(/<img[^>]*>/gi, '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/\b\d{6,}_\d{6,}\S*/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 interface BackfillInput {
   // ISO 8601 timestamp. Only messages newer than this are considered. Default: 24h ago.
   since?: string;
@@ -288,11 +319,14 @@ Deno.serve(async (req) => {
           const detail: MissiveMessageDetail =
             detailData?.messages ?? detailData?.message ?? {};
 
+          // Extract inline images from HTML body before stripping
+          const inlineImages = detail.body ? extractInlineImages(detail.body) : [];
+
           const content = detail.body
-            ? detail.body.replace(/<[^>]+>/g, '').trim()
+            ? stripHtmlAndImageFilenames(detail.body)
             : detail.preview ?? '';
 
-          const attachments = (detail.attachments ?? [])
+          const apiAttachments = (detail.attachments ?? [])
             .filter((a) => a.url)
             .map((a) => ({
               file_url: a.url!,
@@ -303,6 +337,11 @@ Deno.serve(async (req) => {
                   : 'application/octet-stream',
               ...(a.size ? { size_bytes: a.size } : {}),
             }));
+
+          // Merge inline images with API attachments, deduplicating by URL
+          const apiUrls = new Set(apiAttachments.map(a => a.file_url));
+          const uniqueInline = inlineImages.filter(img => !apiUrls.has(img.file_url));
+          const attachments = [...apiAttachments, ...uniqueInline];
 
           const msgCreatedAt = detail.created_at ?? summary.created_at ?? null;
           const createdAtIso = msgCreatedAt

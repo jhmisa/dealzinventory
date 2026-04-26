@@ -42,6 +42,46 @@ interface CustomerMatch {
 // ---------- Helpers ----------
 
 /**
+ * Extract inline <img> src URLs from HTML body and return them as attachments.
+ * Facebook Messenger images come as <img> tags in the Missive message body,
+ * not as Missive attachments, so we need to extract them before stripping HTML.
+ */
+function extractInlineImages(html: string): { file_url: string; filename: string; mime_type: string }[] {
+  const imgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
+  const images: { file_url: string; filename: string; mime_type: string }[] = [];
+  let match;
+  while ((match = imgRegex.exec(html)) !== null) {
+    const src = match[1];
+    if (src.startsWith('http://') || src.startsWith('https://')) {
+      // Try to extract a meaningful filename from the URL or alt text
+      const altMatch = match[0].match(/alt=["']([^"']*)["']/i);
+      const filename = altMatch?.[1] || src.split('/').pop()?.split('?')[0] || 'image';
+      images.push({
+        file_url: src,
+        filename,
+        mime_type: 'image/jpeg', // Facebook images are typically JPEG
+      });
+    }
+  }
+  return images;
+}
+
+/**
+ * Strip HTML tags and also remove leftover Facebook image ID filenames
+ * (patterns like "674222153_93406805613439..." that appear as text nodes
+ * next to <img> tags in Messenger messages).
+ */
+function stripHtmlAndImageFilenames(html: string): string {
+  return html
+    .replace(/<img[^>]*>/gi, '') // Remove img tags first
+    .replace(/<br\s*\/?>/gi, '\n') // Preserve line breaks
+    .replace(/<[^>]+>/g, '') // Strip remaining HTML
+    .replace(/\b\d{6,}_\d{6,}\S*/g, '') // Remove Facebook image ID patterns (e.g. 674222153_93406805613439...)
+    .replace(/\n{3,}/g, '\n\n') // Collapse excessive newlines
+    .trim();
+}
+
+/**
  * Validate Missive webhook HMAC-SHA256 signature.
  */
 async function validateSignature(body: string, signature: string): Promise<boolean> {
@@ -197,11 +237,21 @@ async function backgroundEnrichMessage(
               ...(a.size ? { size_bytes: a.size } : {}),
             }));
           if (attachments.length > 0) {
+            // Merge with any inline image attachments already stored
+            const { data: existingMsg } = await supabase
+              .from('messages')
+              .select('attachments')
+              .eq('id', messageDbId)
+              .single();
+            const existing = (existingMsg?.attachments ?? []) as Array<{ file_url: string }>;
+            const existingUrls = new Set(existing.map(a => a.file_url));
+            const newAttachments = attachments.filter(a => !existingUrls.has(a.file_url));
+            const merged = [...existing, ...newAttachments];
             await supabase
               .from('messages')
-              .update({ attachments })
+              .update({ attachments: merged })
               .eq('id', messageDbId);
-            console.log('Background: attached', attachments.length, 'file(s) to message', messageDbId);
+            console.log('Background: attached', newAttachments.length, 'new file(s) to message', messageDbId, '(total:', merged.length, ')');
           }
         } else {
           console.warn('Background: Missive message fetch failed:', msgRes.status);
@@ -351,12 +401,15 @@ Deno.serve(async (req) => {
 
     if (convError) throw convError;
 
-    // Extract plain text from message body (strip HTML)
+    // Extract inline images from HTML body before stripping
+    const inlineImages = message.body ? extractInlineImages(message.body) : [];
+
+    // Extract plain text from message body (strip HTML + Facebook image filenames)
     const content = message.body
-      ? message.body.replace(/<[^>]+>/g, '').trim()
+      ? stripHtmlAndImageFilenames(message.body)
       : message.preview ?? '';
 
-    // Store inbound message (without attachments — background task adds them)
+    // Store inbound message with inline image attachments (background task may add more from Missive API)
     const { data: insertedMsg, error: msgError } = await supabase.from('messages').insert({
       conversation_id: conv.id,
       missive_message_id: message.id,
@@ -364,6 +417,7 @@ Deno.serve(async (req) => {
       content,
       status: 'SENT' as const,
       message_type: 'REPLY' as const,
+      ...(inlineImages.length > 0 ? { attachments: inlineImages } : {}),
     })
     .select('id')
     .single();
