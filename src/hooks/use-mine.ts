@@ -10,6 +10,14 @@ export function useClaimableByCode(code: string) {
   })
 }
 
+export function useExistingOpenOrder(customerId: string | null) {
+  return useQuery({
+    queryKey: ['mine', 'existing-order', customerId],
+    queryFn: () => mineService.getExistingOpenOrder(customerId!),
+    enabled: !!customerId,
+  })
+}
+
 export function useClaimMine() {
   const queryClient = useQueryClient()
   return useMutation({

@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { AlertTriangle, ArrowLeft, ArrowRight, Camera, Check, ChevronLeft, ChevronRight, LogIn, Play, ShoppingBag, UserPlus, Video, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, ArrowRight, Camera, Check, ChevronLeft, ChevronRight, LogIn, Package, Play, ShoppingBag, UserPlus, Video, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/form'
 import { ShippingStep } from '@/components/orders/shipping-step'
 import { CustomerAuthContext, useCustomerAuthProvider } from '@/hooks/use-customer-auth'
-import { useClaimableByCode, useClaimMine } from '@/hooks/use-mine'
+import { useClaimableByCode, useClaimMine, useExistingOpenOrder } from '@/hooks/use-mine'
 import { CodeInput } from '@/components/mine/code-input'
 import { CONDITION_GRADES, PAYMENT_METHODS } from '@/lib/constants'
 import { formatPrice, cn, formatCustomerName } from '@/lib/utils'
@@ -520,6 +520,9 @@ function MineClaimInner() {
   const authState = useCustomerAuthProvider()
   const { customer, isAuthenticated, isLoading: authLoading, login, register, logout } = authState
 
+  const { data: existingOrder } = useExistingOpenOrder(customer?.id ?? null)
+  const hasExistingOrder = !!existingOrder
+
   const [showClaimFlow, setShowClaimFlow] = useState(false)
   const [authStep, setAuthStep] = useState<AuthStep>('choose')
   const [checkoutStep, setCheckoutStep] = useState<1 | 2 | 3 | 4>(1)
@@ -600,20 +603,25 @@ function MineClaimInner() {
   const gradeInfo = product.grade ? CONDITION_GRADES.find(g => g.value === product.grade) : null
 
   function handleConfirmOrder() {
-    if (!selectedAddress) {
+    // For existing orders, use the order's existing address
+    const addressStr = hasExistingOrder
+      ? (existingOrder!.shipping_address ?? '{}')
+      : selectedAddress
+        ? JSON.stringify(selectedAddress.address)
+        : null
+
+    if (!addressStr) {
       toast.error('Please select a shipping address')
       return
     }
-
-    const addressStr = JSON.stringify(selectedAddress.address)
 
     claimMine.mutate(
       {
         code: activeCode,
         customerId: customer!.id,
         shippingAddress: addressStr,
-        deliveryDate,
-        deliveryTimeCode,
+        deliveryDate: hasExistingOrder ? existingOrder!.delivery_date : deliveryDate,
+        deliveryTimeCode: hasExistingOrder ? existingOrder!.delivery_time_code : deliveryTimeCode,
         paymentMethod: paymentMethod ?? undefined,
       },
       {
@@ -710,57 +718,67 @@ function MineClaimInner() {
           {product.available && showClaimFlow && (
             <>
               {/* Step indicator */}
-              <div className="flex items-center gap-2">
-                {[
-                  { step: 1 as const, label: 'Login' },
-                  { step: 2 as const, label: 'Address' },
-                  { step: 3 as const, label: 'Schedule' },
-                  { step: 4 as const, label: 'Payment' },
-                ].map(({ step, label }, idx) => {
-                  const isCompleted = isAuthenticated
-                    ? (step === 1 || step < checkoutStep)
-                    : step < checkoutStep
-                  const isCurrent = isAuthenticated
-                    ? (step === 1 ? false : step === checkoutStep)
-                    : step === checkoutStep
-                  return (
-                    <div key={step} className="flex items-center gap-2 flex-1">
-                      <button
-                        onClick={() => {
-                          if (step === 1 && isAuthenticated) return
-                          if (isCompleted && step > 1) setCheckoutStep(step)
-                        }}
-                        className={cn(
-                          'flex items-center gap-1.5 text-sm font-medium transition-colors',
-                          isCurrent
-                            ? 'text-primary'
-                            : isCompleted
-                              ? 'text-green-600 cursor-pointer hover:text-green-700'
-                              : 'text-muted-foreground'
-                        )}
-                      >
-                        <span className={cn(
-                          'flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold border-2 transition-colors',
-                          isCurrent
-                            ? 'border-primary bg-primary text-primary-foreground'
-                            : isCompleted
-                              ? 'border-green-500 bg-green-500 text-white'
-                              : 'border-muted-foreground/30 text-muted-foreground'
-                        )}>
-                          {isCompleted ? <Check className="h-3 w-3" /> : step}
-                        </span>
-                        <span className="hidden sm:inline">{label}</span>
-                      </button>
-                      {idx < 3 && (
-                        <div className={cn(
-                          'flex-1 h-0.5 rounded-full',
-                          isCompleted ? 'bg-green-500' : 'bg-muted'
-                        )} />
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
+              {(() => {
+                const steps = hasExistingOrder
+                  ? [
+                      { step: 1 as const, label: 'Login' },
+                      { step: 2 as const, label: 'Confirm' },
+                    ]
+                  : [
+                      { step: 1 as const, label: 'Login' },
+                      { step: 2 as const, label: 'Address' },
+                      { step: 3 as const, label: 'Schedule' },
+                      { step: 4 as const, label: 'Payment' },
+                    ]
+                return (
+                  <div className="flex items-center gap-2">
+                    {steps.map(({ step, label }, idx) => {
+                      const isCompleted = isAuthenticated
+                        ? (step === 1 || step < checkoutStep)
+                        : step < checkoutStep
+                      const isCurrent = isAuthenticated
+                        ? (step === 1 ? false : step === checkoutStep)
+                        : step === checkoutStep
+                      return (
+                        <div key={step} className="flex items-center gap-2 flex-1">
+                          <button
+                            onClick={() => {
+                              if (step === 1 && isAuthenticated) return
+                              if (isCompleted && step > 1) setCheckoutStep(step)
+                            }}
+                            className={cn(
+                              'flex items-center gap-1.5 text-sm font-medium transition-colors',
+                              isCurrent
+                                ? 'text-primary'
+                                : isCompleted
+                                  ? 'text-green-600 cursor-pointer hover:text-green-700'
+                                  : 'text-muted-foreground'
+                            )}
+                          >
+                            <span className={cn(
+                              'flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold border-2 transition-colors',
+                              isCurrent
+                                ? 'border-primary bg-primary text-primary-foreground'
+                                : isCompleted
+                                  ? 'border-green-500 bg-green-500 text-white'
+                                  : 'border-muted-foreground/30 text-muted-foreground'
+                            )}>
+                              {isCompleted ? <Check className="h-3 w-3" /> : step}
+                            </span>
+                            <span className="hidden sm:inline">{label}</span>
+                          </button>
+                          {idx < steps.length - 1 && (
+                            <div className={cn(
+                              'flex-1 h-0.5 rounded-full',
+                              isCompleted ? 'bg-green-500' : 'bg-muted'
+                            )} />
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
 
               {/* Step 1: Login / Register */}
               {checkoutStep === 1 && !isAuthenticated && (
@@ -810,7 +828,7 @@ function MineClaimInner() {
                 </div>
               )}
 
-              {/* Logged-in indicator (steps 2-4) */}
+              {/* Logged-in indicator (steps 2+) */}
               {isAuthenticated && checkoutStep >= 2 && (
                 <div className="flex items-center justify-between text-sm bg-green-50 border border-green-200 rounded-lg px-4 py-2">
                   <span className="text-green-800">
@@ -823,118 +841,150 @@ function MineClaimInner() {
                 </div>
               )}
 
-              {/* Step 2: Address */}
-              {checkoutStep === 2 && isAuthenticated && (
+              {/* EXISTING ORDER: simplified add-to-order flow */}
+              {isAuthenticated && checkoutStep >= 2 && hasExistingOrder && (
                 <div className="space-y-4 animate-in fade-in duration-200">
-                  <ShippingStep
-                    customer={customer as Customer}
-                    orderSource="FB"
-                    selectedAddress={selectedAddress}
-                    onAddressSelect={(addr, receiver) => setSelectedAddress({ address: addr, ...receiver })}
-                    deliveryDate={deliveryDate}
-                    onDeliveryDateChange={setDeliveryDate}
-                    deliveryTimeCode={deliveryTimeCode}
-                    onDeliveryTimeCodeChange={setDeliveryTimeCode}
-                    hideScheduling
-                  />
+                  <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4">
+                    <Package className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-blue-900">
+                        Adding to your existing order <span className="font-mono">{existingOrder!.order_code}</span>
+                      </p>
+                      <p className="text-xs text-blue-700">
+                        This item will be added to your current order ({existingOrder!.item_count} item{existingOrder!.item_count !== 1 ? 's' : ''} so far).
+                        Same address and delivery schedule.
+                      </p>
+                    </div>
+                  </div>
+
                   <Button
-                    className="w-full"
+                    className="w-full text-base font-bold py-5"
                     size="lg"
-                    onClick={() => setCheckoutStep(3)}
-                    disabled={!selectedAddress}
+                    onClick={handleConfirmOrder}
+                    disabled={claimMine.isPending}
                   >
-                    Next — Select Schedule
-                    <ArrowRight className="h-4 w-4 ml-2" />
+                    {claimMine.isPending ? 'Adding...' : `Add to Order — ${formatPrice(product.price)}`}
                   </Button>
                 </div>
               )}
 
-              {/* Step 3: Schedule */}
-              {checkoutStep === 3 && isAuthenticated && (
-                <div className="space-y-4 animate-in fade-in duration-200">
-                  <ShippingStep
-                    customer={customer as Customer}
-                    orderSource="FB"
-                    selectedAddress={selectedAddress}
-                    onAddressSelect={(addr, receiver) => setSelectedAddress({ address: addr, ...receiver })}
-                    deliveryDate={deliveryDate}
-                    onDeliveryDateChange={setDeliveryDate}
-                    deliveryTimeCode={deliveryTimeCode}
-                    onDeliveryTimeCodeChange={setDeliveryTimeCode}
-                    hideAddress
-                  />
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      onClick={() => setCheckoutStep(2)}
-                    >
-                      <ArrowLeft className="h-4 w-4 mr-2" />
-                      Back
-                    </Button>
-                    <Button
-                      className="flex-1"
-                      size="lg"
-                      onClick={() => setCheckoutStep(4)}
-                    >
-                      Next — Payment
-                      <ArrowRight className="h-4 w-4 ml-2" />
-                    </Button>
-                  </div>
-                </div>
-              )}
+              {/* NEW ORDER: full steps 2-4 */}
+              {isAuthenticated && !hasExistingOrder && (
+                <>
+                  {/* Step 2: Address */}
+                  {checkoutStep === 2 && (
+                    <div className="space-y-4 animate-in fade-in duration-200">
+                      <ShippingStep
+                        customer={customer as Customer}
+                        orderSource="FB"
+                        selectedAddress={selectedAddress}
+                        onAddressSelect={(addr, receiver) => setSelectedAddress({ address: addr, ...receiver })}
+                        deliveryDate={deliveryDate}
+                        onDeliveryDateChange={setDeliveryDate}
+                        deliveryTimeCode={deliveryTimeCode}
+                        onDeliveryTimeCodeChange={setDeliveryTimeCode}
+                        hideScheduling
+                      />
+                      <Button
+                        className="w-full"
+                        size="lg"
+                        onClick={() => setCheckoutStep(3)}
+                        disabled={!selectedAddress}
+                      >
+                        Next — Select Schedule
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                      </Button>
+                    </div>
+                  )}
 
-              {/* Step 4: Payment */}
-              {checkoutStep === 4 && isAuthenticated && (
-                <div className="space-y-4 animate-in fade-in duration-200">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Payment Method</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      {PAYMENT_METHODS.map((pm) => (
-                        <label
-                          key={pm.value}
-                          className={cn(
-                            'flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors',
-                            paymentMethod === pm.value
-                              ? 'border-primary bg-primary/5'
-                              : 'hover:bg-muted/50'
-                          )}
+                  {/* Step 3: Schedule */}
+                  {checkoutStep === 3 && (
+                    <div className="space-y-4 animate-in fade-in duration-200">
+                      <ShippingStep
+                        customer={customer as Customer}
+                        orderSource="FB"
+                        selectedAddress={selectedAddress}
+                        onAddressSelect={(addr, receiver) => setSelectedAddress({ address: addr, ...receiver })}
+                        deliveryDate={deliveryDate}
+                        onDeliveryDateChange={setDeliveryDate}
+                        deliveryTimeCode={deliveryTimeCode}
+                        onDeliveryTimeCodeChange={setDeliveryTimeCode}
+                        hideAddress
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="lg"
+                          onClick={() => setCheckoutStep(2)}
                         >
-                          <input
-                            type="radio"
-                            name="payment_method"
-                            value={pm.value}
-                            checked={paymentMethod === pm.value}
-                            onChange={() => setPaymentMethod(pm.value)}
-                            className="accent-primary"
-                          />
-                          <span className="text-sm font-medium">{pm.label}</span>
-                        </label>
-                      ))}
-                    </CardContent>
-                  </Card>
+                          <ArrowLeft className="h-4 w-4 mr-2" />
+                          Back
+                        </Button>
+                        <Button
+                          className="flex-1"
+                          size="lg"
+                          onClick={() => setCheckoutStep(4)}
+                        >
+                          Next — Payment
+                          <ArrowRight className="h-4 w-4 ml-2" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
 
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      onClick={() => setCheckoutStep(3)}
-                    >
-                      <ArrowLeft className="h-4 w-4 mr-2" />
-                      Back
-                    </Button>
-                    <Button
-                      className="flex-1"
-                      size="lg"
-                      onClick={handleConfirmOrder}
-                      disabled={claimMine.isPending || !paymentMethod}
-                    >
-                      {claimMine.isPending ? 'Confirming...' : `Confirm Order — ${formatPrice(product.price)}`}
-                    </Button>
-                  </div>
-                </div>
+                  {/* Step 4: Payment */}
+                  {checkoutStep === 4 && (
+                    <div className="space-y-4 animate-in fade-in duration-200">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Payment Method</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                          {PAYMENT_METHODS.map((pm) => (
+                            <label
+                              key={pm.value}
+                              className={cn(
+                                'flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors',
+                                paymentMethod === pm.value
+                                  ? 'border-primary bg-primary/5'
+                                  : 'hover:bg-muted/50'
+                              )}
+                            >
+                              <input
+                                type="radio"
+                                name="payment_method"
+                                value={pm.value}
+                                checked={paymentMethod === pm.value}
+                                onChange={() => setPaymentMethod(pm.value)}
+                                className="accent-primary"
+                              />
+                              <span className="text-sm font-medium">{pm.label}</span>
+                            </label>
+                          ))}
+                        </CardContent>
+                      </Card>
+
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="lg"
+                          onClick={() => setCheckoutStep(3)}
+                        >
+                          <ArrowLeft className="h-4 w-4 mr-2" />
+                          Back
+                        </Button>
+                        <Button
+                          className="flex-1"
+                          size="lg"
+                          onClick={handleConfirmOrder}
+                          disabled={claimMine.isPending || !paymentMethod}
+                        >
+                          {claimMine.isPending ? 'Confirming...' : `Confirm Order — ${formatPrice(product.price)}`}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </>
           )}

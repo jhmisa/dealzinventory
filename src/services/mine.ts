@@ -202,6 +202,46 @@ async function getClaimableAccessory(code: string): Promise<ClaimableProduct | n
   }
 }
 
+// --- Check for existing open order ---
+
+export interface ExistingOrder {
+  id: string
+  order_code: string
+  order_status: string
+  shipping_address: string | null
+  delivery_date: string | null
+  delivery_time_code: string | null
+  payment_method: string | null
+  shipping_cost: number
+  item_count: number
+}
+
+export async function getExistingOpenOrder(customerId: string): Promise<ExistingOrder | null> {
+  const { data, error } = await supabase
+    .from('orders')
+    .select('id, order_code, order_status, shipping_address, delivery_date, delivery_time_code, payment_method, shipping_cost, order_items(id)')
+    .eq('customer_id', customerId)
+    .in('order_status', ['PENDING', 'CONFIRMED'])
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error || !data) return null
+
+  const items = (data.order_items ?? []) as { id: string }[]
+  return {
+    id: data.id,
+    order_code: data.order_code,
+    order_status: data.order_status,
+    shipping_address: data.shipping_address,
+    delivery_date: data.delivery_date,
+    delivery_time_code: data.delivery_time_code,
+    payment_method: data.payment_method,
+    shipping_cost: data.shipping_cost ?? 1000,
+    item_count: items.length,
+  }
+}
+
 // --- Claim (calls edge function) ---
 
 interface ClaimMineInput {
