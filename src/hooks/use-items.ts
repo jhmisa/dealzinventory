@@ -207,12 +207,13 @@ export function useAvailableInventorySearch(query: string, filters: InventorySea
   return useQuery({
     queryKey: [...queryKeys.items.all, 'available-search', query, filters] as const,
     queryFn: async (): Promise<AvailableInventoryResult[]> => {
-      const [items, accessories] = await Promise.all([
+      const [items, accessories, sellGroups] = await Promise.all([
         itemsService.searchAvailableItems(query, filters),
         hasQuery ? searchAvailableAccessories(query) : Promise.resolve([]),
+        hasQuery ? itemsService.searchAvailableSellGroups(query, filters) : Promise.resolve([]),
       ])
       // Sort: exact code matches first, then alphabetically
-      const all = [...items, ...accessories as unknown as AvailableInventoryResult[]]
+      const all = [...items, ...accessories as unknown as AvailableInventoryResult[], ...sellGroups]
       const q = query.toLowerCase()
       return all.sort((a, b) => {
         const aExact = a.code.toLowerCase() === q ? 0 : 1

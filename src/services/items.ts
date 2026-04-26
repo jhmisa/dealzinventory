@@ -391,7 +391,7 @@ export async function deleteItemMedia(mediaId: string) {
 // --- Available Inventory Search (for messaging) ---
 
 export interface AvailableInventoryResult {
-  type: 'item' | 'accessory'
+  type: 'item' | 'accessory' | 'sell_group'
   id: string
   code: string
   description: string
@@ -490,6 +490,80 @@ export async function searchAvailableItems(query: string, filters: InventorySear
       display_url,
       condition_notes: row.condition_notes,
       product_model_id: row.product_id,
+      accessory_id: null,
+    }
+  })
+}
+
+export async function searchAvailableSellGroups(query: string, filters: InventorySearchFilters = {}): Promise<AvailableInventoryResult[]> {
+  const trimmed = query.trim()
+  if (trimmed.length < 2) return []
+
+  // Build query for sell groups that have at least one AVAILABLE item
+  let sgQuery = supabase
+    .from('sell_groups')
+    .select(`
+      id, sell_group_code, selling_price, condition_grade, active,
+      product_models!inner(brand, model_name, model_number, color, cpu, ram_gb, storage_gb, os_family, screen_size, year,
+        product_media(file_url, role, sort_order)
+      ),
+      sell_group_items!inner(
+        items!inner(item_status)
+      )
+    `)
+    .eq('active', true)
+    .eq('sell_group_items.items.item_status', 'AVAILABLE')
+
+  // Search by G-code or product model name/brand
+  sgQuery = sgQuery.or(
+    `sell_group_code.ilike.%${trimmed}%,product_models.brand.ilike.%${trimmed}%,product_models.model_name.ilike.%${trimmed}%`
+  )
+
+  // Apply filters
+  if (filters.brand) sgQuery = sgQuery.eq('product_models.brand', filters.brand)
+  if (filters.priceMin != null) sgQuery = sgQuery.gte('selling_price', filters.priceMin)
+  if (filters.priceMax != null) sgQuery = sgQuery.lte('selling_price', filters.priceMax)
+
+  sgQuery = sgQuery.order('sell_group_code').limit(20)
+
+  const { data, error } = await sgQuery
+
+  if (error) throw error
+
+  return (data ?? []).map((sg) => {
+    const pm = sg.product_models as {
+      brand: string | null; model_name: string | null; model_number: string | null
+      color: string | null; cpu: string | null; ram_gb: string | null
+      storage_gb: string | null; os_family: string | null; screen_size: number | null; year: number | null
+      product_media: { file_url: string; role: string; sort_order: number }[]
+    }
+    const specParts = [
+      pm.brand, pm.model_name, pm.model_number, pm.year,
+      pm.ram_gb, pm.storage_gb, pm.cpu,
+      pm.screen_size ? `${pm.screen_size}"` : null,
+      pm.color, pm.os_family,
+    ].filter(Boolean)
+    const description = specParts.length > 0 ? specParts.join(' ') : '—'
+
+    // Count available items
+    const availableCount = (sg.sell_group_items as { items: { item_status: string } }[]).length
+
+    // Get hero media from product
+    const media = (pm.product_media ?? []).sort((a, b) => a.sort_order - b.sort_order)
+    const heroMedia = media.find(m => m.role === 'hero') ?? media[0]
+    const thumbnail_url = heroMedia?.file_url ?? null
+
+    return {
+      type: 'sell_group' as const,
+      id: sg.id,
+      code: sg.sell_group_code,
+      description: `${description} (${availableCount} available)`,
+      grade: sg.condition_grade,
+      price: sg.selling_price,
+      thumbnail_url,
+      display_url: thumbnail_url,
+      condition_notes: null,
+      product_model_id: null,
       accessory_id: null,
     }
   })

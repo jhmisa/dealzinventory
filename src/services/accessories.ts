@@ -342,7 +342,11 @@ export interface AvailableAccessoryResult {
 }
 
 export async function searchAvailableAccessories(query: string): Promise<AvailableAccessoryResult[]> {
-  if (!query.trim()) return []
+  const trimmed = query.trim()
+  if (!trimmed) return []
+
+  // Escape special PostgREST filter characters in the search term
+  const escaped = trimmed.replace(/[,()\\]/g, (c) => `\\${c}`)
 
   const { data, error } = await supabase
     .from('accessories')
@@ -352,7 +356,7 @@ export async function searchAvailableAccessories(query: string): Promise<Availab
     `)
     .eq('active', true)
     .gt('stock_quantity', 0)
-    .or(`accessory_code.ilike.%${query}%,name.ilike.%${query}%,brand.ilike.%${query}%`)
+    .or(`accessory_code.ilike.%${escaped}%,name.ilike.%${escaped}%,brand.ilike.%${escaped}%`)
     .order('name')
     .limit(20)
 

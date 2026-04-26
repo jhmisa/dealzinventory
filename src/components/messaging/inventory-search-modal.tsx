@@ -138,6 +138,15 @@ export const InventorySearchModal = memo(function InventorySearchModal({
             const shopUrl = getShopUrl()
             lines.push(`View Full Specs & Photos: ${shopUrl}/item/${item.id}`)
           }
+        } else if (item.type === 'sell_group') {
+          lines.push(item.code)
+          lines.push(item.description)
+          if (item.grade) lines.push(`Rank ${item.grade}`)
+          if (item.price) lines.push(formatPrice(item.price))
+          {
+            const shopUrl = getShopUrl()
+            lines.push(`View & Order: ${shopUrl}/product/${item.id}`)
+          }
         } else {
           lines.push(item.code)
           lines.push(item.description)
