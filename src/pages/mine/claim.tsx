@@ -241,17 +241,20 @@ function LoginForm({ onSuccess, onBack, isLoading, onLogin }: {
   isLoading: boolean
   onLogin: (lastName: string, emailOrPhone: string, pin: string) => Promise<void>
 }) {
+  const [loginError, setLoginError] = useState<string | null>(null)
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { last_name: '', email_or_phone: '', pin: '' },
   })
 
   async function handleSubmit(values: LoginFormValues) {
+    setLoginError(null)
     try {
       await onLogin(values.last_name, values.email_or_phone, values.pin)
       onSuccess()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Login failed')
+      const msg = err instanceof Error ? err.message : 'Login failed'
+      setLoginError(msg)
     }
   }
 
@@ -266,6 +269,12 @@ function LoginForm({ onSuccess, onBack, isLoading, onLogin }: {
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            {loginError && (
+              <div className="flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
+                {loginError}
+              </div>
+            )}
             <FormField
               control={form.control}
               name="last_name"
@@ -349,12 +358,14 @@ function RegisterForm({ onSuccess, onBack, isLoading, onRegister }: {
     last_name: string; first_name?: string; email?: string; phone?: string; pin: string
   }) => Promise<void>
 }) {
+  const [registerError, setRegisterError] = useState<string | null>(null)
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: { last_name: '', first_name: '', email: '', phone: '', pin: '', pin_confirm: '' },
   })
 
   async function handleSubmit(values: RegisterFormValues) {
+    setRegisterError(null)
     try {
       await onRegister({
         last_name: values.last_name,
@@ -365,7 +376,8 @@ function RegisterForm({ onSuccess, onBack, isLoading, onRegister }: {
       })
       onSuccess()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Registration failed')
+      const msg = err instanceof Error ? err.message : 'Registration failed'
+      setRegisterError(msg)
     }
   }
 
@@ -380,6 +392,12 @@ function RegisterForm({ onSuccess, onBack, isLoading, onRegister }: {
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            {registerError && (
+              <div className="flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
+                {registerError}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
