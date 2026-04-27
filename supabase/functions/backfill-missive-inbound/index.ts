@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { downloadAttachmentsToStorage } from "../_shared/download-to-storage.ts";
 
 // Backfill inbound customer messages that never reached our webhook handler.
 // Fetches messages from Missive API for each target conversation, filters to
@@ -348,6 +349,11 @@ Deno.serve(async (req) => {
             ? new Date(msgCreatedAt * 1000).toISOString()
             : null;
 
+          // Download external attachments to Supabase Storage so URLs don't expire
+          const storedAttachments = attachments.length > 0 && !dryRun
+            ? await downloadAttachmentsToStorage(supabase, attachments, conv.id)
+            : attachments;
+
           if (!dryRun) {
             const { error: insertError } = await supabase.from('messages').insert({
               conversation_id: conv.id,
@@ -356,7 +362,7 @@ Deno.serve(async (req) => {
               content,
               status: 'SENT' as const,
               message_type: 'REPLY' as const,
-              ...(attachments.length > 0 ? { attachments } : {}),
+              ...(storedAttachments.length > 0 ? { attachments: storedAttachments } : {}),
               // Preserve original send time — the UI shows created_at as the bubble timestamp
               ...(createdAtIso ? { created_at: createdAtIso } : {}),
             });
