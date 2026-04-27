@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { downloadAttachmentsToStorage } from "../_shared/download-to-storage.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -228,7 +229,7 @@ async function backgroundEnrichMessage(
         if (msgRes.ok) {
           const msgData = await msgRes.json();
           const rawAttachments = msgData?.messages?.attachments ?? msgData?.message?.attachments ?? [];
-          const attachments = rawAttachments
+          const missiveAttachments = rawAttachments
             .filter((a: { url?: string }) => a.url)
             .map((a: { url: string; filename?: string; media_type?: string; sub_type?: string; size?: number }) => ({
               file_url: a.url,
@@ -236,22 +237,46 @@ async function backgroundEnrichMessage(
               mime_type: a.media_type && a.sub_type ? `${a.media_type}/${a.sub_type}` : 'application/octet-stream',
               ...(a.size ? { size_bytes: a.size } : {}),
             }));
-          if (attachments.length > 0) {
-            // Merge with any inline image attachments already stored
-            const { data: existingMsg } = await supabase
-              .from('messages')
-              .select('attachments')
-              .eq('id', messageDbId)
-              .single();
-            const existing = (existingMsg?.attachments ?? []) as Array<{ file_url: string }>;
-            const existingUrls = new Set(existing.map(a => a.file_url));
-            const newAttachments = attachments.filter(a => !existingUrls.has(a.file_url));
-            const merged = [...existing, ...newAttachments];
+
+          // Fetch existing attachments (may include inline images from fast-path)
+          const { data: existingMsg } = await supabase
+            .from('messages')
+            .select('attachments')
+            .eq('id', messageDbId)
+            .single();
+          const existing = (existingMsg?.attachments ?? []) as Array<{ file_url: string; filename: string; mime_type: string; size_bytes?: number }>;
+
+          // Split existing into external URLs (need downloading) and already-stored paths
+          const externalExisting = existing.filter(a =>
+            a.file_url.startsWith('http://') || a.file_url.startsWith('https://'),
+          );
+          const alreadyStored = existing.filter(a =>
+            !a.file_url.startsWith('http://') && !a.file_url.startsWith('https://'),
+          );
+
+          // Dedupe Missive attachments against existing external URLs
+          const existingUrls = new Set(existing.map(a => a.file_url));
+          const newMissiveAttachments = missiveAttachments.filter(
+            (a: { file_url: string }) => !existingUrls.has(a.file_url),
+          );
+
+          // Combine all external-URL attachments that need downloading
+          const toDownload = [...externalExisting, ...newMissiveAttachments];
+
+          if (toDownload.length > 0 || alreadyStored.length !== existing.length) {
+            // Download all external URLs to Supabase Storage
+            const downloaded = await downloadAttachmentsToStorage(
+              supabase,
+              toDownload,
+              conversationDbId,
+            );
+
+            const merged = [...alreadyStored, ...downloaded];
             await supabase
               .from('messages')
               .update({ attachments: merged })
               .eq('id', messageDbId);
-            console.log('Background: attached', newAttachments.length, 'new file(s) to message', messageDbId, '(total:', merged.length, ')');
+            console.log('Background: persisted', downloaded.length, 'attachment(s) to storage for message', messageDbId);
           }
         } else {
           console.warn('Background: Missive message fetch failed:', msgRes.status);
