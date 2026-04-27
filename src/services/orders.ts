@@ -799,6 +799,105 @@ export async function getDeliveryIssueOrders() {
   return data ?? []
 }
 
+// --- Merge Orders ---
+
+export async function getMergeableOrders(orderId: string) {
+  // Fetch the source order to get customer_id + delivery_date
+  const { data: source, error: srcErr } = await supabase
+    .from('orders')
+    .select('id, customer_id, delivery_date')
+    .eq('id', orderId)
+    .single()
+
+  if (srcErr) throw srcErr
+  if (!source) throw new Error('Source order not found')
+
+  // Find other orders from same customer with same delivery date, PENDING or CONFIRMED
+  let query = supabase
+    .from('orders')
+    .select(`
+      id, order_code, order_status, quantity, total_price, delivery_date, delivery_time_code,
+      order_items(count)
+    `)
+    .eq('customer_id', source.customer_id)
+    .neq('id', orderId)
+    .in('order_status', ['PENDING', 'CONFIRMED'])
+    .order('created_at', { ascending: false })
+
+  if (source.delivery_date) {
+    query = query.eq('delivery_date', source.delivery_date)
+  } else {
+    query = query.is('delivery_date', null)
+  }
+
+  const { data, error } = await query
+  if (error) throw error
+  return data ?? []
+}
+
+export async function mergeOrders(sourceOrderId: string, targetOrderId: string) {
+  // Fetch both orders for validation
+  const { data: orders, error: fetchErr } = await supabase
+    .from('orders')
+    .select('id, order_code, customer_id, delivery_date, delivery_time_code, order_status')
+    .in('id', [sourceOrderId, targetOrderId])
+
+  if (fetchErr) throw fetchErr
+  if (!orders || orders.length !== 2) throw new Error('Could not fetch both orders')
+
+  const source = orders.find(o => o.id === sourceOrderId)!
+  const target = orders.find(o => o.id === targetOrderId)!
+
+  // Validate same customer
+  if (source.customer_id !== target.customer_id) {
+    throw new Error('Orders must belong to the same customer')
+  }
+
+  // Validate same delivery date
+  if (source.delivery_date !== target.delivery_date) {
+    throw new Error('Orders must have the same delivery date')
+  }
+
+  // Validate both are PENDING or CONFIRMED
+  const allowed = ['PENDING', 'CONFIRMED']
+  if (!allowed.includes(source.order_status) || !allowed.includes(target.order_status)) {
+    throw new Error('Both orders must be PENDING or CONFIRMED to merge')
+  }
+
+  // Reset packing on source items
+  await supabase
+    .from('order_items')
+    .update({ packed_at: null, packed_by: null })
+    .eq('order_id', sourceOrderId)
+
+  // Move order_items from source to target
+  const { error: moveErr } = await supabase
+    .from('order_items')
+    .update({ order_id: targetOrderId })
+    .eq('order_id', sourceOrderId)
+
+  if (moveErr) throw moveErr
+
+  // Recalculate target totals
+  await recalculateOrderTotal(targetOrderId)
+
+  // Soft-cancel source order
+  const { error: cancelErr } = await supabase
+    .from('orders')
+    .update({
+      order_status: 'CANCELLED' as Order['order_status'],
+      cancellation_category: 'MERGED',
+      cancellation_notes: `Merged into ${target.order_code}`,
+      quantity: 0,
+      total_price: 0,
+    })
+    .eq('id', sourceOrderId)
+
+  if (cancelErr) throw cancelErr
+
+  return { sourceOrderCode: source.order_code, targetOrderCode: target.order_code }
+}
+
 // --- Credit Card Surcharge ---
 
 const CC_FEE_DESCRIPTION = 'Credit Card Fee'

@@ -107,6 +107,12 @@ const columns: ColumnDef<OrderRow>[] = [
   {
     id: 'customer',
     header: 'Customer',
+    accessorFn: (row) => {
+      const receiverName = [row.receiver_first_name, row.receiver_last_name].filter(Boolean).join(' ')
+      if (receiverName) return receiverName
+      const c = row.customers
+      return c ? formatCustomerName(c) : ''
+    },
     cell: ({ row }) => {
       const c = row.original.customers
       if (!c) return '—'
@@ -131,6 +137,11 @@ const columns: ColumnDef<OrderRow>[] = [
   {
     id: 'product',
     header: 'Product',
+    accessorFn: (row) => {
+      const sg = row.sell_groups
+      const pm = sg?.product_models
+      return pm ? `${pm.brand} ${pm.model_name}` : sg?.sell_group_code ?? ''
+    },
     cell: ({ row }) => {
       const sg = row.original.sell_groups
       const pm = sg?.product_models

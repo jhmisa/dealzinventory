@@ -252,6 +252,26 @@ export function useRefreshAllYamatoStatuses() {
   })
 }
 
+export function useMergeableOrders(orderId: string, enabled = false) {
+  return useQuery({
+    queryKey: [...queryKeys.orders.detail(orderId), 'mergeable'],
+    queryFn: () => ordersService.getMergeableOrders(orderId),
+    enabled: enabled && !!orderId,
+  })
+}
+
+export function useMergeOrders() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ sourceOrderId, targetOrderId }: { sourceOrderId: string; targetOrderId: string }) =>
+      ordersService.mergeOrders(sourceOrderId, targetOrderId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.items.all })
+    },
+  })
+}
+
 export function useDeliveryIssueOrders() {
   return useQuery({
     queryKey: queryKeys.orders.list({ _type: 'delivery-issues' }),

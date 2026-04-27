@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Check, Circle, Package, Pencil, X, Plus, History, Truck, Search, Loader2, Printer, RefreshCw, AlertTriangle, ExternalLink, Undo2, RotateCcw } from 'lucide-react'
+import { ArrowLeft, Check, Circle, Package, Pencil, X, Plus, History, Truck, Search, Loader2, Printer, RefreshCw, AlertTriangle, ExternalLink, Undo2, RotateCcw, Merge } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,6 +15,7 @@ import {
   FormSkeleton,
 } from '@/components/shared'
 import { CancelOrderDialog } from '@/components/orders/cancel-order-dialog'
+import { MergeOrdersDialog } from '@/components/orders/merge-orders-dialog'
 import { AdminReturnDialog } from '@/components/orders/admin-return-dialog'
 import type { ReturnableItem } from '@/components/orders/admin-return-dialog'
 import { AddressDisplay } from '@/components/shared/address-display'
@@ -156,6 +157,7 @@ export default function OrderDetailPage() {
   const [advanceOpen, setAdvanceOpen] = useState(false)
   const [revertOpen, setRevertOpen] = useState(false)
   const [returnOpen, setReturnOpen] = useState(false)
+  const [mergeOpen, setMergeOpen] = useState(false)
   const createAdminReturn = useCreateAdminReturn()
   const [isEditing, setIsEditing] = useState(false)
   const [editingItems, setEditingItems] = useState<Record<string, EditingItem>>({})
@@ -675,6 +677,12 @@ export default function OrderDetailPage() {
                 <Button variant="outline" size="sm" onClick={() => setReturnOpen(true)}>
                   <RotateCcw className="h-4 w-4 mr-1" />
                   Create Return
+                </Button>
+              )}
+              {!isEditing && (order.order_status === 'PENDING' || order.order_status === 'CONFIRMED') && (
+                <Button variant="outline" size="sm" onClick={() => setMergeOpen(true)}>
+                  <Merge className="h-4 w-4 mr-1" />
+                  Merge
                 </Button>
               )}
               {!isEditing && canCancel && (
@@ -1527,6 +1535,17 @@ export default function OrderDetailPage() {
         orderCode={order.order_code}
         onConfirm={handleCancel}
         isPending={cancelMutation.isPending}
+      />
+
+      <MergeOrdersDialog
+        open={mergeOpen}
+        onOpenChange={setMergeOpen}
+        sourceOrderId={order.id}
+        sourceOrderCode={order.order_code}
+        onSuccess={(targetId) => {
+          toast.success(`Order merged successfully`)
+          navigate(`/admin/orders/${targetId}`)
+        }}
       />
 
       <AdminReturnDialog
