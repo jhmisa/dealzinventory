@@ -545,16 +545,16 @@ export async function getMessageSyncHealth(): Promise<SyncHealthStatus> {
 
   const [webhookRecent, webhookErrors, lastWebhook, syncSetting, alertCount] = await Promise.all([
     supabase
-      .from('webhook_delivery_log')
+      .from('webhook_events')
       .select('id', { count: 'exact', head: true })
       .gte('created_at', oneHourAgo),
     supabase
-      .from('webhook_delivery_log')
+      .from('webhook_events')
       .select('id', { count: 'exact', head: true })
       .gte('created_at', oneHourAgo)
-      .eq('status', 'error'),
+      .eq('status', 'failed'),
     supabase
-      .from('webhook_delivery_log')
+      .from('webhook_events')
       .select('created_at')
       .order('created_at', { ascending: false })
       .limit(1)

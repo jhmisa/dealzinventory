@@ -2,6 +2,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const STORAGE_BUCKET = 'messaging-attachments';
+const DOWNLOAD_TIMEOUT_MS = 15_000;
 
 interface StoredAttachment {
   file_url: string;
@@ -18,7 +19,14 @@ export async function downloadToStorage(
   mimeType: string,
 ): Promise<StoredAttachment | null> {
   try {
-    const res = await fetch(externalUrl);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS);
+    let res: Response;
+    try {
+      res = await fetch(externalUrl, { signal: controller.signal });
+    } finally {
+      clearTimeout(timeoutId);
+    }
     if (!res.ok) {
       console.warn('downloadToStorage: fetch failed', res.status, externalUrl.slice(0, 80));
       return null;

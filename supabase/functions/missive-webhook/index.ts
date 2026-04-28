@@ -11,6 +11,9 @@ const MISSIVE_WEBHOOK_SECRET = Deno.env.get('MISSIVE_WEBHOOK_SECRET') ?? '';
 const MISSIVE_API_TOKEN = Deno.env.get('MISSIVE_API_TOKEN') ?? '';
 const MISSIVE_API_URL = 'https://public.missiveapp.com/v1';
 
+// Timeout for Missive API calls (ms)
+const MISSIVE_API_TIMEOUT_MS = 10_000;
+
 // ---------- Types ----------
 
 interface MissiveWebhookPayload {
@@ -27,6 +30,7 @@ interface MissiveWebhookPayload {
     body: string;
     preview: string;
     from_field?: {
+      id?: string;
       name?: string;
       address?: string;
     };
@@ -55,13 +59,12 @@ function extractInlineImages(html: string): { file_url: string; filename: string
   while ((match = imgRegex.exec(html)) !== null) {
     const src = match[1];
     if (src.startsWith('http://') || src.startsWith('https://')) {
-      // Try to extract a meaningful filename from the URL or alt text
       const altMatch = match[0].match(/alt=["']([^"']*)["']/i);
       const filename = altMatch?.[1] || src.split('/').pop()?.split('?')[0] || 'image';
       images.push({
         file_url: src,
         filename,
-        mime_type: 'image/jpeg', // Facebook images are typically JPEG
+        mime_type: 'image/jpeg',
       });
     }
   }
@@ -69,17 +72,15 @@ function extractInlineImages(html: string): { file_url: string; filename: string
 }
 
 /**
- * Strip HTML tags and also remove leftover Facebook image ID filenames
- * (patterns like "674222153_93406805613439..." that appear as text nodes
- * next to <img> tags in Messenger messages).
+ * Strip HTML tags and also remove leftover Facebook image ID filenames.
  */
 function stripHtmlAndImageFilenames(html: string): string {
   return html
-    .replace(/<img[^>]*>/gi, '') // Remove img tags first
-    .replace(/<br\s*\/?>/gi, '\n') // Preserve line breaks
-    .replace(/<[^>]+>/g, '') // Strip remaining HTML
-    .replace(/\b\d{6,}_\d{6,}\S*/g, '') // Remove Facebook image ID patterns (e.g. 674222153_93406805613439...)
-    .replace(/\n{3,}/g, '\n\n') // Collapse excessive newlines
+    .replace(/<img[^>]*>/gi, '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/\b\d{6,}_\d{6,}\S*/g, '')
+    .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
 
@@ -103,6 +104,16 @@ async function validateSignature(body: string, signature: string): Promise<boole
     .join('');
 
   return computed === signature;
+}
+
+/**
+ * Fetch with timeout using AbortController.
+ */
+function fetchWithTimeout(url: string, options: RequestInit & { timeout?: number } = {}): Promise<Response> {
+  const { timeout = MISSIVE_API_TIMEOUT_MS, ...fetchOptions } = options;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+  return fetch(url, { ...fetchOptions, signal: controller.signal }).finally(() => clearTimeout(timeoutId));
 }
 
 /**
@@ -170,12 +181,201 @@ async function matchCustomer(
   return null;
 }
 
-// ---------- Background tasks ----------
+// ---------- Phase 2: Async processing ----------
 //
-// Missive API calls (contact name resolution and attachment fetching) are
-// moved here so the webhook always returns 200 within ~100ms. If Missive
-// is slow or down, we still ACK the webhook — preventing Missive from
-// pausing its delivery queue (which caused the 4-hour blackout on 2026-04-16).
+// All DB writes and Missive API calls happen here, AFTER we've already
+// returned 200 to Missive. This runs via EdgeRuntime.waitUntil().
+
+async function processWebhookEvent(
+  eventId: string,
+  payload: MissiveWebhookPayload,
+) {
+  const startMs = Date.now();
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+  );
+
+  try {
+    // Mark as processing
+    await supabase
+      .from('webhook_events')
+      .update({ status: 'processing', attempts: 1 })
+      .eq('id', eventId);
+
+    const { conversation, message } = payload;
+
+    // Idempotency: skip if we already stored this message
+    const { data: existing } = await supabase
+      .from('messages')
+      .select('id')
+      .eq('missive_message_id', message.id)
+      .maybeSingle();
+
+    if (existing) {
+      await supabase
+        .from('webhook_events')
+        .update({
+          status: 'completed',
+          processing_ms: Date.now() - startMs,
+          processed_at: new Date().toISOString(),
+          error_message: 'duplicate — message already exists',
+        })
+        .eq('id', eventId);
+      return;
+    }
+
+    // Customer matching (DB only — no external API calls)
+    const customer = await matchCustomer(
+      supabase,
+      conversation.id,
+      message.from_field?.name,
+      message.from_field?.address,
+    );
+
+    // Resolve contact name from webhook payload fields only
+    let resolvedContactName: string | null = message.from_field?.name
+      ?? conversation.subject
+      ?? (conversation.contacts ?? []).find((c: { name?: string }) => c.name)?.name
+      ?? (conversation.contacts ?? []).find((c: { first_name?: string }) => c.first_name)?.first_name
+      ?? (conversation.authors ?? []).find((a: { name?: string }) => a.name && a.name !== 'Dealz K.K.')?.name
+      ?? message.from_field?.address
+      ?? null;
+    if (resolvedContactName?.startsWith('Message from ')) {
+      resolvedContactName = resolvedContactName.slice('Message from '.length);
+    }
+    if (resolvedContactName) resolvedContactName = resolvedContactName.trim() || null;
+
+    // Look up Inbox folder for auto-unarchive
+    const { data: inboxFolder } = await supabase
+      .from('message_folders')
+      .select('id')
+      .eq('name', 'Inbox')
+      .eq('is_system', true)
+      .single();
+    const inboxFolderId = inboxFolder?.id ?? null;
+
+    // Check if conversation already exists
+    const { data: existingConv } = await supabase
+      .from('conversations')
+      .select('id, contact_name')
+      .eq('missive_conversation_id', conversation.id)
+      .maybeSingle();
+
+    // Upsert conversation
+    const { data: conv, error: convError } = await supabase
+      .from('conversations')
+      .upsert(
+        {
+          missive_conversation_id: conversation.id,
+          customer_id: customer?.id ?? null,
+          ...(resolvedContactName ? { contact_name: resolvedContactName } : {}),
+          ...(message.from_field?.id ? { contact_platform_id: message.from_field.id } : {}),
+          channel: 'facebook' as const,
+          unmatched_contact: !customer,
+          needs_human_review: !customer,
+          last_message_at: new Date().toISOString(),
+          is_archived: false,
+          ...(!existingConv && inboxFolderId ? { folder_id: inboxFolderId } : {}),
+        },
+        { onConflict: 'missive_conversation_id' },
+      )
+      .select('id')
+      .single();
+
+    if (convError) throw convError;
+
+    // Extract inline images from HTML body before stripping
+    const inlineImages = message.body ? extractInlineImages(message.body) : [];
+
+    // Extract plain text from message body
+    const content = message.body
+      ? stripHtmlAndImageFilenames(message.body)
+      : message.preview ?? '';
+
+    // Store inbound message
+    const { data: insertedMsg, error: msgError } = await supabase.from('messages').insert({
+      conversation_id: conv.id,
+      missive_message_id: message.id,
+      role: 'customer' as const,
+      content,
+      status: 'SENT' as const,
+      message_type: 'REPLY' as const,
+      ...(inlineImages.length > 0 ? { attachments: inlineImages } : {}),
+    })
+    .select('id')
+    .single();
+
+    if (msgError) throw msgError;
+
+    // --- AI Draft Debounce ---
+    const { data: aiGlobalSetting } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'ai_messaging_enabled')
+      .maybeSingle();
+
+    const aiGlobalEnabled = aiGlobalSetting?.value === 'true';
+
+    if (aiGlobalEnabled) {
+      const { data: convState } = await supabase
+        .from('conversations')
+        .select('ai_enabled')
+        .eq('id', conv.id)
+        .single();
+
+      if (convState?.ai_enabled !== false) {
+        await supabase
+          .from('conversations')
+          .update({ draft_pending_since: new Date().toISOString() })
+          .eq('id', conv.id);
+      }
+    }
+
+    // Mark event as completed
+    await supabase
+      .from('webhook_events')
+      .update({
+        status: 'completed',
+        processing_ms: Date.now() - startMs,
+        processed_at: new Date().toISOString(),
+      })
+      .eq('id', eventId);
+
+    console.log('Processed webhook event', eventId, 'in', Date.now() - startMs, 'ms');
+
+    // --- Background enrichment (contact name + attachments) ---
+    // This runs after the core processing is done but still within waitUntil.
+    await backgroundEnrichMessage(
+      message.id,
+      insertedMsg.id,
+      conv.id,
+      conversation.id,
+      !resolvedContactName || (existingConv != null && !existingConv.contact_name),
+    );
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error('Failed to process webhook event', eventId, ':', errMsg);
+
+    // Mark event as failed
+    try {
+      // Use raw SQL to atomically increment attempts
+      await supabase
+        .from('webhook_events')
+        .update({
+          status: 'failed',
+          error_message: errMsg.slice(0, 1000),
+          processing_ms: Date.now() - startMs,
+          attempts: 1, // Will be incremented properly if retried
+        })
+        .eq('id', eventId);
+    } catch (logErr) {
+      console.warn('Failed to update webhook_events status:', logErr);
+    }
+  }
+}
+
+// ---------- Background enrichment ----------
 
 async function backgroundEnrichMessage(
   missiveMessageId: string,
@@ -193,7 +393,7 @@ async function backgroundEnrichMessage(
     // 1. Resolve contact name from Missive API (if webhook payload didn't have it)
     if (needsContactName && MISSIVE_API_TOKEN) {
       try {
-        const convRes = await fetch(`${MISSIVE_API_URL}/conversations/${missiveConversationId}`, {
+        const convRes = await fetchWithTimeout(`${MISSIVE_API_URL}/conversations/${missiveConversationId}`, {
           headers: { Authorization: `Bearer ${MISSIVE_API_TOKEN}` },
         });
         if (convRes.ok) {
@@ -226,7 +426,7 @@ async function backgroundEnrichMessage(
     // 2. Fetch full message from Missive API to get attachments
     if (MISSIVE_API_TOKEN) {
       try {
-        const msgRes = await fetch(`${MISSIVE_API_URL}/messages/${missiveMessageId}`, {
+        const msgRes = await fetchWithTimeout(`${MISSIVE_API_URL}/messages/${missiveMessageId}`, {
           headers: { Authorization: `Bearer ${MISSIVE_API_TOKEN}` },
         });
         if (msgRes.ok) {
@@ -267,7 +467,6 @@ async function backgroundEnrichMessage(
           const toDownload = [...externalExisting, ...newMissiveAttachments];
 
           if (toDownload.length > 0 || alreadyStored.length !== existing.length) {
-            // Download all external URLs to Supabase Storage
             const downloaded = await downloadAttachmentsToStorage(
               supabase,
               toDownload,
@@ -293,32 +492,6 @@ async function backgroundEnrichMessage(
   }
 }
 
-// ---------- Webhook delivery logging ----------
-
-async function logWebhookDelivery(
-  missiveMessageId: string,
-  missiveConversationId: string | null,
-  status: 'success' | 'duplicate' | 'error',
-  errorMessage: string | null,
-  processingMs: number,
-) {
-  try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-    );
-    await supabase.from('webhook_delivery_log').insert({
-      missive_message_id: missiveMessageId,
-      missive_conversation_id: missiveConversationId,
-      status,
-      error_message: errorMessage,
-      processing_ms: Math.round(processingMs),
-    });
-  } catch (e) {
-    console.warn('Failed to log webhook delivery:', e);
-  }
-}
-
 // ---------- Main handler ----------
 
 Deno.serve(async (req) => {
@@ -326,205 +499,88 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  const webhookStartMs = Date.now();
-  let logMissiveMessageId = '(unknown)';
-  let logMissiveConversationId: string | null = null;
-
   try {
     const rawBody = await req.text();
 
-    // Validate webhook signature
+    // ---- Phase 1: Validate + queue + ACK (~50ms) ----
+
+    // Validate webhook signature — reject if invalid
     const signature = req.headers.get('x-hook-signature') ?? '';
     if (MISSIVE_WEBHOOK_SECRET && signature) {
       const valid = await validateSignature(rawBody, signature);
       if (!valid) {
-        console.error('Signature mismatch — expected from secret, got:', signature.slice(0, 8) + '...');
-        // Log but don't block — allows debugging while keeping messages flowing
+        console.error('Signature mismatch — rejecting webhook');
+        return new Response(JSON.stringify({ error: 'Invalid signature' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
     }
 
     const payload: MissiveWebhookPayload = JSON.parse(rawBody);
     const { conversation, message } = payload;
 
-    logMissiveMessageId = message?.id ?? '(unknown)';
-    logMissiveConversationId = conversation?.id ?? null;
+    const missiveMessageId = message?.id ?? null;
+    const missiveConversationId = conversation?.id ?? null;
 
-    // Debug: log key payload fields to help diagnose missing contact names
+    // Debug: log key payload fields
     console.log('Webhook received:', JSON.stringify({
-      conv_id: conversation?.id,
-      msg_id: message?.id,
+      conv_id: missiveConversationId,
+      msg_id: missiveMessageId,
       from_name: message?.from_field?.name ?? null,
       from_addr: message?.from_field?.address ?? null,
-      subject: conversation?.subject ?? null,
-      contacts: conversation?.contacts ?? null,
-      authors: conversation?.authors ?? null,
     }));
 
-    if (!conversation?.id || !message?.id) {
+    if (!missiveConversationId || !missiveMessageId) {
       return new Response(JSON.stringify({ error: 'Missing conversation or message data' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
+    // Insert into webhook_events queue (idempotent via unique index)
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
-    // Idempotency: skip if we already stored this message
-    const { data: existing } = await supabase
-      .from('messages')
-      .select('id')
-      .eq('missive_message_id', message.id)
+    const { data: event, error: insertError } = await supabase
+      .from('webhook_events')
+      .upsert(
+        {
+          missive_message_id: missiveMessageId,
+          missive_conversation_id: missiveConversationId,
+          raw_payload: payload,
+          status: 'pending',
+        },
+        { onConflict: 'missive_message_id', ignoreDuplicates: true },
+      )
+      .select('id, status')
       .maybeSingle();
 
-    if (existing) {
-      // Log duplicate delivery
-      EdgeRuntime.waitUntil(logWebhookDelivery(logMissiveMessageId, logMissiveConversationId, 'duplicate', null, Date.now() - webhookStartMs));
+    if (insertError) {
+      console.error('Failed to queue webhook event:', insertError.message);
+      // Still return 200 — we don't want Missive to stop sending
+      return jsonResponse({ ok: false, error: 'queue_failed' });
+    }
+
+    // If upsert returned null or status isn't pending, it's a duplicate
+    if (!event || event.status !== 'pending') {
+      console.log('Duplicate webhook event for message:', missiveMessageId);
       return jsonResponse({ ok: true, skipped: true });
     }
 
-    // Customer matching (DB only — no external API calls)
-    const customer = await matchCustomer(
-      supabase,
-      conversation.id,
-      message.from_field?.name,
-      message.from_field?.address,
-    );
+    // Return 200 immediately — Phase 2 runs in the background
+    const response = jsonResponse({ ok: true, queued: true, event_id: event.id });
 
-    // Resolve contact name from webhook payload fields only — the Missive API
-    // fallback is deferred to the background task so we can return 200 fast.
-    let resolvedContactName: string | null = message.from_field?.name
-      ?? conversation.subject
-      ?? (conversation.contacts ?? []).find((c: { name?: string }) => c.name)?.name
-      ?? (conversation.contacts ?? []).find((c: { first_name?: string }) => c.first_name)?.first_name
-      ?? (conversation.authors ?? []).find((a: { name?: string }) => a.name && a.name !== 'Dealz K.K.')?.name
-      ?? message.from_field?.address
-      ?? null;
-    if (resolvedContactName?.startsWith('Message from ')) {
-      resolvedContactName = resolvedContactName.slice('Message from '.length);
-    }
-    if (resolvedContactName) resolvedContactName = resolvedContactName.trim() || null;
+    // ---- Phase 2: Process asynchronously ----
+    EdgeRuntime.waitUntil(processWebhookEvent(event.id, payload));
 
-    // Look up Inbox folder for auto-unarchive
-    const { data: inboxFolder } = await supabase
-      .from('message_folders')
-      .select('id')
-      .eq('name', 'Inbox')
-      .eq('is_system', true)
-      .single();
-    const inboxFolderId = inboxFolder?.id ?? null;
-
-    // Check if conversation already exists (to avoid moving it to Inbox)
-    const { data: existingConv } = await supabase
-      .from('conversations')
-      .select('id, contact_name')
-      .eq('missive_conversation_id', conversation.id)
-      .maybeSingle();
-
-    // Upsert conversation — only update contact_name if we have a non-null value
-    // Auto-unarchive on new inbound messages; only set folder to Inbox for NEW conversations
-    const { data: conv, error: convError } = await supabase
-      .from('conversations')
-      .upsert(
-        {
-          missive_conversation_id: conversation.id,
-          customer_id: customer?.id ?? null,
-          ...(resolvedContactName ? { contact_name: resolvedContactName } : {}),
-          ...(message.from_field?.id ? { contact_platform_id: message.from_field.id } : {}),
-          channel: 'facebook' as const,
-          unmatched_contact: !customer,
-          needs_human_review: !customer,
-          last_message_at: new Date().toISOString(),
-          is_archived: false,
-          ...(!existingConv && inboxFolderId ? { folder_id: inboxFolderId } : {}),
-        },
-        { onConflict: 'missive_conversation_id' },
-      )
-      .select('id')
-      .single();
-
-    if (convError) throw convError;
-
-    // Extract inline images from HTML body before stripping
-    const inlineImages = message.body ? extractInlineImages(message.body) : [];
-
-    // Extract plain text from message body (strip HTML + Facebook image filenames)
-    const content = message.body
-      ? stripHtmlAndImageFilenames(message.body)
-      : message.preview ?? '';
-
-    // Store inbound message with inline image attachments (background task may add more from Missive API)
-    const { data: insertedMsg, error: msgError } = await supabase.from('messages').insert({
-      conversation_id: conv.id,
-      missive_message_id: message.id,
-      role: 'customer' as const,
-      content,
-      status: 'SENT' as const,
-      message_type: 'REPLY' as const,
-      ...(inlineImages.length > 0 ? { attachments: inlineImages } : {}),
-    })
-    .select('id')
-    .single();
-
-    if (msgError) throw msgError;
-
-    // --- AI Draft Debounce ---
-    // Set/reset draft_pending_since so the cron job generates a draft
-    // after the customer stops sending messages (debounce window).
-    // First check global AI kill switch
-    const { data: aiGlobalSetting } = await supabase
-      .from('system_settings')
-      .select('value')
-      .eq('key', 'ai_messaging_enabled')
-      .maybeSingle();
-
-    const aiGlobalEnabled = aiGlobalSetting?.value === 'true';
-
-    if (aiGlobalEnabled) {
-      const { data: convState } = await supabase
-        .from('conversations')
-        .select('ai_enabled')
-        .eq('id', conv.id)
-        .single();
-
-      if (convState?.ai_enabled !== false) {
-        await supabase
-          .from('conversations')
-          .update({ draft_pending_since: new Date().toISOString() })
-          .eq('id', conv.id);
-      }
-    }
-
-    // --- Background enrichment ---
-    // Fetch contact name (if not resolved from webhook payload) and
-    // message attachments from the Missive API. This runs AFTER we
-    // return 200 to Missive, so even if Missive's API is slow/down,
-    // the webhook handler never blocks.
-    EdgeRuntime.waitUntil(
-      backgroundEnrichMessage(
-        message.id,
-        insertedMsg.id,
-        conv.id,
-        conversation.id,
-        !resolvedContactName || (existingConv != null && !existingConv.contact_name),
-      ),
-    );
-
-    // Log successful delivery
-    EdgeRuntime.waitUntil(logWebhookDelivery(logMissiveMessageId, logMissiveConversationId, 'success', null, Date.now() - webhookStartMs));
-
-    return jsonResponse({
-      ok: true,
-      conversation_id: conv.id,
-      customer_matched: !!customer,
-      customer_id: customer?.id ?? null,
-    });
+    return response;
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : 'Internal server error';
-    // Log error delivery
-    EdgeRuntime.waitUntil(logWebhookDelivery(logMissiveMessageId, logMissiveConversationId, 'error', errMsg, Date.now() - webhookStartMs));
+    console.error('Webhook handler error:', errMsg);
+    // Always return 200 to prevent Missive from pausing webhook delivery
     return jsonResponse({ error: errMsg });
   }
 });
