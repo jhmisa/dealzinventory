@@ -7,6 +7,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { cn, convertEmoticonsToEmoji } from '@/lib/utils'
 import type { MessageAttachment } from '@/lib/types'
 import { useUploadAttachment } from '@/hooks/use-messaging'
+import { useClipboardPaste } from '@/hooks/use-clipboard-paste'
 import { getAttachmentSignedUrl } from '@/services/messaging'
 import {
   compressImageForMessaging,
@@ -120,13 +121,9 @@ export const MessageComposer = memo(function MessageComposer({
     [showSlashMenu, filteredFolders, highlightedIndex, onMoveToFolder, handleSend],
   )
 
-  const handleFileSelect = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = Array.from(e.target.files ?? [])
+  const processFiles = useCallback(
+    async (files: File[]) => {
       if (files.length === 0) return
-
-      // Reset file input so the same file can be selected again
-      e.target.value = ''
 
       const remaining = MAX_ATTACHMENTS - attachments.length
       if (files.length > remaining) {
@@ -185,6 +182,23 @@ export const MessageComposer = memo(function MessageComposer({
     [attachments.length, conversationId, uploadAttachment],
   )
 
+  const handleFileSelect = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = Array.from(e.target.files ?? [])
+      // Reset file input so the same file can be selected again
+      e.target.value = ''
+      await processFiles(files)
+    },
+    [processFiles],
+  )
+
+  const handlePastedFiles = useCallback(
+    (files: File[]) => {
+      void processFiles(files)
+    },
+    [processFiles],
+  )
+
   const removeAttachment = useCallback((fileUrl: string) => {
     setAttachments((prev) => prev.filter((a) => a.file_url !== fileUrl))
     setThumbnails((prev) => {
@@ -227,6 +241,12 @@ export const MessageComposer = memo(function MessageComposer({
   const isUploading = uploadAttachment.isPending
   const isBusy = isUploading || isCompressing
   const canSend = (content.trim() || attachments.length > 0) && !isLoading && !isBusy
+
+  useClipboardPaste({
+    onPaste: handlePastedFiles,
+    enabled: !isBusy && attachments.length < MAX_ATTACHMENTS,
+    accept: 'image',
+  })
 
   return (
     <div ref={composerRef} className="border-t" data-composer>
