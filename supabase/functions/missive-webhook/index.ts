@@ -400,10 +400,12 @@ Deno.serve(async (req) => {
       ?? (conversation.contacts ?? []).find((c: { name?: string }) => c.name)?.name
       ?? (conversation.contacts ?? []).find((c: { first_name?: string }) => c.first_name)?.first_name
       ?? (conversation.authors ?? []).find((a: { name?: string }) => a.name && a.name !== 'Dealz K.K.')?.name
+      ?? message.from_field?.address
       ?? null;
     if (resolvedContactName?.startsWith('Message from ')) {
       resolvedContactName = resolvedContactName.slice('Message from '.length);
     }
+    if (resolvedContactName) resolvedContactName = resolvedContactName.trim() || null;
 
     // Look up Inbox folder for auto-unarchive
     const { data: inboxFolder } = await supabase
@@ -417,7 +419,7 @@ Deno.serve(async (req) => {
     // Check if conversation already exists (to avoid moving it to Inbox)
     const { data: existingConv } = await supabase
       .from('conversations')
-      .select('id')
+      .select('id, contact_name')
       .eq('missive_conversation_id', conversation.id)
       .maybeSingle();
 
@@ -506,7 +508,7 @@ Deno.serve(async (req) => {
         insertedMsg.id,
         conv.id,
         conversation.id,
-        !resolvedContactName,
+        !resolvedContactName || (existingConv != null && !existingConv.contact_name),
       ),
     );
 
