@@ -20,6 +20,7 @@ interface MissiveWebhookPayload {
     subject?: string;
     assignee_id?: string;
     authors?: Array<{ name?: string }>;
+    contacts?: Array<{ name?: string; first_name?: string }>;
   };
   message: {
     id: string;
@@ -202,7 +203,9 @@ async function backgroundEnrichMessage(
             convDetail?.subject
             ?? convDetail?.latest_subject
             ?? (convDetail?.contacts ?? []).find((c: { name?: string }) => c.name)?.name
+            ?? (convDetail?.contacts ?? []).find((c: { first_name?: string }) => c.first_name)?.first_name
             ?? (convDetail?.authors ?? []).find((a: { name?: string }) => a.name && a.name !== 'Dealz K.K.')?.name
+            ?? convDetail?.latest_message?.from_field?.name
             ?? null;
           if (resolvedName?.startsWith('Message from ')) {
             resolvedName = resolvedName.slice('Message from '.length);
@@ -350,7 +353,11 @@ Deno.serve(async (req) => {
     console.log('Webhook received:', JSON.stringify({
       conv_id: conversation?.id,
       msg_id: message?.id,
-      from: message?.from_field?.name,
+      from_name: message?.from_field?.name ?? null,
+      from_addr: message?.from_field?.address ?? null,
+      subject: conversation?.subject ?? null,
+      contacts: conversation?.contacts ?? null,
+      authors: conversation?.authors ?? null,
     }));
 
     if (!conversation?.id || !message?.id) {
@@ -388,10 +395,15 @@ Deno.serve(async (req) => {
 
     // Resolve contact name from webhook payload fields only — the Missive API
     // fallback is deferred to the background task so we can return 200 fast.
-    const resolvedContactName: string | null = message.from_field?.name
+    let resolvedContactName: string | null = message.from_field?.name
       ?? conversation.subject
+      ?? (conversation.contacts ?? []).find((c: { name?: string }) => c.name)?.name
+      ?? (conversation.contacts ?? []).find((c: { first_name?: string }) => c.first_name)?.first_name
       ?? (conversation.authors ?? []).find((a: { name?: string }) => a.name && a.name !== 'Dealz K.K.')?.name
       ?? null;
+    if (resolvedContactName?.startsWith('Message from ')) {
+      resolvedContactName = resolvedContactName.slice('Message from '.length);
+    }
 
     // Look up Inbox folder for auto-unarchive
     const { data: inboxFolder } = await supabase
