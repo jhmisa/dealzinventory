@@ -32,7 +32,9 @@ function formatTimeAgo(dateStr: string | null): string {
 
 function getLastMessage(conv: ConversationWithRelations) {
   if (!conv.messages || conv.messages.length === 0) return null
-  return conv.messages[0]
+  // Skip internal notes for the preview — show the last customer-facing message
+  const visible = conv.messages.filter((m) => m.role !== 'internal')
+  return visible[0] ?? conv.messages[0]
 }
 
 function getDisplayName(conv: ConversationWithRelations): string {

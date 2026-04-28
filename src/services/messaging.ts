@@ -251,6 +251,22 @@ export async function getAttachmentSignedUrl(filePath: string): Promise<string> 
   return data.signedUrl
 }
 
+// ---------- Internal Notes ----------
+
+export async function sendInternalNote(conversationId: string, content: string) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  const { error } = await supabase.from('messages').insert({
+    conversation_id: conversationId,
+    role: 'internal' as const,
+    content: content.trim(),
+    sent_by: user.id,
+    status: 'SENT' as const,
+  })
+  if (error) throw error
+}
+
 export async function retryFailedMessage(messageId: string) {
   // Fetch the failed message
   const { data: msg, error: fetchError } = await supabase

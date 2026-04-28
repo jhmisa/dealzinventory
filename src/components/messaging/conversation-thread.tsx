@@ -19,6 +19,7 @@ import { MessageAvatar } from './message-avatar'
 import { AiDraftCard } from './ai-draft-card'
 import { MessageStatusBadge } from './message-status-badge'
 import { ChannelBadge } from './channel-badge'
+import { InternalNoteInput } from './internal-note-input'
 import { MessageComposer } from './message-composer'
 import { CannedResponsesPanel } from './canned-responses-panel'
 import { InventorySearchModal } from './inventory-search-modal'
@@ -364,6 +365,7 @@ export const ConversationThread = memo(function ConversationThread({
               <div className="space-y-3">
                 {group.messages.map((msg) => {
                   const isCustomer = msg.role === 'customer'
+                  const isInternal = msg.role === 'internal'
                   const isDraft = msg.status === 'DRAFT' && msg.role === 'assistant'
                   const isFailed = msg.status === 'FAILED'
                   const msgAttachments = msg.attachments ?? []
@@ -402,10 +404,17 @@ export const ConversationThread = memo(function ConversationThread({
                           'max-w-[75%] rounded-lg px-3 py-2 text-sm',
                           isCustomer
                             ? 'bg-muted'
-                            : 'bg-blue-100 text-foreground',
+                            : isInternal
+                              ? 'bg-amber-50 border border-amber-200'
+                              : 'bg-blue-100 text-foreground',
                         )}
                       >
-                        {msg.role === 'staff' && msg.sent_by && staffMap?.[msg.sent_by] && (
+                        {isInternal && (
+                          <span className="inline-block rounded bg-amber-200/60 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 mb-1">
+                            Internal
+                          </span>
+                        )}
+                        {(msg.role === 'staff' || isInternal) && msg.sent_by && staffMap?.[msg.sent_by] && (
                           <p className="text-[10px] font-medium text-muted-foreground mb-0.5">
                             {staffMap[msg.sent_by].display_name}
                           </p>
@@ -433,7 +442,7 @@ export const ConversationThread = memo(function ConversationThread({
                           )}>
                             {formatTime(msg.created_at)}
                           </span>
-                          {!isCustomer && <MessageStatusBadge status={msg.status} className={isFailed ? '' : 'text-muted-foreground'} />}
+                          {!isCustomer && !isInternal && <MessageStatusBadge status={msg.status} className={isFailed ? '' : 'text-muted-foreground'} />}
                         </div>
                         {isFailed && (
                           <div className="mt-1 flex items-center gap-1">
@@ -453,7 +462,7 @@ export const ConversationThread = memo(function ConversationThread({
                       </div>
                       {!isCustomer && (
                         <MessageAvatar
-                          role={msg.role}
+                          role={isInternal ? 'staff' : msg.role}
                           name={msg.sent_by && staffMap?.[msg.sent_by] ? staffMap[msg.sent_by].display_name : 'AI'}
                           avatarUrl={msg.sent_by && staffMap?.[msg.sent_by] ? staffMap[msg.sent_by].avatar_url : null}
                         />
@@ -484,6 +493,9 @@ export const ConversationThread = memo(function ConversationThread({
           isArchived={isArchived}
         />
       </div>
+
+      {/* Internal Note Input */}
+      <InternalNoteInput conversationId={conversation.id} />
 
       {/* Canned Responses Panel */}
       <CannedResponsesPanel

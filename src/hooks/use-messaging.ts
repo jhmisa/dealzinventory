@@ -116,6 +116,17 @@ export function useRejectDraft() {
   })
 }
 
+export function useSendInternalNote() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ conversationId, content }: { conversationId: string; content: string }) =>
+      messagingService.sendInternalNote(conversationId, content),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.messaging.all })
+    },
+  })
+}
+
 export function useRetryMessage() {
   const queryClient = useQueryClient()
   return useMutation({

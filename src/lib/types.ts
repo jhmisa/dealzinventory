@@ -361,7 +361,7 @@ export interface MessageAttachment {
 }
 
 // Messaging types — manually defined until DB types are regenerated
-export type MessageRole = 'customer' | 'assistant' | 'staff' | 'system'
+export type MessageRole = 'customer' | 'assistant' | 'staff' | 'system' | 'internal'
 export type MessageStatus = 'DRAFT' | 'SENDING' | 'SENT' | 'FAILED' | 'REJECTED'
 export type MessageType = 'REPLY' | 'REVIEW_REQUEST' | 'DELIVERY_ALERT'
 export type MessageChannel = 'facebook' | 'email' | 'sms'
