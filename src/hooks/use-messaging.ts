@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/query-keys'
 import { supabase } from '@/lib/supabase'
@@ -20,6 +20,7 @@ export function useConversations(filters: ConversationFilters = {}) {
   return useQuery({
     queryKey: queryKeys.messaging.conversationList(filters),
     queryFn: () => messagingService.getConversations(filters),
+    refetchInterval: 15_000,
   })
 }
 
@@ -352,6 +353,8 @@ export function useMessagingStats() {
 
 export function useMessagingRealtime(activeConversationId?: string | null) {
   const queryClient = useQueryClient()
+  const activeConvRef = useRef(activeConversationId)
+  activeConvRef.current = activeConversationId
 
   useEffect(() => {
     const channel = supabase
@@ -368,6 +371,7 @@ export function useMessagingRealtime(activeConversationId?: string | null) {
           // Refresh conversation list (last_message, unread, etc.)
           queryClient.invalidateQueries({ queryKey: queryKeys.messaging.conversations() })
           queryClient.invalidateQueries({ queryKey: queryKeys.messaging.needsReviewCount() })
+          queryClient.invalidateQueries({ queryKey: ['message-folders', 'awaiting-reply-counts'] })
         },
       )
       .on(
@@ -376,9 +380,10 @@ export function useMessagingRealtime(activeConversationId?: string | null) {
         () => {
           queryClient.invalidateQueries({ queryKey: queryKeys.messaging.conversations() })
           queryClient.invalidateQueries({ queryKey: queryKeys.messaging.needsReviewCount() })
-          if (activeConversationId) {
+          queryClient.invalidateQueries({ queryKey: ['message-folders', 'awaiting-reply-counts'] })
+          if (activeConvRef.current) {
             queryClient.invalidateQueries({
-              queryKey: queryKeys.messaging.conversationDetail(activeConversationId),
+              queryKey: queryKeys.messaging.conversationDetail(activeConvRef.current),
             })
           }
         },
@@ -388,7 +393,7 @@ export function useMessagingRealtime(activeConversationId?: string | null) {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [queryClient, activeConversationId])
+  }, [queryClient])
 }
 
 // ---------- Mark Read ----------

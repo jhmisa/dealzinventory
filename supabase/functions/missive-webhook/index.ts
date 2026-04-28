@@ -402,8 +402,15 @@ Deno.serve(async (req) => {
       .single();
     const inboxFolderId = inboxFolder?.id ?? null;
 
+    // Check if conversation already exists (to avoid moving it to Inbox)
+    const { data: existingConv } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('missive_conversation_id', conversation.id)
+      .maybeSingle();
+
     // Upsert conversation — only update contact_name if we have a non-null value
-    // Auto-unarchive and move to Inbox on new inbound messages
+    // Auto-unarchive on new inbound messages; only set folder to Inbox for NEW conversations
     const { data: conv, error: convError } = await supabase
       .from('conversations')
       .upsert(
@@ -417,7 +424,7 @@ Deno.serve(async (req) => {
           needs_human_review: !customer,
           last_message_at: new Date().toISOString(),
           is_archived: false,
-          ...(inboxFolderId ? { folder_id: inboxFolderId } : {}),
+          ...(!existingConv && inboxFolderId ? { folder_id: inboxFolderId } : {}),
         },
         { onConflict: 'missive_conversation_id' },
       )
