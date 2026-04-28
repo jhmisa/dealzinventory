@@ -1,5 +1,5 @@
 import { useParams, Link } from 'react-router-dom'
-import { AlertTriangle, ArrowLeft, Check, Circle, Package, Truck, CalendarDays } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Check, Circle, Package, Truck, CalendarDays, RotateCcw, MessageCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -264,14 +264,30 @@ export default function CustomerOrderDetailPage() {
         </Card>
       )}
 
-      {/* Report a Problem */}
+      {/* Ticket Actions */}
       {['SHIPPED', 'DELIVERED'].includes(order.order_status) && (
-        <Button variant="outline" asChild className="w-full">
-          <Link to={`/account/orders/${order.id}/return`}>
-            <AlertTriangle className="h-4 w-4 mr-2" />
-            Report a Problem
-          </Link>
-        </Button>
+        <div className="space-y-2">
+          <Button variant="outline" asChild className="w-full">
+            <Link to={`/account/tickets/new?type=return&orderId=${order.id}`}>
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Return an Item
+            </Link>
+          </Button>
+          {order.order_status === 'SHIPPED' && (
+            <Button variant="outline" asChild className="w-full">
+              <Link to={`/account/tickets/new?type=delivery&orderId=${order.id}`}>
+                <Truck className="h-4 w-4 mr-2" />
+                Delivery Issue
+              </Link>
+            </Button>
+          )}
+          <Button variant="outline" asChild className="w-full">
+            <Link to={`/account/tickets/new?type=complaint&orderId=${order.id}`}>
+              <MessageCircle className="h-4 w-4 mr-2" />
+              File a Complaint
+            </Link>
+          </Button>
+        </div>
       )}
     </div>
   )

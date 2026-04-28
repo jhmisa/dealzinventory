@@ -9,6 +9,8 @@ import {
   User,
   Store,
   Unlink,
+  Ticket,
+  Plus,
 } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
@@ -30,9 +32,11 @@ import { AddressDisplay } from '@/components/shared/address-display'
 import { CustomerLinker } from '@/components/messaging/customer-linker'
 import { OrderDetailDialog } from '@/components/messaging/order-detail-dialog'
 import { useCustomerWithDetails } from '@/hooks/use-customers'
-import { ORDER_STATUSES, KAITORI_STATUSES } from '@/lib/constants'
+import { ORDER_STATUSES, KAITORI_STATUSES, TICKET_STATUSES } from '@/lib/constants'
 import { formatPrice, formatDate, formatCustomerName } from '@/lib/utils'
 import type { ConversationWithRelations } from '@/lib/types'
+import { useConversationTickets } from '@/hooks/use-tickets'
+import { CreateTicketDialog } from '@/components/tickets'
 
 interface CustomerPanelProps {
   conversation: ConversationWithRelations
@@ -50,8 +54,10 @@ export function CustomerPanel({
   onToggleCollapse,
 }: CustomerPanelProps) {
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
+  const [ticketDialogOpen, setTicketDialogOpen] = useState(false)
   const customerId = conversation.customers?.id ?? ''
   const { data: customerDetails } = useCustomerWithDetails(customerId)
+  const { data: conversationTickets = [] } = useConversationTickets(conversation.id)
 
   if (collapsed) {
     return (
@@ -229,6 +235,58 @@ export function CustomerPanel({
               ) : (
                 <p className="text-xs text-muted-foreground">No kaitori requests</p>
               )}
+            </div>
+          )}
+
+          {/* Section 5 — Tickets */}
+          {isLinked && customer && (
+            <div className="space-y-2 border-t pt-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium flex items-center gap-1">
+                  <Ticket className="h-3.5 w-3.5" />
+                  Tickets
+                </span>
+                <div className="flex items-center gap-1">
+                  {conversationTickets.length > 0 && (
+                    <Badge variant="secondary" className="text-[10px] h-5 px-1.5">
+                      {conversationTickets.length}
+                    </Badge>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    className="h-5 w-5 p-0"
+                    onClick={() => setTicketDialogOpen(true)}
+                  >
+                    <Plus className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+              {conversationTickets.length > 0 ? (
+                <div className="space-y-1.5">
+                  {conversationTickets.map((ticket: { id: string; ticket_code: string; ticket_status: string; subject: string; created_at: string }) => (
+                    <Link
+                      key={ticket.id}
+                      to={`/admin/tickets/${ticket.id}`}
+                      className="flex items-center justify-between rounded-md border px-2 py-1.5 text-xs hover:bg-accent transition-colors"
+                    >
+                      <div className="min-w-0 space-y-0.5">
+                        <CodeDisplay code={ticket.ticket_code} className="text-[11px] truncate" />
+                        <p className="text-muted-foreground truncate">{ticket.subject}</p>
+                      </div>
+                      <StatusBadge status={ticket.ticket_status} config={TICKET_STATUSES} />
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">No tickets</p>
+              )}
+              <CreateTicketDialog
+                open={ticketDialogOpen}
+                onOpenChange={setTicketDialogOpen}
+                customerId={customer.id}
+                conversationId={conversation.id}
+              />
             </div>
           )}
         </div>

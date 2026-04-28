@@ -225,6 +225,11 @@ export type CustomerReview = Tables['customer_reviews']['Row']
 export type CustomerReviewInsert = Tables['customer_reviews']['Insert']
 export type CustomerReviewUpdate = Tables['customer_reviews']['Update']
 
+// Tickets — manually defined until DB types are regenerated
+export type TicketStatus = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED' | 'CANCELLED'
+export type TicketPriority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT'
+export type TicketNoteType = 'note' | 'status_change' | 'assignment' | 'system'
+
 // Social Media Posts — manually defined until DB types are regenerated
 export type SocialPostStatus = 'draft' | 'queued' | 'processing' | 'scheduled' | 'published' | 'failed'
 export type SocialScheduleType = 'now' | 'next_slot' | 'scheduled'

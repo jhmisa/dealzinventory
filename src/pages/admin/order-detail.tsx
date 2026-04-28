@@ -1,10 +1,16 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Check, Circle, Package, Pencil, X, Plus, History, Truck, Search, Loader2, Printer, RefreshCw, AlertTriangle, ExternalLink, Undo2, RotateCcw, Merge } from 'lucide-react'
+import { ArrowLeft, Check, Circle, Package, Pencil, X, Plus, History, Truck, Search, Loader2, Printer, RefreshCw, AlertTriangle, ExternalLink, Undo2, RotateCcw, Merge, Ticket, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   PageHeader,
   StatusBadge,
@@ -16,8 +22,9 @@ import {
 } from '@/components/shared'
 import { CancelOrderDialog } from '@/components/orders/cancel-order-dialog'
 import { MergeOrdersDialog } from '@/components/orders/merge-orders-dialog'
-import { AdminReturnDialog } from '@/components/orders/admin-return-dialog'
-import type { ReturnableItem } from '@/components/orders/admin-return-dialog'
+import { CreateReturnTicketDialog, CreateTicketDialog } from '@/components/tickets'
+import type { ReturnableItem } from '@/components/tickets'
+import { TicketListTable } from '@/components/tickets'
 import { AddressDisplay } from '@/components/shared/address-display'
 import { useCustomerAddresses } from '@/hooks/use-customer-addresses'
 import {
@@ -44,7 +51,7 @@ import { useSystemSetting } from '@/hooks/use-settings'
 import { useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/query-keys'
 import { ORDER_STATUSES, ORDER_SOURCES, YAMATO_TIME_SLOTS, YAMATO_TRACKING_URL, PAYMENT_METHODS, getPaymentMethodLabel, getYamatoStatusConfig, requiresPaymentConfirmation, getCancellationCategoryLabel } from '@/lib/constants'
-import { useCreateAdminReturn } from '@/hooks/use-returns'
+import { useOrderTickets } from '@/hooks/use-tickets'
 import { formatDateTime, formatPrice, formatCustomerName, cn, buildShortDescription } from '@/lib/utils'
 import { useState, useRef, useEffect } from 'react'
 import type { ShippingAddress } from '@/lib/address-types'
@@ -157,8 +164,10 @@ export default function OrderDetailPage() {
   const [advanceOpen, setAdvanceOpen] = useState(false)
   const [revertOpen, setRevertOpen] = useState(false)
   const [returnOpen, setReturnOpen] = useState(false)
+  const [ticketOpen, setTicketOpen] = useState(false)
+  const [ticketTypeSlug, setTicketTypeSlug] = useState<string | undefined>()
   const [mergeOpen, setMergeOpen] = useState(false)
-  const createAdminReturn = useCreateAdminReturn()
+  const { data: orderTickets = [] } = useOrderTickets(id!)
   const [isEditing, setIsEditing] = useState(false)
   const [editingItems, setEditingItems] = useState<Record<string, EditingItem>>({})
   const [editShippingCost, setEditShippingCost] = useState(1000)
@@ -418,28 +427,9 @@ export default function OrderDetailPage() {
     )
   }
 
-  function handleCreateReturn(data: {
-    reason_category: string
-    description: string
-    items: { order_item_id: string; item_id?: string | null }[]
-  }) {
-    createAdminReturn.mutate(
-      {
-        order_id: order!.id,
-        customer_id: order!.customer_id,
-        reason_category: data.reason_category,
-        description: data.description,
-        items: data.items,
-      },
-      {
-        onSuccess: (result) => {
-          toast.success(`Return ${result.return_code} created`)
-          setReturnOpen(false)
-          navigate(`/admin/returns/${result.return_request_id}`)
-        },
-        onError: (err) => toast.error(`Failed: ${err.message}`),
-      },
-    )
+  function openTicketDialog(typeSlug: string) {
+    setTicketTypeSlug(typeSlug)
+    setTicketOpen(true)
   }
 
   // IDs of inventory items already in the order (to prevent duplicates)
@@ -674,10 +664,29 @@ export default function OrderDetailPage() {
                 </div>
               )}
               {!isEditing && canCreateReturn && (
-                <Button variant="outline" size="sm" onClick={() => setReturnOpen(true)}>
-                  <RotateCcw className="h-4 w-4 mr-1" />
-                  Create Return
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <Ticket className="h-4 w-4 mr-1" />
+                      Create Ticket
+                      <ChevronDown className="h-3 w-3 ml-1" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setReturnOpen(true)}>
+                      <RotateCcw className="h-4 w-4 mr-2" />
+                      Return
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => openTicketDialog('delivery')}>
+                      <Truck className="h-4 w-4 mr-2" />
+                      Delivery Issue
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => openTicketDialog('complaint')}>
+                      <AlertTriangle className="h-4 w-4 mr-2" />
+                      Complaint
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
               {!isEditing && (order.order_status === 'PENDING' || order.order_status === 'CONFIRMED') && (
                 <Button variant="outline" size="sm" onClick={() => setMergeOpen(true)}>
@@ -1456,6 +1465,24 @@ export default function OrderDetailPage() {
         </CardContent>
       </Card>
 
+      {/* Tickets */}
+      {orderTickets.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Ticket className="h-4 w-4" />
+              Tickets
+              <span className="text-xs font-normal text-muted-foreground ml-1">
+                ({orderTickets.length})
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <TicketListTable tickets={orderTickets} showCustomer={false} compact />
+          </CardContent>
+        </Card>
+      )}
+
       {/* Audit History */}
       <Card>
         <CardHeader>
@@ -1548,13 +1575,23 @@ export default function OrderDetailPage() {
         }}
       />
 
-      <AdminReturnDialog
+      <CreateReturnTicketDialog
         open={returnOpen}
         onOpenChange={setReturnOpen}
         orderCode={order.order_code}
+        orderId={order.id}
+        customerId={order.customer_id}
         orderItems={orderItems as ReturnableItem[]}
-        onConfirm={handleCreateReturn}
-        isPending={createAdminReturn.isPending}
+        onSuccess={(ticket) => navigate(`/admin/tickets/${ticket.id}`)}
+      />
+
+      <CreateTicketDialog
+        open={ticketOpen}
+        onOpenChange={setTicketOpen}
+        customerId={order.customer_id}
+        orderId={order.id}
+        defaultTypeSlug={ticketTypeSlug}
+        onSuccess={(ticket) => navigate(`/admin/tickets/${ticket.id}`)}
       />
 
       <ConfirmDialog

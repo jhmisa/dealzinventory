@@ -62,6 +62,11 @@ const CustomerReturnDetailPage = lazy(() => import('@/pages/customer/return-deta
 const CustomerReturnRequestPage = lazy(() => import('@/pages/customer/return-request'))
 const AdminReturnsPage = lazy(() => import('@/pages/admin/returns'))
 const AdminReturnDetailPage = lazy(() => import('@/pages/admin/return-detail'))
+const TicketListPage = lazy(() => import('@/pages/admin/tickets'))
+const TicketDetailPage = lazy(() => import('@/pages/admin/ticket-detail'))
+const CustomerTicketsPage = lazy(() => import('@/pages/customer/tickets'))
+const CustomerTicketDetailPage = lazy(() => import('@/pages/customer/ticket-detail'))
+const CustomerCreateTicketPage = lazy(() => import('@/pages/customer/create-ticket'))
 const ShowcasePage = lazy(() => import('@/pages/admin/showcase'))
 const StaffManagementPage = lazy(() => import('@/pages/admin/staff-management'))
 const ForgotPasswordPage = lazy(() => import('@/pages/admin/forgot-password'))
@@ -164,8 +169,10 @@ export const router = createBrowserRouter([
           { path: 'inventory-removals/:id', element: <Navigate to="/admin/inventory-returns?tab=removals" replace /> },
           { path: 'reports', element: lazyElement(ReportsPage) },
           { path: 'reports/inventory', element: lazyElement(InventoryReportPage) },
-          { path: 'returns', element: lazyElement(AdminReturnsPage) },
+          { path: 'returns', element: <Navigate to="/admin/tickets?type=RETURN" replace /> },
           { path: 'returns/:id', element: lazyElement(AdminReturnDetailPage) },
+          { path: 'tickets', element: lazyElement(TicketListPage) },
+          { path: 'tickets/:id', element: lazyElement(TicketDetailPage) },
           { path: 'social-media', element: lazyElement(SocialMediaPage) },
           { path: 'messages', element: lazyElement(MessagesPage) },
           { path: 'suppliers', element: lazyElement(SupplierListPage) },
@@ -224,9 +231,12 @@ export const router = createBrowserRouter([
       { path: 'orders', element: lazyElement(CustomerOrdersPage) },
       { path: 'orders/:id', element: lazyElement(CustomerOrderDetailPage) },
       { path: 'kaitori', element: lazyElement(CustomerKaitoriPage) },
-      { path: 'orders/:orderId/return', element: lazyElement(CustomerReturnRequestPage) },
-      { path: 'returns', element: lazyElement(CustomerReturnsPage) },
+      { path: 'orders/:orderId/return', element: <Navigate to="/account/tickets/new?type=return" replace /> },
+      { path: 'returns', element: <Navigate to="/account/tickets?type=RETURN" replace /> },
       { path: 'returns/:id', element: lazyElement(CustomerReturnDetailPage) },
+      { path: 'tickets', element: lazyElement(CustomerTicketsPage) },
+      { path: 'tickets/:id', element: lazyElement(CustomerTicketDetailPage) },
+      { path: 'tickets/new', element: lazyElement(CustomerCreateTicketPage) },
       { path: 'settings', element: lazyElement(CustomerSettingsPage) },
       { path: 'verify-id', element: lazyElement(CustomerVerifyIdPage) },
     ],

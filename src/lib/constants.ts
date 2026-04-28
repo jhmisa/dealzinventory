@@ -1,4 +1,4 @@
-import type { ConditionGrade, ItemStatus, SourceType, SupplierType, ProductStatus, AcAdapterStatus, OrderStatus, OrderSource, KaitoriStatus, KaitoriDeliveryMethod, KaitoriPaymentMethod, BatteryCondition, ScreenCondition, BodyCondition, KaitoriMediaRole, IntakeAdjustmentType, OfferStatus, SupplierReturnStatus, SupplierReturnResolution, RefundPaymentMethod, InventoryRemovalReason, InventoryRemovalStatus } from './types'
+import type { ConditionGrade, ItemStatus, SourceType, SupplierType, ProductStatus, AcAdapterStatus, OrderStatus, OrderSource, KaitoriStatus, KaitoriDeliveryMethod, KaitoriPaymentMethod, BatteryCondition, ScreenCondition, BodyCondition, KaitoriMediaRole, IntakeAdjustmentType, OfferStatus, SupplierReturnStatus, SupplierReturnResolution, RefundPaymentMethod, InventoryRemovalReason, InventoryRemovalStatus, TicketStatus, TicketPriority } from './types'
 
 // --- Device Category Groupings ---
 
@@ -505,4 +505,29 @@ export function getRemovalStatusConfig(status: InventoryRemovalStatus) {
 
 export function getRemovalReasonLabel(reason: InventoryRemovalReason) {
   return INVENTORY_REMOVAL_REASONS.find(r => r.value === reason)?.label ?? reason
+}
+
+// --- Tickets ---
+
+export const TICKET_STATUSES: { value: TicketStatus; label: string; color: string }[] = [
+  { value: 'OPEN', label: 'Open', color: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
+  { value: 'IN_PROGRESS', label: 'In Progress', color: 'bg-blue-100 text-blue-800 border-blue-300' },
+  { value: 'RESOLVED', label: 'Resolved', color: 'bg-green-100 text-green-800 border-green-300' },
+  { value: 'CLOSED', label: 'Closed', color: 'bg-gray-100 text-gray-800 border-gray-300' },
+  { value: 'CANCELLED', label: 'Cancelled', color: 'bg-red-100 text-red-800 border-red-300' },
+]
+
+export const TICKET_PRIORITIES: { value: TicketPriority; label: string; color: string }[] = [
+  { value: 'LOW', label: 'Low', color: 'bg-gray-100 text-gray-800 border-gray-300' },
+  { value: 'NORMAL', label: 'Normal', color: 'bg-blue-100 text-blue-800 border-blue-300' },
+  { value: 'HIGH', label: 'High', color: 'bg-orange-100 text-orange-800 border-orange-300' },
+  { value: 'URGENT', label: 'Urgent', color: 'bg-red-100 text-red-800 border-red-300' },
+]
+
+export function getTicketStatusConfig(status: TicketStatus) {
+  return TICKET_STATUSES.find(s => s.value === status) ?? { value: status, label: status, color: 'bg-gray-100 text-gray-800 border-gray-300' }
+}
+
+export function getTicketPriorityConfig(priority: TicketPriority) {
+  return TICKET_PRIORITIES.find(p => p.value === priority) ?? { value: priority, label: priority, color: 'bg-gray-100 text-gray-800 border-gray-300' }
 }

@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
-import { ShoppingBag, Package, HandCoins, RotateCcw, Settings, LogOut, Menu, X } from 'lucide-react'
+import { ShoppingBag, Package, HandCoins, RotateCcw, Settings, LogOut, Menu, X, Ticket } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn, formatCustomerName } from '@/lib/utils'
 import { useState } from 'react'
@@ -9,7 +9,7 @@ import { ShopFooter } from './shop-footer'
 
 const navLinks = [
   { label: 'My Orders', href: '/account/orders', icon: Package },
-  { label: 'Returns', href: '/account/returns', icon: RotateCcw },
+  { label: 'Support', href: '/account/tickets', icon: Ticket },
   { label: 'My Sales', href: '/account/kaitori', icon: HandCoins },
   { label: 'Settings', href: '/account/settings', icon: Settings },
 ]

@@ -20,6 +20,7 @@ import {
   Tags,
   MapPin,
   RotateCcw,
+  Ticket,
   Share2,
   Columns3,
   Settings,
@@ -87,7 +88,7 @@ const navSections: NavSection[] = [
     items: [
       { title: 'Sell Groups', href: '/admin/sell-groups', icon: ShoppingBag },
       { title: 'Orders', href: '/admin/orders', icon: ClipboardList },
-      { title: 'Returns', href: '/admin/returns', icon: RotateCcw },
+      { title: 'Tickets', href: '/admin/tickets', icon: Ticket },
       { title: 'Packing', href: '/admin/packing', icon: PackageCheck },
     ],
   },

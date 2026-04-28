@@ -1,5 +1,5 @@
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Pencil, ShieldCheck, ShieldX, Eye, EyeOff } from 'lucide-react'
+import { ArrowLeft, Pencil, ShieldCheck, ShieldX, Eye, EyeOff, Ticket } from 'lucide-react'
 import { toast } from 'sonner'
 import type { ShippingAddress } from '@/lib/address-types'
 import { Button } from '@/components/ui/button'
@@ -35,10 +35,13 @@ import {
   useUpdateCustomer,
   useResetCustomerPin,
 } from '@/hooks/use-customers'
-import { ORDER_STATUSES, KAITORI_STATUSES } from '@/lib/constants'
+import { ORDER_STATUSES, KAITORI_STATUSES, TICKET_STATUSES } from '@/lib/constants'
 import { formatDate, formatDateTime, formatCustomerName } from '@/lib/utils'
 import { useState } from 'react'
 import type { CustomerUpdate } from '@/lib/types'
+import { useCustomerTickets } from '@/hooks/use-tickets'
+import { TicketListTable } from '@/components/tickets'
+import { CreateTicketDialog } from '@/components/tickets'
 
 /** Format Japan phone number with dashes: 09012345678 → 090-1234-5678 */
 function formatJapanPhone(value: string): string {
@@ -65,6 +68,8 @@ export default function CustomerDetailPage() {
   const updateMutation = useUpdateCustomer()
   const resetPinMutation = useResetCustomerPin()
 
+  const { data: customerTickets = [] } = useCustomerTickets(id!)
+  const [ticketDialogOpen, setTicketDialogOpen] = useState(false)
   const [verifyOpen, setVerifyOpen] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [pinDialogOpen, setPinDialogOpen] = useState(false)
@@ -443,6 +448,34 @@ export default function CustomerDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Tickets */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Ticket className="h-4 w-4" />
+            Tickets ({customerTickets.length})
+          </CardTitle>
+          <Button size="sm" variant="outline" onClick={() => setTicketDialogOpen(true)}>
+            Create Ticket
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {customerTickets.length === 0 ? (
+            <EmptyState title="No tickets" description="This customer has no support tickets." />
+          ) : (
+            <TicketListTable tickets={customerTickets} showCustomer={false} compact />
+          )}
+        </CardContent>
+      </Card>
+
+      {customer && (
+        <CreateTicketDialog
+          open={ticketDialogOpen}
+          onOpenChange={setTicketDialogOpen}
+          customerId={customer.id}
+        />
+      )}
 
       {/* Verify ID Dialog */}
       <ConfirmDialog
