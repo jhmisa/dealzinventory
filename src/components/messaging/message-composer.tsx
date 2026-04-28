@@ -1,5 +1,5 @@
 import { memo, useState, useCallback, useRef, useMemo } from 'react'
-import { Send, Paperclip, MessageSquareText, Package, X, FileIcon, Loader2 } from 'lucide-react'
+import { Send, Paperclip, MessageSquareText, Package, X, FileIcon, Loader2, Archive, ArchiveRestore } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -30,6 +30,8 @@ interface MessageComposerProps {
   onOpenInventory?: () => void
   folders?: Array<{ id: string; name: string }>
   onMoveToFolder?: (folderId: string) => void
+  onArchive?: () => void
+  isArchived?: boolean
 }
 
 export const MessageComposer = memo(function MessageComposer({
@@ -41,6 +43,8 @@ export const MessageComposer = memo(function MessageComposer({
   onOpenInventory,
   folders,
   onMoveToFolder,
+  onArchive,
+  isArchived,
 }: MessageComposerProps) {
   const [content, setContent] = useState('')
   const [attachments, setAttachments] = useState<MessageAttachment[]>([])
@@ -52,11 +56,14 @@ export const MessageComposer = memo(function MessageComposer({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const uploadAttachment = useUploadAttachment()
 
-  const filteredFolders = useMemo(() => {
-    if (!folders) return []
-    if (!slashFilter) return folders
-    return folders.filter((f) => f.name.toLowerCase().startsWith(slashFilter))
-  }, [folders, slashFilter])
+  const ARCHIVE_ITEM = { id: '__archive__', name: 'Archive' } as const
+
+  const slashItems = useMemo(() => {
+    const items = folders ? [...folders] : []
+    if (onArchive) items.push(ARCHIVE_ITEM)
+    if (!slashFilter) return items
+    return items.filter((f) => f.name.toLowerCase().startsWith(slashFilter))
+  }, [folders, slashFilter, onArchive])
 
   const handleSend = useCallback(() => {
     const trimmed = content.trim()
@@ -88,7 +95,7 @@ export const MessageComposer = memo(function MessageComposer({
       if (showSlashMenu) {
         if (e.key === 'ArrowDown') {
           e.preventDefault()
-          setHighlightedIndex((prev) => Math.min(prev + 1, filteredFolders.length - 1))
+          setHighlightedIndex((prev) => Math.min(prev + 1, slashItems.length - 1))
           return
         }
         if (e.key === 'ArrowUp') {
@@ -96,12 +103,17 @@ export const MessageComposer = memo(function MessageComposer({
           setHighlightedIndex((prev) => Math.max(prev - 1, 0))
           return
         }
-        if (e.key === 'Enter' && filteredFolders.length > 0) {
+        if (e.key === 'Enter' && slashItems.length > 0) {
           e.preventDefault()
-          const folder = filteredFolders[highlightedIndex]
-          if (folder) {
-            onMoveToFolder?.(folder.id)
-            toast.success(`Moved to ${folder.name}`)
+          const item = slashItems[highlightedIndex]
+          if (item) {
+            if (item.id === '__archive__') {
+              onArchive?.()
+              toast.success('Archived')
+            } else {
+              onMoveToFolder?.(item.id)
+              toast.success(`Moved to ${item.name}`)
+            }
             setContent('')
             setShowSlashMenu(false)
             setSlashFilter('')
@@ -118,7 +130,7 @@ export const MessageComposer = memo(function MessageComposer({
         handleSend()
       }
     },
-    [showSlashMenu, filteredFolders, highlightedIndex, onMoveToFolder, handleSend],
+    [showSlashMenu, slashItems, highlightedIndex, onMoveToFolder, onArchive, handleSend],
   )
 
   const processFiles = useCallback(
@@ -286,26 +298,31 @@ export const MessageComposer = memo(function MessageComposer({
 
       {/* Textarea + send */}
       <div className="relative flex items-end gap-2 p-3">
-        {showSlashMenu && filteredFolders.length > 0 && (
+        {showSlashMenu && slashItems.length > 0 && (
           <div className="absolute bottom-full left-3 right-3 mb-1 rounded-md border bg-popover p-1 shadow-md">
-            <p className="px-2 py-1 text-[10px] font-medium text-muted-foreground">Move to folder</p>
-            {filteredFolders.map((folder, idx) => (
+            <p className="px-2 py-1 text-[10px] font-medium text-muted-foreground">Move to...</p>
+            {slashItems.map((item, idx) => (
               <button
-                key={folder.id}
+                key={item.id}
                 className={cn(
                   'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors',
                   idx === highlightedIndex ? 'bg-accent' : 'hover:bg-muted',
                 )}
                 onMouseDown={(e) => {
                   e.preventDefault()
-                  onMoveToFolder?.(folder.id)
-                  toast.success(`Moved to ${folder.name}`)
+                  if (item.id === '__archive__') {
+                    onArchive?.()
+                    toast.success('Archived')
+                  } else {
+                    onMoveToFolder?.(item.id)
+                    toast.success(`Moved to ${item.name}`)
+                  }
                   setContent('')
                   setShowSlashMenu(false)
                   setSlashFilter('')
                 }}
               >
-                {folder.name}
+                {item.name}
               </button>
             ))}
           </div>
@@ -390,6 +407,26 @@ export const MessageComposer = memo(function MessageComposer({
           </TooltipTrigger>
           <TooltipContent>Search inventory to insert</TooltipContent>
         </Tooltip>
+
+        {onArchive && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="ml-auto h-7 gap-1 px-2 text-xs text-muted-foreground"
+                onClick={onArchive}
+              >
+                {isArchived ? (
+                  <ArchiveRestore className="h-3.5 w-3.5" />
+                ) : (
+                  <Archive className="h-3.5 w-3.5" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{isArchived ? 'Unarchive' : 'Archive'}</TooltipContent>
+          </Tooltip>
+        )}
       </div>
     </div>
   )

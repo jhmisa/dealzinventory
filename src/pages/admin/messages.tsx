@@ -3,7 +3,6 @@ import { Loader2, MessageSquare } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
 import { useStaffProfiles } from '@/hooks/use-staff-profiles'
-import { PageHeader } from '@/components/shared/page-header'
 import { ConversationList, ConversationThread, CustomerPanel, FolderSidebar } from '@/components/messaging'
 import type { MessageAttachment } from '@/lib/types'
 import {
@@ -201,12 +200,7 @@ export default function MessagesPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-5rem)]">
-      <PageHeader
-        title="Messages"
-        description="Customer conversations via Missive"
-      />
-
-      <div className="relative flex flex-1 min-h-0 mt-4 rounded-lg border bg-card overflow-hidden">
+      <div className="relative flex flex-1 min-h-0 rounded-lg border bg-card overflow-hidden">
         {/* Blocking overlay while moving */}
         {moveToFolder.isPending && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/60 backdrop-blur-sm">

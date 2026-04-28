@@ -76,7 +76,7 @@ export function CustomerPanel({
         </Button>
       </div>
 
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 overflow-y-auto" type="always">
         <div className="p-3 space-y-4">
           {/* Section 1 — Contact Info */}
           {isLinked && customer ? (
@@ -170,11 +170,11 @@ export function CustomerPanel({
                       onClick={() => setSelectedOrderId(order.id)}
                       className="flex w-full items-center justify-between rounded-md border px-2 py-1.5 text-xs hover:bg-accent transition-colors text-left"
                     >
-                      <div className="space-y-0.5">
-                        <CodeDisplay code={order.order_code} className="text-[11px]" />
-                        <p className="text-muted-foreground">{formatDate(order.created_at)}</p>
+                      <div className="min-w-0 space-y-0.5">
+                        <CodeDisplay code={order.order_code} className="text-[11px] truncate" />
+                        <p className="text-muted-foreground truncate">{formatDate(order.created_at)}</p>
                       </div>
-                      <div className="text-right space-y-0.5">
+                      <div className="shrink-0 text-right space-y-0.5">
                         <StatusBadge status={order.order_status} config={ORDER_STATUSES} />
                         <p className="text-muted-foreground">{formatPrice(order.total_price)}</p>
                       </div>
@@ -210,11 +210,11 @@ export function CustomerPanel({
                       to={`/admin/kaitori/${kt.id}`}
                       className="flex items-center justify-between rounded-md border px-2 py-1.5 text-xs hover:bg-accent transition-colors"
                     >
-                      <div className="space-y-0.5">
-                        <CodeDisplay code={kt.kaitori_code} className="text-[11px]" />
-                        <p className="text-muted-foreground">{formatDate(kt.created_at)}</p>
+                      <div className="min-w-0 space-y-0.5">
+                        <CodeDisplay code={kt.kaitori_code} className="text-[11px] truncate" />
+                        <p className="text-muted-foreground truncate">{formatDate(kt.created_at)}</p>
                       </div>
-                      <div className="text-right space-y-0.5">
+                      <div className="shrink-0 text-right space-y-0.5">
                         <StatusBadge status={kt.request_status} config={KAITORI_STATUSES} />
                         <p className="text-muted-foreground">
                           {formatPrice(kt.final_price ?? kt.auto_quote_price)}

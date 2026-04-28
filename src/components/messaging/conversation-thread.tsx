@@ -338,23 +338,6 @@ export const ConversationThread = memo(function ConversationThread({
                 ))}
             </SelectContent>
           </Select>
-          {folders && folders.length > 0 && onMoveToFolder && (
-            <Select
-              value={conversation.folder_id ?? ''}
-              onValueChange={(v) => onMoveToFolder(v)}
-            >
-              <SelectTrigger className="h-8 w-[140px] text-xs">
-                <SelectValue placeholder="Move to folder..." />
-              </SelectTrigger>
-              <SelectContent>
-                {folders.map((f) => (
-                  <SelectItem key={f.id} value={f.id}>
-                    {f.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
           {onArchive && (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -511,6 +494,8 @@ export const ConversationThread = memo(function ConversationThread({
           onMoveToFolder={(folderId) => {
             onMoveToFolder?.(folderId)
           }}
+          onArchive={onArchive}
+          isArchived={isArchived}
         />
       </div>
 
