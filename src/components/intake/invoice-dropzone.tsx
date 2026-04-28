@@ -1,7 +1,8 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { Upload, Loader2, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { useClipboardPaste } from '@/hooks/use-clipboard-paste'
 
 interface InvoiceDropzoneProps {
   onFileSelected: (file: File) => void
@@ -22,6 +23,14 @@ const ACCEPTED_EXTENSIONS = '.jpg,.jpeg,.png,.pdf,.csv'
 export function InvoiceDropzone({ onFileSelected, isProcessing, selectedFileName, disabled }: InvoiceDropzoneProps) {
   const [isDragging, setIsDragging] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  useClipboardPaste({
+    onPaste: useCallback((files: File[]) => {
+      if (files[0]) onFileSelected(files[0])
+    }, [onFileSelected]),
+    enabled: !isProcessing && !disabled,
+    accept: 'image',
+  })
 
   function handleFiles(files: FileList | null) {
     if (!files?.[0]) return
@@ -73,7 +82,7 @@ export function InvoiceDropzone({ onFileSelected, isProcessing, selectedFileName
             Drag & drop an invoice here, or click to browse
           </p>
           <p className="text-xs text-muted-foreground/70 mt-1">
-            Supports JPG, PNG, PDF, CSV (max 20MB)
+            Supports JPG, PNG, PDF, CSV (max 20MB) — or paste from clipboard
           </p>
         </>
       )}

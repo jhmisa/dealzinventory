@@ -18,6 +18,7 @@ import {
   rectSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { useClipboardPaste } from '@/hooks/use-clipboard-paste'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -256,6 +257,14 @@ export function UnifiedGalleryCard({ item, productMedia, itemMedia }: UnifiedGal
     },
     [item.id, addMedia],
   )
+
+  useClipboardPaste({
+    onPaste: useCallback((files: File[]) => {
+      files.forEach(uploadProcessedImage)
+    }, [uploadProcessedImage]),
+    enabled: showUploader,
+    accept: 'both',
+  })
 
   function handleImageFiles(files: FileList | null) {
     if (!files) return
@@ -711,7 +720,7 @@ export function UnifiedGalleryCard({ item, productMedia, itemMedia }: UnifiedGal
                 <Upload className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                 <div className="text-left">
                   <p className="text-sm text-muted-foreground">Drop images or click to browse</p>
-                  <p className="text-xs text-muted-foreground/60">Auto-processed to 2 sizes</p>
+                  <p className="text-xs text-muted-foreground/60">Auto-processed to 2 sizes — or paste from clipboard</p>
                 </div>
                 <input
                   ref={fileInputRef}

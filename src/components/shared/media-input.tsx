@@ -1,8 +1,9 @@
 import { useState, useRef, useCallback } from 'react'
-import { Upload, Camera, Video, X, Loader2, Sparkles } from 'lucide-react'
+import { Upload, Camera, Video, X, Loader2, Sparkles, Clipboard } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { uploadMedia, type UploadResult } from '@/lib/media'
+import { useClipboardPaste } from '@/hooks/use-clipboard-paste'
 import { SquareCamera } from './square-camera'
 import { cn } from '@/lib/utils'
 
@@ -104,6 +105,15 @@ export function MediaInput({
     }
   }, [bucket, path, onUpload])
 
+  useClipboardPaste({
+    onPaste: useCallback((files: File[]) => {
+      const remaining = maxFiles != null ? maxFiles - totalCount : files.length
+      files.slice(0, Math.max(remaining, 0)).forEach(processAndUpload)
+    }, [maxFiles, totalCount, processAndUpload]),
+    enabled: !atLimit && !cameraMode,
+    accept,
+  })
+
   function handleFiles(files: FileList | null) {
     if (!files) return
     const remaining = maxFiles != null ? maxFiles - totalCount : files.length
@@ -148,6 +158,10 @@ export function MediaInput({
             <Upload className="h-4 w-4" />
             Upload File
           </Button>
+          <span className="flex items-center gap-1 text-xs text-muted-foreground/60 self-center">
+            <Clipboard className="h-3 w-3" />
+            or paste
+          </span>
           <input
             ref={fileInputRef}
             type="file"
