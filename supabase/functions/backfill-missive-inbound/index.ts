@@ -138,7 +138,7 @@ Deno.serve(async (req) => {
       .from('conversations')
       .select('id, missive_conversation_id, customer_id, contact_platform_id')
       .not('missive_conversation_id', 'is', null)
-      .order('id');
+      .order('last_message_at', { ascending: false, nullsFirst: false });
     if (input.conversation_id) {
       convQuery = convQuery.eq('id', input.conversation_id);
     }

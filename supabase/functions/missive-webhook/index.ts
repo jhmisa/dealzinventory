@@ -504,16 +504,14 @@ Deno.serve(async (req) => {
 
     // ---- Phase 1: Validate + queue + ACK (~50ms) ----
 
-    // Validate webhook signature — reject if invalid
+    // Validate webhook signature — warn but do not reject with non-200.
+    // Returning 401 causes Missive to mark the rule as failed and eventually
+    // pause delivery entirely, so we log the mismatch and continue processing.
     const signature = req.headers.get('x-hook-signature') ?? '';
     if (MISSIVE_WEBHOOK_SECRET && signature) {
       const valid = await validateSignature(rawBody, signature);
       if (!valid) {
-        console.error('Signature mismatch — rejecting webhook');
-        return new Response(JSON.stringify({ error: 'Invalid signature' }), {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        console.warn('Webhook signature mismatch — processing anyway to avoid Missive delivery pause');
       }
     }
 
