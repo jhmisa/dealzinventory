@@ -14,7 +14,7 @@ export function AdminLayout() {
           <div className="px-4 py-2 md:px-6 lg:px-8 shrink-0">
             <BreadcrumbNav />
           </div>
-          <div className="flex-1 min-h-0 overflow-auto px-4 pb-8 md:px-6 lg:px-8 max-w-screen-2xl">
+          <div className="flex-1 min-h-0 overflow-auto px-4 pb-8 md:px-6 lg:px-8 max-w-screen-2xl has-[.full-height-page]:overflow-hidden has-[.full-height-page]:pb-0">
             <Outlet />
           </div>
         </div>
