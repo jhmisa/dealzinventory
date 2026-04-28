@@ -10,11 +10,11 @@ export function AdminLayout() {
       <AppSidebar />
       <SidebarInset>
         <TopHeader />
-        <div className="flex-1 overflow-auto">
-          <div className="px-4 py-2 md:px-6 lg:px-8">
+        <div className="flex-1 flex flex-col overflow-auto">
+          <div className="px-4 py-2 md:px-6 lg:px-8 shrink-0">
             <BreadcrumbNav />
           </div>
-          <div className="px-4 pb-8 md:px-6 lg:px-8 max-w-screen-2xl">
+          <div className="flex-1 min-h-0 px-4 pb-8 md:px-6 lg:px-8 max-w-screen-2xl">
             <Outlet />
           </div>
         </div>

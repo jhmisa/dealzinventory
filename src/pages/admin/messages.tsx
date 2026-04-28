@@ -199,7 +199,7 @@ export default function MessagesPage() {
   )
 
   return (
-    <div className="flex flex-col h-[calc(100vh-5rem)]">
+    <div className="flex flex-col h-full -mb-8">
       <div className="relative flex flex-1 min-h-0 rounded-lg border bg-card overflow-hidden">
         {/* Blocking overlay while moving */}
         {moveToFolder.isPending && (
