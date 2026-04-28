@@ -42,8 +42,8 @@ CREATE POLICY "Staff can manage message folders"
 INSERT INTO message_folders (name, icon, sort_order, is_system) VALUES
   ('Inbox', 'inbox', 0, true);
 
+-- Note: Inquiry folder was removed in 20260429_remove_inquiry_folder.sql
 INSERT INTO message_folders (name, icon, sort_order, is_system) VALUES
-  ('Inquiry', 'message-square', 1, false),
   ('Prospects', 'target', 2, false),
   ('Order', 'shopping-cart', 3, false),
   ('Aftersales', 'package', 4, false),
