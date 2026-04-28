@@ -1116,7 +1116,7 @@ export default function OrderDetailPage() {
           {orderItems.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-4">No items in this order.</p>
           ) : (
-            <div>
+            <div className="overflow-hidden">
               {/* Table Header */}
               <div className={cn(
                 'gap-2 px-3 py-2 text-xs font-medium text-muted-foreground uppercase border-b',
@@ -1154,7 +1154,7 @@ export default function OrderDetailPage() {
                     )}
                   >
                     <span className="text-sm text-muted-foreground">{idx + 1}</span>
-                    <div>
+                    <div className="min-w-0">
                       {item ? (() => {
                         const pm = item.product_models as Record<string, unknown> | null
                         const shortDesc = (pm?.short_description as string) || (() => {
@@ -1169,9 +1169,9 @@ export default function OrderDetailPage() {
                           return undefined
                         })()
                         return (
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <CodeDisplay code={item.item_code} className="text-[28px]" />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <CodeDisplay code={item.item_code} className="text-[28px] shrink-0" />
                               <GradeBadge grade={item.condition_grade} />
                               <span className="text-sm text-muted-foreground truncate">{shortDesc || oi.description}</span>
                             </div>
