@@ -104,7 +104,7 @@ export async function updateConversation(id: string, updates: Partial<Conversati
   return data as Conversation
 }
 
-export async function linkCustomerToConversation(conversationId: string, customerId: string) {
+export async function linkCustomerToConversation(conversationId: string, customerId: string, contactName?: string) {
   const { data, error } = await supabase
     .from('conversations')
     .update({
@@ -115,6 +115,16 @@ export async function linkCustomerToConversation(conversationId: string, custome
     .select()
     .single()
   if (error) throw error
+
+  // Save the FB name to the customer record if not already set
+  if (contactName) {
+    await supabase
+      .from('customers')
+      .update({ fb_name: contactName })
+      .eq('id', customerId)
+      .is('fb_name', null)
+  }
+
   return data as Conversation
 }
 

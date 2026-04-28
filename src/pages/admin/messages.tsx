@@ -148,14 +148,14 @@ export default function MessagesPage() {
     (customerId: string) => {
       if (!selectedConvId) return
       linkCustomer.mutate(
-        { conversationId: selectedConvId, customerId },
+        { conversationId: selectedConvId, customerId, contactName: selectedConversation?.contact_name ?? undefined },
         {
           onSuccess: () => toast.success('Customer linked'),
           onError: (err) => toast.error(`Failed to link: ${err.message}`),
         },
       )
     },
-    [selectedConvId, linkCustomer],
+    [selectedConvId, selectedConversation, linkCustomer],
   )
 
   const handleUnlinkCustomer = useCallback(

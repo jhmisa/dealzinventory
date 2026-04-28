@@ -95,6 +95,9 @@ export function CustomerPanel({
                   <CodeDisplay code={customer.customer_code} className="text-xs" />
                   <ExternalLink className="h-3 w-3" />
                 </Link>
+                {customer.fb_name && (
+                  <p className="text-xs">FB: {customer.fb_name}</p>
+                )}
                 {customer.email && <p>{customer.email}</p>}
                 {customer.phone && <p>{customer.phone}</p>}
                 {customer.shipping_address && (

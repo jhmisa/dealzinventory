@@ -43,8 +43,8 @@ export function useNeedsReviewCount() {
 export function useLinkCustomer() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ conversationId, customerId }: { conversationId: string; customerId: string }) =>
-      messagingService.linkCustomerToConversation(conversationId, customerId),
+    mutationFn: ({ conversationId, customerId, contactName }: { conversationId: string; customerId: string; contactName?: string }) =>
+      messagingService.linkCustomerToConversation(conversationId, customerId, contactName),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.messaging.all })
     },
