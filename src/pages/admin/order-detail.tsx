@@ -1170,13 +1170,13 @@ export default function OrderDetailPage() {
                         })()
                         return (
                           <div className="min-w-0">
-                            <div className="flex items-center gap-2 min-w-0">
+                            <div className="flex items-center gap-2">
                               <CodeDisplay code={item.item_code} className="text-[28px] shrink-0" />
                               <GradeBadge grade={item.condition_grade} />
-                              <span className="text-sm text-muted-foreground truncate">{shortDesc || oi.description}</span>
                             </div>
+                            <p className="text-sm text-muted-foreground mt-0.5 pl-0.5">{shortDesc || oi.description}</p>
                             {item.condition_notes && (
-                              <p className="text-xs text-muted-foreground mt-0.5 truncate pl-0.5">{item.condition_notes}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5 pl-0.5">{item.condition_notes}</p>
                             )}
                           </div>
                         )
