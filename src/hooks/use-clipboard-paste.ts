@@ -15,16 +15,6 @@ export function useClipboardPaste({
     if (!enabled) return
 
     function handlePaste(e: ClipboardEvent) {
-      // Skip if user is typing in a text input
-      const target = e.target as HTMLElement
-      if (
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement ||
-        target.isContentEditable
-      ) {
-        return
-      }
-
       const items = e.clipboardData?.items
       if (!items) return
 
@@ -43,6 +33,8 @@ export function useClipboardPaste({
         if (file) files.push(file)
       }
 
+      // If clipboard has files, always handle them (even in text inputs)
+      // If no files, let the browser handle it normally (text paste)
       if (files.length > 0) {
         e.preventDefault()
         onPaste(files)
