@@ -1,6 +1,6 @@
 import { memo, useRef, useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { User, AlertCircle, RotateCw, Bot, UserCheck, FileIcon, ExternalLink, X, Archive, ArchiveRestore } from 'lucide-react'
+import { User, AlertCircle, RotateCw, Bot, UserCheck, FileIcon, ExternalLink, X } from 'lucide-react'
 import { cn, formatCustomerName } from '@/lib/utils'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
@@ -19,7 +19,6 @@ import { MessageAvatar } from './message-avatar'
 import { AiDraftCard } from './ai-draft-card'
 import { MessageStatusBadge } from './message-status-badge'
 import { ChannelBadge } from './channel-badge'
-import { CustomerLinker } from './customer-linker'
 import { MessageComposer } from './message-composer'
 import { CannedResponsesPanel } from './canned-responses-panel'
 import { InventorySearchModal } from './inventory-search-modal'
@@ -315,9 +314,6 @@ export const ConversationThread = memo(function ConversationThread({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {conversation.unmatched_contact && (
-            <CustomerLinker onLink={onLinkCustomer} />
-          )}
           <Select
             value={conversation.assigned_staff_id ?? 'unassigned'}
             onValueChange={(v) => onAssignStaff(v === 'unassigned' ? null : v)}
@@ -338,16 +334,6 @@ export const ConversationThread = memo(function ConversationThread({
                 ))}
             </SelectContent>
           </Select>
-          {onArchive && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onArchive}>
-                  {isArchived ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{isArchived ? 'Unarchive' : 'Archive'}</TooltipContent>
-            </Tooltip>
-          )}
           <Tooltip>
             <TooltipTrigger asChild>
               <div className="flex items-center gap-1.5">
