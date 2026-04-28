@@ -15,6 +15,16 @@ export function useClipboardPaste({
     if (!enabled) return
 
     function handlePaste(e: ClipboardEvent) {
+      // Skip if user is typing in a text input
+      const target = e.target as HTMLElement
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target.isContentEditable
+      ) {
+        return
+      }
+
       const items = e.clipboardData?.items
       if (!items) return
 
