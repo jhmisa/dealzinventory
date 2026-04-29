@@ -92,7 +92,7 @@ export function useCreateTicket() {
 export function useUpdateTicket() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, ...updates }: { id: string; subject?: string; description?: string; priority?: TicketPriority; assigned_staff_id?: string | null }) =>
+    mutationFn: ({ id, ...updates }: { id: string; subject?: string; description?: string; priority?: TicketPriority; assigned_staff_id?: string | null; order_id?: string | null }) =>
       ticketsService.updateTicket(id, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.tickets.all })

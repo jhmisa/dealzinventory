@@ -22,8 +22,7 @@ import {
 } from '@/components/shared'
 import { CancelOrderDialog } from '@/components/orders/cancel-order-dialog'
 import { MergeOrdersDialog } from '@/components/orders/merge-orders-dialog'
-import { CreateReturnTicketDialog, CreateTicketDialog } from '@/components/tickets'
-import type { ReturnableItem } from '@/components/tickets'
+import { CreateTicketDialog } from '@/components/tickets'
 import { TicketListTable } from '@/components/tickets'
 import { AddressDisplay } from '@/components/shared/address-display'
 import { useCustomerAddresses } from '@/hooks/use-customer-addresses'
@@ -1575,13 +1574,12 @@ export default function OrderDetailPage() {
         }}
       />
 
-      <CreateReturnTicketDialog
+      <CreateTicketDialog
         open={returnOpen}
         onOpenChange={setReturnOpen}
-        orderCode={order.order_code}
-        orderId={order.id}
         customerId={order.customer_id}
-        orderItems={orderItems as ReturnableItem[]}
+        orderId={order.id}
+        defaultTypeSlug="return"
         onSuccess={(ticket) => navigate(`/admin/tickets/${ticket.id}`)}
       />
 

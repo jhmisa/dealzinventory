@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 export const createTicketSchema = z.object({
-  subject: z.string().min(3, 'Subject must be at least 3 characters'),
+  subject: z.string(),
   description: z.string().min(10, 'Please describe the issue in at least 10 characters'),
   ticket_type_id: z.string().min(1, 'Please select a ticket type'),
   priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'URGENT']).default('NORMAL'),

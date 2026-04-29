@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, ExternalLink, User, ShoppingBag, MessageSquare } from 'lucide-react'
+import { ArrowLeft, ExternalLink, User, ShoppingBag, MessageSquare, Link2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Dialog,
@@ -24,7 +25,8 @@ import {
   TicketNotesSection,
   TicketMediaSection,
 } from '@/components/tickets'
-import { useTicket, useResolveTicket } from '@/hooks/use-tickets'
+import { useTicket, useResolveTicket, useUpdateTicket } from '@/hooks/use-tickets'
+import { useCustomerOrders } from '@/hooks/use-customers'
 import { TICKET_STATUSES, RETURN_REASONS, RESOLUTION_TYPES } from '@/lib/constants'
 import { formatDate, formatDateTime, formatPrice, formatCustomerName } from '@/lib/utils'
 import type { TicketStatus } from '@/lib/types'
@@ -35,9 +37,15 @@ export default function TicketDetailPage() {
   const navigate = useNavigate()
   const { data: ticket, isLoading } = useTicket(id!)
   const resolveTicket = useResolveTicket()
+  const updateTicket = useUpdateTicket()
 
   const [resolveOpen, setResolveOpen] = useState(false)
   const [resolutionNotes, setResolutionNotes] = useState('')
+  const [linkingOrder, setLinkingOrder] = useState(false)
+
+  // Extract customer ID for order fetching (must be before early returns for hooks rules)
+  const customerId = (ticket?.customers as { id: string } | null)?.id ?? ''
+  const { data: customerOrders = [] } = useCustomerOrders(customerId)
 
   if (isLoading) return <FormSkeleton />
   if (!ticket) return <div className="p-8 text-center text-muted-foreground">Ticket not found.</div>
@@ -49,6 +57,19 @@ export default function TicketDetailPage() {
   const notes = (ticket.ticket_notes ?? []) as { id: string; staff_id: string | null; content: string; note_type: string; metadata: Record<string, unknown> | null; created_at: string; ticket_id: string }[]
   const media = (ticket.ticket_media ?? []) as { id: string; file_url: string; media_type: string; sort_order: number; uploaded_at: string; ticket_id: string }[]
   const returnData = ticket.return_data as ReturnData | null
+
+  function handleLinkOrder(orderId: string | null) {
+    updateTicket.mutate(
+      { id: ticket!.id, order_id: orderId },
+      {
+        onSuccess: () => {
+          toast.success(orderId ? 'Order linked' : 'Order unlinked')
+          setLinkingOrder(false)
+        },
+        onError: (err) => toast.error(`Failed: ${err.message}`),
+      },
+    )
+  }
 
   function handleResolve() {
     if (!resolutionNotes.trim()) return
@@ -174,7 +195,7 @@ export default function TicketDetailPage() {
                   <span className="text-muted-foreground">(from conversation)</span>
                 </div>
               )}
-              {order && (
+              {order ? (
                 <div className="flex items-center gap-2 text-sm">
                   <ShoppingBag className="h-4 w-4 text-muted-foreground" />
                   <Link to={`/admin/orders/${order.id}`} className="text-primary hover:underline">
@@ -187,6 +208,67 @@ export default function TicketDetailPage() {
                     { value: 'DELIVERED', label: 'Delivered', color: 'bg-green-100 text-green-800 border-green-300' },
                   ]} />
                   <PriceDisplay price={order.total_price} />
+                  {customer && (
+                    <div className="ml-auto flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-xs"
+                        onClick={() => setLinkingOrder(true)}
+                      >
+                        Change
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-1 text-xs text-muted-foreground hover:text-destructive"
+                        onClick={() => handleLinkOrder(null)}
+                        disabled={updateTicket.isPending}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ) : customer && !linkingOrder ? (
+                <div className="flex items-center gap-2 text-sm">
+                  <ShoppingBag className="h-4 w-4 text-muted-foreground" />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs"
+                    onClick={() => setLinkingOrder(true)}
+                  >
+                    <Link2 className="h-3 w-3 mr-1" />
+                    Link Order
+                  </Button>
+                </div>
+              ) : null}
+              {linkingOrder && customer && (
+                <div className="flex items-center gap-2 text-sm">
+                  <ShoppingBag className="h-4 w-4 text-muted-foreground" />
+                  <Select
+                    onValueChange={(v) => handleLinkOrder(v)}
+                  >
+                    <SelectTrigger className="h-8 text-xs flex-1">
+                      <SelectValue placeholder="Select an order..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {customerOrders.map((o: { id: string; order_code: string; order_status: string; created_at: string }) => (
+                        <SelectItem key={o.id} value={o.id}>
+                          {o.order_code} · {o.order_status} · {formatDate(o.created_at)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-1"
+                    onClick={() => setLinkingOrder(false)}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
                 </div>
               )}
               {ticket.conversation_id && (
