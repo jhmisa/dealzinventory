@@ -45,6 +45,7 @@ export default function TicketDetailPage() {
   const ticketType = ticket.ticket_types as { id: string; name: string; slug: string; label: string; icon: string } | null
   const customer = ticket.customers as { id: string; customer_code: string; last_name: string; first_name: string; email: string; phone: string } | null
   const order = ticket.orders as { id: string; order_code: string; order_status: string; total_price: number } | null
+  const conversation = ticket.conversations as { contact_name: string | null } | null
   const notes = (ticket.ticket_notes ?? []) as { id: string; staff_id: string | null; content: string; note_type: string; metadata: Record<string, unknown> | null; created_at: string; ticket_id: string }[]
   const media = (ticket.ticket_media ?? []) as { id: string; file_url: string; media_type: string; sort_order: number; uploaded_at: string; ticket_id: string }[]
   const returnData = ticket.return_data as ReturnData | null
@@ -157,7 +158,7 @@ export default function TicketDetailPage() {
               <CardTitle className="text-base">Linked Info</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {customer && (
+              {customer ? (
                 <div className="flex items-center gap-2 text-sm">
                   <User className="h-4 w-4 text-muted-foreground" />
                   <Link to={`/admin/customers/${customer.id}`} className="text-primary hover:underline">
@@ -165,6 +166,12 @@ export default function TicketDetailPage() {
                   </Link>
                   <span className="text-muted-foreground">({customer.customer_code})</span>
                   {customer.email && <span className="text-muted-foreground">· {customer.email}</span>}
+                </div>
+              ) : conversation?.contact_name && (
+                <div className="flex items-center gap-2 text-sm">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">{conversation.contact_name}</span>
+                  <span className="text-muted-foreground">(from conversation)</span>
                 </div>
               )}
               {order && (

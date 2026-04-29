@@ -115,7 +115,8 @@ export async function getTickets(filters: TicketFilters = {}) {
       *,
       ticket_types(id, name, slug, label, icon),
       customers(customer_code, last_name, first_name, email),
-      orders(order_code)
+      orders(order_code),
+      conversations(contact_name)
     `)
     .order('created_at', { ascending: false })
 
@@ -150,6 +151,7 @@ export async function getTicket(id: string) {
       ticket_types(id, name, slug, label, icon),
       customers(id, customer_code, last_name, first_name, email, phone),
       orders(id, order_code, order_status, total_price),
+      conversations(contact_name),
       ticket_media(id, file_url, media_type, sort_order, uploaded_at),
       ticket_notes(id, staff_id, content, note_type, metadata, created_at, staff_profiles(display_name))
     `)

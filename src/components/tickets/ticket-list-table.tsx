@@ -22,6 +22,7 @@ interface TicketRow {
   assigned_staff_id: string | null
   ticket_types: { name: string; label: string; icon: string } | null
   customers?: { customer_code: string; last_name: string; first_name: string; email?: string } | null
+  conversations?: { contact_name: string | null } | null
   orders?: { order_code: string } | null
 }
 
@@ -68,7 +69,7 @@ export function TicketListTable({ tickets, showCustomer = true, compact = false 
               <TableCell className="text-sm">
                 {ticket.customers
                   ? formatCustomerName(ticket.customers.last_name, ticket.customers.first_name)
-                  : '—'}
+                  : ticket.conversations?.contact_name ?? '—'}
               </TableCell>
             )}
             {!compact && (
