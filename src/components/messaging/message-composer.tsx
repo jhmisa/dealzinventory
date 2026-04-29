@@ -420,21 +420,16 @@ export const MessageComposer = memo(function MessageComposer({
 
         {onCreateTicket && (
           <DropdownMenu>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 gap-1 px-2 text-xs text-muted-foreground"
-                  >
-                    <Ticket className="h-3.5 w-3.5" />
-                    Ticket
-                  </Button>
-                </DropdownMenuTrigger>
-              </TooltipTrigger>
-              <TooltipContent>Create a ticket</TooltipContent>
-            </Tooltip>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1 px-2 text-xs text-muted-foreground"
+              >
+                <Ticket className="h-3.5 w-3.5" />
+                Ticket
+              </Button>
+            </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
               {ticketTypes
                 .filter((t) => t.name !== 'RETURN')
