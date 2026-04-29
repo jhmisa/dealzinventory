@@ -18,9 +18,7 @@ const COLUMN_OPTIONS = [
   { id: 'condition_grade', label: 'Grade' },
   { id: 'item_status', label: 'Status' },
   { id: 'supplier', label: 'Supplier' },
-  { id: 'purchase_price', label: 'Buy Price' },
-  { id: 'selling_price', label: 'Sell Price' },
-  { id: 'discount', label: 'Discount' },
+  { id: 'amount', label: 'Amount (Buy/Sell/Discount/Profit)' },
   { id: 'sold_to', label: 'Sold To' },
   { id: 'created_at', label: 'Intake Date' },
 ] as const

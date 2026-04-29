@@ -406,7 +406,7 @@ export default function ItemListPage() {
   const { data: columnSettings } = useItemListColumnSettings()
 
   // Build VisibilityState from settings for the active tab
-  const ALL_COLUMN_IDS = ['item_summary', 'item_status', 'supplier', 'purchase_price', 'selling_price', 'discount', 'sold_to', 'created_at', 'actions']
+  const ALL_COLUMN_IDS = ['item_summary', 'item_status', 'supplier', 'amount', 'sold_to', 'created_at', 'actions']
   const columnVisibility = useMemo(() => {
     if (!columnSettings) return {}
     const setting = columnSettings.find((s) => s.status_tab === statusTab)
@@ -417,6 +417,9 @@ export default function ItemListPage() {
       if (id === 'item_summary') {
         // Migrate from old separate columns: show if any of the old ones were visible, or if not yet saved
         vis[id] = saved.includes('item_summary') || saved.includes('item_code') || saved.includes('model') || saved.includes('condition_grade')
+      } else if (id === 'amount') {
+        // Migrate from old separate price columns
+        vis[id] = saved.includes('amount') || saved.includes('purchase_price') || saved.includes('selling_price') || saved.includes('discount')
       } else {
         vis[id] = saved.includes(id)
       }
@@ -945,49 +948,39 @@ export default function ItemListPage() {
       },
     },
     {
-      id: 'unified_buy_price',
-      header: 'Buy',
-      size: 65,
+      id: 'unified_amount',
+      header: 'Amount',
+      size: 110,
       cell: ({ row }) => {
         const r = row.original
-        if (r._kind === 'item') return <PriceDisplay amount={r.purchase_price} />
-        return <span className="text-muted-foreground">—</span>
-      },
-    },
-    {
-      id: 'unified_sell_price',
-      header: 'Sell',
-      size: 65,
-      cell: ({ row }) => {
-        const r = row.original
-        if (r._kind === 'accessory') return <PriceDisplay amount={Number(r.selling_price)} />
-        if (r._kind === 'sell-group') return <PriceDisplay amount={r.base_price} />
+        if (r._kind !== 'item') {
+          if (r._kind === 'accessory') return <PriceDisplay amount={Number(r.selling_price)} />
+          if (r._kind === 'sell-group') return <PriceDisplay amount={r.base_price} />
+          return <span className="text-muted-foreground">—</span>
+        }
+        const buy = r.purchase_price ?? 0
+        const sell = r.selling_price ?? 0
+        const disc = r.discount ?? 0
+        const profit = sell - disc - buy
         return (
-          <EditPriceCell
-            itemId={r.id}
-            itemCode={r.item_code}
-            field="selling_price"
-            value={r.selling_price}
-            updateItem={updateItem}
-          />
-        )
-      },
-    },
-    {
-      id: 'unified_discount',
-      header: 'Discount',
-      size: 65,
-      cell: ({ row }) => {
-        const r = row.original
-        if (r._kind !== 'item') return <span className="text-muted-foreground">—</span>
-        return (
-          <EditPriceCell
-            itemId={r.id}
-            itemCode={r.item_code}
-            field="discount"
-            value={r.discount}
-            updateItem={updateItem}
-          />
+          <div className="flex flex-col gap-0 text-xs leading-tight" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-muted-foreground">Buy</span>
+              <PriceDisplay amount={r.purchase_price} className="text-xs" />
+            </div>
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-muted-foreground">Sell</span>
+              <EditPriceCell itemId={r.id} itemCode={r.item_code} field="selling_price" value={r.selling_price} updateItem={updateItem} />
+            </div>
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-muted-foreground">Disc</span>
+              <EditPriceCell itemId={r.id} itemCode={r.item_code} field="discount" value={r.discount} updateItem={updateItem} />
+            </div>
+            <div className={cn('flex items-center justify-between gap-1 font-medium', profit >= 0 ? 'text-green-600' : 'text-red-500')}>
+              <span>Profit</span>
+              <PriceDisplay amount={profit} className="text-xs" />
+            </div>
+          </div>
         )
       },
     },
@@ -1234,40 +1227,36 @@ export default function ItemListPage() {
       cell: ({ row }) => row.original.suppliers?.supplier_name ?? '—',
     },
     {
-      accessorKey: 'purchase_price',
-      header: 'Buy',
-      size: 65,
-      cell: ({ row }) => <PriceDisplay amount={row.original.purchase_price} />,
-    },
-    {
-      id: 'selling_price',
-      accessorFn: (row) => row.selling_price,
-      header: 'Sell',
-      size: 65,
-      cell: ({ row }) => (
-        <EditPriceCell
-          itemId={row.original.id}
-          itemCode={row.original.item_code}
-          field="selling_price"
-          value={row.original.selling_price}
-          updateItem={updateItem}
-        />
-      ),
-    },
-    {
-      id: 'discount',
-      accessorFn: (row) => row.discount,
-      header: 'Discount',
-      size: 65,
-      cell: ({ row }) => (
-        <EditPriceCell
-          itemId={row.original.id}
-          itemCode={row.original.item_code}
-          field="discount"
-          value={row.original.discount}
-          updateItem={updateItem}
-        />
-      ),
+      id: 'amount',
+      header: 'Amount',
+      size: 110,
+      cell: ({ row }) => {
+        const r = row.original
+        const buy = r.purchase_price ?? 0
+        const sell = r.selling_price ?? 0
+        const disc = r.discount ?? 0
+        const profit = sell - disc - buy
+        return (
+          <div className="flex flex-col gap-0 text-xs leading-tight" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-muted-foreground">Buy</span>
+              <PriceDisplay amount={r.purchase_price} className="text-xs" />
+            </div>
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-muted-foreground">Sell</span>
+              <EditPriceCell itemId={r.id} itemCode={r.item_code} field="selling_price" value={r.selling_price} updateItem={updateItem} />
+            </div>
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-muted-foreground">Disc</span>
+              <EditPriceCell itemId={r.id} itemCode={r.item_code} field="discount" value={r.discount} updateItem={updateItem} />
+            </div>
+            <div className={cn('flex items-center justify-between gap-1 font-medium', profit >= 0 ? 'text-green-600' : 'text-red-500')}>
+              <span>Profit</span>
+              <PriceDisplay amount={profit} className="text-xs" />
+            </div>
+          </div>
+        )
+      },
     },
     {
       id: 'sold_to',
