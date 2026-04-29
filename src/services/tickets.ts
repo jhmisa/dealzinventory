@@ -20,7 +20,7 @@ export interface Ticket {
   ticket_type_id: string
   ticket_status: TicketStatus
   priority: TicketPriority
-  customer_id: string
+  customer_id: string | null
   order_id: string | null
   conversation_id: string | null
   assigned_staff_id: string | null
@@ -218,7 +218,7 @@ export async function generateTicketCode() {
 
 interface CreateTicketInput {
   ticket_type_id: string
-  customer_id: string
+  customer_id?: string
   subject: string
   description: string
   priority?: TicketPriority
@@ -237,7 +237,7 @@ export async function createTicket(input: CreateTicketInput) {
     .insert({
       ticket_code: ticketCode,
       ticket_type_id: input.ticket_type_id,
-      customer_id: input.customer_id,
+      customer_id: input.customer_id || null,
       subject: input.subject,
       description: input.description,
       priority: input.priority ?? 'NORMAL',

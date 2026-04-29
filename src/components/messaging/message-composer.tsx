@@ -1,5 +1,5 @@
 import { memo, useState, useCallback, useRef, useMemo } from 'react'
-import { Send, Paperclip, MessageSquareText, Package, X, FileIcon, Loader2, Archive, ArchiveRestore } from 'lucide-react'
+import { Send, Paperclip, MessageSquareText, Package, Ticket, X, FileIcon, Loader2, Archive, ArchiveRestore } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -13,6 +13,13 @@ import {
   compressImageForMessaging,
   IMAGE_MAX_INPUT_SIZE_MB,
 } from '@/lib/image-compression'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { useTicketTypes } from '@/hooks/use-tickets'
 
 const MAX_ATTACHMENTS = 5
 // Non-image files (PDFs, docs, etc.) are uploaded as-is.
@@ -28,6 +35,7 @@ interface MessageComposerProps {
   conversationId?: string
   onOpenResponses?: () => void
   onOpenInventory?: () => void
+  onCreateTicket?: (typeSlug: string) => void
   folders?: Array<{ id: string; name: string }>
   onMoveToFolder?: (folderId: string) => void
   onArchive?: () => void
@@ -41,6 +49,7 @@ export const MessageComposer = memo(function MessageComposer({
   conversationId,
   onOpenResponses,
   onOpenInventory,
+  onCreateTicket,
   folders,
   onMoveToFolder,
   onArchive,
@@ -55,6 +64,7 @@ export const MessageComposer = memo(function MessageComposer({
   const [highlightedIndex, setHighlightedIndex] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const uploadAttachment = useUploadAttachment()
+  const { data: ticketTypes = [] } = useTicketTypes()
 
   const ARCHIVE_ITEM = { id: '__archive__', name: 'Archive' } as const
 
@@ -407,6 +417,35 @@ export const MessageComposer = memo(function MessageComposer({
           </TooltipTrigger>
           <TooltipContent>Search inventory to insert</TooltipContent>
         </Tooltip>
+
+        {onCreateTicket && (
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 gap-1 px-2 text-xs text-muted-foreground"
+                  >
+                    <Ticket className="h-3.5 w-3.5" />
+                    Ticket
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent>Create a ticket</TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="start">
+              {ticketTypes
+                .filter((t) => t.name !== 'RETURN')
+                .map((t) => (
+                  <DropdownMenuItem key={t.id} onClick={() => onCreateTicket(t.slug)}>
+                    {t.label}
+                  </DropdownMenuItem>
+                ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
 
         {onArchive && (
           <Tooltip>

@@ -20,7 +20,7 @@ import { toast } from 'sonner'
 interface CreateTicketDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  customerId: string
+  customerId?: string
   orderId?: string
   conversationId?: string
   defaultTypeSlug?: string
@@ -50,14 +50,14 @@ export function CreateTicketDialog({
       description: '',
       ticket_type_id: defaultType?.id ?? '',
       priority: 'NORMAL',
-      customer_id: customerId,
+      customer_id: customerId ?? '',
       order_id: orderId ?? '',
       conversation_id: conversationId ?? '',
     },
   })
 
   // Update form values when props change
-  if (form.getValues('customer_id') !== customerId) {
+  if (customerId && form.getValues('customer_id') !== customerId) {
     form.setValue('customer_id', customerId)
   }
   if (defaultType && !form.getValues('ticket_type_id')) {
@@ -94,12 +94,14 @@ export function CreateTicketDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange} modal={false}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Create Ticket</DialogTitle>
           <DialogDescription>
-            Create a new support ticket for this customer.
+            {customerId
+              ? 'Create a new support ticket for this customer.'
+              : 'Create a new support ticket. It will auto-link when a customer is linked to this conversation.'}
           </DialogDescription>
         </DialogHeader>
 

@@ -5,7 +5,7 @@ export const createTicketSchema = z.object({
   description: z.string().min(10, 'Please describe the issue in at least 10 characters'),
   ticket_type_id: z.string().min(1, 'Please select a ticket type'),
   priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'URGENT']).default('NORMAL'),
-  customer_id: z.string().min(1, 'Customer is required'),
+  customer_id: z.string().optional().or(z.literal('')),
   order_id: z.string().optional().or(z.literal('')),
   conversation_id: z.string().optional().or(z.literal('')),
 })

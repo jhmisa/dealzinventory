@@ -239,56 +239,54 @@ export function CustomerPanel({
           )}
 
           {/* Section 5 — Tickets */}
-          {isLinked && customer && (
-            <div className="space-y-2 border-t pt-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium flex items-center gap-1">
-                  <Ticket className="h-3.5 w-3.5" />
-                  Tickets
-                </span>
-                <div className="flex items-center gap-1">
-                  {conversationTickets.length > 0 && (
-                    <Badge variant="secondary" className="text-[10px] h-5 px-1.5">
-                      {conversationTickets.length}
-                    </Badge>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="xs"
-                    className="h-5 w-5 p-0"
-                    onClick={() => setTicketDialogOpen(true)}
-                  >
-                    <Plus className="h-3 w-3" />
-                  </Button>
-                </div>
+          <div className="space-y-2 border-t pt-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium flex items-center gap-1">
+                <Ticket className="h-3.5 w-3.5" />
+                Tickets
+              </span>
+              <div className="flex items-center gap-1">
+                {conversationTickets.length > 0 && (
+                  <Badge variant="secondary" className="text-[10px] h-5 px-1.5">
+                    {conversationTickets.length}
+                  </Badge>
+                )}
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  className="h-5 w-5 p-0"
+                  onClick={() => setTicketDialogOpen(true)}
+                >
+                  <Plus className="h-3 w-3" />
+                </Button>
               </div>
-              {conversationTickets.length > 0 ? (
-                <div className="space-y-1.5">
-                  {conversationTickets.map((ticket: { id: string; ticket_code: string; ticket_status: string; subject: string; created_at: string }) => (
-                    <Link
-                      key={ticket.id}
-                      to={`/admin/tickets/${ticket.id}`}
-                      className="flex items-center justify-between rounded-md border px-2 py-1.5 text-xs hover:bg-accent transition-colors"
-                    >
-                      <div className="min-w-0 space-y-0.5">
-                        <CodeDisplay code={ticket.ticket_code} className="text-[11px] truncate" />
-                        <p className="text-muted-foreground truncate">{ticket.subject}</p>
-                      </div>
-                      <StatusBadge status={ticket.ticket_status} config={TICKET_STATUSES} />
-                    </Link>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground">No tickets</p>
-              )}
-              <CreateTicketDialog
-                open={ticketDialogOpen}
-                onOpenChange={setTicketDialogOpen}
-                customerId={customer.id}
-                conversationId={conversation.id}
-              />
             </div>
-          )}
+            {conversationTickets.length > 0 ? (
+              <div className="space-y-1.5">
+                {conversationTickets.map((ticket: { id: string; ticket_code: string; ticket_status: string; subject: string; created_at: string }) => (
+                  <Link
+                    key={ticket.id}
+                    to={`/admin/tickets/${ticket.id}`}
+                    className="flex items-center justify-between rounded-md border px-2 py-1.5 text-xs hover:bg-accent transition-colors"
+                  >
+                    <div className="min-w-0 space-y-0.5">
+                      <CodeDisplay code={ticket.ticket_code} className="text-[11px] truncate" />
+                      <p className="text-muted-foreground truncate">{ticket.subject}</p>
+                    </div>
+                    <StatusBadge status={ticket.ticket_status} config={TICKET_STATUSES} />
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">No tickets</p>
+            )}
+            <CreateTicketDialog
+              open={ticketDialogOpen}
+              onOpenChange={setTicketDialogOpen}
+              customerId={customer?.id}
+              conversationId={conversation.id}
+            />
+          </div>
         </div>
       </ScrollArea>
 

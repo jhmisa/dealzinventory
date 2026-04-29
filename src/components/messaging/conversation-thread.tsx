@@ -23,6 +23,7 @@ import { InternalNoteInput } from './internal-note-input'
 import { MessageComposer } from './message-composer'
 import { CannedResponsesPanel } from './canned-responses-panel'
 import { InventorySearchModal } from './inventory-search-modal'
+import { CreateTicketDialog } from '@/components/tickets'
 import type { Conversation, Message } from '@/lib/types'
 
 function formatTime(dateStr: string): string {
@@ -226,6 +227,8 @@ export const ConversationThread = memo(function ConversationThread({
   const composerRef = useRef<HTMLDivElement>(null)
   const [showResponses, setShowResponses] = useState(false)
   const [showInventory, setShowInventory] = useState(false)
+  const [ticketDialogOpen, setTicketDialogOpen] = useState(false)
+  const [ticketTypeSlug, setTicketTypeSlug] = useState<string | undefined>()
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -276,6 +279,11 @@ export const ConversationThread = memo(function ConversationThread({
     },
     [onSend],
   )
+
+  const handleCreateTicket = useCallback((typeSlug: string) => {
+    setTicketTypeSlug(typeSlug)
+    setTicketDialogOpen(true)
+  }, [])
 
   const handleInsertInventoryItem = useCallback(
     (text: string, attachment?: MessageAttachment, thumbnailUrl?: string) => {
@@ -485,6 +493,7 @@ export const ConversationThread = memo(function ConversationThread({
           conversationId={conversation.id}
           onOpenResponses={() => setShowResponses(true)}
           onOpenInventory={() => setShowInventory(true)}
+          onCreateTicket={handleCreateTicket}
           folders={folders?.map((f) => ({ id: f.id, name: f.name }))}
           onMoveToFolder={(folderId) => {
             onMoveToFolder?.(folderId)
@@ -511,6 +520,15 @@ export const ConversationThread = memo(function ConversationThread({
         open={showInventory}
         onClose={() => setShowInventory(false)}
         onInsertItem={handleInsertInventoryItem}
+      />
+
+      {/* Create Ticket Dialog */}
+      <CreateTicketDialog
+        open={ticketDialogOpen}
+        onOpenChange={setTicketDialogOpen}
+        customerId={conversation.customers?.id}
+        conversationId={conversation.id}
+        defaultTypeSlug={ticketTypeSlug}
       />
     </div>
   )
