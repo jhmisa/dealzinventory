@@ -152,13 +152,31 @@ export async function getTicket(id: string) {
       customers(id, customer_code, last_name, first_name, email, phone),
       orders(id, order_code, order_status, total_price),
       ticket_media(id, file_url, media_type, sort_order, uploaded_at),
-      ticket_notes(id, staff_id, content, note_type, metadata, created_at, staff_profiles(display_name))
+      ticket_notes(id, staff_id, content, note_type, metadata, created_at)
     `)
     .eq('id', id)
     .order('created_at', { referencedTable: 'ticket_notes', ascending: false })
     .single()
 
   if (error) throw error
+
+  // Fetch staff display names for notes separately (ticket_notes.staff_id references auth.users, not staff_profiles)
+  const notes = (data.ticket_notes ?? []) as { id: string; staff_id: string | null; content: string; note_type: string; metadata: Record<string, unknown> | null; created_at: string }[]
+  const staffIds = [...new Set(notes.map(n => n.staff_id).filter(Boolean))] as string[]
+  let staffMap: Record<string, string> = {}
+  if (staffIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from('staff_profiles')
+      .select('id, display_name')
+      .in('id', staffIds)
+    if (profiles) {
+      staffMap = Object.fromEntries(profiles.map(p => [p.id, p.display_name]))
+    }
+  }
+  const enrichedNotes = notes.map(n => ({
+    ...n,
+    staff_profiles: n.staff_id && staffMap[n.staff_id] ? { display_name: staffMap[n.staff_id] } : null,
+  }))
 
   // Fetch conversation contact name separately to avoid join issues
   let contactName: string | null = null
@@ -171,7 +189,7 @@ export async function getTicket(id: string) {
     contactName = conv?.contact_name ?? null
   }
 
-  return { ...data, conversations: contactName ? { contact_name: contactName } : null }
+  return { ...data, ticket_notes: enrichedNotes, conversations: contactName ? { contact_name: contactName } : null }
 }
 
 export async function getCustomerTickets(customerId: string) {
