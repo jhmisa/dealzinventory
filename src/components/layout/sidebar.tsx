@@ -88,7 +88,6 @@ const navSections: NavSection[] = [
     items: [
       { title: 'Sell Groups', href: '/admin/sell-groups', icon: ShoppingBag },
       { title: 'Orders', href: '/admin/orders', icon: ClipboardList },
-      { title: 'Tickets', href: '/admin/tickets', icon: Ticket },
       { title: 'Packing', href: '/admin/packing', icon: PackageCheck },
     ],
   },
@@ -96,6 +95,7 @@ const navSections: NavSection[] = [
     label: 'Messaging',
     items: [
       { title: 'Messages', href: '/admin/messages', icon: MessageSquare },
+      { title: 'Tickets', href: '/admin/tickets', icon: Ticket },
       { title: 'Social Media', href: '/admin/social-media', icon: Share2 },
     ],
   },

@@ -94,7 +94,7 @@ export function CreateTicketDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange} modal={false}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Create Ticket</DialogTitle>
