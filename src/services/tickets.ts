@@ -151,7 +151,6 @@ export async function getTicket(id: string) {
       ticket_types(id, name, slug, label, icon),
       customers(id, customer_code, last_name, first_name, email, phone),
       orders(id, order_code, order_status, total_price),
-      conversations(contact_name),
       ticket_media(id, file_url, media_type, sort_order, uploaded_at),
       ticket_notes(id, staff_id, content, note_type, metadata, created_at, staff_profiles(display_name))
     `)
@@ -160,7 +159,19 @@ export async function getTicket(id: string) {
     .single()
 
   if (error) throw error
-  return data
+
+  // Fetch conversation contact name separately to avoid join issues
+  let contactName: string | null = null
+  if (data.conversation_id) {
+    const { data: conv } = await supabase
+      .from('conversations')
+      .select('contact_name')
+      .eq('id', data.conversation_id)
+      .single()
+    contactName = conv?.contact_name ?? null
+  }
+
+  return { ...data, conversations: contactName ? { contact_name: contactName } : null }
 }
 
 export async function getCustomerTickets(customerId: string) {
