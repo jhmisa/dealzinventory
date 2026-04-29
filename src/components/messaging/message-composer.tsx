@@ -431,9 +431,7 @@ export const MessageComposer = memo(function MessageComposer({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
-              {ticketTypes
-                .filter((t) => t.name !== 'RETURN')
-                .map((t) => (
+              {ticketTypes.map((t) => (
                   <DropdownMenuItem key={t.id} onClick={() => onCreateTicket(t.slug)}>
                     {t.label}
                   </DropdownMenuItem>

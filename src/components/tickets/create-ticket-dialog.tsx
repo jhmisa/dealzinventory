@@ -33,7 +33,7 @@ interface CreateTicketDialogProps {
 }
 
 // Types that show the order selector when a customer is present
-const ORDER_TYPES = new Set(['delivery', 'return', 'complaint', 'general'])
+const ORDER_TYPES = new Set(['delivery', 'return', 'complaint', 'general', 'technical'])
 // Types where order is required
 const ORDER_REQUIRED_TYPES = new Set(['delivery', 'return'])
 
