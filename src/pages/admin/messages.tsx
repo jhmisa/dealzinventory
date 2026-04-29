@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Loader2, MessageSquare } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
@@ -27,11 +28,14 @@ import {
 } from '@/hooks/use-message-folders'
 
 export default function MessagesPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null)
   const [isArchiveView, setIsArchiveView] = useState(false)
   const [mineOnly, setMineOnly] = useState(false)
   const [search, setSearch] = useState('')
-  const [selectedConvId, setSelectedConvId] = useState<string | null>(null)
+  const [selectedConvId, setSelectedConvId] = useState<string | null>(
+    searchParams.get('conversation')
+  )
   const [panelCollapsed, setPanelCollapsed] = useState(
     () => localStorage.getItem('messaging-panel-collapsed') === 'true'
   )
@@ -52,13 +56,20 @@ export default function MessagesPage() {
   const archiveConversation = useArchiveConversation()
   const unarchiveConversation = useUnarchiveConversation()
 
-  // Auto-select Inbox on first load
+  // Clear conversation query param after consuming it
   useEffect(() => {
-    if (!selectedFolderId && folders.length > 0) {
+    if (searchParams.get('conversation')) {
+      setSearchParams({}, { replace: true })
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-select Inbox on first load (skip if deep-linked to a conversation)
+  useEffect(() => {
+    if (!selectedFolderId && folders.length > 0 && !selectedConvId) {
       const inbox = folders.find((f) => f.is_system && f.name === 'Inbox')
       setSelectedFolderId(inbox?.id ?? folders[0].id)
     }
-  }, [folders, selectedFolderId])
+  }, [folders, selectedFolderId, selectedConvId])
 
   const filters = useMemo(() => ({
     ...(isArchiveView

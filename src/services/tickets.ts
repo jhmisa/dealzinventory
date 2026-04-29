@@ -51,6 +51,7 @@ export interface TicketNote {
   note_type: TicketNoteType
   metadata: Record<string, unknown> | null
   created_at: string
+  staff_profiles?: { display_name: string } | null
 }
 
 export interface TicketMedia {
@@ -150,7 +151,7 @@ export async function getTicket(id: string) {
       customers(id, customer_code, last_name, first_name, email, phone),
       orders(id, order_code, order_status, total_price),
       ticket_media(id, file_url, media_type, sort_order, uploaded_at),
-      ticket_notes(id, staff_id, content, note_type, metadata, created_at)
+      ticket_notes(id, staff_id, content, note_type, metadata, created_at, staff_profiles(display_name))
     `)
     .eq('id', id)
     .order('created_at', { referencedTable: 'ticket_notes', ascending: false })

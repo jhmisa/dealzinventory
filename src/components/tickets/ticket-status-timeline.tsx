@@ -30,6 +30,10 @@ export function TicketStatusTimeline({ notes }: TicketStatusTimelineProps) {
             <div className="flex-1 min-w-0">
               <p className="text-sm">{note.content}</p>
               <p className="text-xs text-muted-foreground mt-0.5">
+                {note.staff_profiles?.display_name && (
+                  <span className="font-medium text-foreground">{note.staff_profiles.display_name}</span>
+                )}
+                {note.staff_profiles?.display_name && ' \u00b7 '}
                 {formatDateTime(note.created_at)}
               </p>
             </div>
