@@ -162,7 +162,7 @@ export default function TicketDetailPage() {
                 <div className="flex items-center gap-2 text-sm">
                   <User className="h-4 w-4 text-muted-foreground" />
                   <Link to={`/admin/customers/${customer.id}`} className="text-primary hover:underline">
-                    {formatCustomerName(customer.last_name, customer.first_name)}
+                    {formatCustomerName(customer)}
                   </Link>
                   <span className="text-muted-foreground">({customer.customer_code})</span>
                   {customer.email && <span className="text-muted-foreground">· {customer.email}</span>}
@@ -265,7 +265,7 @@ export default function TicketDetailPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Created by</span>
-                <span className="capitalize">{ticket.created_by_role}</span>
+                <span>{ticket.created_by_name ?? <span className="capitalize">{ticket.created_by_role}</span>}</span>
               </div>
             </CardContent>
           </Card>

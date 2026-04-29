@@ -160,9 +160,12 @@ export async function getTicket(id: string) {
 
   if (error) throw error
 
-  // Fetch staff display names for notes separately (ticket_notes.staff_id references auth.users, not staff_profiles)
+  // Fetch staff display names for notes and creator (ticket_notes.staff_id references auth.users, not staff_profiles)
   const notes = (data.ticket_notes ?? []) as { id: string; staff_id: string | null; content: string; note_type: string; metadata: Record<string, unknown> | null; created_at: string }[]
-  const staffIds = [...new Set(notes.map(n => n.staff_id).filter(Boolean))] as string[]
+  const staffIds = [...new Set([
+    ...notes.map(n => n.staff_id).filter(Boolean),
+    ...(data.created_by_id ? [data.created_by_id] : []),
+  ])] as string[]
   let staffMap: Record<string, string> = {}
   if (staffIds.length > 0) {
     const { data: profiles } = await supabase
@@ -189,7 +192,11 @@ export async function getTicket(id: string) {
     contactName = conv?.contact_name ?? null
   }
 
-  return { ...data, ticket_notes: enrichedNotes, conversations: contactName ? { contact_name: contactName } : null }
+  const createdByName = data.created_by_id && staffMap[data.created_by_id]
+    ? staffMap[data.created_by_id]
+    : null
+
+  return { ...data, ticket_notes: enrichedNotes, conversations: contactName ? { contact_name: contactName } : null, created_by_name: createdByName }
 }
 
 export async function getCustomerTickets(customerId: string) {
@@ -264,6 +271,9 @@ interface CreateTicketInput {
 export async function createTicket(input: CreateTicketInput) {
   const ticketCode = await generateTicketCode()
 
+  // Get current user ID for created_by_id
+  const { data: { user } } = await supabase.auth.getUser()
+
   const { data, error } = await supabase
     .from('tickets')
     .insert({
@@ -277,6 +287,7 @@ export async function createTicket(input: CreateTicketInput) {
       conversation_id: input.conversation_id || null,
       assigned_staff_id: input.assigned_staff_id || null,
       created_by_role: input.created_by_role ?? 'staff',
+      created_by_id: user?.id ?? null,
       return_data: input.return_data ? (input.return_data as unknown as Record<string, unknown>) : null,
     })
     .select()
