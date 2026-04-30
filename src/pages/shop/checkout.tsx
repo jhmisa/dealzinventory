@@ -21,7 +21,8 @@ import { AddressForm } from '@/components/shared'
 import type { ShippingAddress } from '@/lib/address-types'
 import { useSellGroup } from '@/hooks/use-sell-groups'
 import { useSellGroupByCode } from '@/hooks/use-shop'
-import { useCreateOrder } from '@/hooks/use-orders'
+import { useCreateManualOrder } from '@/hooks/use-orders'
+import { pickAvailableItemsFromSellGroup } from '@/services/orders'
 import { CONDITION_GRADES } from '@/lib/constants'
 import { formatPrice, cn } from '@/lib/utils'
 
@@ -46,9 +47,10 @@ export default function CheckoutPage() {
   const { data: sgByCode } = useSellGroupByCode(sellGroupCode ?? '')
   const sg = sgById ?? sgByCode
 
-  const createOrderMutation = useCreateOrder()
+  const createOrderMutation = useCreateManualOrder()
   const [orderCreated, setOrderCreated] = useState<{ orderCode: string } | null>(null)
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(null)
+  const [isPickingItems, setIsPickingItems] = useState(false)
 
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutSchema),
@@ -115,25 +117,31 @@ export default function CheckoutPage() {
       toast.error('Shipping address is required')
       return
     }
-    // For this MVP, we create the order directly without a separate customer auth flow.
-    // In production, the customer-auth Edge Function would handle login/registration.
-    // Here we create a placeholder order that admin can process.
-    createOrderMutation.mutate(
-      {
-        customer_id: '00000000-0000-0000-0000-000000000000', // Placeholder — real flow uses customer-auth
-        sell_group_id: sg!.id,
-        order_source: sellGroupCode ? 'LIVE_SELLING' : 'SHOP',
-        shipping_address: JSON.stringify(shippingAddress),
-        quantity: values.quantity,
-        total_price: Number(sg!.base_price) * values.quantity,
-      },
-      {
-        onSuccess: (order) => {
-          setOrderCreated({ orderCode: order.order_code })
+    try {
+      setIsPickingItems(true)
+      // Pick available items from sell group (with discounts)
+      const items = await pickAvailableItemsFromSellGroup(sg!.id, values.quantity)
+
+      createOrderMutation.mutate(
+        {
+          customer_id: '00000000-0000-0000-0000-000000000000', // Placeholder — real flow uses customer-auth
+          order_source: sellGroupCode ? 'LIVE_SELLING' : 'SHOP',
+          shipping_address: JSON.stringify(shippingAddress),
+          shipping_cost: 0,
+          items,
         },
-        onError: (err) => toast.error(`Order failed: ${err.message}`),
-      },
-    )
+        {
+          onSuccess: (order) => {
+            setOrderCreated({ orderCode: order.order_code })
+          },
+          onError: (err) => toast.error(`Order failed: ${err.message}`),
+          onSettled: () => setIsPickingItems(false),
+        },
+      )
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to find available items')
+      setIsPickingItems(false)
+    }
   }
 
   return (
@@ -286,9 +294,9 @@ export default function CheckoutPage() {
                 type="submit"
                 className="w-full"
                 size="lg"
-                disabled={createOrderMutation.isPending || stockCount === 0}
+                disabled={isPickingItems || createOrderMutation.isPending || stockCount === 0}
               >
-                {createOrderMutation.isPending ? 'Placing Order...' : `Place Order — ${formatPrice(totalPrice)}`}
+                {isPickingItems || createOrderMutation.isPending ? 'Placing Order...' : `Place Order — ${formatPrice(totalPrice)}`}
               </Button>
             </form>
           </Form>

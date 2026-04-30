@@ -307,6 +307,57 @@ export async function getAvailableItems(filters: AvailableItemFilters = {}) {
   return { items, total: count ?? items.length }
 }
 
+// --- Sell Group Item Picker ---
+
+export async function pickAvailableItemsFromSellGroup(sellGroupId: string, quantity: number) {
+  // Get sell group info
+  const { data: sg, error: sgError } = await supabase
+    .from('sell_groups')
+    .select('id, sell_group_code, base_price, product_models(brand, model_name)')
+    .eq('id', sellGroupId)
+    .single()
+
+  if (sgError || !sg) throw new Error('Sell group not found')
+
+  // Find available items in the sell group
+  const { data: sgi } = await supabase
+    .from('sell_group_items')
+    .select('item_id, items!inner(id, item_code, item_status, condition_grade, selling_price, discount)')
+    .eq('sell_group_id', sellGroupId)
+    .eq('items.item_status', 'AVAILABLE')
+    .neq('items.condition_grade', 'J')
+
+  if (!sgi || sgi.length === 0) throw new Error('No available items in this sell group')
+
+  // Filter out items already in orders
+  const candidateIds = sgi.map(s => s.item_id)
+  const { data: orderedItems } = await supabase
+    .from('order_items')
+    .select('item_id')
+    .in('item_id', candidateIds)
+
+  const orderedSet = new Set((orderedItems ?? []).map(o => o.item_id))
+  const available = sgi.filter(s => !orderedSet.has(s.item_id))
+
+  if (available.length < quantity) {
+    throw new Error(`Only ${available.length} items available, requested ${quantity}`)
+  }
+
+  const pm = sg.product_models as { brand: string; model_name: string } | null
+  const description = pm ? `${pm.brand} ${pm.model_name}` : sg.sell_group_code
+
+  return available.slice(0, quantity).map(entry => {
+    const item = entry.items as { id: string; selling_price: number | null; discount: number | null }
+    return {
+      item_id: item.id,
+      description,
+      quantity: 1,
+      unit_price: item.selling_price ?? Number(sg.base_price) ?? 0,
+      discount: item.discount ? Number(item.discount) : 0,
+    }
+  })
+}
+
 // --- Manual Order Creation ---
 
 interface ManualOrderInput {
