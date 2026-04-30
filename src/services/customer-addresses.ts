@@ -42,6 +42,23 @@ export async function createCustomerAddress(address: CustomerAddressInsert) {
 }
 
 export async function updateCustomerAddress(id: string, updates: CustomerAddressUpdate) {
+  // If setting as default, unset other defaults first
+  if (updates.is_default) {
+    const { data: existing } = await supabase
+      .from('customer_addresses')
+      .select('customer_id')
+      .eq('id', id)
+      .single()
+
+    if (existing) {
+      await supabase
+        .from('customer_addresses')
+        .update({ is_default: false })
+        .eq('customer_id', existing.customer_id)
+        .neq('id', id)
+    }
+  }
+
   const { data, error } = await supabase
     .from('customer_addresses')
     .update({ ...updates, updated_at: new Date().toISOString() })
