@@ -35,6 +35,7 @@ interface DataTableProps<TData, TValue> {
   onRowClick?: (row: TData) => void
   columnVisibility?: VisibilityState
   enableColumnResizing?: boolean
+  getRowClassName?: (row: TData) => string
 }
 
 export function DataTable<TData, TValue>({
@@ -44,6 +45,7 @@ export function DataTable<TData, TValue>({
   onRowClick,
   columnVisibility,
   enableColumnResizing = false,
+  getRowClassName,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnResizeMode] = useState<ColumnResizeMode>('onChange')
@@ -107,7 +109,7 @@ export function DataTable<TData, TValue>({
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
-                  className={onRowClick ? 'cursor-pointer hover:bg-muted/50' : ''}
+                  className={`${onRowClick ? 'cursor-pointer hover:bg-muted/50' : ''} ${getRowClassName?.(row.original) ?? ''}`}
                   onClick={() => onRowClick?.(row.original)}
                 >
                   {row.getVisibleCells().map((cell) => (

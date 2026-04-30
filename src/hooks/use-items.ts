@@ -258,6 +258,16 @@ export function useItemsRealtimeSync() {
         () => {
           queryClient.invalidateQueries({ queryKey: queryKeys.items.all })
           queryClient.invalidateQueries({ queryKey: queryKeys.orders.all })
+          queryClient.invalidateQueries({ queryKey: queryKeys.sellGroups.all })
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'order_items' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: queryKeys.items.all })
+          queryClient.invalidateQueries({ queryKey: queryKeys.orders.all })
+          queryClient.invalidateQueries({ queryKey: queryKeys.sellGroups.all })
         },
       )
       .subscribe()

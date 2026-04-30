@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/dialog'
 import { PageHeader, SearchBar, DataTable, StatusBadge, GradeBadge, CodeDisplay, PriceDisplay, TableSkeleton } from '@/components/shared'
 import { useItems, useUpdateItem, useItemStatusCounts, useToggleLiveSelling, useItemsRealtimeSync } from '@/hooks/use-items'
+import { useLiveSellingRealtime } from '@/hooks/use-live-selling-realtime'
 import { useSellGroupByCode, useToggleSellGroupLiveSelling, useLiveSellingSellGroups, useSellGroupLiveSellingCount, useSellGroupsForList, useSellGroupStatusCounts } from '@/hooks/use-sell-groups'
 import { SellGroupResultBlock } from '@/components/sell-groups/sell-group-result-block'
 import { useAccessories, useCreateAccessory, useAccessoryTabCounts, useToggleAccessoryLiveSelling, useAccessoryLiveSellingCount } from '@/hooks/use-accessories'
@@ -76,10 +77,25 @@ type AccessoryRow = Accessory & {
   accessory_media: AccessoryMedia[]
 }
 
+type SellGroupItemInfo = {
+  id: string
+  item_code: string
+  item_status: string
+  order_items: Array<{
+    orders: {
+      id: string
+      order_code: string
+      order_status: string
+      customers: { id: string; customer_code: string; first_name: string | null; last_name: string } | null
+    } | null
+  }>
+}
+
 type SellGroupRow = LiveSellingSellGroup & {
   _sg_description: string
   _sg_thumbnail: string | undefined
   _sg_item_count: number
+  _sg_items: SellGroupItemInfo[]
 }
 
 type InventoryRow =
@@ -450,6 +466,9 @@ export default function ItemListPage() {
   // Fetch live selling sell groups (only on LIVE_SELLING tab when not filtering to sell-groups-only)
   const { data: liveSellingSellGroups } = useLiveSellingSellGroups(statusTab === 'LIVE_SELLING' && inventoryType !== 'sell-groups')
 
+  // Real-time toast notifications + row highlighting for live-selling orders
+  const { recentlyOrderedItemIds } = useLiveSellingRealtime(statusTab === 'LIVE_SELLING')
+
   // Fetch sell groups for the Group Codes filter or LIVE_SELLING tab sell-groups-only view
   const { data: sellGroupsList, isLoading: sgListLoading } = useSellGroupsForList({
     search: debouncedSearch || undefined,
@@ -576,8 +595,16 @@ export default function ItemListPage() {
         const parts = [pm.brand, pm.model_name, pm.cpu, pm.ram_gb, pm.storage_gb, pm.screen_size ? `${pm.screen_size}"` : null, pm.color].filter(Boolean)
         description = parts.join(' / ')
       }
-      const itemCount = ((sg.sell_group_items as Array<{ count: number }> | null)?.[0] as { count: number } | undefined)?.count ?? 0
-      return { ...sg, _kind: 'sell-group' as const, _sg_description: description, _sg_thumbnail: thumbnail, _sg_item_count: itemCount }
+      // Extract items from enriched sell_group_items (live selling query) or fall back to count
+      const sgiArray = sg.sell_group_items as unknown[]
+      const hasItems = sgiArray?.length > 0 && typeof (sgiArray[0] as Record<string, unknown>)?.items === 'object'
+      const itemCount = hasItems
+        ? sgiArray.length
+        : ((sgiArray as Array<{ count: number }> | null)?.[0] as { count: number } | undefined)?.count ?? 0
+      const sgItems: SellGroupItemInfo[] = hasItems
+        ? (sgiArray as Array<{ items: SellGroupItemInfo }>).map(sgi => sgi.items).filter(Boolean)
+        : []
+      return { ...sg, _kind: 'sell-group' as const, _sg_description: description, _sg_thumbnail: thumbnail, _sg_item_count: itemCount, _sg_items: sgItems }
     })
   }, [])
 
@@ -1004,6 +1031,35 @@ export default function ItemListPage() {
       size: 180,
       cell: ({ row }) => {
         const r = row.original
+        if (r._kind === 'sell-group') {
+          const soldItems = r._sg_items.filter(item =>
+            item.order_items?.some(oi => oi.orders?.customers)
+          )
+          if (soldItems.length === 0) return <span className="text-xs text-muted-foreground">—</span>
+          if (soldItems.length === 1) {
+            const order = soldItems[0].order_items.find(oi => oi.orders?.customers)?.orders
+            if (!order?.customers) return <span className="text-xs text-muted-foreground">—</span>
+            return (
+              <div onClick={(e) => e.stopPropagation()} className="text-sm leading-tight">
+                <Link to={`/admin/customers/${order.customers.id}`} className="font-medium text-primary hover:underline">{formatCustomerName(order.customers)}</Link>
+                <div className="text-xs text-muted-foreground">
+                  <Link to={`/admin/orders/${order.id}`} className="hover:underline">{order.order_code}</Link>
+                </div>
+              </div>
+            )
+          }
+          // Multiple sold
+          const names = soldItems.map(item => {
+            const order = item.order_items.find(oi => oi.orders?.customers)?.orders
+            return order?.customers ? formatCustomerName(order.customers) : null
+          }).filter(Boolean)
+          return (
+            <div className="text-sm leading-tight">
+              <span className="font-medium">{soldItems.length}/{r._sg_item_count} sold</span>
+              <div className="text-xs text-muted-foreground truncate">{names.join(', ')}</div>
+            </div>
+          )
+        }
         if (r._kind !== 'item') return <span className="text-xs text-muted-foreground">—</span>
         const soldTo = resolveSoldTo(r.order_items)
         if (!soldTo) return <span className="text-xs text-muted-foreground">—</span>
@@ -1650,6 +1706,7 @@ export default function ItemListPage() {
               onShowcase={openShowcase}
               showLiveSellingToggle={showLiveSellingCheckbox}
               onToggleLiveSelling={(id, val) => toggleSellGroupLiveSelling.mutate({ sellGroupId: id, value: val })}
+              recentlyOrderedItemIds={recentlyOrderedItemIds}
             />
           ) : isGCodeSearch && !sgLoading ? (
             <div className="flex items-center justify-center py-12 text-muted-foreground">
@@ -1666,6 +1723,10 @@ export default function ItemListPage() {
                 if (row._kind === 'accessory') navigate(`/admin/accessories/${row.id}`)
                 else if (row._kind === 'sell-group') { /* no-op for sell groups */ }
                 else navigate(`/admin/items/${row.id}`)
+              }}
+              getRowClassName={(row) => {
+                if (row._kind === 'item' && recentlyOrderedItemIds.has(row.id)) return 'animate-[highlight-green_3s_ease-out]'
+                return ''
               }}
             />
           ) : showUnified && inventoryType === 'sell-groups' ? (

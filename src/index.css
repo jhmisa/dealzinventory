@@ -113,6 +113,11 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+@keyframes highlight-green {
+  0% { background-color: rgb(34 197 94 / 0.3); }
+  100% { background-color: transparent; }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

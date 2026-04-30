@@ -379,7 +379,7 @@ export async function getSellGroupStatusCounts(filters: { search?: string; grade
   }
 }
 
-// Fetch sell groups marked for live selling with product info
+// Fetch sell groups marked for live selling with product info + item/order/customer details
 export async function getLiveSellingSellGroups() {
   const { data, error } = await supabase
     .from('sell_groups')
@@ -390,7 +390,17 @@ export async function getLiveSellingSellGroups() {
         categories(name, description_fields),
         product_media(id, file_url, media_type, sort_order)
       ),
-      sell_group_items(count)
+      sell_group_items(
+        id, assigned_at,
+        items(
+          id, item_code, item_status,
+          order_items(
+            orders(id, order_code, order_status,
+              customers(id, customer_code, first_name, last_name)
+            )
+          )
+        )
+      )
     `)
     .eq('is_live_selling', true)
     .order('created_at', { ascending: false })

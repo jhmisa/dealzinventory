@@ -22,9 +22,10 @@ interface SellGroupResultBlockProps {
   onShowcase: (code: string, mode: 'photos' | 'videos') => void
   showLiveSellingToggle?: boolean
   onToggleLiveSelling?: (sellGroupId: string, value: boolean) => void
+  recentlyOrderedItemIds?: Set<string>
 }
 
-export function SellGroupResultBlock({ sellGroup, onShowcase, showLiveSellingToggle, onToggleLiveSelling }: SellGroupResultBlockProps) {
+export function SellGroupResultBlock({ sellGroup, onShowcase, showLiveSellingToggle, onToggleLiveSelling, recentlyOrderedItemIds }: SellGroupResultBlockProps) {
   const [expanded, setExpanded] = useState(true)
   const navigate = useNavigate()
 
@@ -163,7 +164,7 @@ export function SellGroupResultBlock({ sellGroup, onShowcase, showLiveSellingTog
                   return (
                     <TableRow
                       key={item.id}
-                      className="cursor-pointer hover:bg-muted/50"
+                      className={`cursor-pointer hover:bg-muted/50 ${recentlyOrderedItemIds?.has(item.id) ? 'animate-[highlight-green_3s_ease-out]' : ''}`}
                       onClick={() => navigate(`/admin/items/${item.id}`)}
                     >
                       <TableCell>
