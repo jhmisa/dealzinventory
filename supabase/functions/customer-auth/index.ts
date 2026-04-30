@@ -128,12 +128,35 @@ async function handleLogin(supabase: ReturnType<typeof createClient>, body: Reco
   const nameUpper = String(last_name).toUpperCase();
   const contact = String(email_or_phone);
 
-  const { data: customer } = await supabase
+  let { data: customer } = await supabase
     .from('customers')
     .select('*')
     .eq('last_name', nameUpper)
     .or(`email.eq.${contact},phone.eq.${contact}`)
     .maybeSingle();
+
+  // E.164 fallback: if no match and phone is in E.164 format, retry with local format
+  // +819012345678 → 09012345678 (Japan)
+  // +639171234567 → 09171234567 (Philippines)
+  if (!customer && contact.startsWith('+81')) {
+    const localPhone = '0' + contact.slice(3);
+    const { data: fallback } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('last_name', nameUpper)
+      .eq('phone', localPhone)
+      .maybeSingle();
+    customer = fallback;
+  } else if (!customer && contact.startsWith('+63')) {
+    const localPhone = '0' + contact.slice(3);
+    const { data: fallback } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('last_name', nameUpper)
+      .eq('phone', localPhone)
+      .maybeSingle();
+    customer = fallback;
+  }
 
   if (!customer) {
     return jsonResponse({ error: 'Invalid credentials' });
