@@ -126,9 +126,18 @@ export default function ItemDetailPage() {
             )}
             <div className="flex items-baseline gap-2 pt-1">
               <span className="text-xs text-muted-foreground">Selling Price</span>
-              <span className="text-2xl font-bold tracking-tight">
-                {item.selling_price != null ? formatPrice(item.selling_price) : '—'}
-              </span>
+              {item.selling_price != null ? (() => {
+                const discount = Number(item.discount ?? 0)
+                const effectivePrice = item.selling_price - discount
+                return discount > 0 ? (
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-bold tracking-tight">{formatPrice(effectivePrice)}</span>
+                    <span className="text-sm text-muted-foreground line-through">{formatPrice(item.selling_price)}</span>
+                  </div>
+                ) : (
+                  <span className="text-2xl font-bold tracking-tight">{formatPrice(item.selling_price)}</span>
+                )
+              })() : <span className="text-2xl font-bold tracking-tight">—</span>}
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">

@@ -435,6 +435,7 @@ export async function searchAvailableItems(query: string, filters: InventorySear
     item_code: string
     condition_grade: string | null
     selling_price: number | null
+    discount: number | null
     product_id: string | null
     brand: string | null
     model_name: string | null
@@ -481,7 +482,7 @@ export async function searchAvailableItems(query: string, filters: InventorySear
       code: row.item_code,
       description,
       grade: row.condition_grade,
-      price: row.selling_price,
+      price: row.selling_price != null ? row.selling_price - (Number(row.discount) || 0) : null,
       thumbnail_url,
       display_url,
       condition_notes: row.condition_notes,

@@ -101,7 +101,7 @@ async function getClaimableItem(code: string): Promise<ClaimableProduct | null> 
       title,
       subtitle,
       grade: item.condition_grade,
-      price: item.selling_price ?? 0,
+      price: (item.selling_price ?? 0) - (Number(item.discount) || 0),
       media,
       available,
       conditionNotes: item.condition_notes,
