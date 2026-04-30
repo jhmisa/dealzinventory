@@ -1,5 +1,5 @@
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Pencil, ShieldCheck, ShieldX, Eye, EyeOff, Ticket } from 'lucide-react'
+import { ArrowLeft, Pencil, ShieldCheck, ShieldX, Eye, EyeOff, Ticket, Plus, Trash2, Star } from 'lucide-react'
 import { toast } from 'sonner'
 import type { ShippingAddress } from '@/lib/address-types'
 import { Button } from '@/components/ui/button'
@@ -26,6 +26,8 @@ import {
   EmptyState,
   AddressDisplay,
   AddressForm,
+  PhoneInput,
+  PhoneDisplay,
 } from '@/components/shared'
 import {
   useCustomerWithDetails,
@@ -35,29 +37,19 @@ import {
   useUpdateCustomer,
   useResetCustomerPin,
 } from '@/hooks/use-customers'
-import { ORDER_STATUSES, KAITORI_STATUSES, TICKET_STATUSES } from '@/lib/constants'
+import {
+  useCustomerAddresses,
+  useCreateCustomerAddress,
+  useUpdateCustomerAddress,
+  useDeleteCustomerAddress,
+} from '@/hooks/use-customer-addresses'
+import { ORDER_STATUSES, KAITORI_STATUSES } from '@/lib/constants'
 import { formatDate, formatDateTime, formatCustomerName } from '@/lib/utils'
 import { useState } from 'react'
-import type { CustomerUpdate } from '@/lib/types'
+import type { CustomerUpdate, CustomerAddress } from '@/lib/types'
 import { useCustomerTickets } from '@/hooks/use-tickets'
 import { TicketListTable } from '@/components/tickets'
 import { CreateTicketDialog } from '@/components/tickets'
-
-/** Format Japan phone number with dashes: 09012345678 → 090-1234-5678 */
-function formatJapanPhone(value: string): string {
-  const digits = value.replace(/[^\d]/g, '')
-  if (/^0[5789]0/.test(digits)) {
-    if (digits.length <= 3) return digits
-    if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`
-    return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7, 11)}`
-  }
-  if (/^0[1-9]/.test(digits)) {
-    if (digits.length <= 2) return digits
-    if (digits.length <= 6) return `${digits.slice(0, 2)}-${digits.slice(2)}`
-    return `${digits.slice(0, 2)}-${digits.slice(2, 6)}-${digits.slice(6, 10)}`
-  }
-  return digits
-}
 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -81,15 +73,94 @@ export default function CustomerDetailPage() {
   const [editFirstName, setEditFirstName] = useState('')
   const [editEmail, setEditEmail] = useState('')
   const [editPhone, setEditPhone] = useState('')
-  const [editAddress, setEditAddress] = useState<ShippingAddress | null>(null)
   const [editIsSeller, setEditIsSeller] = useState(false)
   const [editBankName, setEditBankName] = useState('')
   const [editBankBranch, setEditBankBranch] = useState('')
   const [editBankAccountNumber, setEditBankAccountNumber] = useState('')
   const [editBankAccountHolder, setEditBankAccountHolder] = useState('')
 
+  // Address management
+  const { data: addresses = [], isLoading: addressesLoading } = useCustomerAddresses(id!)
+  const createAddress = useCreateCustomerAddress()
+  const updateAddress = useUpdateCustomerAddress(id!)
+  const deleteAddress = useDeleteCustomerAddress(id!)
+
+  const [addressDialogOpen, setAddressDialogOpen] = useState(false)
+  const [editingAddress, setEditingAddress] = useState<CustomerAddress | null>(null)
+  const [deleteAddressId, setDeleteAddressId] = useState<string | null>(null)
+
+  // Address form state
+  const [addrFormAddress, setAddrFormAddress] = useState<ShippingAddress | null>(null)
+  const [addrFormReceiverFirst, setAddrFormReceiverFirst] = useState('')
+  const [addrFormReceiverLast, setAddrFormReceiverLast] = useState('')
+  const [addrFormReceiverPhone, setAddrFormReceiverPhone] = useState('')
+  const [addrFormIsDefault, setAddrFormIsDefault] = useState(false)
+
   if (isLoading) return <FormSkeleton fields={8} />
   if (!customer) return <div className="text-center py-12 text-muted-foreground">Customer not found.</div>
+
+  function openAddAddress() {
+    setEditingAddress(null)
+    setAddrFormAddress(null)
+    setAddrFormReceiverFirst('')
+    setAddrFormReceiverLast('')
+    setAddrFormReceiverPhone('')
+    setAddrFormIsDefault(addresses.length === 0)
+    setAddressDialogOpen(true)
+  }
+
+  function openEditAddress(addr: CustomerAddress) {
+    setEditingAddress(addr)
+    const parsed = typeof addr.address === 'string' ? JSON.parse(addr.address) : addr.address
+    setAddrFormAddress(parsed as ShippingAddress | null)
+    setAddrFormReceiverFirst(addr.receiver_first_name ?? '')
+    setAddrFormReceiverLast(addr.receiver_last_name ?? '')
+    setAddrFormReceiverPhone(addr.receiver_phone ?? '')
+    setAddrFormIsDefault(addr.is_default ?? false)
+    setAddressDialogOpen(true)
+  }
+
+  async function handleSaveAddress() {
+    try {
+      if (editingAddress) {
+        await updateAddress.mutateAsync({
+          id: editingAddress.id,
+          updates: {
+            address: addrFormAddress as unknown as Record<string, unknown>,
+            receiver_first_name: addrFormReceiverFirst || null,
+            receiver_last_name: addrFormReceiverLast || null,
+            receiver_phone: addrFormReceiverPhone || null,
+            is_default: addrFormIsDefault,
+          },
+        })
+        toast.success('Address updated')
+      } else {
+        await createAddress.mutateAsync({
+          customer_id: id!,
+          address: addrFormAddress as unknown as Record<string, unknown>,
+          receiver_first_name: addrFormReceiverFirst || null,
+          receiver_last_name: addrFormReceiverLast || null,
+          receiver_phone: addrFormReceiverPhone || null,
+          is_default: addrFormIsDefault,
+        })
+        toast.success('Address added')
+      }
+      setAddressDialogOpen(false)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save address')
+    }
+  }
+
+  async function handleDeleteAddress() {
+    if (!deleteAddressId) return
+    try {
+      await deleteAddress.mutateAsync(deleteAddressId)
+      toast.success('Address deleted')
+      setDeleteAddressId(null)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete address')
+    }
+  }
 
   function enterEditMode() {
     if (!customer) return
@@ -97,11 +168,6 @@ export default function CustomerDetailPage() {
     setEditFirstName(customer.first_name ?? '')
     setEditEmail(customer.email ?? '')
     setEditPhone(customer.phone ?? '')
-    setEditAddress(
-      typeof customer.shipping_address === 'string'
-        ? JSON.parse(customer.shipping_address) as ShippingAddress
-        : customer.shipping_address as ShippingAddress | null
-    )
     setEditIsSeller(customer.is_seller ?? false)
     setEditBankName(customer.bank_name ?? '')
     setEditBankBranch(customer.bank_branch ?? '')
@@ -127,13 +193,6 @@ export default function CustomerDetailPage() {
     if (editBankBranch !== (customer.bank_branch ?? '')) updates.bank_branch = editBankBranch || null
     if (editBankAccountNumber !== (customer.bank_account_number ?? '')) updates.bank_account_number = editBankAccountNumber || null
     if (editBankAccountHolder !== (customer.bank_account_holder ?? '')) updates.bank_account_holder = editBankAccountHolder || null
-
-    // Compare address by JSON serialization
-    const currentAddrStr = customer.shipping_address ? JSON.stringify(customer.shipping_address) : null
-    const newAddrStr = editAddress ? JSON.stringify(editAddress) : null
-    if (newAddrStr !== currentAddrStr) {
-      updates.shipping_address = newAddrStr
-    }
 
     if (Object.keys(updates).length === 0) {
       setIsEditing(false)
@@ -246,25 +305,15 @@ export default function CustomerDetailPage() {
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">Phone</Label>
-                  <Input
-                    type="tel"
-                    value={editPhone}
-                    onChange={(e) => setEditPhone(formatJapanPhone(e.target.value))}
-                    placeholder="090-1234-5678"
-                  />
+                  <PhoneInput value={editPhone} onChange={setEditPhone} />
                 </div>
-                <AddressForm value={editAddress} onChange={setEditAddress} />
               </>
             ) : (
               <>
                 <InfoRow label="Email" value={customer.email ?? '-'} />
-                <InfoRow label="Phone" value={customer.phone ?? '-'} />
-                <div className="space-y-1">
-                  <span className="text-sm text-muted-foreground">Shipping Address</span>
-                  <AddressDisplay
-                    address={customer.shipping_address as ShippingAddress | null}
-                    format="auto"
-                  />
+                <div className="flex items-start justify-between text-sm">
+                  <span className="text-muted-foreground">Phone</span>
+                  <PhoneDisplay phone={customer.phone} className="text-right" />
                 </div>
                 <InfoRow label="Registered" value={formatDateTime(customer.created_at)} />
               </>
@@ -387,6 +436,77 @@ export default function CustomerDetailPage() {
         </Card>
       </div>
 
+      {/* Addresses */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <CardTitle className="text-lg">Addresses ({addresses.length})</CardTitle>
+          <Button size="sm" variant="outline" onClick={openAddAddress}>
+            <Plus className="h-4 w-4 mr-1" />
+            Add Address
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {addressesLoading ? (
+            <TableSkeleton rows={2} cols={1} />
+          ) : addresses.length === 0 ? (
+            <EmptyState title="No addresses" description="No addresses added yet." />
+          ) : (
+            <div className="divide-y">
+              {addresses.map((addr) => {
+                const parsedAddr = typeof addr.address === 'string'
+                  ? JSON.parse(addr.address)
+                  : addr.address
+                const hasReceiver = addr.receiver_first_name || addr.receiver_last_name
+                return (
+                  <div key={addr.id} className="py-3 first:pt-0 last:pb-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">{addr.label}</span>
+                        {addr.is_default && (
+                          <Badge variant="secondary" className="text-xs gap-1">
+                            <Star className="h-3 w-3" />
+                            Default
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          onClick={() => openEditAddress(addr)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-destructive hover:text-destructive"
+                          onClick={() => setDeleteAddressId(addr.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                    <AddressDisplay address={parsedAddr as ShippingAddress} format="auto" />
+                    {hasReceiver && (
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        <span>Receiver: {[addr.receiver_first_name, addr.receiver_last_name].filter(Boolean).join(' ')}</span>
+                        {addr.receiver_phone && (
+                          <span className="ml-2">
+                            <PhoneDisplay phone={addr.receiver_phone} />
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Order History */}
       <Card>
         <CardHeader>
@@ -476,6 +596,69 @@ export default function CustomerDetailPage() {
           customerId={customer.id}
         />
       )}
+
+      {/* Address Add/Edit Dialog */}
+      <Dialog open={addressDialogOpen} onOpenChange={setAddressDialogOpen}>
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingAddress ? 'Edit Address' : 'Add Address'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <AddressForm value={addrFormAddress} onChange={setAddrFormAddress} />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Receiver First Name</Label>
+                <Input
+                  value={addrFormReceiverFirst}
+                  onChange={(e) => setAddrFormReceiverFirst(e.target.value.toUpperCase())}
+                  placeholder="TARO"
+                  className="uppercase"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Receiver Last Name</Label>
+                <Input
+                  value={addrFormReceiverLast}
+                  onChange={(e) => setAddrFormReceiverLast(e.target.value.toUpperCase())}
+                  placeholder="TANAKA"
+                  className="uppercase"
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Receiver Phone</Label>
+              <PhoneInput value={addrFormReceiverPhone} onChange={setAddrFormReceiverPhone} />
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={addrFormIsDefault} onCheckedChange={setAddrFormIsDefault} />
+              <Label className="text-sm">Set as default address</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddressDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveAddress}
+              disabled={!addrFormAddress || createAddress.isPending || updateAddress.isPending}
+            >
+              {(createAddress.isPending || updateAddress.isPending) ? 'Saving...' : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Address Confirmation */}
+      <ConfirmDialog
+        open={!!deleteAddressId}
+        onOpenChange={(open) => { if (!open) setDeleteAddressId(null) }}
+        title="Delete Address"
+        description="Are you sure you want to delete this address? This cannot be undone."
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={handleDeleteAddress}
+        loading={deleteAddress.isPending}
+      />
 
       {/* Verify ID Dialog */}
       <ConfirmDialog
