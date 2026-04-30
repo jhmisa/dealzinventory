@@ -1552,6 +1552,10 @@ export default function ItemListPage() {
                   if (inventoryType !== 'products' && inventoryType !== 'sell-groups') count += accLiveSellingCount
                   if (inventoryType !== 'products' && inventoryType !== 'accessories') count += sgLiveSellingCount
                 }
+                // During active live session, override Sold badge with session sales count
+                if (tab.value === 'SOLD' && isSessionActive) {
+                  count = sessionSales.length
+                }
                 const isActive = statusTab === tab.value
                 return (
                   <button
