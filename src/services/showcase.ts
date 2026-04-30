@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { getItemDescription } from '@/lib/utils'
 import type { AccessoryMedia } from '@/lib/types'
 
 export interface ShowcaseItem {
@@ -24,11 +25,12 @@ export async function getShowcaseItem(itemCode: string): Promise<ShowcaseItem | 
 
   if (matchError || !match) return null
 
-  // Fetch full item with relations
+  // Fetch full item with relations (include item-level spec fields for accurate description)
   const { data, error } = await supabase
     .from('items')
     .select(`
       id, item_code, selling_price, purchase_price, discount, condition_grade, condition_notes,
+      brand, model_name, color, cpu, ram_gb, storage_gb, screen_size, supplier_description,
       product_models(
         brand, model_name, color, short_description, cpu, ram_gb, storage_gb, screen_size,
         categories(name, description_fields),
@@ -45,15 +47,9 @@ export async function getShowcaseItem(itemCode: string): Promise<ShowcaseItem | 
   const productMedia = (pm?.product_media ?? []) as Array<{ id: string; file_url: string; media_type: string; sort_order: number }>
   const itemMedia = (data.item_media ?? []) as Array<{ id: string; file_url: string; sort_order: number; visible: boolean; media_type: string }>
 
-  // Build description from product model
-  let description = ''
-  if (pm) {
-    description = (pm.short_description as string) || ''
-    if (!description) {
-      const parts = [pm.brand, pm.model_name, pm.cpu, pm.ram_gb ?? null, pm.storage_gb ?? null, pm.screen_size ? `${pm.screen_size}"` : null, pm.color].filter(Boolean)
-      description = parts.join(' ')
-    }
-  }
+  // Build description from item-level fields (with product model fallback), matching Admin Items
+  const category = pm?.categories as { name: string; description_fields: string[] } | null
+  const description = getItemDescription(data as Record<string, unknown>, pm, category?.description_fields)
 
   // Split product_media into photos and videos
   const photos = productMedia
