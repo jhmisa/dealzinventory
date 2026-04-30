@@ -498,7 +498,7 @@ export async function searchAvailableSellGroups(query: string, filters: Inventor
   if (!hasQuery && !hasFilters) return []
 
   const selectStr = `
-    id, sell_group_code, selling_price, condition_grade, active,
+    id, sell_group_code, base_price, condition_grade, active,
     product_models!inner(brand, model_name, model_number, color, cpu, ram_gb, storage_gb, os_family, screen_size, year,
       product_media(file_url, role, sort_order)
     ),
@@ -516,8 +516,8 @@ export async function searchAvailableSellGroups(query: string, filters: Inventor
       .eq('active', true)
       .eq('sell_group_items.items.item_status', 'AVAILABLE')
     if (filters.brand) q = q.eq('product_models.brand', filters.brand)
-    if (filters.priceMin != null) q = q.gte('selling_price', filters.priceMin)
-    if (filters.priceMax != null) q = q.lte('selling_price', filters.priceMax)
+    if (filters.priceMin != null) q = q.gte('base_price', filters.priceMin)
+    if (filters.priceMax != null) q = q.lte('base_price', filters.priceMax)
     return q.order('sell_group_code').limit(20)
   }
 
@@ -582,7 +582,7 @@ export async function searchAvailableSellGroups(query: string, filters: Inventor
       code: sg.sell_group_code,
       description: `${description} (${availableCount} available)`,
       grade: sg.condition_grade,
-      price: sg.selling_price,
+      price: sg.base_price,
       thumbnail_url,
       display_url: thumbnail_url,
       condition_notes: null,
