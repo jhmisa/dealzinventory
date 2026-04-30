@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { ShoppingBag } from 'lucide-react'
-import { AddressForm } from '@/components/shared'
+import { AddressForm, PhoneInput } from '@/components/shared'
 import type { ShippingAddress } from '@/lib/address-types'
 
 export default function CustomerRegisterPage() {
@@ -116,7 +116,7 @@ export default function CustomerRegisterPage() {
                   <FormItem>
                     <FormLabel>Phone</FormLabel>
                     <FormControl>
-                      <Input type="tel" placeholder="090-1234-5678" {...field} />
+                      <PhoneInput value={field.value ?? ''} onChange={field.onChange} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
