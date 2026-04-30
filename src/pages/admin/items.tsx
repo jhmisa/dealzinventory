@@ -1263,8 +1263,8 @@ export default function ItemListPage() {
     },
     {
       id: 'sold_to',
-      header: 'Sold To',
-      size: 180,
+      header: 'Customer Details',
+      size: 220,
       cell: ({ row }) => {
         const soldTo = resolveSoldTo(row.original.order_items)
         if (!soldTo) return <span className="text-xs text-muted-foreground">—</span>
@@ -1277,11 +1277,20 @@ export default function ItemListPage() {
               {formatCustomerName(soldTo.customer)}
             </Link>
             <div className="text-xs text-muted-foreground">
-              {soldTo.customer.customer_code} ·{' '}
               <Link to={`/admin/orders/${soldTo.orderId}`} className="hover:underline">
                 {soldTo.orderCode}
               </Link>
+              {' · '}
+              <span className={soldTo.orderStatus === 'CONFIRMED' ? 'text-green-600' : ''}>
+                {soldTo.orderStatus}
+              </span>
             </div>
+            {(soldTo.customer.email || soldTo.customer.phone) && (
+              <div className="text-xs text-muted-foreground mt-0.5">
+                {soldTo.customer.email && <div>{soldTo.customer.email}</div>}
+                {soldTo.customer.phone && <div>{soldTo.customer.phone}</div>}
+              </div>
+            )}
           </div>
         )
       },
