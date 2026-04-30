@@ -102,9 +102,16 @@ const INVENTORY_TABS = [
 ] as const
 
 const STATUS_TABS = [
-  { value: 'all', label: 'All' },
-  ...ITEM_STATUSES.map((s) => ({ value: s.value, label: s.label })),
+  { value: 'AVAILABLE', label: 'Available' },
   { value: 'LIVE_SELLING', label: 'LiveSelling' },
+  { value: 'RESERVED', label: 'Reserved' },
+  { value: 'all', label: 'All' },
+  { value: 'INTAKE', label: 'Intake' },
+  { value: 'REPAIR', label: 'Repair' },
+  { value: 'MISSING', label: 'Missing' },
+  { value: 'SOLD', label: 'Sold' },
+  { value: 'SUPPLIER_RETURN', label: 'Supplier Return' },
+  { value: 'REMOVED', label: 'Removed' },
 ]
 
 const SORT_OPTIONS = [
