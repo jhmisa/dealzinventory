@@ -1027,6 +1027,7 @@ function MineClaimInner() {
                           className="flex-1"
                           size="lg"
                           onClick={() => setCheckoutStep(4)}
+                          disabled={!deliveryTimeCode}
                         >
                           Next — Payment
                           <ArrowRight className="h-4 w-4 ml-2" />

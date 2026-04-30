@@ -340,14 +340,13 @@ export function ShippingStep({
               <div className="space-y-1.5">
                 <Label className="text-sm">Delivery Time</Label>
                 <Select
-                  value={deliveryTimeCode ?? 'none'}
-                  onValueChange={(v) => onDeliveryTimeCodeChange(v === 'none' ? null : v)}
+                  value={deliveryTimeCode ?? ''}
+                  onValueChange={(v) => onDeliveryTimeCodeChange(v)}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select time slot" />
+                    <SelectValue placeholder="Select a time slot" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">No preference</SelectItem>
                     {YAMATO_TIME_SLOTS.map((slot) => (
                       <SelectItem key={slot.code} value={slot.code}>
                         {slot.label}
