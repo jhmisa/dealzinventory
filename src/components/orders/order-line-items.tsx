@@ -111,7 +111,7 @@ export function OrderLineItems({
       condition_grade: item.condition_grade,
       quantity: 1,
       unit_price: item.selling_price ?? 0,
-      discount: 0,
+      discount: item.discount ? Number(item.discount) : 0,
     }
 
     onLineItemsChange([...lineItems, newLine])

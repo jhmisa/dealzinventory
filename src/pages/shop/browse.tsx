@@ -255,9 +255,19 @@ export default function ShopBrowsePage() {
                   </h3>
                   <p className="text-xs text-muted-foreground line-clamp-2">{description}</p>
                   <div className="flex items-center justify-between pt-1">
-                    <span className="text-lg font-bold">
-                      {item.selling_price ? formatPrice(Number(item.selling_price)) : '—'}
-                    </span>
+                    {item.selling_price ? (() => {
+                      const discount = Number(item.discount ?? 0)
+                      const sellingPrice = Number(item.selling_price)
+                      const effectivePrice = sellingPrice - discount
+                      return discount > 0 ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-lg font-bold text-red-600 dark:text-red-400">{formatPrice(effectivePrice)}</span>
+                          <span className="text-xs text-muted-foreground line-through">{formatPrice(sellingPrice)}</span>
+                        </div>
+                      ) : (
+                        <span className="text-lg font-bold">{formatPrice(sellingPrice)}</span>
+                      )
+                    })() : <span className="text-lg font-bold">—</span>}
                   </div>
                 </CardContent>
               </Card>

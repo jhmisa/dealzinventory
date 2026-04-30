@@ -219,9 +219,22 @@ export default function ShopItemDetailPage() {
               <p className="text-sm text-muted-foreground mt-1">{pm.short_description}</p>
             )}
             <div className="flex items-center gap-3 mt-3">
-              <span className="text-2xl font-bold">
-                {item.selling_price ? formatPrice(Number(item.selling_price)) : 'Price on request'}
-              </span>
+              {item.selling_price ? (() => {
+                const discount = Number(item.discount ?? 0)
+                const sellingPrice = Number(item.selling_price)
+                const effectivePrice = sellingPrice - discount
+                return discount > 0 ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl font-bold text-red-600 dark:text-red-400">{formatPrice(effectivePrice)}</span>
+                    <span className="text-sm text-muted-foreground line-through">{formatPrice(sellingPrice)}</span>
+                    <Badge className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-0">
+                      Save {formatPrice(discount)}
+                    </Badge>
+                  </div>
+                ) : (
+                  <span className="text-2xl font-bold">{formatPrice(sellingPrice)}</span>
+                )
+              })() : <span className="text-2xl font-bold">Price on request</span>}
               {gradeInfo && (
                 <Badge variant="outline" className={cn('text-xs', gradeInfo.color)}>
                   Grade {gradeInfo.value}

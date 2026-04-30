@@ -140,7 +140,9 @@ export default function ShowcasePage() {
     )
   }
 
-  const price = currentItem?.selling_price ?? currentItem?.purchase_price
+  const rawPrice = currentItem?.selling_price ?? currentItem?.purchase_price
+  const discount = currentItem?.discount ?? 0
+  const price = rawPrice != null ? rawPrice - discount : null
   const currentMedia = mediaItems[currentIndex]
 
   return (
@@ -228,6 +230,11 @@ export default function ShowcasePage() {
                   </div>
                 )}
               </div>
+              {discount > 0 && rawPrice != null && (
+                <span className="text-white/50 line-through text-[36px]/[40px] mt-1">
+                  {formatPrice(rawPrice)}
+                </span>
+              )}
               <span className="tracking-[-0.03em] text-white font-extrabold text-[72px]/[72px] mt-1">
                 {price != null ? formatPrice(price) : '—'}
               </span>

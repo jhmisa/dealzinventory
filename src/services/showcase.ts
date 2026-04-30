@@ -6,6 +6,7 @@ export interface ShowcaseItem {
   item_code: string
   selling_price: number | null
   purchase_price: number | null
+  discount: number | null
   condition_grade: string | null
   condition_notes: string | null
   description: string
@@ -27,7 +28,7 @@ export async function getShowcaseItem(itemCode: string): Promise<ShowcaseItem | 
   const { data, error } = await supabase
     .from('items')
     .select(`
-      id, item_code, selling_price, purchase_price, condition_grade, condition_notes,
+      id, item_code, selling_price, purchase_price, discount, condition_grade, condition_notes,
       product_models(
         brand, model_name, color, short_description, cpu, ram_gb, storage_gb, screen_size,
         categories(name, description_fields),
@@ -80,6 +81,7 @@ export async function getShowcaseItem(itemCode: string): Promise<ShowcaseItem | 
     item_code: data.item_code,
     selling_price: data.selling_price,
     purchase_price: data.purchase_price,
+    discount: data.discount ?? null,
     condition_grade: data.condition_grade,
     condition_notes: data.condition_notes,
     description,
@@ -131,6 +133,7 @@ export async function getShowcaseSellGroup(gCode: string): Promise<ShowcaseItem 
     item_code: sg.sell_group_code,
     selling_price: sg.base_price,
     purchase_price: null,
+    discount: null,
     condition_grade: sg.condition_grade,
     condition_notes: null,
     description,
@@ -170,6 +173,7 @@ export async function getShowcaseAccessory(accessoryCode: string): Promise<Showc
     item_code: data.accessory_code,
     selling_price: data.selling_price,
     purchase_price: null,
+    discount: null,
     condition_grade: null,
     condition_notes: null,
     description,

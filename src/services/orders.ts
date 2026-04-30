@@ -254,7 +254,7 @@ export async function getAvailableItems(filters: AvailableItemFilters = {}) {
   let query = supabase
     .from('items')
     .select(`
-      id, item_code, condition_grade, selling_price, item_status,
+      id, item_code, condition_grade, selling_price, discount, item_status,
       product_models(id, brand, model_name, color,
         product_media(file_url, role, sort_order)
       )
@@ -280,7 +280,7 @@ export async function getAvailableItems(filters: AvailableItemFilters = {}) {
     const { data: modelResults, error: modelError } = await supabase
       .from('items')
       .select(`
-        id, item_code, condition_grade, selling_price, item_status,
+        id, item_code, condition_grade, selling_price, discount, item_status,
         product_models!inner(id, brand, model_name, color,
           product_media(file_url, role, sort_order)
         )

@@ -50,7 +50,7 @@ export async function getShopItems(filters: ShopFilters = {}) {
   let query = supabase
     .from('items')
     .select(`
-      id, item_code, condition_grade, selling_price, specs_notes, condition_notes,
+      id, item_code, condition_grade, selling_price, discount, specs_notes, condition_notes,
       product_models!inner(id, brand, model_name, color, short_description, category_id,
         categories(id, name),
         product_media(id, file_url, role, sort_order)
