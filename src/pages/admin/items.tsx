@@ -236,15 +236,12 @@ function EditPriceCell({
 
   return (
     <>
-      <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-        <button
-          onClick={handleOpen}
-          className="text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded hover:bg-muted"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
-        <PriceDisplay amount={value} />
-      </div>
+      <button
+        onClick={(e) => { e.stopPropagation(); handleOpen() }}
+        className="text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded hover:bg-muted"
+      >
+        <Pencil className="h-3.5 w-3.5" />
+      </button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-[360px]" onClick={(e) => e.stopPropagation()}>
           <DialogHeader>
@@ -961,12 +958,12 @@ export default function ItemListPage() {
               <PriceDisplay amount={r.purchase_price} className="text-xs" />
             </div>
             <div className="flex items-center justify-between gap-1">
-              <span className="text-muted-foreground">Sell</span>
-              <EditPriceCell itemId={r.id} itemCode={r.item_code} field="selling_price" value={r.selling_price} updateItem={updateItem} />
+              <span className="text-muted-foreground flex items-center gap-0.5">Sell <EditPriceCell itemId={r.id} itemCode={r.item_code} field="selling_price" value={r.selling_price} updateItem={updateItem} /></span>
+              <PriceDisplay amount={r.selling_price} className="text-xs" />
             </div>
             <div className="flex items-center justify-between gap-1">
-              <span className="text-muted-foreground">Disc</span>
-              <EditPriceCell itemId={r.id} itemCode={r.item_code} field="discount" value={r.discount} updateItem={updateItem} />
+              <span className="text-muted-foreground flex items-center gap-0.5">Disc <EditPriceCell itemId={r.id} itemCode={r.item_code} field="discount" value={r.discount} updateItem={updateItem} /></span>
+              <PriceDisplay amount={r.discount} className="text-xs" />
             </div>
             <div className={cn('flex items-center justify-between gap-1 font-medium', profit >= 0 ? 'text-green-600' : 'text-red-500')}>
               <span>Profit</span>
@@ -1235,12 +1232,12 @@ export default function ItemListPage() {
               <PriceDisplay amount={r.purchase_price} className="text-xs" />
             </div>
             <div className="flex items-center justify-between gap-1">
-              <span className="text-muted-foreground">Sell</span>
-              <EditPriceCell itemId={r.id} itemCode={r.item_code} field="selling_price" value={r.selling_price} updateItem={updateItem} />
+              <span className="text-muted-foreground flex items-center gap-0.5">Sell <EditPriceCell itemId={r.id} itemCode={r.item_code} field="selling_price" value={r.selling_price} updateItem={updateItem} /></span>
+              <PriceDisplay amount={r.selling_price} className="text-xs" />
             </div>
             <div className="flex items-center justify-between gap-1">
-              <span className="text-muted-foreground">Disc</span>
-              <EditPriceCell itemId={r.id} itemCode={r.item_code} field="discount" value={r.discount} updateItem={updateItem} />
+              <span className="text-muted-foreground flex items-center gap-0.5">Disc <EditPriceCell itemId={r.id} itemCode={r.item_code} field="discount" value={r.discount} updateItem={updateItem} /></span>
+              <PriceDisplay amount={r.discount} className="text-xs" />
             </div>
             <div className={cn('flex items-center justify-between gap-1 font-medium', profit >= 0 ? 'text-green-600' : 'text-red-500')}>
               <span>Profit</span>
