@@ -237,13 +237,13 @@ function EditPriceCell({
   return (
     <>
       <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-        <PriceDisplay amount={value} />
         <button
           onClick={handleOpen}
           className="text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded hover:bg-muted"
         >
           <Pencil className="h-3.5 w-3.5" />
         </button>
+        <PriceDisplay amount={value} />
       </div>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-[360px]" onClick={(e) => e.stopPropagation()}>
