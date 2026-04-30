@@ -276,7 +276,7 @@ export default function ItemListPage() {
   const toggleLiveSelling = useToggleLiveSelling()
   const toggleAccessoryLiveSelling = useToggleAccessoryLiveSelling()
   const toggleSellGroupLiveSelling = useToggleSellGroupLiveSelling()
-  const { getParam, setParam } = usePersistedFilters('items-filters')
+  const { getParam, setParam, setParams } = usePersistedFilters('items-filters')
 
   // Inventory type tab (items vs accessories)
   const inventoryTab = getParam('inventoryTab', 'items') as 'items' | 'accessories'
@@ -366,9 +366,11 @@ export default function ItemListPage() {
 
   const setSortValue = useCallback((combined: string) => {
     const [field, dir] = combined.split('-')
-    setParam('sortBy', field, 'date')
-    setParam('sortDir', dir, 'desc')
-  }, [setParam])
+    setParams({
+      sortBy: { value: field, defaultValue: 'date' },
+      sortDir: { value: dir, defaultValue: 'desc' },
+    })
+  }, [setParams])
 
   const hasActiveFilters = !!(search || gradeFilter || categoryFilter || brandFilter || descriptionSearch || conditionSearch || priceFrom || priceTo || noSellFilter || (sortBy && sortBy !== 'date') || (sortDir && sortDir !== 'desc'))
 
