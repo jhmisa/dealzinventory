@@ -26,26 +26,8 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
-import { AddressForm } from '@/components/shared'
+import { AddressForm, PhoneInput } from '@/components/shared'
 import type { ShippingAddress } from '@/lib/address-types'
-
-/** Format Japan phone number with dashes: 09012345678 → 090-1234-5678 */
-function formatJapanPhone(value: string): string {
-  const digits = value.replace(/[^\d]/g, '')
-  // Mobile: 090/080/070/050 → XXX-XXXX-XXXX
-  if (/^0[5789]0/.test(digits)) {
-    if (digits.length <= 3) return digits
-    if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`
-    return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7, 11)}`
-  }
-  // Landline: 03/06/etc → XX-XXXX-XXXX
-  if (/^0[1-9]/.test(digits)) {
-    if (digits.length <= 2) return digits
-    if (digits.length <= 6) return `${digits.slice(0, 2)}-${digits.slice(2)}`
-    return `${digits.slice(0, 2)}-${digits.slice(2, 6)}-${digits.slice(6, 10)}`
-  }
-  return digits
-}
 
 interface CustomerFormDialogProps {
   open: boolean
@@ -166,12 +148,7 @@ export function CustomerFormDialog({
                 <FormItem>
                   <FormLabel>Phone</FormLabel>
                   <FormControl>
-                    <Input
-                      type="tel"
-                      placeholder="090-1234-5678"
-                      {...field}
-                      onChange={(e) => field.onChange(formatJapanPhone(e.target.value))}
-                    />
+                    <PhoneInput value={field.value} onChange={field.onChange} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
