@@ -443,7 +443,7 @@ export function OrderDetailContent({ orderId, onClose, onNavigate, isModal }: Or
     orderItems.filter((oi) => oi.item_id).map((oi) => oi.item_id)
   )
 
-  async function handleAddInventoryItem(item: { id: string; item_code: string; condition_grade: string; selling_price: number | null; product_models: { brand: string; model_name: string } | null }) {
+  async function handleAddInventoryItem(item: { id: string; item_code: string; condition_grade: string; selling_price: number | null; discount: number | null; product_models: { brand: string; model_name: string } | null }) {
     if (existingItemIds.has(item.id)) return
     try {
       const pm = item.product_models
@@ -455,7 +455,7 @@ export function OrderDetailContent({ orderId, onClose, onNavigate, isModal }: Or
           description,
           quantity: 1,
           unit_price: item.selling_price ?? 0,
-          discount: 0,
+          discount: item.discount ? Number(item.discount) : 0,
         },
       })
       await recalcTotal.mutateAsync(order.id)
@@ -1429,6 +1429,7 @@ export function OrderDetailContent({ orderId, onClose, onNavigate, isModal }: Or
                                       item_code: item.item_code,
                                       condition_grade: item.condition_grade,
                                       selling_price: item.selling_price,
+                                      discount: item.discount,
                                       product_models: pm,
                                     })}
                                   >
