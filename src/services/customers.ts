@@ -240,6 +240,44 @@ export async function resetCustomerPin(customerId: string, newPin: string) {
   return data
 }
 
+// --- Merge Customers ---
+
+export async function getMergePreview(primaryId: string, secondaryIds: string[]) {
+  const counts = { orders: 0, kaitori: 0, addresses: 0, conversations: 0, tickets: 0, offers: 0 }
+
+  for (const secId of secondaryIds) {
+    const [orders, kaitori, addresses, conversations, tickets, offers] = await Promise.all([
+      supabase.from('orders').select('id', { count: 'exact', head: true }).eq('customer_id', secId),
+      supabase.from('kaitori_requests').select('id', { count: 'exact', head: true }).eq('customer_id', secId),
+      supabase.from('customer_addresses').select('id', { count: 'exact', head: true }).eq('customer_id', secId),
+      supabase.from('conversations').select('id', { count: 'exact', head: true }).eq('customer_id', secId),
+      supabase.from('tickets').select('id', { count: 'exact', head: true }).eq('customer_id', secId),
+      supabase.from('offers').select('id', { count: 'exact', head: true }).eq('customer_id', secId),
+    ])
+    counts.orders += orders.count ?? 0
+    counts.kaitori += kaitori.count ?? 0
+    counts.addresses += addresses.count ?? 0
+    counts.conversations += conversations.count ?? 0
+    counts.tickets += tickets.count ?? 0
+    counts.offers += offers.count ?? 0
+  }
+
+  return counts
+}
+
+export async function mergeCustomers(primaryId: string, secondaryIds: string[]) {
+  const { data: { user } } = await supabase.auth.getUser()
+
+  const { data, error } = await supabase.rpc('merge_customers', {
+    p_primary_id: primaryId,
+    p_secondary_ids: secondaryIds,
+    p_performed_by: user?.id ?? null,
+  })
+
+  if (error) throw error
+  return data as { merged_count: number; primary_code: string; merged_codes: string[] }
+}
+
 export async function customerChangePin(customerId: string, currentPin: string, newPin: string) {
   const { data, error } = await supabase.functions.invoke('customer-auth', {
     body: { action: 'change_pin', customer_id: customerId, current_pin: currentPin, new_pin: newPin },

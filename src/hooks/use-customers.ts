@@ -74,6 +74,21 @@ export function useResetCustomerPin() {
   })
 }
 
+export function useMergeCustomers() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ primaryId, secondaryIds }: { primaryId: string; secondaryIds: string[] }) =>
+      customersService.mergeCustomers(primaryId, secondaryIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.customers.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.messaging.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.tickets.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.offers.all })
+    },
+  })
+}
+
 export function useVerifyCustomerId() {
   const queryClient = useQueryClient()
   return useMutation({

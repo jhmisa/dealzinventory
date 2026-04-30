@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { usePersistedFilters } from '@/hooks/use-persisted-filters'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Plus } from 'lucide-react'
+import { Plus, Merge } from 'lucide-react'
 import { toast } from 'sonner'
 import { useCustomers, useCreateCustomer } from '@/hooks/use-customers'
 import { DataTable, SearchBar, PageHeader, CodeDisplay, TableSkeleton, EmptyState } from '@/components/shared'
@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { ShieldCheck } from 'lucide-react'
 import { formatDate, formatCustomerName } from '@/lib/utils'
 import { CustomerFormDialog } from '@/components/customers/customer-form-dialog'
+import { MergeCustomersDialog } from '@/components/customers/merge-customers-dialog'
 import type { Customer } from '@/lib/types'
 import type { AdminCreateCustomerFormValues } from '@/validators/customer'
 import type { ShippingAddress } from '@/lib/address-types'
@@ -78,6 +79,7 @@ export default function CustomerListPage() {
   const search = getParam('q')
   const setSearch = (v: string) => setParam('q', v)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [mergeDialogOpen, setMergeDialogOpen] = useState(false)
   const { data: customers, isLoading } = useCustomers(search || undefined)
   const createMutation = useCreateCustomer()
 
@@ -110,10 +112,16 @@ export default function CustomerListPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <PageHeader title="Customers" />
-        <Button onClick={() => setDialogOpen(true)} size="sm">
-          <Plus className="h-4 w-4 mr-1" />
-          Add Customer
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setMergeDialogOpen(true)}>
+            <Merge className="h-4 w-4 mr-1" />
+            Merge Customers
+          </Button>
+          <Button onClick={() => setDialogOpen(true)} size="sm">
+            <Plus className="h-4 w-4 mr-1" />
+            Add Customer
+          </Button>
+        </div>
       </div>
 
       <SearchBar
@@ -138,6 +146,11 @@ export default function CustomerListPage() {
         onOpenChange={setDialogOpen}
         loading={createMutation.isPending}
         onSubmit={handleCreate}
+      />
+
+      <MergeCustomersDialog
+        open={mergeDialogOpen}
+        onOpenChange={setMergeDialogOpen}
       />
     </div>
   )
