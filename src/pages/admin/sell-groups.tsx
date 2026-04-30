@@ -25,6 +25,7 @@ import {
 import { PageHeader, SearchBar, DataTable, GradeBadge, StatusBadge, CodeDisplay, PriceDisplay, TableSkeleton } from '@/components/shared'
 import { useSellGroups, useUnassignedItems, useCreateSellGroupWithItems } from '@/hooks/use-sell-groups'
 import { CONDITION_GRADES } from '@/lib/constants'
+import { buildShortDescription } from '@/lib/utils'
 
 type SellGroupRow = {
   id: string
@@ -33,7 +34,11 @@ type SellGroupRow = {
   base_price: number
   active: boolean
   created_at: string
-  product_models: { brand: string; model_name: string; color: string; cpu: string | null; ram_gb: string | null; storage_gb: string | null; os_family: string | null } | null
+  product_models: {
+    brand: string; model_name: string; color: string; cpu: string | null; ram_gb: string | null; storage_gb: string | null; os_family: string | null;
+    categories: { name: string; description_fields: string[] } | null;
+    [key: string]: unknown;
+  } | null
   sell_group_items: { count: number }[]
 }
 
@@ -53,10 +58,19 @@ const columns: ColumnDef<SellGroupRow>[] = [
   },
   {
     id: 'config',
-    header: 'Config',
+    header: 'Description',
     cell: ({ row }) => {
       const pm = row.original.product_models
-      return pm && (pm.cpu || pm.ram_gb || pm.storage_gb) ? `${pm.cpu ?? '?'} / ${pm.ram_gb ?? '?'} / ${pm.storage_gb ?? '?'}` : '—'
+      if (!pm) return '—'
+      const descFields = pm.categories?.description_fields
+      if (descFields && descFields.length > 0) {
+        const values: Record<string, unknown> = {}
+        for (const key of descFields) {
+          values[key] = pm[key]
+        }
+        return buildShortDescription(values, descFields) || '—'
+      }
+      return pm.cpu || pm.ram_gb || pm.storage_gb ? `${pm.cpu ?? '?'} / ${pm.ram_gb ?? '?'} / ${pm.storage_gb ?? '?'}` : '—'
     },
   },
   {

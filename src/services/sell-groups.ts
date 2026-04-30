@@ -13,7 +13,7 @@ export async function getSellGroups(filters: SellGroupFilters = {}) {
     .from('sell_groups')
     .select(`
       *,
-      product_models(brand, model_name, color, cpu, ram_gb, storage_gb, os_family),
+      product_models(*, categories(name, description_fields)),
       sell_group_items(count)
     `)
     .order('created_at', { ascending: false })
