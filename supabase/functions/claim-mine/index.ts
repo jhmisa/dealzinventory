@@ -68,13 +68,14 @@ Deno.serve(async (req) => {
     let accessoryId: string | null = null;
     let description = '';
     let unitPrice = 0;
+    let itemDiscount = 0;
     let quantity = 1;
 
     if (prefix === 'P') {
       // Fetch item by P-code
       const { data: item, error: itemError } = await supabase
         .from('items')
-        .select('id, item_code, item_status, condition_grade, selling_price, product_id, product_models(brand, model_name)')
+        .select('id, item_code, item_status, condition_grade, selling_price, discount, product_id, product_models(brand, model_name)')
         .eq('item_code', code.toUpperCase())
         .maybeSingle();
 
@@ -86,6 +87,7 @@ Deno.serve(async (req) => {
       const pm = item.product_models as { brand: string; model_name: string } | null;
       description = pm ? `${pm.brand} ${pm.model_name}` : item.item_code;
       unitPrice = item.selling_price ?? 0;
+      itemDiscount = item.discount ? Number(item.discount) : 0;
 
     } else if (prefix === 'G') {
       // Fetch sell group
@@ -101,7 +103,7 @@ Deno.serve(async (req) => {
       // Find first available item in the sell group that's not already in an order
       const { data: sgi } = await supabase
         .from('sell_group_items')
-        .select('item_id, items!inner(id, item_status, condition_grade)')
+        .select('item_id, items!inner(id, item_status, condition_grade, discount)')
         .eq('sell_group_id', sg.id)
         .eq('items.item_status', 'AVAILABLE')
         .neq('items.condition_grade', 'J');
@@ -116,11 +118,13 @@ Deno.serve(async (req) => {
         .in('item_id', candidateIds);
 
       const orderedSet = new Set((orderedItems ?? []).map(o => o.item_id));
-      const availableItem = candidateIds.find(id => !orderedSet.has(id));
+      const availableEntry = sgi.find(s => !orderedSet.has(s.item_id));
 
-      if (!availableItem) return jsonResponse({ error: 'All items in this sell group are already claimed' });
+      if (!availableEntry) return jsonResponse({ error: 'All items in this sell group are already claimed' });
 
-      itemId = availableItem;
+      itemId = availableEntry.item_id;
+      const itemData = availableEntry.items as { id: string; item_status: string; condition_grade: string; discount: number | null };
+      itemDiscount = itemData.discount ? Number(itemData.discount) : 0;
       const pm = sg.product_models as { brand: string; model_name: string } | null;
       description = pm ? `${pm.brand} ${pm.model_name}` : sg.sell_group_code;
       unitPrice = sg.base_price ?? 0;
@@ -185,7 +189,7 @@ Deno.serve(async (req) => {
           order_status: 'CONFIRMED',
           shipping_address,
           quantity,
-          total_price: unitPrice * quantity + DEFAULT_SHIPPING_COST,
+          total_price: unitPrice * quantity - itemDiscount + DEFAULT_SHIPPING_COST,
           delivery_date: delivery_date ?? null,
           delivery_time_code: delivery_time_code ?? null,
           payment_method: payment_method ?? null,
@@ -211,7 +215,7 @@ Deno.serve(async (req) => {
         description,
         quantity,
         unit_price: unitPrice,
-        discount: 0,
+        discount: itemDiscount,
       });
 
     if (oiError) {
