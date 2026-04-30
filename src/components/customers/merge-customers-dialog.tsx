@@ -65,14 +65,17 @@ function CustomerCard({ customer, onRemove }: { customer: Customer; onRemove?: (
 
 function CustomerSearch({
   label,
+  confirmLabel,
   excludeIds,
   onSelect,
 }: {
   label: string
+  confirmLabel: string
   excludeIds: string[]
   onSelect: (customer: Customer) => void
 }) {
   const [search, setSearch] = useState('')
+  const [pendingCustomer, setPendingCustomer] = useState<Customer | null>(null)
   const { data: customers, isLoading } = useCustomers(search || undefined)
 
   const filtered = customers?.filter((c) => !excludeIds.includes(c.id)) ?? []
@@ -84,7 +87,10 @@ function CustomerSearch({
         <CommandInput
           placeholder="Search by name, code, email..."
           value={search}
-          onValueChange={setSearch}
+          onValueChange={(v) => {
+            setSearch(v)
+            setPendingCustomer(null)
+          }}
         />
         <CommandList>
           {search && !isLoading && filtered.length === 0 && (
@@ -93,16 +99,13 @@ function CustomerSearch({
           {search && isLoading && (
             <div className="py-4 text-center text-sm text-muted-foreground">Searching...</div>
           )}
-          {filtered.length > 0 && (
+          {search && filtered.length > 0 && (
             <CommandGroup>
               {filtered.slice(0, 8).map((c) => (
                 <CommandItem
                   key={c.id}
                   value={c.id}
-                  onSelect={() => {
-                    onSelect(c)
-                    setSearch('')
-                  }}
+                  onSelect={() => setPendingCustomer(c)}
                 >
                   <CodeDisplay code={c.customer_code} />
                   <span>{formatCustomerName(c)}</span>
@@ -115,6 +118,33 @@ function CustomerSearch({
           )}
         </CommandList>
       </Command>
+      {pendingCustomer && (
+        <div className="flex items-center justify-between rounded-lg border border-primary/30 bg-primary/5 p-3">
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-2">
+              <CodeDisplay code={pendingCustomer.customer_code} />
+              <span className="font-medium text-sm">{formatCustomerName(pendingCustomer)}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">{confirmLabel}</p>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Button variant="ghost" size="sm" className="h-7" onClick={() => setPendingCustomer(null)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              className="h-7"
+              onClick={() => {
+                onSelect(pendingCustomer)
+                setSearch('')
+                setPendingCustomer(null)
+              }}
+            >
+              Yes
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -198,6 +228,7 @@ export function MergeCustomersDialog({ open, onOpenChange }: MergeCustomersDialo
           <div className="space-y-4">
             <CustomerSearch
               label="Primary Account (keep)"
+              confirmLabel="Set as Primary Account?"
               excludeIds={secondaries.map((s) => s.id)}
               onSelect={setPrimary}
             />
@@ -207,6 +238,7 @@ export function MergeCustomersDialog({ open, onOpenChange }: MergeCustomersDialo
 
             <CustomerSearch
               label="Accounts to Merge (delete)"
+              confirmLabel="Add to merge list?"
               excludeIds={allSelectedIds}
               onSelect={(c) => setSecondaries((prev) => [...prev, c])}
             />
