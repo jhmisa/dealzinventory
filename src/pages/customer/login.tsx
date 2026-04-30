@@ -9,11 +9,13 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { ShoppingBag } from 'lucide-react'
+import { PhoneInput } from '@/components/shared'
 
 export default function CustomerLoginPage() {
   const navigate = useNavigate()
   const { login } = useCustomerAuth()
   const [error, setError] = useState<string | null>(null)
+  const [loginMethod, setLoginMethod] = useState<'email' | 'phone'>('phone')
 
   const form = useForm<CustomerLoginFormValues>({
     resolver: zodResolver(customerLoginSchema),
@@ -61,19 +63,45 @@ export default function CustomerLoginPage() {
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="email_or_phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email or Phone</FormLabel>
-                    <FormControl>
-                      <Input placeholder="tanaka@example.com or 090-1234-5678" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div>
+                <div className="flex gap-1 mb-2">
+                  <button
+                    type="button"
+                    onClick={() => { setLoginMethod('email'); form.setValue('email_or_phone', '') }}
+                    className={`px-3 py-1 text-xs rounded-full border ${loginMethod === 'email' ? 'bg-primary text-primary-foreground border-primary' : 'border-input text-muted-foreground hover:bg-accent'}`}
+                  >
+                    Email
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setLoginMethod('phone'); form.setValue('email_or_phone', '') }}
+                    className={`px-3 py-1 text-xs rounded-full border ${loginMethod === 'phone' ? 'bg-primary text-primary-foreground border-primary' : 'border-input text-muted-foreground hover:bg-accent'}`}
+                  >
+                    Phone
+                  </button>
+                </div>
+                <FormField
+                  control={form.control}
+                  name="email_or_phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{loginMethod === 'email' ? 'Email' : 'Phone'}</FormLabel>
+                      <FormControl>
+                        {loginMethod === 'email' ? (
+                          <Input
+                            type="email"
+                            placeholder="tanaka@example.com"
+                            {...field}
+                          />
+                        ) : (
+                          <PhoneInput value={field.value} onChange={field.onChange} />
+                        )}
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               <FormField
                 control={form.control}
                 name="pin"
