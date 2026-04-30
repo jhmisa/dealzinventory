@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Plus, Printer, QrCode, Pencil, Copy, AlertTriangle, Image, Play, Star, X, Link2 } from 'lucide-react'
+import { Plus, Printer, QrCode, Pencil, Copy, AlertTriangle, Image, Play, Star, X, Link2, Radio, Eye } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -24,7 +24,8 @@ import {
 } from '@/components/ui/dialog'
 import { PageHeader, SearchBar, DataTable, StatusBadge, GradeBadge, CodeDisplay, PriceDisplay, TableSkeleton } from '@/components/shared'
 import { useItems, useUpdateItem, useItemStatusCounts, useToggleLiveSelling, useItemsRealtimeSync } from '@/hooks/use-items'
-import { useLiveSellingRealtime } from '@/hooks/use-live-selling-realtime'
+import { useLiveSellingRealtime, type SessionSale } from '@/hooks/use-live-selling-realtime'
+import { useAuth } from '@/hooks/use-auth'
 import { useSellGroupByCode, useToggleSellGroupLiveSelling, useLiveSellingSellGroups, useSellGroupLiveSellingCount, useSellGroupsForList, useSellGroupStatusCounts } from '@/hooks/use-sell-groups'
 import { SellGroupResultBlock } from '@/components/sell-groups/sell-group-result-block'
 import { useAccessories, useCreateAccessory, useAccessoryTabCounts, useToggleAccessoryLiveSelling, useAccessoryLiveSellingCount } from '@/hooks/use-accessories'
@@ -292,6 +293,7 @@ function EditPriceCell({
 export default function ItemListPage() {
   const navigate = useNavigate()
   useItemsRealtimeSync()
+  const { displayName } = useAuth()
   const updateItem = useUpdateItem()
   const toggleLiveSelling = useToggleLiveSelling()
   const toggleAccessoryLiveSelling = useToggleAccessoryLiveSelling()
@@ -328,6 +330,7 @@ export default function ItemListPage() {
   const [newPrice, setNewPrice] = useState('')
   const [newCategory, setNewCategory] = useState('')
   const [newShopVisible, setNewShopVisible] = useState(false)
+  const [viewSoldOpen, setViewSoldOpen] = useState(false)
 
   function handleCreateAccessory() {
     const price = parseInt(newPrice, 10)
@@ -466,8 +469,8 @@ export default function ItemListPage() {
   // Fetch live selling sell groups (only on LIVE_SELLING tab when not filtering to sell-groups-only)
   const { data: liveSellingSellGroups } = useLiveSellingSellGroups(statusTab === 'LIVE_SELLING' && inventoryType !== 'sell-groups')
 
-  // Real-time toast notifications + row highlighting for live-selling orders
-  const { recentlyOrderedItemIds } = useLiveSellingRealtime(statusTab === 'LIVE_SELLING')
+  // Real-time toast notifications + row highlighting + session tracking for live-selling orders
+  const { recentlyOrderedItemIds, isSessionActive, sessionSales, startSession, endSession } = useLiveSellingRealtime(statusTab === 'LIVE_SELLING')
 
   // Fetch sell groups for the Group Codes filter or LIVE_SELLING tab sell-groups-only view
   const { data: sellGroupsList, isLoading: sgListLoading } = useSellGroupsForList({
@@ -1531,7 +1534,7 @@ export default function ItemListPage() {
       ) : (
         <>
           {/* Status Tabs */}
-          <div className="border-b">
+          <div className="border-b flex items-end justify-between">
             <nav className="flex gap-0 -mb-px overflow-x-auto">
               {STATUS_TABS.map((tab) => {
                 let count = statusCounts[tab.value] ?? 0
@@ -1577,6 +1580,49 @@ export default function ItemListPage() {
                 )
               })}
             </nav>
+            {statusTab === 'LIVE_SELLING' && (
+              <div className="flex items-center gap-2 pb-1.5 pr-2 shrink-0">
+                {isSessionActive ? (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setViewSoldOpen(true)}
+                    >
+                      <Eye className="h-4 w-4 mr-1.5" />
+                      View Sold
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={async () => {
+                        const sales = await endSession()
+                        toast.success(`Session ended — ${sales.length} items sold`)
+                      }}
+                    >
+                      <Radio className="h-4 w-4 mr-1.5" />
+                      End Live
+                      <span className={cn(
+                        'ml-1.5 inline-flex items-center justify-center rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold',
+                        sessionSales.length > 0 && 'animate-pulse',
+                      )}>
+                        {sessionSales.length}
+                      </span>
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-green-500 text-green-600 hover:bg-green-50 hover:text-green-700"
+                    onClick={() => startSession(displayName ?? 'Staff')}
+                  >
+                    <Radio className="h-4 w-4 mr-1.5" />
+                    Start Live
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Inventory Type Filter — only on All & Available tabs */}
@@ -1773,6 +1819,59 @@ export default function ItemListPage() {
           )}
         </>
       )}
+      {/* View Sold Dialog */}
+      <Dialog open={viewSoldOpen} onOpenChange={setViewSoldOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Live Sold Items</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[400px] overflow-y-auto">
+            {sessionSales.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">No sales yet</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left">
+                    <th className="py-2 pr-2 font-medium">Time</th>
+                    <th className="py-2 pr-2 font-medium">Description</th>
+                    <th className="py-2 pr-2 font-medium text-right">Amount</th>
+                    <th className="py-2 font-medium">Customer</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sessionSales.map((sale, i) => (
+                    <tr key={`${sale.itemId}-${i}`} className="border-b last:border-0">
+                      <td className="py-2 pr-2 whitespace-nowrap text-muted-foreground">
+                        {sale.timestamp.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                      </td>
+                      <td className="py-2 pr-2 truncate max-w-[180px]" title={sale.description}>
+                        {sale.description}
+                      </td>
+                      <td className="py-2 pr-2 text-right whitespace-nowrap">
+                        {sale.amount != null ? `¥${sale.amount.toLocaleString()}` : '—'}
+                      </td>
+                      <td className="py-2 truncate max-w-[120px]" title={sale.customerName}>
+                        {sale.customerName}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+          {sessionSales.length > 0 && (
+            <div className="flex justify-between items-center pt-2 border-t text-sm font-medium">
+              <span>{sessionSales.length} item{sessionSales.length !== 1 ? 's' : ''} sold</span>
+              <span>
+                Total: ¥{sessionSales.reduce((sum, s) => sum + (s.amount ?? 0), 0).toLocaleString()}
+              </span>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewSoldOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
