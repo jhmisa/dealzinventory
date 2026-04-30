@@ -11,6 +11,9 @@ const STATUS_TABS = [
   { value: 'REPAIR', label: 'Repair' },
   { value: 'MISSING', label: 'Missing' },
   { value: 'SOLD', label: 'Sold' },
+  { value: 'SUPPLIER_RETURN', label: 'Supplier Return' },
+  { value: 'REMOVED', label: 'Removed' },
+  { value: 'LIVE_SELLING', label: 'LiveSelling' },
 ] as const
 
 const COLUMN_OPTIONS = [
@@ -19,7 +22,7 @@ const COLUMN_OPTIONS = [
   { id: 'item_status', label: 'Status' },
   { id: 'supplier', label: 'Supplier' },
   { id: 'amount', label: 'Amount (Buy/Sell/Discount/Profit)' },
-  { id: 'sold_to', label: 'Sold To' },
+  { id: 'sold_to', label: 'Customer Details' },
   { id: 'created_at', label: 'Intake Date' },
 ] as const
 
