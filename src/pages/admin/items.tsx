@@ -409,6 +409,10 @@ export default function ItemListPage() {
       } else if (id === 'amount') {
         // Migrate from old separate price columns
         vis[id] = saved.includes('amount') || saved.includes('purchase_price') || saved.includes('selling_price') || saved.includes('discount')
+      } else if (id === 'sold_to') {
+        // Show sold_to by default on order-related tabs even if not yet in saved settings
+        const orderTabs = new Set(['RESERVED', 'SOLD'])
+        vis[id] = saved.includes(id) || orderTabs.has(statusTab)
       } else {
         vis[id] = saved.includes(id)
       }
