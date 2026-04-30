@@ -213,7 +213,7 @@ export async function getItemStats() {
   return stats
 }
 
-const ITEM_STATUS_VALUES = ['INTAKE', 'AVAILABLE', 'RESERVED', 'REPAIR', 'MISSING', 'SOLD'] as const
+const ITEM_STATUS_VALUES = ['INTAKE', 'AVAILABLE', 'RESERVED', 'REPAIR', 'MISSING', 'SOLD', 'SUPPLIER_RETURN', 'REMOVED'] as const
 
 export async function getItemStatusCounts(filters: Omit<ItemFilters, 'status'> = {}) {
   const counts: Record<string, number> = {}

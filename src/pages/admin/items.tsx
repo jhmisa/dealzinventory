@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
 import { Plus, Printer, QrCode, Pencil, Copy, AlertTriangle, Image, Play, Star, X, Link2 } from 'lucide-react'
@@ -461,6 +461,20 @@ export default function ItemListPage() {
   // Derive dropdown options from data
   const categoryOptions = [...new Set(items.map(i => i.product_models?.categories?.name).filter(Boolean))].sort() as string[]
   const brandOptions = [...new Set(items.map(i => i.brand ?? i.product_models?.brand).filter(Boolean))].sort() as string[]
+
+  // Reset category filter if value not in current options
+  useEffect(() => {
+    if (categoryFilter && categoryFilter !== 'all' && !categoryOptions.includes(categoryFilter)) {
+      setCategoryFilter('')
+    }
+  }, [categoryOptions, categoryFilter, setCategoryFilter])
+
+  // Reset brand filter if value not in current options
+  useEffect(() => {
+    if (brandFilter && brandFilter !== 'all' && !brandOptions.includes(brandFilter)) {
+      setBrandFilter('')
+    }
+  }, [brandOptions, brandFilter, setBrandFilter])
 
   // Client-side filtering for filters not passed to the server
   const filteredItems = items.filter(item => {
