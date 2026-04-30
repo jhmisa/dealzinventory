@@ -24,10 +24,6 @@ import { uploadAttachment } from '@/services/messaging'
 import type { MessageAttachment, ConditionGrade } from '@/lib/types'
 import type { AvailableInventoryResult, InventorySearchFilters } from '@/services/items'
 
-function getShopUrl() {
-  return import.meta.env.VITE_PUBLIC_SHOP_URL || `${window.location.origin}/shop`
-}
-
 interface InventorySearchModalProps {
   open: boolean
   onClose: () => void
@@ -126,35 +122,27 @@ export const InventorySearchModal = memo(function InventorySearchModal({
           }
         }
 
-        // Build message text matching Available items table format
+        // Build message text with emojis for visual separation
+        const baseUrl = import.meta.env.VITE_PUBLIC_SHOP_URL?.replace(/\/shop\/?$/, '') || window.location.origin
         const lines: string[] = []
         if (item.type === 'item') {
-          lines.push(item.code)
-          lines.push(item.description)
+          lines.push(`🏷 ${item.code}`)
+          lines.push(`📝 ${item.description}`)
           if (item.condition_notes) lines.push(item.condition_notes)
-          if (item.grade) lines.push(`Rank ${item.grade}`)
-          if (item.price) lines.push(formatPrice(item.price))
-          {
-            const baseUrl = import.meta.env.VITE_PUBLIC_SHOP_URL?.replace(/\/shop\/?$/, '') || window.location.origin
-            lines.push(`Buy Now & View Photos: ${baseUrl}/mine/${item.code}`)
-          }
+          if (item.grade) lines.push(`🏅 Rank ${item.grade}`)
+          if (item.price) lines.push(`💴 ${formatPrice(item.price)}`)
+          lines.push(`📸 Buy Now & View Photos: ${baseUrl}/mine/${item.code}`)
         } else if (item.type === 'sell_group') {
-          lines.push(item.code)
-          lines.push(item.description)
-          if (item.grade) lines.push(`Rank ${item.grade}`)
-          if (item.price) lines.push(formatPrice(item.price))
-          {
-            const shopUrl = getShopUrl()
-            lines.push(`View & Order: ${shopUrl}/product/${item.id}`)
-          }
+          lines.push(`🏷 ${item.code}`)
+          lines.push(`📝 ${item.description}`)
+          if (item.grade) lines.push(`🏅 Rank ${item.grade}`)
+          if (item.price) lines.push(`💴 ${formatPrice(item.price)}`)
+          lines.push(`📸 View & Order: ${baseUrl}/mine/${item.code}`)
         } else {
-          lines.push(item.code)
-          lines.push(item.description)
-          if (item.price) lines.push(formatPrice(item.price))
-          if (item.accessory_id) {
-            const shopUrl = getShopUrl()
-            lines.push(`${shopUrl}/accessory/${item.accessory_id}`)
-          }
+          lines.push(`🏷 ${item.code}`)
+          lines.push(`📝 ${item.description}`)
+          if (item.price) lines.push(`💴 ${formatPrice(item.price)}`)
+          lines.push(`📸 Buy Now: ${baseUrl}/mine/${item.code}`)
         }
         const text = lines.join('\n')
 

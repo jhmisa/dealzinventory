@@ -32,7 +32,7 @@ import { useItemListColumnSettings } from '@/hooks/use-settings'
 import { usePersistedFilters } from '@/hooks/use-persisted-filters'
 import { useDebounce } from '@/hooks/use-debounce'
 import { ITEM_STATUSES, CONDITION_GRADES } from '@/lib/constants'
-import { formatDate, formatPrice, cn, buildShortDescription, formatCustomerName } from '@/lib/utils'
+import { formatDate, formatPrice, cn, buildShortDescription, formatCustomerName, getItemDescription } from '@/lib/utils'
 import { toast } from 'sonner'
 import { printItemLabel } from '@/components/items/label-print'
 import { resolveSoldTo } from '@/lib/item-sale'
@@ -120,23 +120,13 @@ const SORT_OPTIONS = [
   { value: 'sell_price-desc', label: 'Sell Price (High → Low)' },
 ] as const
 
-function getItemDescription(item: ItemRow): string {
+function getItemDesc(item: ItemRow): string {
   const pm = item.product_models
-  const descFields = pm?.categories?.description_fields
-  if (descFields && descFields.length > 0) {
-    const resolvedValues: Record<string, unknown> = {}
-    for (const key of descFields) {
-      resolvedValues[key] = (item as Record<string, unknown>)[key] ?? (pm as Record<string, unknown> | null)?.[key]
-    }
-    return buildShortDescription(resolvedValues, descFields) || item.supplier_description || ''
-  }
-  const { brand, model_name, cpu, ram_gb, storage_gb, screen_size } = item
-  const modelName = brand && model_name
-    ? `${brand} ${model_name}`
-    : pm ? `${pm.brand} ${pm.model_name}` : null
-  const screenVal = screen_size ?? pm?.screen_size
-  const parts = [modelName, cpu, ram_gb, storage_gb, screenVal ? `${screenVal}"` : null].filter(Boolean)
-  return parts.length > 0 ? parts.join(' / ') : (item.supplier_description || '')
+  return getItemDescription(
+    item as unknown as Record<string, unknown>,
+    pm as unknown as Record<string, unknown> | null,
+    pm?.categories?.description_fields,
+  )
 }
 
 const accessoryColumns: ColumnDef<AccessoryRow>[] = [
@@ -513,8 +503,8 @@ export default function ItemListPage() {
           return dir * codeA.localeCompare(codeB)
         }
         case 'description': {
-          const descA = a._kind === 'item' ? getItemDescription(a) : a._kind === 'accessory' ? [a.brand, a.name].filter(Boolean).join(' ') : a._sg_description
-          const descB = b._kind === 'item' ? getItemDescription(b) : b._kind === 'accessory' ? [b.brand, b.name].filter(Boolean).join(' ') : b._sg_description
+          const descA = a._kind === 'item' ? getItemDesc(a) : a._kind === 'accessory' ? [a.brand, a.name].filter(Boolean).join(' ') : a._sg_description
+          const descB = b._kind === 'item' ? getItemDesc(b) : b._kind === 'accessory' ? [b.brand, b.name].filter(Boolean).join(' ') : b._sg_description
           return dir * descA.localeCompare(descB)
         }
         case 'buy_price': {
@@ -541,7 +531,7 @@ export default function ItemListPage() {
     sorted.sort((a, b) => {
       switch (sortBy) {
         case 'code': return dir * a.item_code.localeCompare(b.item_code)
-        case 'description': return dir * getItemDescription(a).localeCompare(getItemDescription(b))
+        case 'description': return dir * getItemDesc(a).localeCompare(getItemDesc(b))
         case 'buy_price': return dir * ((a.purchase_price ?? 0) - (b.purchase_price ?? 0))
         case 'sell_price': return dir * ((a.selling_price ?? 0) - (b.selling_price ?? 0))
         case 'date':

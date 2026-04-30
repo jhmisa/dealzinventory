@@ -54,6 +54,36 @@ export function buildShortDescription(
     .join(' ')
 }
 
+/**
+ * Build a full item description using category description_fields when available,
+ * falling back to basic spec concatenation. Shared between Admin Items and Messaging search.
+ */
+export function getItemDescription(
+  item: Record<string, unknown>,
+  productModel?: Record<string, unknown> | null,
+  descriptionFields?: string[] | null,
+): string {
+  if (descriptionFields && descriptionFields.length > 0) {
+    const resolvedValues: Record<string, unknown> = {}
+    for (const key of descriptionFields) {
+      resolvedValues[key] = item[key] ?? productModel?.[key]
+    }
+    return buildShortDescription(resolvedValues, descriptionFields) || (item.supplier_description as string) || ''
+  }
+  const brand = item.brand ?? productModel?.brand
+  const modelName = item.model_name ?? productModel?.model_name
+  const fullModel = brand && modelName ? `${brand} ${modelName}` : null
+  const screenSize = item.screen_size ?? productModel?.screen_size
+  const parts = [
+    fullModel,
+    item.cpu,
+    item.ram_gb,
+    item.storage_gb,
+    screenSize ? `${screenSize}"` : null,
+  ].filter(Boolean)
+  return parts.length > 0 ? parts.join(' / ') : ((item.supplier_description as string) || '')
+}
+
 const EMOTICON_MAP: [RegExp, string][] = [
   [/(?<!\w):\)(?!\w)/g, '😊'],
   [/(?<!\w);\)(?!\w)/g, '😉'],

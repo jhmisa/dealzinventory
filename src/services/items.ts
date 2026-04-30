@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { getItemDescription } from '@/lib/utils'
 import type { Item, ItemInsert, ItemUpdate, ItemCost, ItemMedia } from '@/lib/types'
 
 // Temporary debug function — can be removed later
@@ -451,22 +452,17 @@ export async function searchAvailableItems(query: string, filters: InventorySear
     first_item_thumb_url: string | null
     hero_media_url: string | null
     first_product_media_url: string | null
+    battery_health_pct: number | null
+    is_unlocked: boolean | null
+    has_touchscreen: boolean | null
+    supplier_description: string | null
+    category_description_fields: string[] | null
   }) => {
-    // Build full description matching Available items table format
-    const specParts = [
-      row.brand,
-      row.model_name,
-      row.model_number,
-      row.year,
-      row.ram_gb,
-      row.storage_gb,
-      row.cpu,
-      row.gpu,
-      row.screen_size ? `${row.screen_size}"` : null,
-      row.color,
-      row.os_family,
-    ].filter(Boolean)
-    const description = specParts.length > 0 ? specParts.join(' ') : '—'
+    const description = getItemDescription(
+      row as unknown as Record<string, unknown>,
+      null,
+      row.category_description_fields,
+    ) || '—'
 
     const thumbnail_url = row.first_item_thumb_url
       ?? row.hero_media_url
@@ -497,7 +493,9 @@ export async function searchAvailableItems(query: string, filters: InventorySear
 
 export async function searchAvailableSellGroups(query: string, filters: InventorySearchFilters = {}): Promise<AvailableInventoryResult[]> {
   const trimmed = query.trim()
-  if (trimmed.length < 2) return []
+  const hasQuery = trimmed.length >= 2
+  const hasFilters = !!(filters.brand || filters.categoryId || filters.priceMin != null || filters.priceMax != null)
+  if (!hasQuery && !hasFilters) return []
 
   const selectStr = `
     id, sell_group_code, selling_price, condition_grade, active,
@@ -523,27 +521,37 @@ export async function searchAvailableSellGroups(query: string, filters: Inventor
     return q.order('sell_group_code').limit(20)
   }
 
-  // Query 1: match by sell_group_code
-  const codeQuery = buildBase().ilike('sell_group_code', `%${trimmed}%`)
+  type SgQueryResult = Awaited<ReturnType<typeof buildBase>>['data']
+  let merged: NonNullable<SgQueryResult>
 
-  // Query 2: match by product brand or model name
-  const modelQuery = buildBase().or(
-    `brand.ilike.%${trimmed}%,model_name.ilike.%${trimmed}%`,
-    { referencedTable: 'product_models' }
-  )
+  if (!hasQuery) {
+    // Filter-only mode — no text search needed
+    const result = await buildBase()
+    if (result.error) throw result.error
+    merged = result.data ?? []
+  } else {
+    // Query 1: match by sell_group_code
+    const codeQuery = buildBase().ilike('sell_group_code', `%${trimmed}%`)
 
-  const [codeResult, modelResult] = await Promise.all([codeQuery, modelQuery])
+    // Query 2: match by product brand or model name
+    const modelQuery = buildBase().or(
+      `brand.ilike.%${trimmed}%,model_name.ilike.%${trimmed}%`,
+      { referencedTable: 'product_models' }
+    )
 
-  if (codeResult.error) throw codeResult.error
-  if (modelResult.error) throw modelResult.error
+    const [codeResult, modelResult] = await Promise.all([codeQuery, modelQuery])
 
-  // Merge and deduplicate by id
-  const seen = new Set<string>()
-  const merged = [...(codeResult.data ?? []), ...(modelResult.data ?? [])].filter((sg) => {
-    if (seen.has(sg.id)) return false
-    seen.add(sg.id)
-    return true
-  })
+    if (codeResult.error) throw codeResult.error
+    if (modelResult.error) throw modelResult.error
+
+    // Merge and deduplicate by id
+    const seen = new Set<string>()
+    merged = [...(codeResult.data ?? []), ...(modelResult.data ?? [])].filter((sg) => {
+      if (seen.has(sg.id)) return false
+      seen.add(sg.id)
+      return true
+    })
+  }
 
   return merged.map((sg) => {
     const pm = sg.product_models as {
