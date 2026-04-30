@@ -662,7 +662,12 @@ function MineClaimInner() {
                     <p className="text-sm text-muted-foreground mt-0.5">{product.subtitle}</p>
                   )}
                 </div>
-                <span className="text-xl font-bold shrink-0">{formatPrice(product.price)}</span>
+                <div className="text-right shrink-0">
+                  {product.originalPrice && (
+                    <span className="text-sm text-muted-foreground line-through block">{formatPrice(product.originalPrice)}</span>
+                  )}
+                  <span className="text-xl font-bold">{formatPrice(product.price)}</span>
+                </div>
               </div>
 
               {/* Meta row: code + grade + stock */}
@@ -715,7 +720,7 @@ function MineClaimInner() {
                 }}
               >
                 <ShoppingBag className="h-6 w-6 mr-2" />
-                Buy Now — {formatPrice(product.price)}
+                Buy Now — {product.originalPrice && <span className="line-through opacity-60 mr-1">{formatPrice(product.originalPrice)}</span>}{formatPrice(product.price)}
               </Button>
             ) : null}
           </div>

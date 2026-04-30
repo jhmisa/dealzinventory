@@ -12,6 +12,7 @@ export interface ClaimableProduct {
   subtitle: string
   grade: string | null
   price: number
+  originalPrice?: number
   media: GalleryImage[]
   available: boolean
   stockCount?: number
@@ -102,6 +103,7 @@ async function getClaimableItem(code: string): Promise<ClaimableProduct | null> 
       subtitle,
       grade: item.condition_grade,
       price: (item.selling_price ?? 0) - (Number(item.discount) || 0),
+      originalPrice: (Number(item.discount) || 0) > 0 ? (item.selling_price ?? 0) : undefined,
       media,
       available,
       conditionNotes: item.condition_notes,

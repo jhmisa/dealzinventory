@@ -398,6 +398,7 @@ export interface AvailableInventoryResult {
   description: string
   grade: string | null
   price: number | null
+  originalPrice?: number
   thumbnail_url: string | null
   display_url: string | null
   condition_notes: string | null
@@ -483,6 +484,7 @@ export async function searchAvailableItems(query: string, filters: InventorySear
       description,
       grade: row.condition_grade,
       price: row.selling_price != null ? row.selling_price - (Number(row.discount) || 0) : null,
+      originalPrice: row.selling_price != null && (Number(row.discount) || 0) > 0 ? row.selling_price : undefined,
       thumbnail_url,
       display_url,
       condition_notes: row.condition_notes,

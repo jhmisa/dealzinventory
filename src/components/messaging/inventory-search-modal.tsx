@@ -125,23 +125,29 @@ export const InventorySearchModal = memo(function InventorySearchModal({
         // Build message text with emojis for visual separation
         const baseUrl = import.meta.env.VITE_PUBLIC_SHOP_URL?.replace(/\/shop\/?$/, '') || window.location.origin
         const lines: string[] = []
+        const priceText = item.price
+          ? item.originalPrice
+            ? `💴 ~${formatPrice(item.originalPrice)}~ ${formatPrice(item.price)}`
+            : `💴 ${formatPrice(item.price)}`
+          : null
+
         if (item.type === 'item') {
           lines.push(`🏷 ${item.code}`)
           lines.push(`📝 ${item.description}`)
           if (item.condition_notes) lines.push(item.condition_notes)
           if (item.grade) lines.push(`🏅 Rank ${item.grade}`)
-          if (item.price) lines.push(`💴 ${formatPrice(item.price)}`)
+          if (priceText) lines.push(priceText)
           lines.push(`📸 Buy Now & View Photos: ${baseUrl}/mine/${item.code}`)
         } else if (item.type === 'sell_group') {
           lines.push(`🏷 ${item.code}`)
           lines.push(`📝 ${item.description}`)
           if (item.grade) lines.push(`🏅 Rank ${item.grade}`)
-          if (item.price) lines.push(`💴 ${formatPrice(item.price)}`)
+          if (priceText) lines.push(priceText)
           lines.push(`📸 View & Order: ${baseUrl}/mine/${item.code}`)
         } else {
           lines.push(`🏷 ${item.code}`)
           lines.push(`📝 ${item.description}`)
-          if (item.price) lines.push(`💴 ${formatPrice(item.price)}`)
+          if (priceText) lines.push(priceText)
           lines.push(`📸 Buy Now: ${baseUrl}/mine/${item.code}`)
         }
         const text = lines.join('\n')
