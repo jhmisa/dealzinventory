@@ -45,14 +45,11 @@ export const FolderSidebar = memo(function FolderSidebar({
   onSelectArchive,
   isArchiveSelected,
 }: FolderSidebarProps) {
-  const systemFolders = folders.filter((f) => f.is_system)
-  const pipelineFolders = folders.filter((f) => !f.is_system)
-
   return (
     <div className="flex h-full w-48 shrink-0 flex-col border-r bg-muted/30">
       <ScrollArea className="flex-1">
         <div className="p-2 space-y-1">
-          {systemFolders.map((folder) => (
+          {folders.map((folder) => (
             <FolderItem
               key={folder.id}
               folder={folder}
@@ -61,25 +58,6 @@ export const FolderSidebar = memo(function FolderSidebar({
               onSelect={onSelectFolder}
             />
           ))}
-
-          {pipelineFolders.length > 0 && (
-            <>
-              <div className="px-2 pt-3 pb-1">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Pipeline
-                </span>
-              </div>
-              {pipelineFolders.map((folder) => (
-                <FolderItem
-                  key={folder.id}
-                  folder={folder}
-                  isSelected={folder.id === selectedFolderId}
-                  awaitingCount={awaitingCounts[folder.id] ?? 0}
-                  onSelect={onSelectFolder}
-                />
-              ))}
-            </>
-          )}
 
           {onSelectArchive && (
             <>

@@ -1,7 +1,7 @@
--- Update unarchive_to_inbox trigger so that an explicit folder_id chosen by
--- the caller in the same UPDATE is respected. Previously the trigger always
--- overrode folder_id with Inbox whenever is_archived flipped true -> false,
--- which broke "move from Archive to <other folder>" flows.
+-- Fix unarchive trigger: preserve existing folder_id instead of defaulting to Inbox.
+-- Previously, when a conversation was unarchived (e.g. customer sends a new message),
+-- the trigger would reset folder_id to Inbox even if the conversation already had a
+-- folder assigned (e.g. Prospects). Now it only defaults to Inbox if folder_id is NULL.
 CREATE OR REPLACE FUNCTION unarchive_to_inbox()
 RETURNS trigger
 LANGUAGE plpgsql
