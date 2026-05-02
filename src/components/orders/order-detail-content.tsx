@@ -976,19 +976,19 @@ export function OrderDetailContent({ orderId, onClose, onNavigate, isModal }: Or
               <>
                 {orderReceiverName ? (
                   <>
-                    <div className="flex justify-between"><span className="text-muted-foreground">Receiver</span><span className="font-medium">{orderReceiverName}</span></div>
-                    {orderReceiverPhone && <div className="flex justify-between"><span className="text-muted-foreground">Phone</span><span>{orderReceiverPhone}</span></div>}
-                    <div className="flex justify-between"><span className="text-muted-foreground">Account Holder</span><span className="text-muted-foreground text-xs">{formatCustomerName(customer)} ({customer.customer_code})</span></div>
-                    {!orderReceiverPhone && customer.phone && <div className="flex justify-between"><span className="text-muted-foreground">Phone</span><span>{customer.phone}</span></div>}
+                    <div className="flex justify-between gap-2"><span className="text-muted-foreground shrink-0">Receiver</span><span className="font-medium text-right">{orderReceiverName}</span></div>
+                    {orderReceiverPhone && <div className="flex justify-between gap-2"><span className="text-muted-foreground shrink-0">Phone</span><span className="text-right">{orderReceiverPhone}</span></div>}
+                    <div className="flex justify-between gap-2"><span className="text-muted-foreground shrink-0">Account Holder</span><span className="text-muted-foreground text-xs text-right">{formatCustomerName(customer)} ({customer.customer_code})</span></div>
+                    {!orderReceiverPhone && customer.phone && <div className="flex justify-between gap-2"><span className="text-muted-foreground shrink-0">Phone</span><span className="text-right">{customer.phone}</span></div>}
                   </>
                 ) : (
                   <>
-                    <div className="flex justify-between"><span className="text-muted-foreground">Code</span><CodeDisplay code={customer.customer_code} /></div>
-                    <div className="flex justify-between"><span className="text-muted-foreground">Name</span><span>{formatCustomerName(customer)}</span></div>
-                    {customer.phone && <div className="flex justify-between"><span className="text-muted-foreground">Phone</span><span>{customer.phone}</span></div>}
+                    <div className="flex justify-between"><span className="text-muted-foreground shrink-0">Code</span><CodeDisplay code={customer.customer_code} /></div>
+                    <div className="flex justify-between gap-2"><span className="text-muted-foreground shrink-0">Name</span><span className="text-right">{formatCustomerName(customer)}</span></div>
+                    {customer.phone && <div className="flex justify-between gap-2"><span className="text-muted-foreground shrink-0">Phone</span><span className="text-right">{customer.phone}</span></div>}
                   </>
                 )}
-                {customer.email && <div className="flex justify-between"><span className="text-muted-foreground">Email</span><span>{customer.email}</span></div>}
+                {customer.email && <div className="flex justify-between gap-2"><span className="text-muted-foreground shrink-0">Email</span><span className="text-right break-all">{customer.email}</span></div>}
               </>
             ) : (
               <p className="text-muted-foreground">—</p>
@@ -1031,7 +1031,7 @@ export function OrderDetailContent({ orderId, onClose, onNavigate, isModal }: Or
                   </Button>
                 </div>
               ) : shippingAddr ? (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-3">
                   <div>
                     <p className="text-xs text-muted-foreground mb-0.5">Japanese</p>
                     <AddressDisplay address={shippingAddr} format="jp" />
