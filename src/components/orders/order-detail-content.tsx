@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Check, Circle, Package, Pencil, X, Plus, History, Truck, Search, Loader2, Printer, RefreshCw, AlertTriangle, ExternalLink, Undo2, RotateCcw, Merge, Ticket, ChevronDown } from 'lucide-react'
+import { ArrowLeft, Check, Circle, Package, Pencil, X, Plus, History, Truck, Search, Loader2, Printer, RefreshCw, AlertTriangle, ExternalLink, Undo2, RotateCcw, Merge, Ticket, ChevronDown, Copy } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -56,6 +56,7 @@ import { useState, useRef, useEffect } from 'react'
 import type { ShippingAddress } from '@/lib/address-types'
 import { usePaymentConfirmations } from '@/hooks/use-payment-confirmations'
 import { PaymentConfirmationSection } from '@/components/orders/payment-confirmation-section'
+import { formatOrderSummary } from '@/lib/format-order-summary'
 
 function formatRelativeTime(isoString: string): string {
   const diff = Date.now() - new Date(isoString).getTime()
@@ -196,6 +197,20 @@ export function OrderDetailContent({ orderId, onClose, onNavigate, isModal }: Or
   const searchRef = useRef<HTMLDivElement>(null)
   const addLineItem = useAddOrderLineItem()
   const checkTracking = useCheckYamatoTracking()
+
+  const [invoiceCopied, setInvoiceCopied] = useState(false)
+
+  async function handleCopyInvoice() {
+    try {
+      const text = formatOrderSummary(order)
+      await navigator.clipboard.writeText(text)
+      setInvoiceCopied(true)
+      toast.success('Copied to clipboard')
+      setTimeout(() => setInvoiceCopied(false), 2000)
+    } catch {
+      toast.error('Failed to copy')
+    }
+  }
 
   // Debounce search
   useEffect(() => {
@@ -642,6 +657,20 @@ export function OrderDetailContent({ orderId, onClose, onNavigate, isModal }: Or
                   <Button
                     variant="outline"
                     size="sm"
+                    onClick={handleCopyInvoice}
+                  >
+                    {invoiceCopied ? (
+                      <Check className="h-4 w-4 mr-1 text-green-600" />
+                    ) : (
+                      <Copy className="h-4 w-4 mr-1" />
+                    )}
+                    Copy Invoice
+                  </Button>
+                )}
+                {!isEditing && (
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => {
                       printInvoice({
                         order: order as Parameters<typeof printInvoice>[0]['order'],
@@ -740,6 +769,20 @@ export function OrderDetailContent({ orderId, onClose, onNavigate, isModal }: Or
                   </Button>
                 )}
               </>
+            )}
+            {!isEditing && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCopyInvoice}
+              >
+                {invoiceCopied ? (
+                  <Check className="h-4 w-4 mr-1 text-green-600" />
+                ) : (
+                  <Copy className="h-4 w-4 mr-1" />
+                )}
+                Copy Invoice
+              </Button>
             )}
             {!isEditing && (
               <Button
