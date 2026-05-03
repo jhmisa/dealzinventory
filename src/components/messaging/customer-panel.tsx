@@ -11,6 +11,8 @@ import {
   Unlink,
   Ticket,
   Plus,
+  Copy,
+  Check,
 } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
@@ -37,6 +39,9 @@ import { formatPrice, formatDate, formatCustomerName } from '@/lib/utils'
 import type { ConversationWithRelations } from '@/lib/types'
 import { useConversationTickets } from '@/hooks/use-tickets'
 import { CreateTicketDialog } from '@/components/tickets'
+import { toast } from 'sonner'
+import * as ordersService from '@/services/orders'
+import { formatOrderSummary } from '@/lib/format-order-summary'
 
 interface CustomerPanelProps {
   conversation: ConversationWithRelations
@@ -54,7 +59,22 @@ export function CustomerPanel({
   onToggleCollapse,
 }: CustomerPanelProps) {
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
+  const [copiedOrderId, setCopiedOrderId] = useState<string | null>(null)
   const [ticketDialogOpen, setTicketDialogOpen] = useState(false)
+
+  async function handleCopyOrder(e: React.MouseEvent, orderId: string) {
+    e.stopPropagation()
+    try {
+      const fullOrder = await ordersService.getOrder(orderId)
+      const text = formatOrderSummary(fullOrder)
+      await navigator.clipboard.writeText(text)
+      setCopiedOrderId(orderId)
+      toast.success('Copied to clipboard')
+      setTimeout(() => setCopiedOrderId(null), 2000)
+    } catch {
+      toast.error('Failed to copy')
+    }
+  }
   const customerId = conversation.customers?.id ?? ''
   const { data: customerDetails } = useCustomerWithDetails(customerId)
   const { data: conversationTickets = [] } = useConversationTickets(conversation.id)
@@ -173,21 +193,35 @@ export function CustomerPanel({
                       new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
                     )
                     .map((order: { id: string; order_code: string; order_status: string; total_price: number | null; created_at: string }) => (
-                    <button
-                      key={order.id}
-                      type="button"
-                      onClick={() => setSelectedOrderId(order.id)}
-                      className="flex w-full items-center justify-between rounded-md border px-2 py-1.5 text-xs hover:bg-accent transition-colors text-left"
-                    >
-                      <div className="min-w-0 space-y-0.5">
-                        <CodeDisplay code={order.order_code} className="text-[11px] truncate" />
-                        <p className="text-muted-foreground truncate">{formatDate(order.created_at)}</p>
-                      </div>
-                      <div className="shrink-0 text-right space-y-0.5">
-                        <StatusBadge status={order.order_status} config={ORDER_STATUSES} />
-                        <p className="text-muted-foreground">{formatPrice(order.total_price)}</p>
-                      </div>
-                    </button>
+                    <div key={order.id} className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedOrderId(order.id)}
+                        className="flex flex-1 min-w-0 items-center justify-between rounded-md border px-2 py-1.5 text-xs hover:bg-accent transition-colors text-left"
+                      >
+                        <div className="min-w-0 space-y-0.5">
+                          <CodeDisplay code={order.order_code} className="text-[11px] truncate" />
+                          <p className="text-muted-foreground truncate">{formatDate(order.created_at)}</p>
+                        </div>
+                        <div className="shrink-0 text-right space-y-0.5">
+                          <StatusBadge status={order.order_status} config={ORDER_STATUSES} />
+                          <p className="text-muted-foreground">{formatPrice(order.total_price)}</p>
+                        </div>
+                      </button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 shrink-0"
+                        onClick={(e) => handleCopyOrder(e, order.id)}
+                        title="Copy order summary"
+                      >
+                        {copiedOrderId === order.id ? (
+                          <Check className="h-3.5 w-3.5 text-green-600" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+                        )}
+                      </Button>
+                    </div>
                   ))}
                 </div>
               ) : (
