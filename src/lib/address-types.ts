@@ -51,13 +51,11 @@ export function serializeAddress(addr: ShippingAddress, lang: 'ja' | 'en' = 'ja'
   if (isJPAddress(addr)) {
     if (lang === 'en') {
       const parts: string[] = []
+      if (addr.postal_code) parts.push(formatPostalCode(addr.postal_code))
+      const prefCityTown = [addr.prefecture_en, addr.city_en, addr.town_en].filter(Boolean).join(' ')
+      if (prefCityTown) parts.push(prefCityTown)
       if (addr.address_line_1) parts.push(addr.address_line_1)
       if (addr.address_line_2) parts.push(addr.address_line_2)
-      const cityTown = [addr.town_en, addr.city_en].filter(Boolean).join(' ')
-      if (cityTown) parts.push(cityTown)
-      const prefPostal = [addr.prefecture_en, addr.postal_code ? formatPostalCode(addr.postal_code) : ''].filter(Boolean).join(' ')
-      if (prefPostal) parts.push(prefPostal)
-      parts.push('JAPAN')
       return parts.join('\n')
     }
     const parts: string[] = []
