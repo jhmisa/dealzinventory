@@ -54,8 +54,11 @@ export function serializeAddress(addr: ShippingAddress, lang: 'ja' | 'en' = 'ja'
       if (addr.postal_code) parts.push(formatPostalCode(addr.postal_code))
       const prefCityTown = [addr.prefecture_en, addr.city_en, addr.town_en].filter(Boolean).join(' ')
       if (prefCityTown) parts.push(prefCityTown)
-      if (addr.address_line_1) parts.push(addr.address_line_1)
-      if (addr.address_line_2) parts.push(addr.address_line_2)
+      // Skip address lines if they contain the postal code (full Google-style addresses that duplicate structured fields)
+      const postalDigits = addr.postal_code?.replace(/-/g, '') ?? ''
+      const isFullAddress = (line: string) => postalDigits && line.includes(postalDigits)
+      if (addr.address_line_1 && !isFullAddress(addr.address_line_1)) parts.push(addr.address_line_1)
+      if (addr.address_line_2 && !isFullAddress(addr.address_line_2) && addr.address_line_2 !== addr.address_line_1) parts.push(addr.address_line_2)
       return parts.join('\n')
     }
     const parts: string[] = []
