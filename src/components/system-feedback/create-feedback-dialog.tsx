@@ -61,7 +61,7 @@ export function CreateFeedbackDialog({ open, onOpenChange, onSubmit, isLoading }
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>New Feedback</DialogTitle>
         </DialogHeader>
@@ -97,7 +97,7 @@ export function CreateFeedbackDialog({ open, onOpenChange, onSubmit, isLoading }
               id="description"
               {...form.register('description')}
               placeholder="Detailed explanation (optional)"
-              rows={4}
+              rows={8}
             />
           </div>
           <div className="space-y-2">
