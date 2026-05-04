@@ -43,12 +43,23 @@ export function isLegacyAddress(addr: ShippingAddress): addr is ShippingAddressL
 }
 
 // Serialize JSONB address to text for order snapshots
-export function serializeAddress(addr: ShippingAddress): string {
+export function serializeAddress(addr: ShippingAddress, lang: 'ja' | 'en' = 'ja'): string {
   if (isLegacyAddress(addr)) {
     return addr.freeform_legacy
   }
 
   if (isJPAddress(addr)) {
+    if (lang === 'en') {
+      const parts: string[] = []
+      if (addr.address_line_1) parts.push(addr.address_line_1)
+      if (addr.address_line_2) parts.push(addr.address_line_2)
+      const cityTown = [addr.town_en, addr.city_en].filter(Boolean).join(' ')
+      if (cityTown) parts.push(cityTown)
+      const prefPostal = [addr.prefecture_en, addr.postal_code ? formatPostalCode(addr.postal_code) : ''].filter(Boolean).join(' ')
+      if (prefPostal) parts.push(prefPostal)
+      parts.push('JAPAN')
+      return parts.join('\n')
+    }
     const parts: string[] = []
     if (addr.postal_code) parts.push(`〒${formatPostalCode(addr.postal_code)}`)
     const prefCityTown = [addr.prefecture_ja, addr.city_ja, addr.town_ja].filter(Boolean).join(' ')

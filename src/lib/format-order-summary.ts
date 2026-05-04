@@ -64,7 +64,7 @@ export function formatOrderSummary(order: OrderSummaryInput): string {
   if (order.shipping_address) {
     try {
       const addr: ShippingAddress = JSON.parse(order.shipping_address)
-      lines.push(`📍 ${serializeAddress(addr).replace(/\n/g, ', ')}`)
+      lines.push(`📍 ${serializeAddress(addr, 'en').replace(/\n/g, ', ')}`)
     } catch {
       lines.push(`📍 ${order.shipping_address}`)
     }
