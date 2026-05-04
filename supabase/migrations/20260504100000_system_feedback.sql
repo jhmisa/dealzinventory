@@ -45,7 +45,7 @@ CREATE INDEX idx_system_feedback_media_feedback_id ON system_feedback_media(feed
 CREATE TRIGGER set_system_feedback_updated_at
   BEFORE UPDATE ON system_feedback
   FOR EACH ROW
-  EXECUTE FUNCTION moddatetime(updated_at);
+  EXECUTE FUNCTION update_updated_at();
 
 -- RLS
 ALTER TABLE system_feedback ENABLE ROW LEVEL SECURITY;
