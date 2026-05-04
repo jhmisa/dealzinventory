@@ -35,10 +35,30 @@ export interface CreateSystemFeedbackInput {
   type: SystemFeedbackType
 }
 
+const BASE_SELECT = '*, system_feedback_media(*)'
+
+async function attachStaffNames<T extends { created_by: string | null }>(items: T[]): Promise<(T & { staff_profiles: { display_name: string } | null })[]> {
+  const staffIds = [...new Set(items.map((i) => i.created_by).filter(Boolean))] as string[]
+  if (staffIds.length === 0) return items.map((i) => ({ ...i, staff_profiles: null }))
+
+  const { data: profiles } = await supabase
+    .from('staff_profiles')
+    .select('id, display_name')
+    .in('id', staffIds)
+
+  const staffMap: Record<string, string> = {}
+  for (const p of profiles || []) staffMap[p.id] = p.display_name
+
+  return items.map((i) => ({
+    ...i,
+    staff_profiles: i.created_by && staffMap[i.created_by] ? { display_name: staffMap[i.created_by] } : null,
+  }))
+}
+
 export async function getSystemFeedback(filters: SystemFeedbackFilters = {}): Promise<SystemFeedback[]> {
   let query = supabase
     .from('system_feedback')
-    .select('*, staff_profiles!created_by(display_name), system_feedback_media(*)')
+    .select(BASE_SELECT)
     .order('created_at', { ascending: false })
 
   if (filters.status) {
@@ -50,18 +70,19 @@ export async function getSystemFeedback(filters: SystemFeedbackFilters = {}): Pr
 
   const { data, error } = await query
   if (error) throw error
-  return data as SystemFeedback[]
+  return attachStaffNames(data)
 }
 
 export async function getSystemFeedbackById(id: string): Promise<SystemFeedback> {
   const { data, error } = await supabase
     .from('system_feedback')
-    .select('*, staff_profiles!created_by(display_name), system_feedback_media(*)')
+    .select(BASE_SELECT)
     .eq('id', id)
     .single()
 
   if (error) throw error
-  return data as SystemFeedback
+  const [withStaff] = await attachStaffNames([data])
+  return withStaff
 }
 
 export async function createSystemFeedback(input: CreateSystemFeedbackInput): Promise<SystemFeedback> {
@@ -75,11 +96,12 @@ export async function createSystemFeedback(input: CreateSystemFeedbackInput): Pr
       type: input.type,
       created_by: user?.id || null,
     })
-    .select('*, staff_profiles!created_by(display_name), system_feedback_media(*)')
+    .select(BASE_SELECT)
     .single()
 
   if (error) throw error
-  return data as SystemFeedback
+  const [withStaff] = await attachStaffNames([data])
+  return withStaff
 }
 
 export async function updateSystemFeedback(
@@ -90,11 +112,12 @@ export async function updateSystemFeedback(
     .from('system_feedback')
     .update(updates)
     .eq('id', id)
-    .select('*, staff_profiles!created_by(display_name), system_feedback_media(*)')
+    .select(BASE_SELECT)
     .single()
 
   if (error) throw error
-  return data as SystemFeedback
+  const [withStaff] = await attachStaffNames([data])
+  return withStaff
 }
 
 export async function deleteSystemFeedback(id: string): Promise<void> {
