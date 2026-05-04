@@ -1,9 +1,11 @@
+import { useEffect, useState } from 'react'
 import { Bug, Lightbulb, Trash2 } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { SystemFeedback, SystemFeedbackStatus } from '@/services/system-feedback'
+import { getSignedMediaUrl } from '@/services/system-feedback'
 
 interface FeedbackDetailDialogProps {
   feedback: SystemFeedback | null
@@ -14,6 +16,25 @@ interface FeedbackDetailDialogProps {
 }
 
 export function FeedbackDetailDialog({ feedback, open, onOpenChange, onStatusChange, onDelete }: FeedbackDetailDialogProps) {
+  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    if (!feedback?.system_feedback_media?.length) {
+      setSignedUrls({})
+      return
+    }
+    let cancelled = false
+    Promise.all(
+      feedback.system_feedback_media.map(async (m) => {
+        const url = await getSignedMediaUrl(m.file_url).catch(() => '')
+        return [m.id, url] as const
+      })
+    ).then((entries) => {
+      if (!cancelled) setSignedUrls(Object.fromEntries(entries))
+    })
+    return () => { cancelled = true }
+  }, [feedback?.id, feedback?.system_feedback_media?.length])
+
   if (!feedback) return null
 
   return (
@@ -41,15 +62,19 @@ export function FeedbackDetailDialog({ feedback, open, onOpenChange, onStatusCha
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground">Attachments</p>
               <div className="grid grid-cols-2 gap-2">
-                {feedback.system_feedback_media.map((media) => (
-                  <a key={media.id} href={media.file_url} target="_blank" rel="noopener noreferrer">
-                    <img
-                      src={media.file_url}
-                      alt="Screenshot"
-                      className="rounded border object-cover h-32 w-full"
-                    />
-                  </a>
-                ))}
+                {feedback.system_feedback_media.map((media) => {
+                  const url = signedUrls[media.id]
+                  if (!url) return <div key={media.id} className="h-32 rounded border bg-muted animate-pulse" />
+                  return (
+                    <a key={media.id} href={url} target="_blank" rel="noopener noreferrer">
+                      <img
+                        src={url}
+                        alt="Screenshot"
+                        className="rounded border object-cover h-32 w-full"
+                      />
+                    </a>
+                  )
+                })}
               </div>
             </div>
           )}

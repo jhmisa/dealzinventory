@@ -139,16 +139,22 @@ export async function uploadFeedbackMedia(feedbackId: string, file: File): Promi
 
   if (uploadError) throw uploadError
 
-  const { data: { publicUrl } } = supabase.storage
-    .from('system-feedback-media')
-    .getPublicUrl(path)
-
+  // Store the storage path (not a public URL) since the bucket is private
   const { data, error } = await supabase
     .from('system_feedback_media')
-    .insert({ feedback_id: feedbackId, file_url: publicUrl })
+    .insert({ feedback_id: feedbackId, file_url: path })
     .select()
     .single()
 
   if (error) throw error
   return data as SystemFeedbackMedia
+}
+
+export async function getSignedMediaUrl(path: string): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from('system-feedback-media')
+    .createSignedUrl(path, 3600) // 1 hour
+
+  if (error) throw error
+  return data.signedUrl
 }
