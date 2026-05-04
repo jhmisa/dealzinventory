@@ -26,6 +26,7 @@ import { formatPrice, cn, formatCustomerName } from '@/lib/utils'
 import type { ShippingAddress } from '@/lib/address-types'
 import type { Customer } from '@/lib/types'
 import type { GalleryImage } from '@/components/shared/image-gallery'
+import { PhoneInput } from '@/components/shared/phone-input'
 
 // --- Product Media Gallery ---
 
@@ -439,7 +440,7 @@ function RegisterForm({ onSuccess, onBack, isLoading, onRegister }: {
                   <FormItem>
                     <FormLabel>Phone</FormLabel>
                     <FormControl>
-                      <Input type="tel" placeholder="090-1234-5678" {...field} />
+                      <PhoneInput value={field.value ?? ''} onChange={field.onChange} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

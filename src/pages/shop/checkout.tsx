@@ -18,6 +18,7 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { AddressForm } from '@/components/shared'
+import { PhoneInput } from '@/components/shared/phone-input'
 import type { ShippingAddress } from '@/lib/address-types'
 import { useSellGroup } from '@/hooks/use-sell-groups'
 import { useSellGroupByCode } from '@/hooks/use-shop'
@@ -239,7 +240,7 @@ export default function CheckoutPage() {
                     <FormItem>
                       <FormLabel>Phone</FormLabel>
                       <FormControl>
-                        <Input type="tel" placeholder="090-1234-5678" {...field} />
+                        <PhoneInput value={field.value ?? ''} onChange={field.onChange} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

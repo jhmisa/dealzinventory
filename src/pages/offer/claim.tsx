@@ -34,6 +34,7 @@ import { CONDITION_GRADES, PAYMENT_METHODS } from '@/lib/constants'
 import { formatPrice, cn, formatCustomerName } from '@/lib/utils'
 import type { ShippingAddress } from '@/lib/address-types'
 import type { Customer } from '@/lib/types'
+import { PhoneInput } from '@/components/shared/phone-input'
 
 // --- Countdown Timer ---
 
@@ -269,7 +270,7 @@ function RegisterForm({ onSuccess, onBack, isLoading, onRegister }: {
                   <FormItem>
                     <FormLabel>Phone</FormLabel>
                     <FormControl>
-                      <Input type="tel" placeholder="090-1234-5678" {...field} />
+                      <PhoneInput value={field.value ?? ''} onChange={field.onChange} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
