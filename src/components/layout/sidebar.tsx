@@ -25,6 +25,7 @@ import {
   Columns3,
   Settings,
   MessageSquare,
+  MessageSquarePlus,
   ChevronRight,
   Undo2,
 } from 'lucide-react'
@@ -97,6 +98,7 @@ const navSections: NavSection[] = [
       { title: 'Messages', href: '/admin/messages', icon: MessageSquare },
       { title: 'Tickets', href: '/admin/tickets', icon: Ticket },
       { title: 'Social Media', href: '/admin/social-media', icon: Share2 },
+      { title: 'Feedback', href: '/admin/feedback', icon: MessageSquarePlus },
     ],
   },
   {

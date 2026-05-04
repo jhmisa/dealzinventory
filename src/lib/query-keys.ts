@@ -207,6 +207,13 @@ export const queryKeys = {
     notes: (ticketId: string) => [...queryKeys.tickets.all, 'notes', ticketId] as const,
     media: (ticketId: string) => [...queryKeys.tickets.all, 'media', ticketId] as const,
   },
+  systemFeedback: {
+    all: ['system-feedback'] as const,
+    lists: () => [...queryKeys.systemFeedback.all, 'list'] as const,
+    list: (filters: Record<string, unknown>) => [...queryKeys.systemFeedback.lists(), filters] as const,
+    details: () => [...queryKeys.systemFeedback.all, 'detail'] as const,
+    detail: (id: string) => [...queryKeys.systemFeedback.details(), id] as const,
+  },
   messaging: {
     all: ['messaging'] as const,
     conversations: () => [...queryKeys.messaging.all, 'conversations'] as const,

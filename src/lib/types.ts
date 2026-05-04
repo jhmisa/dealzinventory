@@ -315,6 +315,10 @@ export interface SocialMediaPostWithItem extends SocialMediaPost {
   } | null
 }
 
+// System Feedback types
+export type SystemFeedbackType = 'BUG' | 'FEATURE_REQUEST'
+export type SystemFeedbackStatus = 'OPEN' | 'IN_PROGRESS' | 'DONE'
+
 // Joined / composite types used across the app
 export type ItemWithRelations = Item & {
   suppliers: Supplier | null
