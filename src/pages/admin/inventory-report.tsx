@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useSnapshots, useSnapshot, useSnapshotItems, useGenerateSnapshot } from '@/hooks/use-inventory-snapshots'
 import { downloadSnapshotCsv } from '@/services/inventory-snapshots'
+import { downloadInventoryPdf } from '@/services/inventory-report-pdf'
 import { PageHeader, PriceDisplay, TableSkeleton } from '@/components/shared'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -9,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { formatPrice } from '@/lib/utils'
-import { Download, Printer, RefreshCw, Package, DollarSign, Wrench, Calculator, Box } from 'lucide-react'
+import { Download, FileText, RefreshCw, Package, DollarSign, Wrench, Calculator, Box } from 'lucide-react'
 import { toast } from 'sonner'
 import type { InventorySnapshotItem } from '@/services/inventory-snapshots'
 
@@ -73,22 +74,18 @@ export default function InventoryReportPage() {
     toast.success('CSV downloaded')
   }
 
-  function handlePrint() {
-    window.print()
+  function handleDownloadPdf() {
+    if (!snapshot || !items) return
+    downloadInventoryPdf(snapshot, items)
+    toast.success('PDF downloaded')
   }
 
   if (loadingSnapshots) return <TableSkeleton rows={6} columns={4} />
 
   return (
     <>
-      {/* Print-only header */}
-      <div className="hidden print:block mb-6">
-        <h1 className="text-xl font-bold">Dealz K.K. — Monthly Inventory Report</h1>
-        {snapshot && <p className="text-sm text-muted-foreground">{snapshot.period_label}</p>}
-      </div>
-
-      <div className="space-y-6 print:space-y-4">
-        <div className="print:hidden">
+      <div className="space-y-6">
+        <div>
           <PageHeader
             title="Inventory Report"
             actions={
@@ -159,7 +156,7 @@ export default function InventoryReportPage() {
             </Card>
 
             {/* Breakdown Tabs */}
-            <Tabs defaultValue="status" className="print:hidden">
+            <Tabs defaultValue="status">
               <TabsList>
                 <TabsTrigger value="status">By Status</TabsTrigger>
                 <TabsTrigger value="brand">By Brand</TabsTrigger>
@@ -180,42 +177,20 @@ export default function InventoryReportPage() {
               </TabsContent>
             </Tabs>
 
-            {/* Print-only: show all breakdowns */}
-            <div className="hidden print:block space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <h3 className="font-semibold mb-2">By Status</h3>
-                  <BreakdownTable data={snapshot.summary_by_status} />
-                </div>
-                <div>
-                  <h3 className="font-semibold mb-2">By Brand</h3>
-                  <BreakdownTable data={snapshot.summary_by_brand} />
-                </div>
-                <div>
-                  <h3 className="font-semibold mb-2">By Source</h3>
-                  <BreakdownTable data={snapshot.summary_by_source} />
-                </div>
-                <div>
-                  <h3 className="font-semibold mb-2">By Grade</h3>
-                  <BreakdownTable data={snapshot.summary_by_grade} />
-                </div>
-              </div>
-            </div>
-
             {/* Action Buttons */}
-            <div className="flex gap-2 print:hidden">
+            <div className="flex gap-2">
               <Button onClick={handleDownloadCsv} variant="outline" disabled={loadingItems}>
                 <Download className="h-4 w-4 mr-1" />
                 Download CSV
               </Button>
-              <Button onClick={handlePrint} variant="outline">
-                <Printer className="h-4 w-4 mr-1" />
-                Print Report
+              <Button onClick={handleDownloadPdf} variant="outline" disabled={loadingItems}>
+                <FileText className="h-4 w-4 mr-1" />
+                Download PDF
               </Button>
             </div>
 
             {/* Line Items Table */}
-            <div className="print:break-before-page">
+            <div>
               {loadingItems ? (
                 <TableSkeleton rows={10} columns={6} />
               ) : (
