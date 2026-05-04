@@ -355,6 +355,12 @@ export async function updateTicketStatus(
         .from('items')
         .update({ item_status: 'INTAKE' })
         .in('id', itemIds)
+
+      // Unlink returned items from their order_items rows (frees unique constraint)
+      await supabase
+        .from('order_items')
+        .update({ item_id: null })
+        .in('item_id', itemIds)
     }
   }
 
@@ -404,6 +410,12 @@ export async function resolveTicket(id: string, resolutionNotes: string) {
         .from('items')
         .update({ item_status: 'INTAKE' })
         .in('id', itemIds)
+
+      // Unlink returned items from their order_items rows (frees unique constraint)
+      await supabase
+        .from('order_items')
+        .update({ item_id: null })
+        .in('item_id', itemIds)
     }
   }
 
