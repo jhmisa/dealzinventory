@@ -46,11 +46,14 @@ export default function SystemFeedbackPage() {
 
   return (
     <div className="flex flex-col gap-4 p-4 h-full">
-      <PageHeader title="System Feedback">
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />New Feedback
-        </Button>
-      </PageHeader>
+      <PageHeader
+        title="System Feedback"
+        actions={
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />New Feedback
+          </Button>
+        }
+      />
 
       {isLoading ? (
         <div className="flex items-center justify-center py-12 text-muted-foreground">Loading...</div>
