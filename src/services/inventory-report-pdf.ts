@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { supabase } from '@/lib/supabase'
 import type { InventorySnapshot, InventorySnapshotItem } from './inventory-snapshots'
 
 const COLORS = {
@@ -13,9 +14,49 @@ const COLORS = {
   totalRowBg: [248, 250, 252] as [number, number, number], // slate-50
 }
 
+const MAX_BREAKDOWN_ROWS = 10
+
 function fmtPrice(yen: number | null | undefined): string {
   if (yen == null) return '—'
   return `¥${yen.toLocaleString('ja-JP')}`
+}
+
+async function fetchDescriptions(itemCodes: string[]): Promise<Record<string, string>> {
+  if (itemCodes.length === 0) return {}
+
+  const { data } = await supabase
+    .from('items')
+    .select('item_code, product_models(short_description)')
+    .in('item_code', itemCodes)
+
+  const map: Record<string, string> = {}
+  if (data) {
+    for (const row of data) {
+      const pm = row.product_models as unknown as { short_description: string | null } | null
+      if (pm?.short_description) {
+        map[row.item_code] = pm.short_description
+      }
+    }
+  }
+  return map
+}
+
+function capBreakdown(
+  data: Record<string, { count: number; value: number }>,
+  max: number,
+): Record<string, { count: number; value: number }> {
+  const entries = Object.entries(data).sort((a, b) => b[1].value - a[1].value)
+  if (entries.length <= max) return data
+
+  const top = entries.slice(0, max)
+  const rest = entries.slice(max)
+  const othersCount = rest.reduce((s, [, d]) => s + d.count, 0)
+  const othersValue = rest.reduce((s, [, d]) => s + d.value, 0)
+
+  const result: Record<string, { count: number; value: number }> = {}
+  for (const [key, val] of top) result[key] = val
+  result[`Others (${rest.length})`] = { count: othersCount, value: othersValue }
+  return result
 }
 
 function addHeader(doc: jsPDF, snapshot: InventorySnapshot) {
@@ -64,7 +105,7 @@ function addKpiRow(doc: jsPDF, snapshot: InventorySnapshot, startY: number): num
   const pageW = doc.internal.pageSize.getWidth()
   const margin = 20
   const usable = pageW - margin * 2
-  const boxW = (usable - 16) / 5  // 5 boxes, 4 gaps of 4pt each
+  const boxW = (usable - 16) / 5
   const boxH = 28
   const gap = 4
 
@@ -89,12 +130,10 @@ function addKpiRow(doc: jsPDF, snapshot: InventorySnapshot, startY: number): num
       doc.setTextColor(...COLORS.muted)
     }
 
-    // Label
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(7)
     doc.text(kpi.label.toUpperCase(), x + boxW / 2, startY + 8, { align: 'center' })
 
-    // Value
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(kpi.highlight ? 12 : 11)
     if (!kpi.highlight) doc.setTextColor(...COLORS.brand)
@@ -148,83 +187,90 @@ function addAccessorySummary(doc: jsPDF, snapshot: InventorySnapshot, startY: nu
   return y + boxH + 6
 }
 
+function addBreakdownTable(
+  doc: jsPDF,
+  title: string,
+  data: Record<string, { count: number; value: number }>,
+  x: number,
+  startY: number,
+  tableWidth: number,
+): number {
+  const pageW = doc.internal.pageSize.getWidth()
+  const entries = Object.entries(data).sort((a, b) => b[1].value - a[1].value)
+  const totalCount = entries.reduce((s, [, d]) => s + d.count, 0)
+  const totalValue = entries.reduce((s, [, d]) => s + d.value, 0)
+
+  const body = entries.map(([key, { count, value }]) => [key, count.toLocaleString(), fmtPrice(value)])
+  body.push(['Total', totalCount.toLocaleString(), fmtPrice(totalValue)])
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9)
+  doc.setTextColor(...COLORS.brand)
+  doc.text(title, x, startY + 3)
+
+  autoTable(doc, {
+    startY: startY + 6,
+    margin: { left: x, right: pageW - x - tableWidth },
+    tableWidth,
+    head: [['Category', 'Count', 'Value']],
+    body,
+    theme: 'plain',
+    styles: {
+      fontSize: 7.5,
+      cellPadding: { top: 1.8, bottom: 1.8, left: 3, right: 3 },
+      textColor: COLORS.brand,
+      lineColor: COLORS.border,
+      lineWidth: 0.3,
+    },
+    headStyles: {
+      fillColor: COLORS.headerBg,
+      textColor: COLORS.muted,
+      fontStyle: 'bold',
+      fontSize: 7,
+    },
+    columnStyles: {
+      0: { cellWidth: 'auto' },
+      1: { halign: 'right', cellWidth: 30 },
+      2: { halign: 'right', cellWidth: 45 },
+    },
+    didParseCell(data) {
+      if (data.row.index === body.length - 1) {
+        data.cell.styles.fontStyle = 'bold'
+        data.cell.styles.fillColor = COLORS.totalRowBg
+      }
+    },
+  })
+
+  return (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY
+}
+
 function addBreakdownGrid(doc: jsPDF, snapshot: InventorySnapshot, startY: number): number {
   const pageW = doc.internal.pageSize.getWidth()
   const margin = 20
   const halfW = (pageW - margin * 2 - 10) / 2
 
-  const breakdowns: { title: string; data: Record<string, { count: number; value: number }> }[] = [
-    { title: 'By Status', data: snapshot.summary_by_status },
-    { title: 'By Brand', data: snapshot.summary_by_brand },
-    { title: 'By Source', data: snapshot.summary_by_source },
-    { title: 'By Grade', data: snapshot.summary_by_grade },
-  ]
+  // Cap brand at top 10 + Others
+  const cappedBrand = capBreakdown(snapshot.summary_by_brand, MAX_BREAKDOWN_ROWS)
 
-  let maxY = startY
+  // Row 1: Status (left) + Brand (right)
+  const statusY = addBreakdownTable(doc, 'By Status', snapshot.summary_by_status, margin, startY, halfW)
+  const brandY = addBreakdownTable(doc, 'By Brand', cappedBrand, margin + halfW + 10, startY, halfW)
+  const row1Bottom = Math.max(statusY, brandY)
 
-  breakdowns.forEach((bd, i) => {
-    const col = i % 2
-    const row = Math.floor(i / 2)
-    const x = margin + col * (halfW + 10)
+  // Row 2: Source (left) + Grade (right)
+  const row2Start = row1Bottom + 8
+  const sourceY = addBreakdownTable(doc, 'By Source', snapshot.summary_by_source, margin, row2Start, halfW)
+  const gradeY = addBreakdownTable(doc, 'By Grade', snapshot.summary_by_grade, margin + halfW + 10, row2Start, halfW)
 
-    const entries = Object.entries(bd.data)
-      .sort((a, b) => b[1].value - a[1].value)
-    const totalCount = entries.reduce((s, [, d]) => s + d.count, 0)
-    const totalValue = entries.reduce((s, [, d]) => s + d.value, 0)
-
-    const body = entries.map(([key, { count, value }]) => [key, count.toLocaleString(), fmtPrice(value)])
-    body.push(['Total', totalCount.toLocaleString(), fmtPrice(totalValue)])
-
-    const tableStartY = row === 0 ? startY : maxY + 4
-
-    // Section title
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(9)
-    doc.setTextColor(...COLORS.brand)
-    doc.text(bd.title, x, tableStartY + 3)
-
-    autoTable(doc, {
-      startY: tableStartY + 6,
-      margin: { left: x, right: pageW - x - halfW },
-      tableWidth: halfW,
-      head: [['Category', 'Count', 'Value']],
-      body,
-      theme: 'plain',
-      styles: {
-        fontSize: 7.5,
-        cellPadding: { top: 1.8, bottom: 1.8, left: 3, right: 3 },
-        textColor: COLORS.brand,
-        lineColor: COLORS.border,
-        lineWidth: 0.3,
-      },
-      headStyles: {
-        fillColor: COLORS.headerBg,
-        textColor: COLORS.muted,
-        fontStyle: 'bold',
-        fontSize: 7,
-      },
-      columnStyles: {
-        0: { cellWidth: 'auto' },
-        1: { halign: 'right', cellWidth: 22 },
-        2: { halign: 'right', cellWidth: 30 },
-      },
-      didParseCell(data) {
-        // Bold the total row
-        if (data.row.index === body.length - 1) {
-          data.cell.styles.fontStyle = 'bold'
-          data.cell.styles.fillColor = COLORS.totalRowBg
-        }
-      },
-    })
-
-    const finalY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY
-    if (finalY > maxY) maxY = finalY
-  })
-
-  return maxY + 6
+  return Math.max(sourceY, gradeY) + 6
 }
 
-function addItemsTable(doc: jsPDF, items: InventorySnapshotItem[], startY: number): number {
+function addItemsTable(
+  doc: jsPDF,
+  items: InventorySnapshotItem[],
+  descriptions: Record<string, string>,
+  startY: number,
+): number {
   const itemRows = items.filter((i) => i.item_type === 'item')
   if (itemRows.length === 0) return startY
 
@@ -236,10 +282,9 @@ function addItemsTable(doc: jsPDF, items: InventorySnapshotItem[], startY: numbe
   const body = itemRows.map((item) => [
     item.item_code,
     item.brand ?? '—',
-    item.model_name ?? '—',
+    descriptions[item.item_code] || item.model_name || '—',
     item.condition_grade ?? '—',
     item.item_status,
-    item.source_type ?? '—',
     fmtPrice(item.purchase_price),
     fmtPrice(item.additional_costs),
     fmtPrice(item.total_cost),
@@ -248,12 +293,12 @@ function addItemsTable(doc: jsPDF, items: InventorySnapshotItem[], startY: numbe
   autoTable(doc, {
     startY: startY + 8,
     margin: { left: 20, right: 20 },
-    head: [['Code', 'Brand', 'Model', 'Grade', 'Status', 'Source', 'Purchase', 'Add\'l', 'Total']],
+    head: [['Code', 'Brand', 'Description', 'Grade', 'Status', 'Purchase', 'Add\'l', 'Total']],
     body,
     theme: 'striped',
     styles: {
-      fontSize: 6.5,
-      cellPadding: { top: 1.5, bottom: 1.5, left: 2, right: 2 },
+      fontSize: 7,
+      cellPadding: { top: 2, bottom: 2, left: 3, right: 3 },
       textColor: COLORS.brand,
       lineColor: COLORS.border,
       lineWidth: 0.2,
@@ -263,39 +308,43 @@ function addItemsTable(doc: jsPDF, items: InventorySnapshotItem[], startY: numbe
       fillColor: COLORS.brand,
       textColor: COLORS.white,
       fontStyle: 'bold',
-      fontSize: 6.5,
+      fontSize: 7,
     },
     alternateRowStyles: {
       fillColor: [249, 250, 251],
     },
     columnStyles: {
-      0: { cellWidth: 18, font: 'courier' },
-      1: { cellWidth: 18 },
-      2: { cellWidth: 'auto' },
-      3: { cellWidth: 12, halign: 'center' },
-      4: { cellWidth: 20 },
-      5: { cellWidth: 18 },
-      6: { cellWidth: 20, halign: 'right' },
-      7: { cellWidth: 18, halign: 'right' },
-      8: { cellWidth: 20, halign: 'right', fontStyle: 'bold' },
+      0: { cellWidth: 55, font: 'courier' },  // Code — full P000xxx
+      1: { cellWidth: 50 },                     // Brand
+      2: { cellWidth: 'auto' },                 // Description — takes remaining space
+      3: { cellWidth: 30, halign: 'center' },   // Grade
+      4: { cellWidth: 55 },                     // Status
+      5: { cellWidth: 55, halign: 'right' },    // Purchase
+      6: { cellWidth: 45, halign: 'right' },    // Add'l
+      7: { cellWidth: 55, halign: 'right', fontStyle: 'bold' }, // Total
     },
     didDrawPage(data) {
-      // Footer on every page
       const pageH = doc.internal.pageSize.getHeight()
       const pageW = doc.internal.pageSize.getWidth()
-      doc.setFontSize(7)
-      doc.setFont('helvetica', 'normal')
-      doc.setTextColor(...COLORS.muted)
-      doc.text('Dealz K.K. — Confidential', 20, pageH - 8)
-      const pageNum = (doc as unknown as { getNumberOfPages: () => number }).getNumberOfPages()
-      const currentPage = doc.getCurrentPageInfo().pageNumber
-      doc.text(`Page ${currentPage} of ${pageNum}`, pageW - 20, pageH - 8, { align: 'right' })
 
       // Top accent bar on continuation pages
       if (data.pageNumber > 1) {
         doc.setFillColor(...COLORS.brand)
         doc.rect(0, 0, pageW, 2, 'F')
       }
+
+      // Bottom accent bar
+      doc.setFillColor(...COLORS.brand)
+      doc.rect(0, pageH - 3, pageW, 3, 'F')
+
+      // Footer text
+      doc.setFontSize(7)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(...COLORS.muted)
+      doc.text('Dealz K.K. — Confidential', 20, pageH - 6)
+      const pageCount = (doc as unknown as { getNumberOfPages: () => number }).getNumberOfPages()
+      const currentPage = doc.getCurrentPageInfo().pageNumber
+      doc.text(`Page ${currentPage} of ${pageCount}`, pageW - 20, pageH - 6, { align: 'right' })
     },
   })
 
@@ -306,7 +355,6 @@ function addAccessoriesTable(doc: jsPDF, items: InventorySnapshotItem[], startY:
   const accRows = items.filter((i) => i.item_type === 'accessory')
   if (accRows.length === 0) return startY
 
-  // Check if we need a new page (at least 40pt needed for header + a few rows)
   const pageH = doc.internal.pageSize.getHeight()
   if (startY > pageH - 50) {
     doc.addPage()
@@ -335,7 +383,7 @@ function addAccessoriesTable(doc: jsPDF, items: InventorySnapshotItem[], startY:
     theme: 'striped',
     styles: {
       fontSize: 7,
-      cellPadding: { top: 1.5, bottom: 1.5, left: 3, right: 3 },
+      cellPadding: { top: 2, bottom: 2, left: 3, right: 3 },
       textColor: COLORS.brand,
       lineColor: COLORS.border,
       lineWidth: 0.2,
@@ -350,12 +398,12 @@ function addAccessoriesTable(doc: jsPDF, items: InventorySnapshotItem[], startY:
       fillColor: [249, 250, 251],
     },
     columnStyles: {
-      0: { cellWidth: 22, font: 'courier' },
-      1: { cellWidth: 25 },
+      0: { cellWidth: 55, font: 'courier' },
+      1: { cellWidth: 60 },
       2: { cellWidth: 'auto' },
-      3: { cellWidth: 18, halign: 'right' },
-      4: { cellWidth: 25, halign: 'right' },
-      5: { cellWidth: 25, halign: 'right', fontStyle: 'bold' },
+      3: { cellWidth: 40, halign: 'right' },
+      4: { cellWidth: 55, halign: 'right' },
+      5: { cellWidth: 55, halign: 'right', fontStyle: 'bold' },
     },
   })
 
@@ -383,20 +431,25 @@ function addFooter(doc: jsPDF) {
   }
 }
 
-export function downloadInventoryPdf(snapshot: InventorySnapshot, items: InventorySnapshotItem[]) {
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' })
+export async function downloadInventoryPdf(snapshot: InventorySnapshot, items: InventorySnapshotItem[]) {
+  // Fetch short_descriptions from product_models for all item codes
+  const itemCodes = items
+    .filter((i) => i.item_type === 'item')
+    .map((i) => i.item_code)
+  const descriptions = await fetchDescriptions(itemCodes)
 
-  // Page 1: Summary
+  // Page 1: Summary (portrait)
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' })
   addHeader(doc, snapshot)
   let y = 42
   y = addKpiRow(doc, snapshot, y)
   y = addAccessorySummary(doc, snapshot, y)
-  y = addBreakdownGrid(doc, snapshot, y)
+  addBreakdownGrid(doc, snapshot, y)
 
-  // Page 2+: Item line-items
-  doc.addPage()
+  // Page 2+: Items table (landscape for full-width columns)
+  doc.addPage('a4', 'landscape')
   let itemY = 12
-  itemY = addItemsTable(doc, items, itemY)
+  itemY = addItemsTable(doc, items, descriptions, itemY)
   addAccessoriesTable(doc, items, itemY)
 
   addFooter(doc)

@@ -20,6 +20,7 @@ import { formatDateTime, formatPrice, formatCustomerName, cn } from '@/lib/utils
 import { printBatchInvoices } from '@/components/orders/batch-invoice-print'
 import { validateOrders, generateDempyoXlsx, downloadBlob, generateDempyoFilename } from '@/lib/yamato'
 import { YamatoTrackingImportDialog } from '@/components/orders/yamato-tracking-import-dialog'
+import { PrintSelectionDialog } from '@/components/orders/print-selection-dialog'
 
 type OrderRow = {
   id: string
@@ -262,25 +263,33 @@ export default function OrderListPage() {
   const stampInvoice = useStampInvoicePrinted()
   const stampDempyo = useStampDempyoPrinted()
   const [trackingImportOpen, setTrackingImportOpen] = useState(false)
+  const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false)
+  const [dempyoDialogOpen, setDempyoDialogOpen] = useState(false)
   const [showDeliveryIssuesOnly, setShowDeliveryIssuesOnly] = useState(false)
   const refreshYamato = useRefreshAllYamatoStatuses()
 
   const invoiceCount = invoiceOrders?.length ?? 0
   const dempyoCount = dempyoOrders?.length ?? 0
 
-  const handleBatchInvoice = () => {
-    if (!invoiceOrders || invoiceOrders.length === 0) return
-    printBatchInvoices(invoiceOrders, '')
-    const ids = invoiceOrders.map((o) => o.id)
-    stampInvoice.mutate(ids, {
-      onSuccess: () => toast.success(`Marked ${ids.length} invoices as printed`),
+  const handleInvoiceConfirm = (selectedIds: string[]) => {
+    if (!invoiceOrders) return
+    const selected = invoiceOrders.filter((o) => selectedIds.includes(o.id))
+    if (selected.length === 0) return
+    printBatchInvoices(selected, '')
+    stampInvoice.mutate(selectedIds, {
+      onSuccess: () => {
+        toast.success(`Marked ${selectedIds.length} invoices as printed`)
+        setInvoiceDialogOpen(false)
+      },
       onError: (err) => toast.error(err.message),
     })
   }
 
-  const handleBatchDempyo = async () => {
-    if (!dempyoOrders || dempyoOrders.length === 0) return
-    const { valid, skipped, warnings } = validateOrders(dempyoOrders)
+  const handleDempyoConfirm = async (selectedIds: string[]) => {
+    if (!dempyoOrders) return
+    const selected = dempyoOrders.filter((o) => selectedIds.includes(o.id))
+    if (selected.length === 0) return
+    const { valid, skipped, warnings } = validateOrders(selected)
     if (skipped.length > 0) {
       for (const s of skipped) toast.warning(`${s.order.order_code}: ${s.reason}`)
     }
@@ -294,7 +303,10 @@ export default function OrderListPage() {
       downloadBlob(blob, generateDempyoFilename())
       const ids = valid.map((o) => o.id)
       stampDempyo.mutate(ids, {
-        onSuccess: () => toast.success(`Dempyo generated for ${ids.length} orders`),
+        onSuccess: () => {
+          toast.success(`Dempyo generated for ${ids.length} orders`)
+          setDempyoDialogOpen(false)
+        },
         onError: (err) => toast.error(err.message),
       })
     } catch (err) {
@@ -610,11 +622,11 @@ export default function OrderListPage() {
             </Select>
             {statusTab === 'CONFIRMED' && (
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" disabled={invoiceCount === 0} onClick={handleBatchInvoice}>
+                <Button variant="outline" size="sm" disabled={invoiceCount === 0} onClick={() => setInvoiceDialogOpen(true)}>
                   <Printer className="h-4 w-4 mr-1" />
                   Print Invoices ({invoiceCount})
                 </Button>
-                <Button variant="outline" size="sm" disabled={dempyoCount === 0} onClick={handleBatchDempyo}>
+                <Button variant="outline" size="sm" disabled={dempyoCount === 0} onClick={() => setDempyoDialogOpen(true)}>
                   <FileSpreadsheet className="h-4 w-4 mr-1" />
                   Print Dempyo ({dempyoCount})
                 </Button>
@@ -734,6 +746,24 @@ export default function OrderListPage() {
       <YamatoTrackingImportDialog
         open={trackingImportOpen}
         onOpenChange={setTrackingImportOpen}
+      />
+      <PrintSelectionDialog
+        open={invoiceDialogOpen}
+        onOpenChange={setInvoiceDialogOpen}
+        title="Print Invoices"
+        description="Select which orders to print invoices for. All unprinted invoices are selected by default."
+        orders={(invoiceOrders ?? []) as any}
+        actionLabel="Print Invoices"
+        onConfirm={handleInvoiceConfirm}
+      />
+      <PrintSelectionDialog
+        open={dempyoDialogOpen}
+        onOpenChange={setDempyoDialogOpen}
+        title="Print Dempyo"
+        description="Select which orders to generate dempyo for. All unprinted orders are selected by default."
+        orders={(dempyoOrders ?? []) as any}
+        actionLabel="Print Dempyo"
+        onConfirm={handleDempyoConfirm}
       />
     </div>
   )

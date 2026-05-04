@@ -74,10 +74,14 @@ export default function InventoryReportPage() {
     toast.success('CSV downloaded')
   }
 
-  function handleDownloadPdf() {
+  async function handleDownloadPdf() {
     if (!snapshot || !items) return
-    downloadInventoryPdf(snapshot, items)
-    toast.success('PDF downloaded')
+    try {
+      await downloadInventoryPdf(snapshot, items)
+      toast.success('PDF downloaded')
+    } catch {
+      toast.error('Failed to generate PDF')
+    }
   }
 
   if (loadingSnapshots) return <TableSkeleton rows={6} columns={4} />
