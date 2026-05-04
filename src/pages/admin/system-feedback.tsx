@@ -4,7 +4,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/shared'
 import { KanbanBoard, CreateFeedbackDialog, FeedbackDetailDialog } from '@/components/system-feedback'
-import { useSystemFeedback, useCreateSystemFeedback, useUpdateSystemFeedback, useDeleteSystemFeedback } from '@/hooks/use-system-feedback'
+import { useSystemFeedback, useCreateSystemFeedback, useUpdateSystemFeedback, useDeleteSystemFeedback, useUploadFeedbackMedia } from '@/hooks/use-system-feedback'
 import type { SystemFeedback, SystemFeedbackStatus } from '@/services/system-feedback'
 import type { CreateSystemFeedbackFormValues } from '@/validators/system-feedback'
 
@@ -16,10 +16,20 @@ export default function SystemFeedbackPage() {
   const createMutation = useCreateSystemFeedback()
   const updateMutation = useUpdateSystemFeedback()
   const deleteMutation = useDeleteSystemFeedback()
+  const uploadMutation = useUploadFeedbackMedia()
 
-  const handleCreate = (values: CreateSystemFeedbackFormValues) => {
+  const handleCreate = (values: CreateSystemFeedbackFormValues, files: File[]) => {
     createMutation.mutate(values, {
-      onSuccess: () => {
+      onSuccess: async (created) => {
+        if (files.length > 0) {
+          try {
+            await Promise.all(
+              files.map((file) => uploadMutation.mutateAsync({ feedbackId: created.id, file }))
+            )
+          } catch {
+            toast.error('Feedback created but some screenshots failed to upload')
+          }
+        }
         toast.success('Feedback created')
         setCreateOpen(false)
       },
