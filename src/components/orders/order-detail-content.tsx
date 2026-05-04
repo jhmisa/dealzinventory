@@ -742,7 +742,7 @@ export function OrderDetailContent({ orderId, onClose, onNavigate, isModal }: Or
       )}
 
       {isModal && (
-        <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center justify-between flex-wrap gap-2 pr-8">
           <div className="flex items-center gap-3">
             <CodeDisplay code={order.order_code} />
             {statusCfg && <StatusBadge label={statusCfg.label} color={statusCfg.color} />}

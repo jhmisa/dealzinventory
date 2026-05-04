@@ -39,6 +39,7 @@ interface OrderSummaryInput {
     description: string | null
     quantity: number
     unit_price: number | null
+    discount?: number | null
   }>
 }
 
@@ -77,8 +78,15 @@ export function formatOrderSummary(order: OrderSummaryInput): string {
     for (const item of items) {
       const desc = item.description || 'Item'
       const price = item.unit_price != null ? ` — ${formatPrice(item.unit_price)}` : ''
-      lines.push(`${item.quantity}x ${desc}${price}`)
+      const discount = item.discount && item.discount > 0 ? ` (discount: -${formatPrice(item.discount)})` : ''
+      lines.push(`${item.quantity}x ${desc}${price}${discount}`)
     }
+  }
+
+  // Total discount summary
+  const totalDiscount = items.reduce((sum, item) => sum + (item.discount ?? 0), 0)
+  if (totalDiscount > 0) {
+    lines.push(`🏷️ Discount: -${formatPrice(totalDiscount)}`)
   }
 
   // Delivery fee
