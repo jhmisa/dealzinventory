@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Plus } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Plus, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { PageHeader, ConfirmDialog } from '@/components/shared'
@@ -8,6 +8,7 @@ import {
   useSocialMediaPosts,
   useUpdateSocialMediaPost,
   useDeleteSocialMediaPost,
+  useSyncSocialMediaStatuses,
 } from '@/hooks/use-social-media-posts'
 
 export default function SocialMediaPage() {
@@ -17,6 +18,20 @@ export default function SocialMediaPage() {
   const { data: posts = [], isLoading } = useSocialMediaPosts()
   const updateMutation = useUpdateSocialMediaPost()
   const deleteMutation = useDeleteSocialMediaPost()
+  const syncMutation = useSyncSocialMediaStatuses()
+  const hasSynced = useRef(false)
+
+  useEffect(() => {
+    if (hasSynced.current) return
+    hasSynced.current = true
+    syncMutation.mutate(undefined, {
+      onSuccess: (data) => {
+        if (data.published > 0 || data.failed > 0) {
+          toast.success(`Synced: ${data.published} published, ${data.failed} failed`)
+        }
+      },
+    })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleQueue(id: string) {
     updateMutation.mutate(
@@ -56,10 +71,25 @@ export default function SocialMediaPage() {
           title="Social Media"
           description="Stage and queue posts for Blotato publishing."
         />
-        <Button onClick={() => setFormOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          New Post
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => syncMutation.mutate(undefined, {
+              onSuccess: (data) => {
+                toast.success(`Synced: ${data.published} published, ${data.failed} failed, ${data.unchanged} unchanged`)
+              },
+              onError: (err) => toast.error(`Sync failed: ${err.message}`),
+            })}
+            disabled={syncMutation.isPending}
+          >
+            <RefreshCw className={`h-4 w-4 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+          </Button>
+          <Button onClick={() => setFormOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Post
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (

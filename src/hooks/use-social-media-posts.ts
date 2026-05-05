@@ -50,6 +50,16 @@ export function useDeleteSocialMediaPost() {
   })
 }
 
+export function useSyncSocialMediaStatuses() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => socialMediaPostService.syncSocialMediaStatuses(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.socialMediaPosts.all })
+    },
+  })
+}
+
 export function useSourceMedia(
   sourceType: socialMediaPostService.MediaSourceType | undefined,
   sourceId: string | undefined,

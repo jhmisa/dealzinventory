@@ -137,6 +137,12 @@ export async function deleteSocialMediaPost(id: string) {
   if (error) throw error
 }
 
+export async function syncSocialMediaStatuses() {
+  const { data, error } = await supabase.functions.invoke('sync-social-status')
+  if (error) throw error
+  return data as { synced: number; published: number; failed: number; unchanged: number }
+}
+
 export interface MediaItem {
   url: string
   thumbnail_url: string | null
