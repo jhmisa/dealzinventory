@@ -20,6 +20,7 @@ interface OrderCustomer {
 interface OrderItemData {
   id: string
   item_id: string | null
+  accessory_id: string | null
   description: string | null
   quantity: number
   unit_price: number
@@ -49,6 +50,11 @@ interface OrderItemData {
       categories: { description_fields: string[] } | null
       product_media: { file_url: string; role: string; sort_order: number }[]
     } | null
+  } | null
+  accessories: {
+    id: string
+    accessory_code: string
+    name: string
   } | null
 }
 
@@ -175,7 +181,9 @@ function buildInvoicePageHtml(order: BatchInvoiceOrder, salesAgent: string, isLa
   // Build table rows
   const tableRows = orderItems
     .map((oi) => {
-      const itemCode = escapeHtml(oi.items?.item_code ?? 'CUSTOM')
+      const itemCode = escapeHtml(
+        oi.items?.item_code ?? oi.accessories?.accessory_code ?? 'CUSTOM',
+      )
       const description = escapeHtml(buildItemDescription(oi))
       const lineTotal = oi.unit_price * oi.quantity - oi.discount
       return `<tr>

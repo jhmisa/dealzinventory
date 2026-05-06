@@ -623,14 +623,15 @@ export async function getConfirmedOrdersForInvoice() {
         product_models(brand, model_name, color, cpu, ram_gb, storage_gb)
       ),
       order_items(
-        id, item_id, description, quantity, unit_price, discount,
+        id, item_id, accessory_id, description, quantity, unit_price, discount,
         items(id, item_code, condition_grade, condition_notes, item_status,
           cpu, ram_gb, storage_gb, screen_size, os_family, color,
           product_models(brand, model_name, color, cpu, ram_gb, storage_gb, screen_size, os_family, short_description,
             categories(description_fields),
             product_media(file_url, role, sort_order)
           )
-        )
+        ),
+        accessories(id, accessory_code, name)
       )
     `)
     .eq('order_status', 'CONFIRMED')
