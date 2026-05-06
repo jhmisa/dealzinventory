@@ -89,7 +89,7 @@ export default function SellGroupDetailPage() {
 
   const pm = sg.product_models as { brand: string; model_name: string; color: string; cpu: string | null; ram_gb: string | null; storage_gb: string | null; os_family: string | null } | null
 
-  const shareUrl = `${window.location.origin}/order/${sg.sell_group_code}`
+  const shareUrl = `${window.location.origin}/mine/${sg.sell_group_code}`
   const sellingPrice = Number(repItem?.selling_price ?? 0)
   const discountAmount = Number(sg.discount_amount ?? 0)
   const effectivePrice = Math.max(0, sellingPrice - discountAmount)
