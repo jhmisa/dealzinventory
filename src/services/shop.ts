@@ -122,30 +122,37 @@ export async function getShopSellGroups(filters: ShopFilters = {}) {
         cpu, ram_gb, storage_gb, os_family, short_description,
         product_media(id, file_url, role, sort_order)
       ),
-      sell_group_items(count)
+      sell_group_items(items(id, selling_price, discount, condition_grade, item_status))
     `)
     .eq('active', true)
-
-  if (filters.hideNoPrice) {
-    query = query.not('base_price', 'is', null)
-  }
 
   if (filters.grade) {
     query = query.eq('condition_grade', filters.grade)
   }
 
-  if (filters.sort === 'price_asc') {
-    query = query.order('base_price', { ascending: true })
-  } else if (filters.sort === 'price_desc') {
-    query = query.order('base_price', { ascending: false })
-  } else {
-    query = query.order('created_at', { ascending: false })
-  }
+  // We always order by created_at server-side; price-based sort and price filters happen client-side
+  // because effective price is derived (selling_price − discount_amount), not a column.
+  query = query.order('created_at', { ascending: false })
 
   const { data, error } = await query
   if (error) throw error
 
-  let results = data ?? []
+  // Compute effective price per sell group from the first member item
+  const enriched = (data ?? []).map((sg) => {
+    const sgItems = (sg.sell_group_items ?? []) as Array<{ items: { selling_price: number | null; condition_grade: string; item_status: string } | null }>
+    const rep = sgItems.map(s => s.items).find(i => i?.selling_price != null) ?? null
+    const sellingPrice = Number(rep?.selling_price ?? 0)
+    const discount = Number(sg.discount_amount ?? 0)
+    const effectivePrice = Math.max(0, sellingPrice - discount)
+    return { ...sg, _selling_price: sellingPrice, _effective_price: effectivePrice }
+  })
+
+  let results = enriched
+
+  // hideNoPrice: groups with no rep item (no available items priced)
+  if (filters.hideNoPrice) {
+    results = results.filter(sg => sg._selling_price > 0)
+  }
 
   const searchTerm = filters.search?.toLowerCase()
   results = results.filter((sg) => {
@@ -160,10 +167,16 @@ export async function getShopSellGroups(filters: ShopFilters = {}) {
       const pm = sg.product_models as { brand: string } | null
       if (pm?.brand !== filters.brand) return false
     }
-    if (filters.minPrice !== undefined && Number(sg.base_price) < filters.minPrice) return false
-    if (filters.maxPrice !== undefined && Number(sg.base_price) > filters.maxPrice) return false
+    if (filters.minPrice !== undefined && sg._effective_price < filters.minPrice) return false
+    if (filters.maxPrice !== undefined && sg._effective_price > filters.maxPrice) return false
     return true
   })
+
+  if (filters.sort === 'price_asc') {
+    results.sort((a, b) => a._effective_price - b._effective_price)
+  } else if (filters.sort === 'price_desc') {
+    results.sort((a, b) => b._effective_price - a._effective_price)
+  }
 
   return results
 }
@@ -178,7 +191,7 @@ export async function getSellGroupByCode(code: string) {
     .select(`
       *,
       product_models(*, product_media(id, file_url, media_type, role, sort_order)),
-      sell_group_items(count)
+      sell_group_items(items(id, selling_price, discount, condition_grade, item_status))
     `)
     .eq('sell_group_code', code)
     .eq('active', true)
@@ -195,14 +208,22 @@ export async function getProductDetail(productModelId: string) {
     .select(`
       *,
       product_models(*, categories(name, form_fields), product_media(id, file_url, media_type, role, sort_order)),
-      sell_group_items(count)
+      sell_group_items(items(id, selling_price, discount, condition_grade, item_status))
     `)
     .eq('product_id', productModelId)
     .eq('active', true)
-    .order('base_price', { ascending: true })
+    .order('created_at', { ascending: false })
 
   if (error) throw error
-  return data ?? []
+
+  // Sort client-side by effective price ascending (price = selling_price − discount_amount)
+  return (data ?? []).slice().sort((a, b) => {
+    const repA = (a.sell_group_items ?? []).map((s: { items: { selling_price: number | null } | null }) => s.items).find(i => i?.selling_price != null) ?? null
+    const repB = (b.sell_group_items ?? []).map((s: { items: { selling_price: number | null } | null }) => s.items).find(i => i?.selling_price != null) ?? null
+    const priceA = Math.max(0, Number(repA?.selling_price ?? 0) - Number(a.discount_amount ?? 0))
+    const priceB = Math.max(0, Number(repB?.selling_price ?? 0) - Number(b.discount_amount ?? 0))
+    return priceA - priceB
+  })
 }
 
 // ---------- Item detail (single P-code) ----------

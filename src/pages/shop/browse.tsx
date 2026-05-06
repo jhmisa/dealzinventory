@@ -283,7 +283,11 @@ export default function ShopBrowsePage() {
             } | null
             const media = pm?.product_media ?? []
             const heroImg = media.find(m => m.role === 'hero') ?? media[0]
-            const stockCount = (sg.sell_group_items as { count: number }[])?.[0]?.count ?? 0
+            const sgItems = (sg.sell_group_items ?? []) as Array<{ items: { item_status: string; condition_grade: string } | null }>
+            const stockCount = sgItems.filter(s => s.items?.item_status === 'AVAILABLE' && s.items?.condition_grade !== 'J').length
+            const sellingPrice = (sg as unknown as { _selling_price?: number })._selling_price ?? 0
+            const effectivePrice = (sg as unknown as { _effective_price?: number })._effective_price ?? sellingPrice
+            const discount = sellingPrice - effectivePrice
             const gradeInfo = CONDITION_GRADES.find(g => g.value === sg.condition_grade)
 
             return (
@@ -327,7 +331,14 @@ export default function ShopBrowsePage() {
                     {pm?.short_description ?? ''}
                   </p>
                   <div className="flex items-center justify-between pt-1">
-                    <span className="text-lg font-bold">{formatPrice(Number(sg.base_price))}</span>
+                    {discount > 0 ? (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-lg font-bold text-red-600 dark:text-red-400">{formatPrice(effectivePrice)}</span>
+                        <span className="text-xs text-muted-foreground line-through">{formatPrice(sellingPrice)}</span>
+                      </div>
+                    ) : (
+                      <span className="text-lg font-bold">{formatPrice(effectivePrice)}</span>
+                    )}
                     <span className={cn('text-xs', stockCount > 0 ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground')}>
                       {stockCount > 0 ? `${stockCount} in stock` : 'Sold out'}
                     </span>

@@ -101,7 +101,11 @@ export default function ItemDetailPage() {
   // Locking logic
   const isReserved = item.item_status === 'RESERVED'
   const isSold = item.item_status === 'SOLD'
-  const isLocked = isSold || (isReserved && !unlocked)
+  // Sell group membership locks the item's pricing/spec fields (selling_price, condition_grade, color, ram_gb, storage_gb, discount).
+  // These are managed by the owning sell group via DB triggers — manual edits would drift from the group invariant.
+  const sgMembership = (item as { sell_group_items?: Array<{ sell_groups: { id: string; sell_group_code: string; active: boolean } | null }> | null }).sell_group_items
+  const inSellGroup = sgMembership?.[0]?.sell_groups ?? null
+  const isLocked = isSold || (isReserved && !unlocked) || !!inSellGroup
 
   // Sold-to customer (if the item is in a CONFIRMED-or-later order)
   const soldTo = resolveSoldTo((item as unknown as { order_items?: unknown }).order_items)
@@ -266,6 +270,21 @@ export default function ItemDetailPage() {
           <span className="text-sm font-medium text-gray-600">
             This item has been sold. Editing is permanently locked.
           </span>
+        </div>
+      )}
+
+      {/* Lock banner for items in a sell group */}
+      {inSellGroup && !isSold && (
+        <div className="flex items-center justify-between gap-2 px-4 py-3 rounded-lg border border-purple-300 bg-purple-50">
+          <div className="flex items-center gap-2">
+            <Lock className="h-4 w-4 text-purple-600" />
+            <span className="text-sm font-medium text-purple-800">
+              In sell group <Link to={`/admin/sell-groups/${inSellGroup.id}`} className="underline font-mono">{inSellGroup.sell_group_code}</Link> — selling price, grade, color, RAM, storage, and discount are locked.
+            </span>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => navigate(`/admin/sell-groups/${inSellGroup.id}`)}>
+            Open Group
+          </Button>
         </div>
       )}
 

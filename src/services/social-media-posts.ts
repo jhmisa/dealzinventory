@@ -45,14 +45,18 @@ export async function createSocialMediaPost(post: SocialMediaPostInsert) {
     const { data: sg } = await supabase
       .from('sell_groups')
       .select(`
-        condition_grade, base_price,
-        product_models(brand, model_name, model_number, part_number, year, screen_size, other_features)
+        condition_grade, discount_amount,
+        product_models(brand, model_name, model_number, part_number, year, screen_size, other_features),
+        sell_group_items(items(selling_price))
       `)
       .eq('sell_group_code', post.item_code)
       .single()
 
     if (sg) {
       const pm = sg.product_models as Record<string, unknown> | null
+      const sgItems = (sg.sell_group_items ?? []) as Array<{ items: { selling_price: number | null } | null }>
+      const repSp = sgItems.map(s => s.items?.selling_price).find(p => p != null) ?? null
+      const effective = repSp != null ? Math.max(0, Number(repSp) - Number(sg.discount_amount ?? 0)) : null
       itemSpecs = {
         brand: pm?.brand ?? null,
         model_name: pm?.model_name ?? null,
@@ -62,7 +66,7 @@ export async function createSocialMediaPost(post: SocialMediaPostInsert) {
         screen_size: pm?.screen_size ?? null,
         other_features: pm?.other_features ?? null,
         condition_grade: sg.condition_grade,
-        selling_price: sg.base_price,
+        selling_price: effective,
       }
     }
   } else if (post.item_id) {

@@ -148,8 +148,9 @@ function useUnifiedSearch(search: string) {
         let query = supabase
           .from('sell_groups')
           .select(`
-            id, sell_group_code, product_id, condition_grade, base_price,
-            product_models(brand, model_name, short_description, product_media(file_url, sort_order))
+            id, sell_group_code, product_id, condition_grade, discount_amount,
+            product_models(brand, model_name, short_description, product_media(file_url, sort_order)),
+            sell_group_items(items(selling_price))
           `)
           .eq('active', true)
           .order('sell_group_code', { ascending: false })
@@ -170,13 +171,16 @@ function useUnifiedSearch(search: string) {
               brand: string; model_name: string; short_description: string | null
               product_media: { file_url: string; sort_order: number }[]
             } | null
+            const sgItems = (sg.sell_group_items ?? []) as Array<{ items: { selling_price: number | null } | null }>
+            const repSp = sgItems.map(s => s.items?.selling_price).find(p => p != null)
+            const effectivePrice = repSp != null ? Math.max(0, Number(repSp) - Number(sg.discount_amount ?? 0)) : null
 
             results.push({
               id: sg.id,
               code: sg.sell_group_code,
               type: 'sell_group',
               label: pm ? `${pm.brand} ${pm.model_name}` : 'Unknown',
-              sublabel: sg.base_price ? `¥${Number(sg.base_price).toLocaleString()}` : pm?.short_description ?? null,
+              sublabel: effectivePrice != null ? `¥${effectivePrice.toLocaleString()}` : pm?.short_description ?? null,
               thumbnail_url: pm?.product_media?.[0]?.file_url ?? null,
               grade: sg.condition_grade,
               product_id: sg.product_id,

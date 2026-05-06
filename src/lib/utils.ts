@@ -12,6 +12,37 @@ export function formatPrice(yen: number | null | undefined): string {
   return `¥${yen.toLocaleString('ja-JP')}`
 }
 
+/**
+ * Compute effective pricing for a sell group from its discount_amount and a representative member item.
+ * Under the new model (D1–D3), all members share the same selling_price, so any non-null member works.
+ * Returns 0s if no representative item is available.
+ */
+export function getSellGroupPricing(
+  discountAmount: number | null | undefined,
+  representativeItem?: { selling_price?: number | null } | null | undefined,
+): { sellingPrice: number; discount: number; effectivePrice: number; hasDiscount: boolean } {
+  const sellingPrice = Number(representativeItem?.selling_price ?? 0)
+  const discount = Number(discountAmount ?? 0)
+  const effectivePrice = Math.max(0, sellingPrice - discount)
+  return { sellingPrice, discount, effectivePrice, hasDiscount: discount > 0 }
+}
+
+/**
+ * Pluck the first member item from a sell-group response shape (for use with getSellGroupPricing).
+ * Accepts both `sell_group_items: [{ items: ... }]` and an array of items directly.
+ */
+export function getRepresentativeMember<T extends { selling_price?: number | null }>(
+  sgItems: Array<{ items?: T | null } | T | null> | null | undefined,
+): T | null {
+  if (!sgItems || sgItems.length === 0) return null
+  for (const sgi of sgItems) {
+    if (sgi == null) continue
+    const candidate = (sgi as { items?: T | null }).items ?? (sgi as T)
+    if (candidate && (candidate as T).selling_price != null) return candidate as T
+  }
+  return null
+}
+
 export function formatCustomerName(customer: { last_name: string; first_name?: string | null }): string {
   return `${customer.first_name ?? ''} ${customer.last_name}`.trim()
 }

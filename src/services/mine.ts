@@ -150,10 +150,17 @@ async function getClaimableSellGroup(code: string): Promise<ClaimableProduct | n
       media.push({ id: m.id, url: m.file_url, mediaType: m.media_type === 'video' ? 'video' : 'image' })
     }
 
-    // Count available items in the sell group
-    const items = (sg.sell_group_items ?? []) as { items: { id: string; item_status: string; condition_grade: string } | null }[]
+    // Count available items in the sell group + pick a representative for pricing
+    const items = (sg.sell_group_items ?? []) as { items: { id: string; item_status: string; condition_grade: string; selling_price: number | null } | null }[]
     const availableItems = items.filter(sgi => sgi.items?.item_status === 'AVAILABLE' && sgi.items?.condition_grade !== 'J')
     const available = sg.active === true && availableItems.length > 0
+
+    // Under the new model, sell_groups.discount_amount is synced down to each member's items.discount.
+    // Pricing is driven by the items' selling_price minus the group's discount_amount.
+    const repItem = availableItems[0]?.items ?? items[0]?.items
+    const sellingPrice = Number(repItem?.selling_price ?? 0)
+    const discount = Number(sg.discount_amount ?? 0)
+    const effectivePrice = Math.max(0, sellingPrice - discount)
 
     return {
       type: 'sell_group',
@@ -162,7 +169,8 @@ async function getClaimableSellGroup(code: string): Promise<ClaimableProduct | n
       title,
       subtitle,
       grade: sg.condition_grade,
-      price: sg.base_price ?? 0,
+      price: effectivePrice,
+      originalPrice: discount > 0 ? sellingPrice : undefined,
       media,
       available,
       stockCount: availableItems.length,

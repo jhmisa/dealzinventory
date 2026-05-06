@@ -124,7 +124,7 @@ export function useUnassignedItems(filters: UnassignedItemFilters = {}) {
 export function useCreateSellGroupWithItems() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ sg, itemIds }: { sg: Omit<SellGroupInsert, 'sell_group_code'>; itemIds: string[] }) => {
+    mutationFn: async ({ sg, itemIds }: { sg: { discount_amount: number; active: boolean }; itemIds: string[] }) => {
       const code = await sellGroupsService.generateSellGroupCode()
       return sellGroupsService.createSellGroupWithItems({ ...sg, sell_group_code: code }, itemIds)
     },

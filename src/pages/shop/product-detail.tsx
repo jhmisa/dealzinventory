@@ -68,9 +68,15 @@ export default function ShopProductDetailPage() {
 
   const currentImage = allMedia[currentImageIndex]
 
+  const sgEffectivePrice = (sg: typeof sellGroups[number]) => {
+    const sgItems = (sg.sell_group_items ?? []) as Array<{ items: { selling_price: number | null } | null }>
+    const repSp = Number(sgItems.map(s => s.items?.selling_price).find(p => p != null) ?? 0)
+    return Math.max(0, repSp - Number(sg.discount_amount ?? 0))
+  }
+  const sgPrices = sellGroups.map(sgEffectivePrice).filter(p => p > 0)
   const priceRange = {
-    min: Math.min(...sellGroups.map(sg => Number(sg.base_price))),
-    max: Math.max(...sellGroups.map(sg => Number(sg.base_price))),
+    min: sgPrices.length ? Math.min(...sgPrices) : 0,
+    max: sgPrices.length ? Math.max(...sgPrices) : 0,
   }
 
   return (
@@ -181,8 +187,12 @@ export default function ShopProductDetailPage() {
                     </div>
                     {sellGroups.map((sg) => {
                       const gradeInfo = CONDITION_GRADES.find(g => g.value === sg.condition_grade)
-                      const stock = (sg.sell_group_items as { count: number }[])?.[0]?.count ?? 0
+                      const sgItems = (sg.sell_group_items ?? []) as Array<{ items: { item_status: string; condition_grade: string; selling_price: number | null } | null }>
+                      const stock = sgItems.filter(s => s.items?.item_status === 'AVAILABLE' && s.items?.condition_grade !== 'J').length
                       const inStock = stock > 0
+                      const repSp = Number(sgItems.map(s => s.items?.selling_price).find(p => p != null) ?? 0)
+                      const discount = Number(sg.discount_amount ?? 0)
+                      const effective = Math.max(0, repSp - discount)
 
                       return (
                         <div
@@ -197,7 +207,14 @@ export default function ShopProductDetailPage() {
                             )}
                             <span className="text-sm">{gradeInfo?.label.split(' — ')[1] ?? sg.condition_grade}</span>
                           </div>
-                          <span className="text-lg font-bold">{formatPrice(Number(sg.base_price))}</span>
+                          {discount > 0 ? (
+                            <div className="flex items-baseline gap-1.5">
+                              <span className="text-lg font-bold text-red-600 dark:text-red-400">{formatPrice(effective)}</span>
+                              <span className="text-xs text-muted-foreground line-through">{formatPrice(repSp)}</span>
+                            </div>
+                          ) : (
+                            <span className="text-lg font-bold">{formatPrice(effective)}</span>
+                          )}
                           <span className={cn('text-sm', inStock ? 'text-green-600' : 'text-muted-foreground')}>
                             {inStock ? `${stock} available` : 'Out of stock'}
                           </span>

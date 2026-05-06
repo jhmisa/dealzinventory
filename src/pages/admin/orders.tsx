@@ -36,7 +36,7 @@ type OrderRow = {
   sell_groups: {
     sell_group_code: string
     condition_grade: string
-    base_price: number
+    discount_amount: number
     product_models: { brand: string; model_name: string } | null
   } | null
   order_items: { count: number }[]

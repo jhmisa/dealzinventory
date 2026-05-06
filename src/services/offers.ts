@@ -219,10 +219,10 @@ export async function addItemByCode(offerId: string, code: string) {
     const { data: sellGroup, error: sgError } = await supabase
       .from('sell_groups')
       .select(`
-        id, sell_group_code, base_price,
+        id, sell_group_code, discount_amount,
         product_models(brand, model_name, color),
         sell_group_items(
-          items(id, item_code, item_status, condition_grade, selling_price)
+          items(id, item_code, item_status, condition_grade, selling_price, discount)
         )
       `)
       .eq('sell_group_code', trimmedCode)
@@ -231,7 +231,7 @@ export async function addItemByCode(offerId: string, code: string) {
     if (sgError || !sellGroup) throw new Error(`Sell group ${trimmedCode} not found`)
 
     const pm = sellGroup.product_models as { brand: string; model_name: string; color: string | null } | null
-    const sgItems = (sellGroup.sell_group_items as { items: { id: string; item_code: string; item_status: string; condition_grade: string; selling_price: number | null } | null }[]) ?? []
+    const sgItems = (sellGroup.sell_group_items as { items: { id: string; item_code: string; item_status: string; condition_grade: string; selling_price: number | null; discount: number | null } | null }[]) ?? []
     const availableItems = sgItems
       .map(sgi => sgi.items)
       .filter((item): item is NonNullable<typeof item> =>
@@ -250,7 +250,7 @@ export async function addItemByCode(offerId: string, code: string) {
           offer_id: offerId,
           item_id: item.id,
           description,
-          unit_price: item.selling_price ?? Number(sellGroup.base_price) ?? 0,
+          unit_price: item.selling_price ?? 0,
           added_by: 'customer',
         })
         .select()

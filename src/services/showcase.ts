@@ -90,12 +90,13 @@ export async function getShowcaseSellGroup(gCode: string): Promise<ShowcaseItem 
   const { data: sg, error: sgError } = await supabase
     .from('sell_groups')
     .select(`
-      id, sell_group_code, base_price, condition_grade,
+      id, sell_group_code, discount_amount, condition_grade,
       product_models(
         brand, model_name, color, short_description, cpu, ram_gb, storage_gb, screen_size,
         categories(name, description_fields),
         product_media(id, file_url, media_type, sort_order)
-      )
+      ),
+      sell_group_items(items(selling_price))
     `)
     .ilike('sell_group_code', gCode.toUpperCase())
     .maybeSingle()
@@ -124,12 +125,17 @@ export async function getShowcaseSellGroup(gCode: string): Promise<ShowcaseItem 
     .sort((a, b) => a.sort_order - b.sort_order)
     .map((m) => ({ id: m.id, url: m.file_url }))
 
+  // Compute selling_price + discount from a representative item
+  const sgItems = (sg.sell_group_items ?? []) as Array<{ items: { selling_price: number | null } | null }>
+  const repSp = Number(sgItems.map(s => s.items?.selling_price).find(p => p != null) ?? 0)
+  const discountAmount = Number(sg.discount_amount ?? 0)
+
   return {
     id: sg.id,
     item_code: sg.sell_group_code,
-    selling_price: sg.base_price,
+    selling_price: repSp,
     purchase_price: null,
-    discount: null,
+    discount: discountAmount > 0 ? discountAmount : null,
     condition_grade: sg.condition_grade,
     condition_notes: null,
     description,

@@ -2617,9 +2617,9 @@ export type Database = {
       sell_groups: {
         Row: {
           active: boolean
-          base_price: number
           condition_grade: Database["public"]["Enums"]["condition_grade"]
           created_at: string
+          discount_amount: number
           id: string
           is_live_selling: boolean
           product_id: string
@@ -2628,9 +2628,9 @@ export type Database = {
         }
         Insert: {
           active?: boolean
-          base_price: number
           condition_grade: Database["public"]["Enums"]["condition_grade"]
           created_at?: string
+          discount_amount?: number
           id?: string
           is_live_selling?: boolean
           product_id: string
@@ -2639,9 +2639,9 @@ export type Database = {
         }
         Update: {
           active?: boolean
-          base_price?: number
           condition_grade?: Database["public"]["Enums"]["condition_grade"]
           created_at?: string
+          discount_amount?: number
           id?: string
           is_live_selling?: boolean
           product_id?: string

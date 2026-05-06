@@ -40,7 +40,7 @@ export async function getOrders(filters: OrderFilters = {}) {
     .select(`
       *,
       customers(customer_code, last_name, first_name, email, phone),
-      sell_groups(sell_group_code, condition_grade, base_price,
+      sell_groups(sell_group_code, condition_grade, discount_amount,
         product_models(brand, model_name, cpu, ram_gb, storage_gb, short_description)
       ),
       order_items(count)
@@ -80,7 +80,7 @@ export async function getOrder(id: string) {
     .select(`
       *,
       customers(customer_code, last_name, first_name, email, phone),
-      sell_groups(sell_group_code, condition_grade, base_price,
+      sell_groups(sell_group_code, condition_grade, discount_amount,
         product_models(brand, model_name, color, cpu, ram_gb, storage_gb)
       ),
       order_items(
@@ -313,7 +313,7 @@ export async function pickAvailableItemsFromSellGroup(sellGroupId: string, quant
   // Get sell group info
   const { data: sg, error: sgError } = await supabase
     .from('sell_groups')
-    .select('id, sell_group_code, base_price, product_models(brand, model_name)')
+    .select('id, sell_group_code, discount_amount, product_models(brand, model_name)')
     .eq('id', sellGroupId)
     .single()
 
@@ -352,7 +352,7 @@ export async function pickAvailableItemsFromSellGroup(sellGroupId: string, quant
       item_id: item.id,
       description,
       quantity: 1,
-      unit_price: item.selling_price ?? Number(sg.base_price) ?? 0,
+      unit_price: item.selling_price ?? 0,
       discount: item.discount ? Number(item.discount) : 0,
     }
   })
@@ -619,7 +619,7 @@ export async function getConfirmedOrdersForInvoice() {
     .select(`
       *,
       customers(customer_code, last_name, first_name, email, phone),
-      sell_groups(sell_group_code, condition_grade, base_price,
+      sell_groups(sell_group_code, condition_grade, discount_amount,
         product_models(brand, model_name, color, cpu, ram_gb, storage_gb)
       ),
       order_items(

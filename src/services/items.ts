@@ -104,6 +104,7 @@ export async function getItem(id: string) {
       product_models(*, categories(name, form_fields, description_fields), product_media(id, file_url, role, sort_order, media_type)),
       item_costs(id, description, amount, created_at),
       item_media(id, file_url, description, sort_order, visible, created_at, media_type, thumbnail_url),
+      sell_group_items(sell_groups(id, sell_group_code, discount_amount, active)),
       order_items(
         orders(id, order_code, order_status,
           customers(id, customer_code, first_name, last_name, email, phone)
@@ -501,17 +502,18 @@ export async function searchAvailableSellGroups(query: string, filters: Inventor
   if (!hasQuery && !hasFilters) return []
 
   const selectStr = `
-    id, sell_group_code, base_price, condition_grade, active,
+    id, sell_group_code, discount_amount, condition_grade, active,
     product_models!inner(brand, model_name, model_number, color, cpu, ram_gb, storage_gb, os_family, screen_size, year,
       product_media(file_url, role, sort_order)
     ),
     sell_group_items!inner(
-      items!inner(item_status)
+      items!inner(id, item_status, selling_price, discount)
     )
   `
 
   // PostgREST doesn't support foreign table columns inside .or(), so we run
   // two queries: one for G-code match, one for brand/model match, then merge.
+  // Price filters are applied client-side (effective price = items.selling_price - sg.discount_amount).
   const buildBase = () => {
     let q = supabase
       .from('sell_groups')
@@ -519,8 +521,6 @@ export async function searchAvailableSellGroups(query: string, filters: Inventor
       .eq('active', true)
       .eq('sell_group_items.items.item_status', 'AVAILABLE')
     if (filters.brand) q = q.eq('product_models.brand', filters.brand)
-    if (filters.priceMin != null) q = q.gte('base_price', filters.priceMin)
-    if (filters.priceMax != null) q = q.lte('base_price', filters.priceMax)
     return q.order('sell_group_code').limit(20)
   }
 
@@ -556,7 +556,17 @@ export async function searchAvailableSellGroups(query: string, filters: Inventor
     })
   }
 
-  return merged.map((sg) => {
+  // Apply price filters client-side using the representative item's effective price
+  const filtered = merged.filter((sg) => {
+    const sgItems = (sg.sell_group_items ?? []) as { items: { selling_price: number | null } | null }[]
+    const rep = sgItems.map(s => s.items).find(i => i?.selling_price != null) ?? null
+    const effective = Math.max(0, Number(rep?.selling_price ?? 0) - Number(sg.discount_amount ?? 0))
+    if (filters.priceMin != null && effective < filters.priceMin) return false
+    if (filters.priceMax != null && effective > filters.priceMax) return false
+    return true
+  })
+
+  return filtered.map((sg) => {
     const pm = sg.product_models as {
       brand: string | null; model_name: string | null; model_number: string | null
       color: string | null; cpu: string | null; ram_gb: string | null
@@ -571,8 +581,10 @@ export async function searchAvailableSellGroups(query: string, filters: Inventor
     ].filter(Boolean)
     const description = specParts.length > 0 ? specParts.join(' ') : '—'
 
-    // Count available items
-    const availableCount = (sg.sell_group_items as { items: { item_status: string } }[]).length
+    const sgItems = (sg.sell_group_items ?? []) as { items: { item_status: string; selling_price: number | null } | null }[]
+    const availableCount = sgItems.length
+    const rep = sgItems.map(s => s.items).find(i => i?.selling_price != null) ?? null
+    const effective = Math.max(0, Number(rep?.selling_price ?? 0) - Number(sg.discount_amount ?? 0))
 
     // Get hero media from product
     const media = (pm.product_media ?? []).sort((a, b) => a.sort_order - b.sort_order)
@@ -585,7 +597,7 @@ export async function searchAvailableSellGroups(query: string, filters: Inventor
       code: sg.sell_group_code,
       description: `${description} (${availableCount} available)`,
       grade: sg.condition_grade,
-      price: sg.base_price,
+      price: effective,
       thumbnail_url,
       display_url: thumbnail_url,
       condition_notes: null,

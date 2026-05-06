@@ -89,7 +89,7 @@ export async function getCustomerOrders(customerId: string) {
     .from('orders')
     .select(`
       *,
-      sell_groups(sell_group_code, condition_grade, base_price,
+      sell_groups(sell_group_code, condition_grade, discount_amount,
         product_models(brand, model_name, color, cpu, ram_gb, storage_gb,
           product_media(file_url, role, sort_order)
         )

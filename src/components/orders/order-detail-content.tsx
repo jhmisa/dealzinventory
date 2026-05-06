@@ -240,7 +240,7 @@ export function OrderDetailContent({ orderId, onClose, onNavigate, isModal }: Or
   const sg = order.sell_groups as {
     sell_group_code: string
     condition_grade: string
-    base_price: number
+    discount_amount: number
     product_models: { brand: string; model_name: string; color: string } | null
   } | null
   const orderItems = (order.order_items ?? []) as OrderItemRow[]

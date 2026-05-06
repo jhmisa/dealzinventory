@@ -23,7 +23,7 @@ function useReportStats() {
         supabase.from('orders').select('order_status, total_price, quantity'),
         supabase.from('kaitori_requests').select('request_status, auto_quote_price, final_price'),
         supabase.from('customers').select('is_seller, id_verified'),
-        supabase.from('sell_groups').select('is_active, base_price'),
+        supabase.from('sell_groups').select('active, discount_amount'),
       ])
 
       if (items.error) throw items.error
@@ -76,7 +76,7 @@ function useReportStats() {
       }
 
       // Sell group stats
-      const activeGroups = (sellGroups.data ?? []).filter((sg) => sg.is_active).length
+      const activeGroups = (sellGroups.data ?? []).filter((sg) => sg.active).length
 
       return {
         items: { total: items.data?.length ?? 0, byStatus: itemsByStatus, byGrade: itemsByGrade, bySource: itemsBySource },

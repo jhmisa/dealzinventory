@@ -559,8 +559,12 @@ export default function ItemListPage() {
           return dir * (priceA - priceB)
         }
         case 'sell_price': {
-          const priceA = a._kind === 'sell-group' ? (a.base_price ?? 0) : (Number(a.selling_price) || 0)
-          const priceB = b._kind === 'sell-group' ? (b.base_price ?? 0) : (Number(b.selling_price) || 0)
+          const priceA = a._kind === 'sell-group'
+            ? Math.max(0, Number((a._sg_items?.[0] as { selling_price?: number | null } | undefined)?.selling_price ?? 0) - Number(a.discount_amount ?? 0))
+            : (Number(a.selling_price) || 0)
+          const priceB = b._kind === 'sell-group'
+            ? Math.max(0, Number((b._sg_items?.[0] as { selling_price?: number | null } | undefined)?.selling_price ?? 0) - Number(b.discount_amount ?? 0))
+            : (Number(b.selling_price) || 0)
           return dir * (priceA - priceB)
         }
         case 'date':
@@ -999,7 +1003,19 @@ export default function ItemListPage() {
         const r = row.original
         if (r._kind !== 'item') {
           if (r._kind === 'accessory') return <PriceDisplay amount={Number(r.selling_price)} />
-          if (r._kind === 'sell-group') return <PriceDisplay amount={r.base_price} />
+          if (r._kind === 'sell-group') {
+            const repSp = Number((r._sg_items?.[0] as { selling_price?: number | null } | undefined)?.selling_price ?? 0)
+            const disc = Number(r.discount_amount ?? 0)
+            const effective = Math.max(0, repSp - disc)
+            return disc > 0 ? (
+              <div className="flex flex-col items-end">
+                <span className="text-xs text-muted-foreground line-through tabular-nums">{formatPrice(repSp)}</span>
+                <PriceDisplay amount={effective} />
+              </div>
+            ) : (
+              <PriceDisplay amount={effective || repSp} />
+            )
+          }
           return <span className="text-muted-foreground">—</span>
         }
         const buy = r.purchase_price ?? 0

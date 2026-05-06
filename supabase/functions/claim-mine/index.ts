@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
       // Fetch sell group
       const { data: sg, error: sgError } = await supabase
         .from('sell_groups')
-        .select('id, sell_group_code, active, base_price, product_id, product_models(brand, model_name)')
+        .select('id, sell_group_code, active, discount_amount, product_id, product_models(brand, model_name)')
         .ilike('sell_group_code', code.toUpperCase())
         .maybeSingle();
 
@@ -103,7 +103,7 @@ Deno.serve(async (req) => {
       // Find first available item in the sell group that's not already in an order
       const { data: sgi } = await supabase
         .from('sell_group_items')
-        .select('item_id, items!inner(id, item_status, condition_grade, discount)')
+        .select('item_id, items!inner(id, item_status, condition_grade, selling_price, discount)')
         .eq('sell_group_id', sg.id)
         .eq('items.item_status', 'AVAILABLE')
         .neq('items.condition_grade', 'J');
@@ -123,11 +123,13 @@ Deno.serve(async (req) => {
       if (!availableEntry) return jsonResponse({ error: 'All items in this sell group are already claimed' });
 
       itemId = availableEntry.item_id;
-      const itemData = availableEntry.items as { id: string; item_status: string; condition_grade: string; discount: number | null };
+      // Snapshot pricing from the item: unit_price = items.selling_price (the "normal" price);
+      // discount = items.discount (which the trigger has synced from sg.discount_amount).
+      const itemData = availableEntry.items as { id: string; item_status: string; condition_grade: string; selling_price: number | null; discount: number | null };
       itemDiscount = itemData.discount ? Number(itemData.discount) : 0;
       const pm = sg.product_models as { brand: string; model_name: string } | null;
       description = pm ? `${pm.brand} ${pm.model_name}` : sg.sell_group_code;
-      unitPrice = sg.base_price ?? 0;
+      unitPrice = itemData.selling_price ?? 0;
 
     } else if (prefix === 'A') {
       // Fetch accessory

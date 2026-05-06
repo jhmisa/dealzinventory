@@ -13,7 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { CodeDisplay, GradeBadge, StatusBadge, PriceDisplay } from '@/components/shared'
-import { formatDate, formatCustomerName } from '@/lib/utils'
+import { formatDate, formatCustomerName, formatPrice } from '@/lib/utils'
 import type { SellGroupByCode } from '@/services/sell-groups'
 import type { ConditionGrade } from '@/lib/types'
 
@@ -107,7 +107,21 @@ export function SellGroupResultBlock({ sellGroup, onShowcase, showLiveSellingTog
           {description}
         </span>
 
-        <PriceDisplay amount={sellGroup.base_price} />
+        {(() => {
+          const repItem = items.find(i => i.selling_price != null)
+          const sp = Number(repItem?.selling_price ?? 0)
+          const disc = Number((sellGroup as { discount_amount?: number | null }).discount_amount ?? 0)
+          const effective = Math.max(0, sp - disc)
+          if (sp === 0) return <span className="text-muted-foreground">—</span>
+          return disc > 0 ? (
+            <div className="flex items-baseline gap-1.5 shrink-0">
+              <span className="font-bold text-red-600 dark:text-red-400 tabular-nums">{formatPrice(effective)}</span>
+              <span className="text-xs text-muted-foreground line-through tabular-nums">{formatPrice(sp)}</span>
+            </div>
+          ) : (
+            <PriceDisplay amount={sp} />
+          )
+        })()}
 
         <Badge variant="secondary" className="shrink-0">
           {items.length} item{items.length !== 1 ? 's' : ''}
@@ -186,8 +200,8 @@ export function SellGroupResultBlock({ sellGroup, onShowcase, showLiveSellingTog
                         <PriceDisplay amount={item.selling_price} />
                       </TableCell>
                       <TableCell className="text-right">
-                        {item.discount != null ? (
-                          <span className="text-red-600 font-mono tabular-nums">-{item.discount}%</span>
+                        {item.discount != null && Number(item.discount) > 0 ? (
+                          <span className="text-red-600 font-mono tabular-nums">−{formatPrice(Number(item.discount))}</span>
                         ) : (
                           <span className="text-muted-foreground">—</span>
                         )}

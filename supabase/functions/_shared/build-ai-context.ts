@@ -55,7 +55,9 @@ interface InventoryItem {
   category: string | null;
   specs: string;
   condition_grade: string;
-  base_price: number;
+  effective_price: number;
+  selling_price: number;
+  discount_amount: number;
   stock_count: number;
 }
 
@@ -166,7 +168,12 @@ export function formatContextForPrompt(context: AIContext): string {
 
   if (context.inventorySummary.length > 0) {
     const lines = context.inventorySummary.map(
-      (i) => `- ${i.brand} ${i.model_name} (${i.specs}) | Grade ${i.condition_grade} | ¥${i.base_price.toLocaleString()} | ${i.stock_count} in stock | ${i.sell_group_code}`
+      (i) => {
+        const priceStr = i.discount_amount > 0
+          ? `¥${i.effective_price.toLocaleString()} (was ¥${i.selling_price.toLocaleString()}, −¥${i.discount_amount.toLocaleString()})`
+          : `¥${i.effective_price.toLocaleString()}`;
+        return `- ${i.brand} ${i.model_name} (${i.specs}) | Grade ${i.condition_grade} | ${priceStr} | ${i.stock_count} in stock | ${i.sell_group_code}`;
+      }
     );
     sections.push(`## Available Inventory\n${lines.join('\n')}`);
   }
@@ -294,50 +301,64 @@ async function getInventorySummary(
   const { data, error } = await supabase
     .from('sell_groups')
     .select(`
-      sell_group_code, condition_grade, base_price,
+      sell_group_code, condition_grade, discount_amount,
       product_models(brand, model_name, color, cpu, ram_gb, storage_gb, os_family,
         categories(name)),
-      sell_group_items(count)
+      sell_group_items(items(selling_price, item_status, condition_grade))
     `)
     .eq('active', true)
-    .order('base_price', { ascending: true })
     .limit(80);
 
   if (error || !data) return [];
 
-  // Filter to in-stock items and take top 50
-  return data
-    .filter((sg: Record<string, unknown>) => {
-      const counts = sg.sell_group_items as Array<{ count: number }> | null;
-      return counts && counts.length > 0 && counts[0].count > 0;
+  type SgRow = {
+    sell_group_code: string;
+    condition_grade: string;
+    discount_amount: number | null;
+    product_models: {
+      brand: string;
+      model_name: string;
+      color: string | null;
+      cpu: string | null;
+      ram_gb: string | null;
+      storage_gb: string | null;
+      os_family: string | null;
+      categories: { name: string } | null;
+    } | null;
+    sell_group_items: Array<{ items: { selling_price: number | null; item_status: string; condition_grade: string } | null }> | null;
+  };
+
+  // Compute effective price from a representative AVAILABLE member item
+  const enriched = (data as unknown as SgRow[])
+    .map((sg) => {
+      const sgItems = sg.sell_group_items ?? [];
+      const stockCount = sgItems.filter(s => s.items?.item_status === 'AVAILABLE' && s.items?.condition_grade !== 'J').length;
+      const repSp = Number(sgItems.map(s => s.items?.selling_price).find(p => p != null) ?? 0);
+      const discount = Number(sg.discount_amount ?? 0);
+      const effective = Math.max(0, repSp - discount);
+      return { sg, stockCount, repSp, discount, effective };
     })
-    .slice(0, 50)
-    .map((sg: Record<string, unknown>) => {
-      const pm = sg.product_models as {
-        brand: string;
-        model_name: string;
-        color: string | null;
-        cpu: string | null;
-        ram_gb: string | null;
-        storage_gb: string | null;
-        os_family: string | null;
-        categories: { name: string } | null;
-      } | null;
+    .filter(e => e.stockCount > 0)
+    .sort((a, b) => a.effective - b.effective)
+    .slice(0, 50);
 
-      const specParts = [pm?.color, pm?.cpu, pm?.ram_gb ? `${pm.ram_gb}GB` : null, pm?.storage_gb ? `${pm.storage_gb}GB` : null, pm?.os_family].filter(Boolean);
-      const counts = sg.sell_group_items as Array<{ count: number }>;
+  return enriched.map(({ sg, stockCount, repSp, discount, effective }) => {
+    const pm = sg.product_models;
+    const specParts = [pm?.color, pm?.cpu, pm?.ram_gb ? `${pm.ram_gb}GB` : null, pm?.storage_gb ? `${pm.storage_gb}GB` : null, pm?.os_family].filter(Boolean);
 
-      return {
-        sell_group_code: sg.sell_group_code as string,
-        brand: pm?.brand ?? 'Unknown',
-        model_name: pm?.model_name ?? 'Unknown',
-        category: pm?.categories?.name ?? null,
-        specs: specParts.join(' / ') || 'N/A',
-        condition_grade: sg.condition_grade as string,
-        base_price: sg.base_price as number,
-        stock_count: counts[0].count,
-      };
-    });
+    return {
+      sell_group_code: sg.sell_group_code,
+      brand: pm?.brand ?? 'Unknown',
+      model_name: pm?.model_name ?? 'Unknown',
+      category: pm?.categories?.name ?? null,
+      specs: specParts.join(' / ') || 'N/A',
+      condition_grade: sg.condition_grade,
+      effective_price: effective,
+      selling_price: repSp,
+      discount_amount: discount,
+      stock_count: stockCount,
+    };
+  });
 }
 
 async function getAvailableItemsSummary(

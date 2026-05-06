@@ -87,10 +87,14 @@ export default function CheckoutPage() {
     cpu: string | null; ram_gb: string | null; storage_gb: string | null
   } | null
   const gradeInfo = CONDITION_GRADES.find(g => g.value === sg.condition_grade)
-  const stockCount = (sg as { sell_group_items?: { count: number }[] }).sell_group_items?.[0]?.count ?? 0
+  const sgItems = ((sg as { sell_group_items?: Array<{ items: { item_status: string; condition_grade: string; selling_price: number | null } | null }> }).sell_group_items ?? [])
+  const stockCount = sgItems.filter(s => s.items?.item_status === 'AVAILABLE' && s.items?.condition_grade !== 'J').length
+  const repSp = Number(sgItems.map(s => s.items?.selling_price).find(p => p != null) ?? 0)
+  const discountAmount = Number((sg as { discount_amount?: number | null }).discount_amount ?? 0)
+  const effectiveUnitPrice = Math.max(0, repSp - discountAmount)
 
   const watchQuantity = form.watch('quantity')
-  const totalPrice = Number(sg.base_price) * (watchQuantity || 1)
+  const totalPrice = effectiveUnitPrice * (watchQuantity || 1)
 
   // Order success view
   if (orderCreated) {
@@ -175,7 +179,14 @@ export default function CheckoutPage() {
                   Grade {gradeInfo.value}
                 </Badge>
               )}
-              <p className="text-lg font-bold mt-1">{formatPrice(Number(sg.base_price))}</p>
+              {discountAmount > 0 ? (
+                <div className="mt-1 flex items-baseline gap-1.5 justify-end">
+                  <p className="text-lg font-bold text-red-600 dark:text-red-400">{formatPrice(effectiveUnitPrice)}</p>
+                  <p className="text-xs text-muted-foreground line-through">{formatPrice(repSp)}</p>
+                </div>
+              ) : (
+                <p className="text-lg font-bold mt-1">{formatPrice(effectiveUnitPrice)}</p>
+              )}
               <p className="text-xs text-muted-foreground">{stockCount} in stock</p>
             </div>
           </div>
@@ -273,8 +284,14 @@ export default function CheckoutPage() {
               <div className="border border-primary/20 bg-primary/5 rounded-lg p-4 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span>Unit price</span>
-                  <span>{formatPrice(Number(sg.base_price))}</span>
+                  <span>{formatPrice(repSp)}</span>
                 </div>
+                {discountAmount > 0 && (
+                  <div className="flex justify-between text-sm text-red-600 dark:text-red-400">
+                    <span>Discount</span>
+                    <span>−{formatPrice(discountAmount)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-sm">
                   <span>Quantity</span>
                   <span>&times; {watchQuantity || 1}</span>
