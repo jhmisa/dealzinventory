@@ -25,6 +25,7 @@ export function useClaimMine() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.orders.all })
       queryClient.invalidateQueries({ queryKey: queryKeys.items.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.sellGroups.all })
     },
   })
 }

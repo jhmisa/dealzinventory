@@ -123,9 +123,21 @@ export function SellGroupResultBlock({ sellGroup, onShowcase, showLiveSellingTog
           )
         })()}
 
-        <Badge variant="secondary" className="shrink-0">
-          {items.length} item{items.length !== 1 ? 's' : ''}
-        </Badge>
+        {(() => {
+          const availableCount = items.filter(i => i.item_status === 'AVAILABLE').length
+          return (
+            <Badge
+              variant="secondary"
+              className="shrink-0"
+              title={availableCount !== items.length ? `${availableCount} available of ${items.length} total` : undefined}
+            >
+              {availableCount} item{availableCount !== 1 ? 's' : ''}
+              {availableCount !== items.length && (
+                <span className="ml-1 text-muted-foreground">/ {items.length}</span>
+              )}
+            </Badge>
+          )
+        })()}
 
         <div className="flex items-center gap-1 ml-auto shrink-0" onClick={(e) => e.stopPropagation()}>
           <Button

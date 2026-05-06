@@ -96,6 +96,7 @@ type SellGroupRow = LiveSellingSellGroup & {
   _sg_description: string
   _sg_thumbnail: string | undefined
   _sg_item_count: number
+  _sg_available_count: number
   _sg_items: SellGroupItemInfo[]
 }
 
@@ -611,7 +612,10 @@ export default function ItemListPage() {
       const sgItems: SellGroupItemInfo[] = hasItems
         ? (sgiArray as Array<{ items: SellGroupItemInfo }>).map(sgi => sgi.items).filter(Boolean)
         : []
-      return { ...sg, _kind: 'sell-group' as const, _sg_description: description, _sg_thumbnail: thumbnail, _sg_item_count: itemCount, _sg_items: sgItems }
+      const availableCount = hasItems
+        ? sgItems.filter(i => i.item_status === 'AVAILABLE').length
+        : itemCount
+      return { ...sg, _kind: 'sell-group' as const, _sg_description: description, _sg_thumbnail: thumbnail, _sg_item_count: itemCount, _sg_available_count: availableCount, _sg_items: sgItems }
     })
   }, [])
 
@@ -820,7 +824,12 @@ export default function ItemListPage() {
                 <div className="flex items-center gap-2">
                   <CodeDisplay code={r.sell_group_code} />
                   <GradeBadge grade={r.condition_grade as ConditionGrade} />
-                  <Badge variant="secondary" className="text-xs">{r._sg_item_count} item{r._sg_item_count !== 1 ? 's' : ''}</Badge>
+                  <Badge variant="secondary" className="text-xs" title={r._sg_available_count !== r._sg_item_count ? `${r._sg_available_count} available of ${r._sg_item_count} total` : undefined}>
+                    {r._sg_available_count} item{r._sg_available_count !== 1 ? 's' : ''}
+                    {r._sg_available_count !== r._sg_item_count && (
+                      <span className="ml-1 text-muted-foreground">/ {r._sg_item_count}</span>
+                    )}
+                  </Badge>
                   <Button
                     variant="ghost"
                     size="icon"

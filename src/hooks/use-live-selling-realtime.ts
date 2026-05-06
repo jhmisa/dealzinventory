@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
+import { queryKeys } from '@/lib/query-keys'
 import { startLiveSession, endLiveSession, addSessionSale } from '@/services/live-sessions'
 
 export type SessionSale = {
@@ -24,6 +26,7 @@ const chaChingAudio = typeof window !== 'undefined' ? new Audio('/sounds/cha-chi
  * Extended with live session tracking: start/end session, track sales, play sound.
  */
 export function useLiveSellingRealtime(enabled: boolean) {
+  const queryClient = useQueryClient()
   const [recentlyOrderedItemIds, setRecentlyOrderedItemIds] = useState<Set<string>>(new Set())
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
@@ -97,6 +100,11 @@ export function useLiveSellingRealtime(enabled: boolean) {
             .select('id, item_code, is_live_selling, selling_price, brand, model_name, cpu, ram_gb, storage_gb, screen_size, supplier_description, product_models(brand, model_name, screen_size, categories(description_fields))')
             .eq('id', item_id)
             .single()
+
+          // Refresh sell-group and items queries so badges (item count, status)
+          // reflect the new RESERVED state set by claim-mine.
+          queryClient.invalidateQueries({ queryKey: queryKeys.sellGroups.all })
+          queryClient.invalidateQueries({ queryKey: queryKeys.items.all })
 
           if (!item?.is_live_selling) return
 
@@ -172,7 +180,7 @@ export function useLiveSellingRealtime(enabled: boolean) {
       for (const timer of timersRef.current.values()) clearTimeout(timer)
       timersRef.current.clear()
     }
-  }, [enabled, addRecentItem])
+  }, [enabled, addRecentItem, queryClient])
 
   return { recentlyOrderedItemIds, isSessionActive, sessionSales, startSession, endSession }
 }
