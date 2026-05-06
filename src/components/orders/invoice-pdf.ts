@@ -71,6 +71,7 @@ interface InvoiceOrder {
   created_at: string
   receiver_first_name: string | null
   receiver_last_name: string | null
+  receiver_phone: string | null
   customers: OrderCustomer | null
   order_items: OrderItemData[]
 }
@@ -512,7 +513,7 @@ function buildInvoiceHtml(order: InvoiceOrder, salesAgent: string, paymentMethod
       </div>
       <div class="customer-detail">
         <span class="label">PHONE</span>
-        <span>${escapeHtml(customer?.phone ?? '—')}</span>
+        <span>${escapeHtml(order.receiver_phone ?? customer?.phone ?? '—')}</span>
       </div>
       <div class="address-block">
         <div class="label">SHIPPING ADDRESS</div>
