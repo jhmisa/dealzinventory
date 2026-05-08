@@ -49,6 +49,7 @@ type ItemRow = {
   condition_notes: string | null
   source_type: string
   purchase_price: number | null
+  item_costs?: Array<{ amount: number | string | null }> | null
   selling_price: number | null
   discount: number | null
   created_at: string
