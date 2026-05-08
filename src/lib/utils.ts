@@ -137,3 +137,26 @@ export function convertEmoticonsToEmoji(text: string): string {
   }
   return result
 }
+
+// --- Cost calculations ---
+
+/**
+ * Minimal shape an object must have for getItemTotalCost.
+ * Accepts both the joined query result (item_costs as array of {amount})
+ * and an explicit pre-summed shape.
+ */
+export interface ItemWithCosts {
+  purchase_price: number | null
+  item_costs?: Array<{ amount: number | string | null }> | null
+}
+
+/** Sum of all item_costs.amount rows, coerced to number. Returns 0 when none. */
+export function sumItemCosts(item: { item_costs?: Array<{ amount: number | string | null }> | null }): number {
+  const rows = item.item_costs ?? []
+  return rows.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
+}
+
+/** purchase_price + Σ item_costs.amount. Both sides coerced safely. */
+export function getItemTotalCost(item: ItemWithCosts): number {
+  return (Number(item.purchase_price) || 0) + sumItemCosts(item)
+}
