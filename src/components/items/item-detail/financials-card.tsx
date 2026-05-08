@@ -11,7 +11,7 @@ import { PriceDisplay } from '@/components/shared'
 import { useAddItemCost, useDeleteItemCost, useUpdateItem } from '@/hooks/use-items'
 import { itemCostSchema, itemFinancialsSchema, type ItemCostFormValues, type ItemFinancialsFormValues } from '@/validators/item'
 import type { Item, ItemCost } from '@/lib/types'
-import { formatPrice } from '@/lib/utils'
+import { formatPrice, getItemTotalCost } from '@/lib/utils'
 
 interface FinancialsCardProps {
   item: Item
@@ -26,8 +26,7 @@ export function FinancialsCard({ item, costs, locked }: FinancialsCardProps) {
   const deleteCost = useDeleteItemCost()
   const updateItem = useUpdateItem()
 
-  const totalAddedCosts = costs.reduce((sum, c) => sum + Number(c.amount), 0)
-  const totalCost = (item.purchase_price ?? 0) + totalAddedCosts
+  const totalCost = getItemTotalCost({ purchase_price: item.purchase_price, item_costs: costs })
   const sellingPrice = item.selling_price ?? 0
   const margin = sellingPrice - totalCost
   const marginPct = sellingPrice > 0 ? Math.round((margin / sellingPrice) * 100) : 0
