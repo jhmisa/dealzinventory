@@ -140,8 +140,8 @@ const SORT_OPTIONS = [
   { value: 'code-desc', label: 'Code (High → Low)' },
   { value: 'description-asc', label: 'Description (A → Z)' },
   { value: 'description-desc', label: 'Description (Z → A)' },
-  { value: 'buy_price-asc', label: 'Buy Price (Low → High)' },
-  { value: 'buy_price-desc', label: 'Buy Price (High → Low)' },
+  { value: 'buy_price-asc', label: 'Cost (Low → High)' },
+  { value: 'buy_price-desc', label: 'Cost (High → Low)' },
   { value: 'sell_price-asc', label: 'Sell Price (Low → High)' },
   { value: 'sell_price-desc', label: 'Sell Price (High → Low)' },
 ] as const
@@ -556,8 +556,8 @@ export default function ItemListPage() {
           return dir * descA.localeCompare(descB)
         }
         case 'buy_price': {
-          const priceA = a._kind === 'item' ? (a.purchase_price ?? 0) : 0
-          const priceB = b._kind === 'item' ? (b.purchase_price ?? 0) : 0
+          const priceA = a._kind === 'item' ? getItemTotalCost(a) : 0
+          const priceB = b._kind === 'item' ? getItemTotalCost(b) : 0
           return dir * (priceA - priceB)
         }
         case 'sell_price': {
@@ -584,7 +584,7 @@ export default function ItemListPage() {
       switch (sortBy) {
         case 'code': return dir * a.item_code.localeCompare(b.item_code)
         case 'description': return dir * getItemDesc(a).localeCompare(getItemDesc(b))
-        case 'buy_price': return dir * ((a.purchase_price ?? 0) - (b.purchase_price ?? 0))
+        case 'buy_price': return dir * (getItemTotalCost(a) - getItemTotalCost(b))
         case 'sell_price': return dir * ((a.selling_price ?? 0) - (b.selling_price ?? 0))
         case 'date':
         default: return dir * (new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
