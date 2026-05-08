@@ -26,7 +26,7 @@ import {
   INVENTORY_REMOVAL_STATUSES,
   INVENTORY_REMOVAL_REASONS,
 } from '@/lib/constants'
-import { formatDateTime, formatPrice, getItemTotalCost } from '@/lib/utils'
+import { formatDateTime, formatPrice, getItemTotalCost, type ItemCostRow } from '@/lib/utils'
 
 export default function InventoryRemovalDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -54,7 +54,7 @@ export default function InventoryRemovalDetailPage() {
 
   const item = removal.items as {
     id: string; item_code: string; brand: string | null; model_name: string | null
-    color: string | null; condition_grade: string | null; purchase_price: number | null; item_costs?: Array<{ amount: number | string | null }> | null
+    color: string | null; condition_grade: string | null; purchase_price: number | null; item_costs?: Array<ItemCostRow> | null
     item_status: string
     product_models: { brand: string | null; model_name: string | null; color: string | null; cpu: string | null; ram_gb: string | null; storage_gb: string | null } | null
   } | null

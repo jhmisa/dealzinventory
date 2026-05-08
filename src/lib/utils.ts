@@ -140,6 +140,9 @@ export function convertEmoticonsToEmoji(text: string): string {
 
 // --- Cost calculations ---
 
+/** A single row from the item_costs embed — shape matches what PostgREST returns. */
+export type ItemCostRow = { amount: number | string | null }
+
 /**
  * Minimal shape an object must have for getItemTotalCost.
  * Accepts both the joined query result (item_costs as array of {amount})
@@ -147,11 +150,11 @@ export function convertEmoticonsToEmoji(text: string): string {
  */
 export interface ItemWithCosts {
   purchase_price: number | null
-  item_costs?: Array<{ amount: number | string | null }> | null
+  item_costs?: Array<ItemCostRow> | null
 }
 
 /** Sum of all item_costs.amount rows, coerced to number. Returns 0 when none. */
-export function sumItemCosts(item: { item_costs?: Array<{ amount: number | string | null }> | null }): number {
+export function sumItemCosts(item: { item_costs?: Array<ItemCostRow> | null }): number {
   const rows = item.item_costs ?? []
   return rows.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
 }

@@ -16,7 +16,7 @@ import { generateReceiptPdf } from '@/components/intake/receipt-pdf'
 import { printItemLabels } from '@/components/items/label-print'
 import { useIntakeReceipt, useReceiptItems, useReceiptAccessoryEntries, useReceiptAdjustments } from '@/hooks/use-intake-receipts'
 import { getInvoiceSignedUrl } from '@/services/intake-receipts'
-import { formatDate, formatDateTime, formatPrice, buildShortDescription, getItemTotalCost } from '@/lib/utils'
+import { formatDate, formatDateTime, formatPrice, buildShortDescription, getItemTotalCost, type ItemCostRow } from '@/lib/utils'
 import { getStatusConfig, getAdjustmentTypeConfig } from '@/lib/constants'
 import type { Item, IntakeAdjustment } from '@/lib/types'
 
@@ -62,7 +62,7 @@ export default function ReceivingReportDetailPage() {
   // Live cost vs intake snapshot
   type ReceiptItemForCost = {
     purchase_price: number | null
-    item_costs?: Array<{ amount: number | string | null }> | null
+    item_costs?: Array<ItemCostRow> | null
   }
   const liveItemsCost = (items ?? []).reduce(
     (sum, it) => sum + getItemTotalCost(it as unknown as ReceiptItemForCost),

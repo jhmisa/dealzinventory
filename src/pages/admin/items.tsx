@@ -34,7 +34,7 @@ import { useItemListColumnSettings } from '@/hooks/use-settings'
 import { usePersistedFilters } from '@/hooks/use-persisted-filters'
 import { useDebounce } from '@/hooks/use-debounce'
 import { ITEM_STATUSES, CONDITION_GRADES } from '@/lib/constants'
-import { formatDate, formatPrice, cn, buildShortDescription, formatCustomerName, getItemDescription, getItemTotalCost } from '@/lib/utils'
+import { formatDate, formatPrice, cn, buildShortDescription, formatCustomerName, getItemDescription, getItemTotalCost, type ItemCostRow } from '@/lib/utils'
 import { toast } from 'sonner'
 import { printItemLabel } from '@/components/items/label-print'
 import { resolveSoldTo } from '@/lib/item-sale'
@@ -49,7 +49,7 @@ type ItemRow = {
   condition_notes: string | null
   source_type: string
   purchase_price: number | null
-  item_costs?: Array<{ amount: number | string | null }> | null
+  item_costs?: Array<ItemCostRow> | null
   selling_price: number | null
   discount: number | null
   created_at: string
