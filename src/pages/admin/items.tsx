@@ -34,7 +34,7 @@ import { useItemListColumnSettings } from '@/hooks/use-settings'
 import { usePersistedFilters } from '@/hooks/use-persisted-filters'
 import { useDebounce } from '@/hooks/use-debounce'
 import { ITEM_STATUSES, CONDITION_GRADES } from '@/lib/constants'
-import { formatDate, formatPrice, cn, buildShortDescription, formatCustomerName, getItemDescription } from '@/lib/utils'
+import { formatDate, formatPrice, cn, buildShortDescription, formatCustomerName, getItemDescription, getItemTotalCost } from '@/lib/utils'
 import { toast } from 'sonner'
 import { printItemLabel } from '@/components/items/label-print'
 import { resolveSoldTo } from '@/lib/item-sale'
@@ -1028,15 +1028,15 @@ export default function ItemListPage() {
           }
           return <span className="text-muted-foreground">—</span>
         }
-        const buy = r.purchase_price ?? 0
+        const totalCost = getItemTotalCost(r)
         const sell = r.selling_price ?? 0
         const disc = r.discount ?? 0
-        const profit = sell - disc - buy
+        const profit = sell - disc - totalCost
         return (
           <div className="flex flex-col gap-0 text-xs leading-tight" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between gap-1">
-              <span className="text-muted-foreground">Buy</span>
-              <PriceDisplay amount={r.purchase_price} className="text-xs" />
+              <span className="text-muted-foreground">Cost</span>
+              <PriceDisplay amount={totalCost} className="text-xs" />
             </div>
             <div className="flex items-center justify-between gap-1">
               <span className="text-muted-foreground flex items-center gap-0.5">Sell <EditPriceCell itemId={r.id} itemCode={r.item_code} field="selling_price" value={r.selling_price} updateItem={updateItem} /></span>
