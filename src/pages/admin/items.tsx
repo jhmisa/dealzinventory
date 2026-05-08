@@ -1331,15 +1331,15 @@ export default function ItemListPage() {
       size: 110,
       cell: ({ row }) => {
         const r = row.original
-        const buy = r.purchase_price ?? 0
+        const totalCost = getItemTotalCost(r)
         const sell = r.selling_price ?? 0
         const disc = r.discount ?? 0
-        const profit = sell - disc - buy
+        const profit = sell - disc - totalCost
         return (
           <div className="flex flex-col gap-0 text-xs leading-tight" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between gap-1">
-              <span className="text-muted-foreground">Buy</span>
-              <PriceDisplay amount={r.purchase_price} className="text-xs" />
+              <span className="text-muted-foreground">Cost</span>
+              <PriceDisplay amount={totalCost} className="text-xs" />
             </div>
             <div className="flex items-center justify-between gap-1">
               <span className="text-muted-foreground flex items-center gap-0.5">Sell <EditPriceCell itemId={r.id} itemCode={r.item_code} field="selling_price" value={r.selling_price} updateItem={updateItem} /></span>
