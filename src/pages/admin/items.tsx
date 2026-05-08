@@ -292,6 +292,33 @@ function EditPriceCell({
   )
 }
 
+function ItemAmountCell({ row, updateItem }: { row: ItemRow; updateItem: ReturnType<typeof useUpdateItem> }) {
+  const totalCost = getItemTotalCost(row)
+  const sell = row.selling_price ?? 0
+  const disc = row.discount ?? 0
+  const profit = sell - disc - totalCost
+  return (
+    <div className="flex flex-col gap-0 text-xs leading-tight" onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-center justify-between gap-1">
+        <span className="text-muted-foreground">Cost</span>
+        <PriceDisplay amount={totalCost} className="text-xs" />
+      </div>
+      <div className="flex items-center justify-between gap-1">
+        <span className="text-muted-foreground flex items-center gap-0.5">Sell <EditPriceCell itemId={row.id} itemCode={row.item_code} field="selling_price" value={row.selling_price} updateItem={updateItem} /></span>
+        <PriceDisplay amount={row.selling_price} className="text-xs" />
+      </div>
+      <div className="flex items-center justify-between gap-1">
+        <span className="text-muted-foreground flex items-center gap-0.5">Disc <EditPriceCell itemId={row.id} itemCode={row.item_code} field="discount" value={row.discount} updateItem={updateItem} /></span>
+        <PriceDisplay amount={row.discount} className="text-xs" />
+      </div>
+      <div className={cn('flex items-center justify-between gap-1 font-medium', profit >= 0 ? 'text-green-600' : 'text-red-500')}>
+        <span>Profit</span>
+        <PriceDisplay amount={profit} className="text-xs" />
+      </div>
+    </div>
+  )
+}
+
 export default function ItemListPage() {
   const navigate = useNavigate()
   useItemsRealtimeSync()
@@ -1028,30 +1055,7 @@ export default function ItemListPage() {
           }
           return <span className="text-muted-foreground">—</span>
         }
-        const totalCost = getItemTotalCost(r)
-        const sell = r.selling_price ?? 0
-        const disc = r.discount ?? 0
-        const profit = sell - disc - totalCost
-        return (
-          <div className="flex flex-col gap-0 text-xs leading-tight" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between gap-1">
-              <span className="text-muted-foreground">Cost</span>
-              <PriceDisplay amount={totalCost} className="text-xs" />
-            </div>
-            <div className="flex items-center justify-between gap-1">
-              <span className="text-muted-foreground flex items-center gap-0.5">Sell <EditPriceCell itemId={r.id} itemCode={r.item_code} field="selling_price" value={r.selling_price} updateItem={updateItem} /></span>
-              <PriceDisplay amount={r.selling_price} className="text-xs" />
-            </div>
-            <div className="flex items-center justify-between gap-1">
-              <span className="text-muted-foreground flex items-center gap-0.5">Disc <EditPriceCell itemId={r.id} itemCode={r.item_code} field="discount" value={r.discount} updateItem={updateItem} /></span>
-              <PriceDisplay amount={r.discount} className="text-xs" />
-            </div>
-            <div className={cn('flex items-center justify-between gap-1 font-medium', profit >= 0 ? 'text-green-600' : 'text-red-500')}>
-              <span>Profit</span>
-              <PriceDisplay amount={profit} className="text-xs" />
-            </div>
-          </div>
-        )
+        return <ItemAmountCell row={r} updateItem={updateItem} />
       },
     },
     {
@@ -1331,30 +1335,7 @@ export default function ItemListPage() {
       size: 110,
       cell: ({ row }) => {
         const r = row.original
-        const totalCost = getItemTotalCost(r)
-        const sell = r.selling_price ?? 0
-        const disc = r.discount ?? 0
-        const profit = sell - disc - totalCost
-        return (
-          <div className="flex flex-col gap-0 text-xs leading-tight" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between gap-1">
-              <span className="text-muted-foreground">Cost</span>
-              <PriceDisplay amount={totalCost} className="text-xs" />
-            </div>
-            <div className="flex items-center justify-between gap-1">
-              <span className="text-muted-foreground flex items-center gap-0.5">Sell <EditPriceCell itemId={r.id} itemCode={r.item_code} field="selling_price" value={r.selling_price} updateItem={updateItem} /></span>
-              <PriceDisplay amount={r.selling_price} className="text-xs" />
-            </div>
-            <div className="flex items-center justify-between gap-1">
-              <span className="text-muted-foreground flex items-center gap-0.5">Disc <EditPriceCell itemId={r.id} itemCode={r.item_code} field="discount" value={r.discount} updateItem={updateItem} /></span>
-              <PriceDisplay amount={r.discount} className="text-xs" />
-            </div>
-            <div className={cn('flex items-center justify-between gap-1 font-medium', profit >= 0 ? 'text-green-600' : 'text-red-500')}>
-              <span>Profit</span>
-              <PriceDisplay amount={profit} className="text-xs" />
-            </div>
-          </div>
-        )
+        return <ItemAmountCell row={r} updateItem={updateItem} />
       },
     },
     {
