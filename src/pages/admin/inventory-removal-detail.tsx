@@ -54,7 +54,7 @@ export default function InventoryRemovalDetailPage() {
 
   const item = removal.items as {
     id: string; item_code: string; brand: string | null; model_name: string | null
-    color: string | null; condition_grade: string | null; purchase_price: number | null
+    color: string | null; condition_grade: string | null; purchase_price: number | null; item_costs?: Array<{ amount: number | string | null }> | null
     item_status: string
     product_models: { brand: string | null; model_name: string | null; color: string | null; cpu: string | null; ram_gb: string | null; storage_gb: string | null } | null
   } | null
