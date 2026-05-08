@@ -16,7 +16,7 @@ import { generateReceiptPdf } from '@/components/intake/receipt-pdf'
 import { printItemLabels } from '@/components/items/label-print'
 import { useIntakeReceipt, useReceiptItems, useReceiptAccessoryEntries, useReceiptAdjustments } from '@/hooks/use-intake-receipts'
 import { getInvoiceSignedUrl } from '@/services/intake-receipts'
-import { formatDate, formatDateTime, formatPrice, buildShortDescription } from '@/lib/utils'
+import { formatDate, formatDateTime, formatPrice, buildShortDescription, getItemTotalCost } from '@/lib/utils'
 import { getStatusConfig, getAdjustmentTypeConfig } from '@/lib/constants'
 import type { Item, IntakeAdjustment } from '@/lib/types'
 
@@ -58,6 +58,19 @@ export default function ReceivingReportDetailPage() {
     adjustmentCounts[key] += adj.quantity
   }
   const totalAdjusted = Object.values(adjustmentCounts).reduce((a, b) => a + b, 0)
+
+  // Live cost vs intake snapshot
+  type ReceiptItemForCost = {
+    purchase_price: number | null
+    item_costs?: Array<{ amount: number | string | null }> | null
+  }
+  const liveItemsCost = (items ?? []).reduce(
+    (sum, it) => sum + getItemTotalCost(it as unknown as ReceiptItemForCost),
+    0,
+  )
+  const snapshotCost = Number(receipt?.total_cost ?? 0)
+  const drift = liveItemsCost - snapshotCost
+  const hasDrift = Math.abs(drift) >= 1 // tolerate rounding
 
   async function handleDownloadPdf() {
     let invoiceImageBase64: string | undefined
@@ -151,8 +164,19 @@ export default function ReceivingReportDetailPage() {
             </div>
             )}
             <div>
-              <span className="text-muted-foreground block">Total Cost</span>
-              <span className="font-semibold">{formatPrice(receipt.total_cost)}</span>
+              <span className="text-muted-foreground block">Total Cost (intake)</span>
+              <span className="font-semibold">{formatPrice(snapshotCost)}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground block">Live Total</span>
+              <span className={`font-semibold ${hasDrift ? 'text-amber-600' : ''}`}>
+                {formatPrice(liveItemsCost)}
+                {hasDrift && (
+                  <span className="ml-2 text-xs font-normal">
+                    ({drift > 0 ? '+' : ''}{formatPrice(drift)})
+                  </span>
+                )}
+              </span>
             </div>
             {receipt.supplier_contact_snapshot && (
               <div className="col-span-2">
@@ -161,6 +185,14 @@ export default function ReceivingReportDetailPage() {
               </div>
             )}
           </div>
+          {hasDrift && (
+            <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+              <span className="font-medium">Note:</span>{' '}
+              The intake total is a snapshot from when this receipt was created.
+              The live total reflects current item purchase prices plus any added costs.
+              A non-zero difference is expected after price corrections or additional charges.
+            </div>
+          )}
           {receipt.notes && (
             <div className="mt-3 text-sm">
               <span className="text-muted-foreground block">Notes</span>
