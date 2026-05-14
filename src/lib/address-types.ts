@@ -13,8 +13,18 @@ export interface ShippingAddressJP {
   address_line_2?: string
 }
 
+export interface ShippingAddressPH {
+  country: 'PH'
+  house_number: string // House #, Unit, Building
+  street?: string // Street / Subdivision
+  barangay: string
+  city: string // City / Municipality
+  province: string // Philippine province or "Metro Manila"
+  postal_code: string // 4-digit PH ZIP
+}
+
 export interface ShippingAddressIntl {
-  country: string // ISO 3166-1 alpha-2, never 'JP'
+  country: string // ISO 3166-1 alpha-2, never 'JP' or 'PH'
   address_line_1: string
   address_line_2?: string
   city: string
@@ -27,15 +37,23 @@ export interface ShippingAddressLegacy {
   freeform_legacy: string
 }
 
-export type ShippingAddress = ShippingAddressJP | ShippingAddressIntl | ShippingAddressLegacy
+export type ShippingAddress =
+  | ShippingAddressJP
+  | ShippingAddressPH
+  | ShippingAddressIntl
+  | ShippingAddressLegacy
 
 // Type guards
 export function isJPAddress(addr: ShippingAddress): addr is ShippingAddressJP {
   return addr.country === 'JP' && !('freeform_legacy' in addr)
 }
 
+export function isPHAddress(addr: ShippingAddress): addr is ShippingAddressPH {
+  return addr.country === 'PH' && !('freeform_legacy' in addr) && 'barangay' in addr
+}
+
 export function isIntlAddress(addr: ShippingAddress): addr is ShippingAddressIntl {
-  return addr.country !== 'JP' && !('freeform_legacy' in addr)
+  return addr.country !== 'JP' && !('freeform_legacy' in addr) && !('barangay' in addr)
 }
 
 export function isLegacyAddress(addr: ShippingAddress): addr is ShippingAddressLegacy {
@@ -70,6 +88,18 @@ export function serializeAddress(addr: ShippingAddress, lang: 'ja' | 'en' = 'ja'
     return parts.join('\n')
   }
 
+  if (isPHAddress(addr)) {
+    const parts: string[] = []
+    const line1 = [addr.house_number, addr.street].filter(Boolean).join(', ')
+    if (line1) parts.push(line1)
+    if (addr.barangay) parts.push(`Brgy. ${addr.barangay}`)
+    const cityProv = [addr.city, addr.province].filter(Boolean).join(', ')
+    const cityLine = [cityProv, addr.postal_code].filter(Boolean).join(' ')
+    if (cityLine) parts.push(cityLine)
+    parts.push('PHILIPPINES')
+    return parts.join('\n')
+  }
+
   // International
   const intl = addr as ShippingAddressIntl
   const parts: string[] = []
@@ -98,6 +128,18 @@ export function uppercaseAddress(addr: ShippingAddress): ShippingAddress {
       city_en: addr.city_en.toUpperCase(),
       town_en: addr.town_en ? addr.town_en.toUpperCase() : undefined,
       // address_line_1/2 NOT uppercased (may contain kanji)
+    }
+  }
+
+  if (isPHAddress(addr)) {
+    return {
+      ...addr,
+      house_number: addr.house_number.toUpperCase(),
+      street: addr.street?.toUpperCase(),
+      barangay: addr.barangay.toUpperCase(),
+      city: addr.city.toUpperCase(),
+      province: addr.province, // canonical capitalization preserved
+      postal_code: addr.postal_code,
     }
   }
 

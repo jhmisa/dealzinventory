@@ -225,7 +225,7 @@ export function ShippingStep({
               Add new address
             </Button>
           ) : (
-            <div className="border rounded-md p-4 space-y-4">
+            <div className="space-y-4">
               {/* Receiver section — only show radio when customer already has addresses */}
               {addressOptions.length > 0 && (
                 <div className="space-y-2">

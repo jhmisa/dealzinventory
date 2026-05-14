@@ -20,3 +20,21 @@ export function useReverseLookup(prefectureJa: string, cityJa: string, townJa: s
     staleTime: Infinity,
   })
 }
+
+export function useCitiesInPrefecture(prefectureJa: string) {
+  return useQuery({
+    queryKey: queryKeys.postalCodes.cities(prefectureJa),
+    queryFn: () => postalCodesService.listCitiesInPrefecture(prefectureJa),
+    enabled: !!prefectureJa,
+    staleTime: Infinity, // postal data is effectively static
+  })
+}
+
+export function useTownsInCity(prefectureJa: string, cityJa: string) {
+  return useQuery({
+    queryKey: queryKeys.postalCodes.towns(prefectureJa, cityJa),
+    queryFn: () => postalCodesService.listTownsInCity(prefectureJa, cityJa),
+    enabled: !!prefectureJa && !!cityJa,
+    staleTime: Infinity,
+  })
+}

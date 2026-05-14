@@ -1,5 +1,5 @@
 import type { ShippingAddress } from '@/lib/address-types'
-import { isJPAddress, isIntlAddress, isLegacyAddress, formatPostalCode } from '@/lib/address-types'
+import { isJPAddress, isPHAddress, isIntlAddress, isLegacyAddress, formatPostalCode } from '@/lib/address-types'
 
 interface AddressDisplayProps {
   address: ShippingAddress | string | null
@@ -67,6 +67,21 @@ export function AddressDisplay({ address: rawAddress, format = 'auto', className
         </p>
         <p className="text-sm">{address.prefecture_en} {formatPostalCode(address.postal_code)}</p>
         <p className="text-sm">JAPAN</p>
+      </div>
+    )
+  }
+
+  if (isPHAddress(address)) {
+    const line1 = [address.house_number, address.street].filter(Boolean).join(', ')
+    return (
+      <div className={className}>
+        {receiverLine}
+        {line1 && <p className="text-sm">{line1}</p>}
+        {address.barangay && <p className="text-sm">Brgy. {address.barangay}</p>}
+        <p className="text-sm">
+          {address.city}{address.province ? `, ${address.province}` : ''} {address.postal_code}
+        </p>
+        <p className="text-sm">PHILIPPINES</p>
       </div>
     )
   }

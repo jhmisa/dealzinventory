@@ -153,6 +153,9 @@ export const queryKeys = {
     lookup: (code: string) => ['postal-codes', 'lookup', code] as const,
     reverse: (prefectureJa: string, cityJa: string, townJa: string) =>
       ['postal-codes', 'reverse', prefectureJa, cityJa, townJa] as const,
+    cities: (prefectureJa: string) => ['postal-codes', 'cities', prefectureJa] as const,
+    towns: (prefectureJa: string, cityJa: string) =>
+      ['postal-codes', 'towns', prefectureJa, cityJa] as const,
   },
   paymentConfirmations: {
     all: ['payment-confirmations'] as const,

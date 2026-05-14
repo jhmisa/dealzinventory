@@ -661,14 +661,9 @@ function MineClaimInner() {
           {/* Product Info + Price + CTA — all up top */}
           <div className="space-y-4">
             {/* Title row */}
-            <div className="space-y-1">
+            <div className="space-y-2">
               <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h1 className="text-xl font-bold leading-tight">{product.title}</h1>
-                  {product.subtitle && (
-                    <p className="text-sm text-muted-foreground mt-0.5">{product.subtitle}</p>
-                  )}
-                </div>
+                <h1 className="text-xl font-bold leading-tight min-w-0">{product.title}</h1>
                 <div className="text-right shrink-0">
                   {product.originalPrice && (
                     <span className="text-sm text-muted-foreground line-through block">{formatPrice(product.originalPrice)}</span>
@@ -677,9 +672,9 @@ function MineClaimInner() {
                 </div>
               </div>
 
-              {/* Meta row: code + grade + stock */}
+              {/* Meta row: code + grade + stock — directly under the title */}
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs text-muted-foreground font-mono">{product.code}</span>
+                <span className="text-sm font-mono font-semibold text-foreground">{product.code}</span>
                 {gradeInfo && (
                   <Badge variant="outline" className={cn('text-xs py-0', gradeInfo.color)}>
                     Grade {gradeInfo.value}
@@ -696,6 +691,10 @@ function MineClaimInner() {
                   </span>
                 )}
               </div>
+
+              {product.subtitle && (
+                <p className="text-sm text-muted-foreground">{product.subtitle}</p>
+              )}
             </div>
 
             {/* Condition notes */}

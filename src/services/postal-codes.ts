@@ -25,6 +25,38 @@ export async function lookupPostalCode(code: string): Promise<PostalCodeEntry[]>
   return (data ?? []) as PostalCodeEntry[]
 }
 
+export interface LocalityOption {
+  ja: string
+  en: string
+}
+
+/** Distinct cities (市区町村) in a prefecture, ordered by Japanese name. */
+export async function listCitiesInPrefecture(prefectureJa: string): Promise<LocalityOption[]> {
+  if (!prefectureJa) return []
+  // @ts-expect-error postal_codes RPC not yet in generated types
+  const { data, error } = await supabase.rpc('cities_in_prefecture', { p_prefecture_ja: prefectureJa })
+  if (error) throw error
+  return ((data ?? []) as { city_ja: string; city_en: string }[]).map((r) => ({
+    ja: r.city_ja,
+    en: r.city_en,
+  }))
+}
+
+/** Distinct towns (町域) in a prefecture+city, ordered by Japanese name. */
+export async function listTownsInCity(prefectureJa: string, cityJa: string): Promise<LocalityOption[]> {
+  if (!prefectureJa || !cityJa) return []
+  // @ts-expect-error postal_codes RPC not yet in generated types
+  const { data, error } = await supabase.rpc('towns_in_city', {
+    p_prefecture_ja: prefectureJa,
+    p_city_ja: cityJa,
+  })
+  if (error) throw error
+  return ((data ?? []) as { town_ja: string; town_en: string }[]).map((r) => ({
+    ja: r.town_ja,
+    en: r.town_en,
+  }))
+}
+
 /** Reverse lookup: find postal code(s) by prefecture + city + town */
 export async function reverseLookupPostalCode(
   prefectureJa: string,
