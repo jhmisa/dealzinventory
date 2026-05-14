@@ -9,6 +9,8 @@ export interface PostalCodeEntry {
   city_en: string
   town_ja: string
   town_en: string
+  chome_ja: string | null
+  chome_en: string | null
 }
 
 export async function lookupPostalCode(code: string): Promise<PostalCodeEntry[]> {
@@ -28,6 +30,11 @@ export async function lookupPostalCode(code: string): Promise<PostalCodeEntry[]>
 export interface LocalityOption {
   ja: string
   en: string
+  // Optional chōme breakdown — present for town options when one town has
+  // multiple postal codes split by chōme (e.g. 中央本町 → 120-0011 vs 121-0011).
+  chome_ja?: string | null
+  chome_en?: string | null
+  postal_code?: string | null
 }
 
 /** Distinct cities (市区町村) in a prefecture, ordered by Japanese name. */
@@ -42,7 +49,7 @@ export async function listCitiesInPrefecture(prefectureJa: string): Promise<Loca
   }))
 }
 
-/** Distinct towns (町域) in a prefecture+city, ordered by Japanese name. */
+/** Distinct (town, chōme) pairs in a prefecture+city, ordered by Japanese name then chōme. */
 export async function listTownsInCity(prefectureJa: string, cityJa: string): Promise<LocalityOption[]> {
   if (!prefectureJa || !cityJa) return []
   // @ts-expect-error postal_codes RPC not yet in generated types
@@ -51,9 +58,13 @@ export async function listTownsInCity(prefectureJa: string, cityJa: string): Pro
     p_city_ja: cityJa,
   })
   if (error) throw error
-  return ((data ?? []) as { town_ja: string; town_en: string }[]).map((r) => ({
+  type Row = { town_ja: string; town_en: string; chome_ja: string | null; chome_en: string | null; postal_code: string | null }
+  return ((data ?? []) as Row[]).map((r) => ({
     ja: r.town_ja,
     en: r.town_en,
+    chome_ja: r.chome_ja,
+    chome_en: r.chome_en,
+    postal_code: r.postal_code,
   }))
 }
 
@@ -114,14 +125,24 @@ export function parsePostalCodeCSV(buffer: ArrayBuffer): Omit<PostalCodeEntry, '
     // Skip if postal_code is not 7 digits (header row or invalid)
     if (!/^\d{7}$/.test(postal_code)) continue
 
+    // Capture chome range from the parens BEFORE stripping them from the town name.
+    // JA: "中央本町（２〜５丁目）" -> town "中央本町", chome "２〜５丁目"
+    // EN: "CHUOHONCHO (2-5-CHOME)" -> town "CHUOHONCHO", chome "2-5-CHOME"
+    const townJaRaw = town_ja.replace(/\u3000/g, '')
+    const townEnRaw = town_en.toUpperCase()
+    const chome_ja = townJaRaw.match(/（(.*?)）/)?.[1]?.trim() || null
+    const chome_en = townEnRaw.match(/\(([^)]*?)\)/)?.[1]?.trim() || null
+
     rows.push({
       postal_code,
       prefecture_ja,
       prefecture_en: prefecture_en.toUpperCase(),
-      city_ja: city_ja.replace(/\u3000/g, ''), // Remove full-width spaces
+      city_ja: city_ja.replace(/\u3000/g, ''),
       city_en: city_en.toUpperCase(),
-      town_ja: town_ja.replace(/\u3000/g, '').replace(/（.*?）/g, '').trim(), // Remove full-width parens
-      town_en: town_en.toUpperCase().replace(/\(.*?\)/g, '').trim(), // Remove half-width parens
+      town_ja: townJaRaw.replace(/（.*?）/g, '').trim(),
+      town_en: townEnRaw.replace(/\(.*?\)/g, '').trim(),
+      chome_ja,
+      chome_en,
     })
   }
 

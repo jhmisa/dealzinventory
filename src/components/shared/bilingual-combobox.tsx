@@ -15,13 +15,17 @@ import { cn } from '@/lib/utils'
 export interface BilingualOption {
   ja: string
   en: string
+  /** Optional metadata threaded back through onChange — the combobox doesn't read this. */
+  postal_code?: string | null
+  raw_ja?: string
+  raw_en?: string
 }
 
-interface BilingualComboboxProps {
-  options: BilingualOption[]
+interface BilingualComboboxProps<T extends BilingualOption = BilingualOption> {
+  options: T[]
   /** Selected value, matched against `ja`. */
   value: string
-  onChange: (option: BilingualOption) => void
+  onChange: (option: T) => void
   placeholder?: string
   searchPlaceholder?: string
   emptyText?: string
@@ -34,7 +38,7 @@ interface BilingualComboboxProps {
  * Filters on BOTH languages — typing "to" surfaces TOKYO, TOTTORI, TOCHIGI;
  * typing "渋" narrows to 渋谷区.
  */
-export function BilingualCombobox({
+export function BilingualCombobox<T extends BilingualOption>({
   options,
   value,
   onChange,
@@ -43,7 +47,7 @@ export function BilingualCombobox({
   emptyText = 'No matches found.',
   disabled,
   loading,
-}: BilingualComboboxProps) {
+}: BilingualComboboxProps<T>) {
   const [open, setOpen] = useState(false)
 
   const selected = useMemo(

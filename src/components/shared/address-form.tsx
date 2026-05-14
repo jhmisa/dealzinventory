@@ -47,6 +47,10 @@ export function AddressForm({ value, onChange, required = false }: AddressFormPr
   const [cityEn, setCityEn] = useState('')
   const [townJa, setTownJa] = useState('')
   const [townEn, setTownEn] = useState('')
+  // Formatted town display value for the combobox — includes the chōme suffix
+  // (e.g. "中央本町（2〜5丁目）") so multiple-postal-code towns show as distinct
+  // selectable rows. The canonical bare name lives in `townJa` for storage.
+  const [townDisplayJa, setTownDisplayJa] = useState('')
   const [addressLine1, setAddressLine1] = useState('')
   const [addressLine2, setAddressLine2] = useState('')
 
@@ -89,6 +93,7 @@ export function AddressForm({ value, onChange, required = false }: AddressFormPr
       setCityEn(value.city_en)
       setTownJa(value.town_ja ?? '')
       setTownEn(value.town_en ?? '')
+      setTownDisplayJa(value.town_ja ?? '')
       setAddressLine1(value.address_line_1)
       setAddressLine2(value.address_line_2 ?? '')
     } else if (isPHAddress(value)) {
@@ -121,6 +126,9 @@ export function AddressForm({ value, onChange, required = false }: AddressFormPr
     if (postalResults.length === 1) {
       setTownJa(match.town_ja)
       setTownEn(match.town_en)
+      // Sync the town display value to match — when chome data exists, this
+      // shows the right disambiguated row as selected in the combobox.
+      setTownDisplayJa(match.chome_ja ? `${match.town_ja}（${match.chome_ja}）` : match.town_ja)
     }
     setHasAutoFilled(true)
   }, [postalResults, hasAutoFilled])
@@ -227,6 +235,7 @@ export function AddressForm({ value, onChange, required = false }: AddressFormPr
     setCityEn('')
     setTownJa('')
     setTownEn('')
+    setTownDisplayJa('')
     setPostalCode('')
     setHasAutoFilled(false)
     setHasReverseAutoFilled(false)
@@ -239,23 +248,30 @@ export function AddressForm({ value, onChange, required = false }: AddressFormPr
     // Picking a new city invalidates town and stale postal code.
     setTownJa('')
     setTownEn('')
+    setTownDisplayJa('')
     setPostalCode('')
     setHasAutoFilled(false)
     setHasReverseAutoFilled(false)
     setTimeout(emitJP, 0)
   }
 
-  async function handleTownSelect(option: { ja: string; en: string }) {
-    setTownJa(option.ja)
-    setTownEn(option.en)
-    // Picking a new town should refresh the postal code to match — the previously
-    // auto-filled code (from typing or earlier town) is now stale.
-    setHasReverseAutoFilled(true) // suppress the gated effect; we look up directly below.
+  async function handleTownSelect(option: { ja: string; en: string; postal_code?: string | null; raw_ja?: string; raw_en?: string }) {
+    // Store the bare town name (without chōme parens) — chōme is a postal-code
+    // disambiguator, not part of the canonical town name.
+    setTownJa(option.raw_ja ?? option.ja)
+    setTownEn(option.raw_en ?? option.en)
+    setTownDisplayJa(option.ja)
+    setHasReverseAutoFilled(true)
+    if (option.postal_code) {
+      setPostalCode(formatPostalCodeInput(option.postal_code))
+      setTimeout(emitJP, 0)
+      return
+    }
+    // Fallback for towns without chōme data (legacy rows, edge cases).
     try {
-      const matches = await reverseLookupPostalCode(prefectureJa, cityJa, option.ja)
+      const matches = await reverseLookupPostalCode(prefectureJa, cityJa, option.raw_ja ?? option.ja)
       if (matches.length > 0) {
         setPostalCode(formatPostalCodeInput(matches[0].postal_code))
-        // Sync English fields from the canonical postal row too.
         if (matches[0].city_en) setCityEn(matches[0].city_en)
         if (matches[0].town_en) setTownEn(matches[0].town_en)
       }
@@ -358,12 +374,20 @@ export function AddressForm({ value, onChange, required = false }: AddressFormPr
             />
           </div>
 
-          {/* Town (searchable) */}
+          {/* Town (searchable) — chōme is appended to the displayed JA/EN
+              labels so towns with multiple postal codes (e.g. 中央本町（1丁目）
+              vs 中央本町（2〜5丁目）) appear as distinct picker rows. */}
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Town (町域)</Label>
             <BilingualCombobox
-              options={townOptions ?? []}
-              value={townJa}
+              options={(townOptions ?? []).map((o) => ({
+                ja: o.chome_ja ? `${o.ja}（${o.chome_ja}）` : o.ja,
+                en: o.chome_en ? `${o.en} (${o.chome_en})` : o.en,
+                postal_code: o.postal_code,
+                raw_ja: o.ja,
+                raw_en: o.en,
+              }))}
+              value={townDisplayJa}
               onChange={handleTownSelect}
               placeholder={cityJa ? 'Select town…' : 'Pick a city first'}
               searchPlaceholder="Type to filter (JINNAN, 神南, ...)"
