@@ -391,62 +391,58 @@ function RegisterForm({ onSuccess, onBack, isLoading, onRegister }: {
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="first_name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>First Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Taro" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="last_name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Last Name *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Tanaka" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email *</FormLabel>
-                    <FormControl>
-                      <Input type="email" placeholder="you@example.com" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Phone</FormLabel>
-                    <FormControl>
-                      <PhoneInput value={field.value ?? ''} onChange={field.onChange} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            <FormField
+              control={form.control}
+              name="first_name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>First Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Taro" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="last_name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Last Name *</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Tanaka" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email *</FormLabel>
+                  <FormControl>
+                    <Input type="email" placeholder="you@example.com" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="phone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Phone</FormLabel>
+                  <FormControl>
+                    <PhoneInput value={field.value ?? ''} onChange={field.onChange} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -536,6 +532,16 @@ function MineClaimInner() {
   const [deliveryTimeCode, setDeliveryTimeCode] = useState<string | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<string | null>(null)
   const [orderCreated, setOrderCreated] = useState<{ orderCode: string } | null>(null)
+
+  // Destination country drives delivery scheduling + payment method gating.
+  // Legacy / country-missing addresses default to JP.
+  const shippingCountry = selectedAddress?.address && 'country' in selectedAddress.address
+    ? (selectedAddress.address as { country: string }).country
+    : 'JP'
+  const isJpShipping = shippingCountry === 'JP'
+
+  const JP_PAYMENT_METHODS = ['COD', 'CREDIT_CARD', 'KONBINI', 'BANK', 'PAYPAL']
+  const INTL_PAYMENT_METHODS = ['KONBINI', 'BANK', 'PAYPAL']
 
   // Handle code input completion
   function handleCodeChange(newCode: string) {
@@ -741,12 +747,18 @@ function MineClaimInner() {
                         { step: 1 as const, label: 'Login' },
                         { step: 2 as const, label: 'Choose' },
                       ]
-                    : [
-                      { step: 1 as const, label: 'Login' },
-                      { step: 2 as const, label: 'Address' },
-                      { step: 3 as const, label: 'Schedule' },
-                      { step: 4 as const, label: 'Payment' },
-                    ]
+                    : isJpShipping
+                      ? [
+                          { step: 1 as const, label: 'Login' },
+                          { step: 2 as const, label: 'Address' },
+                          { step: 3 as const, label: 'Schedule' },
+                          { step: 4 as const, label: 'Payment' },
+                        ]
+                      : [
+                          { step: 1 as const, label: 'Login' },
+                          { step: 2 as const, label: 'Address' },
+                          { step: 4 as const, label: 'Payment' },
+                        ]
                 return (
                   <div className="flex items-center gap-2">
                     {steps.map(({ step, label }, idx) => {
@@ -806,21 +818,17 @@ function MineClaimInner() {
                         <p className="text-sm text-muted-foreground text-center">
                           Log in to use a saved address, or create an account to get started.
                         </p>
-                        <div className="flex gap-3">
+                        <div className="flex flex-col gap-2">
+                          <Button onClick={() => setAuthStep('register')}>
+                            <UserPlus className="h-4 w-4 mr-2" />
+                            Create an Account
+                          </Button>
                           <Button
-                            className="flex-1"
                             variant="outline"
                             onClick={() => setAuthStep('login')}
                           >
                             <LogIn className="h-4 w-4 mr-2" />
                             I have an account
-                          </Button>
-                          <Button
-                            className="flex-1"
-                            onClick={() => setAuthStep('register')}
-                          >
-                            <UserPlus className="h-4 w-4 mr-2" />
-                            Create an Account
                           </Button>
                         </div>
                       </CardContent>
@@ -982,7 +990,19 @@ function MineClaimInner() {
                         customer={customer as Customer}
                         orderSource="FB"
                         selectedAddress={selectedAddress}
-                        onAddressSelect={(addr, receiver) => setSelectedAddress({ address: addr, ...receiver })}
+                        onAddressSelect={(addr, receiver) => {
+                          setSelectedAddress({ address: addr, ...receiver })
+                          const nextCountry = addr && 'country' in addr ? (addr as { country: string }).country : 'JP'
+                          if (nextCountry !== 'JP') {
+                            // Yamato slots are JP-only.
+                            setDeliveryDate(null)
+                            setDeliveryTimeCode(null)
+                            // COD / Credit Card are JP-only — drop if previously chosen.
+                            if (paymentMethod && !INTL_PAYMENT_METHODS.includes(paymentMethod)) {
+                              setPaymentMethod(null)
+                            }
+                          }
+                        }}
                         deliveryDate={deliveryDate}
                         onDeliveryDateChange={setDeliveryDate}
                         deliveryTimeCode={deliveryTimeCode}
@@ -992,23 +1012,29 @@ function MineClaimInner() {
                       <Button
                         className="w-full"
                         size="lg"
-                        onClick={() => setCheckoutStep(3)}
+                        onClick={() => setCheckoutStep(isJpShipping ? 3 : 4)}
                         disabled={!selectedAddress}
                       >
-                        Next — Select Schedule
+                        Next — {isJpShipping ? 'Select Schedule' : 'Payment'}
                         <ArrowRight className="h-4 w-4 ml-2" />
                       </Button>
                     </div>
                   )}
 
-                  {/* Step 3: Schedule */}
-                  {checkoutStep === 3 && (
+                  {/* Step 3: Schedule (JP destinations only) */}
+                  {checkoutStep === 3 && isJpShipping && (
                     <div className="space-y-4 animate-in fade-in duration-200">
                       <ShippingStep
                         customer={customer as Customer}
                         orderSource="FB"
                         selectedAddress={selectedAddress}
-                        onAddressSelect={(addr, receiver) => setSelectedAddress({ address: addr, ...receiver })}
+                        onAddressSelect={(addr, receiver) => {
+                          setSelectedAddress({ address: addr, ...receiver })
+                          if (addr && 'country' in addr && (addr as { country: string }).country !== 'JP') {
+                            setDeliveryDate(null)
+                            setDeliveryTimeCode(null)
+                          }
+                        }}
                         deliveryDate={deliveryDate}
                         onDeliveryDateChange={setDeliveryDate}
                         deliveryTimeCode={deliveryTimeCode}
@@ -1045,7 +1071,9 @@ function MineClaimInner() {
                           <CardTitle>Payment Method</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-2">
-                          {PAYMENT_METHODS.map((pm) => (
+                          {PAYMENT_METHODS
+                            .filter((pm) => (isJpShipping ? JP_PAYMENT_METHODS : INTL_PAYMENT_METHODS).includes(pm.value))
+                            .map((pm) => (
                             <label
                               key={pm.value}
                               className={cn(
@@ -1073,7 +1101,7 @@ function MineClaimInner() {
                         <Button
                           variant="outline"
                           size="lg"
-                          onClick={() => setCheckoutStep(3)}
+                          onClick={() => setCheckoutStep(isJpShipping ? 3 : 2)}
                         >
                           <ArrowLeft className="h-4 w-4 mr-2" />
                           Back

@@ -228,7 +228,7 @@ export function AddressForm({ value, onChange, required = false }: AddressFormPr
       </div>
 
       {country === 'JP' ? (
-        <div className="space-y-3 rounded-lg border p-3">
+        <div className="space-y-3">
           {/* Postal Code */}
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Postal Code (郵便番号)</Label>
@@ -356,7 +356,7 @@ export function AddressForm({ value, onChange, required = false }: AddressFormPr
         </div>
       ) : (
         /* International address (WooCommerce/PayPal style) */
-        <div className="space-y-3 rounded-lg border p-3">
+        <div className="space-y-3">
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Address Line 1 *</Label>
             <Input

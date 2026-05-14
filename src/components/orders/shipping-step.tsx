@@ -233,7 +233,7 @@ export function ShippingStep({
                   <RadioGroup
                     value={receiverType}
                     onValueChange={(v: 'same' | 'new') => setReceiverType(v)}
-                    className="flex gap-4"
+                    className="flex flex-col gap-2"
                   >
                     <div className="flex items-center gap-2">
                       <RadioGroupItem value="same" id="receiver-same" />
@@ -252,7 +252,7 @@ export function ShippingStep({
               )}
 
               {receiverType === 'new' && (
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 gap-3">
                   <div className="space-y-1.5">
                     <Label className="text-sm">First Name</Label>
                     <Input
@@ -316,7 +316,7 @@ export function ShippingStep({
             <CardTitle className="text-base">Delivery Scheduling</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-4">
               <div className="space-y-1.5">
                 <Label className="text-sm">Delivery Date</Label>
                 <Input

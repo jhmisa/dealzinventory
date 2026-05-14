@@ -298,11 +298,11 @@ export type PaymentMethod = 'COD' | 'CREDIT_CARD' | 'BANK' | 'KONBINI' | 'CASH' 
 
 export const PAYMENT_METHODS: { value: PaymentMethod; label: string; code: number }[] = [
   { value: 'COD', label: 'Cash On Delivery (代引き)', code: 2 },
-  { value: 'CREDIT_CARD', label: 'Credit Card', code: 2 },
+  { value: 'CREDIT_CARD', label: 'Credit Card +4%', code: 2 },
   { value: 'BANK', label: 'Bank Transfer (振込)', code: 0 },
   { value: 'KONBINI', label: 'Konbini (コンビニ)', code: 0 },
   { value: 'CASH', label: 'Cash (現金)', code: 0 },
-  { value: 'PAYPAL', label: 'PayPal', code: 0 },
+  { value: 'PAYPAL', label: 'PayPal +5%', code: 0 },
 ]
 
 export const REQUIRES_PAYMENT_CONFIRMATION: PaymentMethod[] = ['KONBINI', 'PAYPAL', 'BANK']
