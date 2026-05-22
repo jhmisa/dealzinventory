@@ -115,6 +115,32 @@ export function getItemDescription(
   return parts.length > 0 ? parts.join(' / ') : ((item.supplier_description as string) || '')
 }
 
+/**
+ * Build a sell group's description by picking a representative member item and
+ * delegating to getItemDescription. Honors per-item field overrides and the
+ * model's category description_fields config — so every surface (Admin Sell
+ * Groups list, Messages inventory send, public /mine page) renders identically.
+ *
+ * Falls back to the sell group's own product_models join if no member items are
+ * present (e.g. an empty group).
+ */
+export function getSellGroupDescription(sg: {
+  product_models?: Record<string, unknown> | null
+  sell_group_items?: Array<{ items?: Record<string, unknown> | null } | null> | null
+}): string {
+  const rep =
+    (sg.sell_group_items ?? [])
+      .map((s) => s?.items ?? null)
+      .find((it): it is Record<string, unknown> => it != null) ?? null
+  const pm =
+    (rep?.product_models as Record<string, unknown> | undefined) ??
+    (sg.product_models as Record<string, unknown> | undefined) ??
+    null
+  const descFields =
+    ((pm?.categories as { description_fields?: string[] | null } | undefined)?.description_fields) ?? null
+  return getItemDescription((rep ?? {}) as Record<string, unknown>, pm, descFields)
+}
+
 const EMOTICON_MAP: [RegExp, string][] = [
   [/(?<!\w):\)(?!\w)/g, '😊'],
   [/(?<!\w);\)(?!\w)/g, '😉'],

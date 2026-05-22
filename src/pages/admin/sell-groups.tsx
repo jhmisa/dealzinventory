@@ -32,7 +32,7 @@ import {
 import { PageHeader, SearchBar, DataTable, GradeBadge, StatusBadge, CodeDisplay, PriceDisplay, TableSkeleton } from '@/components/shared'
 import { useSellGroups, useUnassignedItems, useCreateSellGroupWithItems } from '@/hooks/use-sell-groups'
 import { CONDITION_GRADES } from '@/lib/constants'
-import { getItemDescription, formatPrice } from '@/lib/utils'
+import { getItemDescription, getSellGroupDescription, formatPrice } from '@/lib/utils'
 
 type SellGroupRow = {
   id: string
@@ -95,14 +95,7 @@ const columns: ColumnDef<SellGroupRow>[] = [
     id: 'description',
     header: 'Description',
     cell: ({ row }) => {
-      const rep = getRepItem(row.original)
-      const pm = rep?.product_models ?? row.original.product_models
-      const descFields = pm?.categories?.description_fields ?? null
-      const desc = getItemDescription(
-        (rep ?? {}) as Record<string, unknown>,
-        pm as Record<string, unknown> | null,
-        descFields,
-      )
+      const desc = getSellGroupDescription(row.original as Parameters<typeof getSellGroupDescription>[0])
       return desc || '—'
     },
   },

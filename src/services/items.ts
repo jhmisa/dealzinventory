@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase'
-import { getItemDescription } from '@/lib/utils'
+import { getItemDescription, getSellGroupDescription } from '@/lib/utils'
 import type { Item, ItemInsert, ItemUpdate, ItemCost, ItemMedia } from '@/lib/types'
 
 // Temporary debug function — can be removed later
@@ -505,10 +505,18 @@ export async function searchAvailableSellGroups(query: string, filters: Inventor
   const selectStr = `
     id, sell_group_code, discount_amount, condition_grade, active,
     product_models!inner(brand, model_name, model_number, color, cpu, ram_gb, storage_gb, os_family, screen_size, year,
+      categories(name, description_fields),
       product_media(file_url, role, sort_order)
     ),
     sell_group_items!inner(
-      items!inner(id, item_status, selling_price, discount)
+      items!inner(
+        id, item_status, selling_price, discount,
+        brand, model_name, model_number, color, cpu, ram_gb, storage_gb, os_family, screen_size, year,
+        condition_notes, battery_health_pct, is_unlocked, has_touchscreen, supplier_description,
+        product_models(brand, model_name, model_number, color, cpu, ram_gb, storage_gb, os_family, screen_size, year,
+          categories(name, description_fields)
+        )
+      )
     )
   `
 
@@ -574,13 +582,7 @@ export async function searchAvailableSellGroups(query: string, filters: Inventor
       storage_gb: string | null; os_family: string | null; screen_size: number | null; year: number | null
       product_media: { file_url: string; role: string; sort_order: number }[]
     }
-    const specParts = [
-      pm.brand, pm.model_name, pm.model_number, pm.year,
-      pm.ram_gb, pm.storage_gb, pm.cpu,
-      pm.screen_size ? `${pm.screen_size}"` : null,
-      pm.color, pm.os_family,
-    ].filter(Boolean)
-    const description = specParts.length > 0 ? specParts.join(' ') : '—'
+    const description = getSellGroupDescription(sg as Parameters<typeof getSellGroupDescription>[0]) || '—'
 
     const sgItems = (sg.sell_group_items ?? []) as { items: { item_status: string; selling_price: number | null } | null }[]
     const availableCount = sgItems.length

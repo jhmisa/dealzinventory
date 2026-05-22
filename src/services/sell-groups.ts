@@ -132,8 +132,10 @@ export async function getSellGroupByCode(gCode: string) {
       id, assigned_at,
       items(
         id, item_code, condition_grade, item_status, selling_price, purchase_price, discount, created_at,
+        ram_gb, storage_gb, cpu, screen_size, color, os_family, year, brand, model_name,
+        condition_notes, battery_health_pct, is_unlocked, has_touchscreen, supplier_description,
         suppliers(supplier_name),
-        product_models(brand, model_name, cpu, ram_gb, storage_gb, screen_size, categories(name, description_fields)),
+        product_models(brand, model_name, cpu, ram_gb, storage_gb, screen_size, color, os_family, year, categories(name, description_fields)),
         order_items(
           orders(id, order_code, order_status,
             customers(id, customer_code, first_name, last_name)

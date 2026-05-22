@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase'
 import { getItemByCode, getItem } from '@/services/items'
 import { getSellGroupByCode } from '@/services/sell-groups'
 import { getAccessoryByCode } from '@/services/accessories'
+import { getSellGroupDescription } from '@/lib/utils'
 import type { GalleryImage } from '@/components/shared/image-gallery'
 
 export interface ClaimableProduct {
@@ -126,8 +127,7 @@ async function getClaimableSellGroup(code: string): Promise<ClaimableProduct | n
     } | null
 
     const title = pm ? `${pm.brand} ${pm.model_name}` : code
-    const specParts = [pm?.cpu, pm?.ram_gb, pm?.storage_gb, pm?.screen_size ? `${pm.screen_size}"` : null].filter(Boolean)
-    const subtitle = pm?.short_description || specParts.join(' / ') || ''
+    const subtitle = getSellGroupDescription(sg as Parameters<typeof getSellGroupDescription>[0])
 
     // Fetch photo group media (primary product shots)
     let photoGroupMedia: { id: string; file_url: string; media_type: string; sort_order: number }[] = []
