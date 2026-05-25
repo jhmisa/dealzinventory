@@ -129,6 +129,9 @@ export default function CustomerLoginPage() {
           </Form>
         </CardContent>
         <CardFooter className="flex flex-col gap-2">
+          <Link to="/account/forgot-pin" className="text-sm text-primary hover:underline font-medium">
+            Forgot your PIN?
+          </Link>
           <p className="text-sm text-muted-foreground text-center">
             Don't have an account?{' '}
             <Link to="/account/register" className="text-primary hover:underline font-medium">

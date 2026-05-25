@@ -240,6 +240,48 @@ export async function resetCustomerPin(customerId: string, newPin: string) {
   return data
 }
 
+// Customer self-service "Forgot PIN" — request a one-time code by email.
+// Always resolves (server intentionally never reveals whether the email exists),
+// so the UI should advance to the code-entry step unconditionally.
+export async function requestCustomerPinReset(lastName: string, email: string) {
+  const { data, error } = await supabase.functions.invoke('customer-auth', {
+    body: {
+      action: 'forgot_pin_request',
+      last_name: lastName.toUpperCase(),
+      email,
+    },
+  })
+  if (error) {
+    throw new Error(error.message ?? 'Failed to send reset code')
+  }
+  if (data?.error) throw new Error(data.error)
+  return data
+}
+
+// Customer self-service "Forgot PIN" — verify the code and set the new PIN.
+export async function completeCustomerPinReset(
+  lastName: string,
+  email: string,
+  code: string,
+  newPin: string,
+) {
+  const { data, error } = await supabase.functions.invoke('customer-auth', {
+    body: {
+      action: 'forgot_pin_complete',
+      last_name: lastName.toUpperCase(),
+      email,
+      code,
+      new_pin: newPin,
+    },
+  })
+  if (error) {
+    if (data?.error) throw new Error(data.error)
+    throw new Error(error.message ?? 'Failed to reset PIN')
+  }
+  if (data?.error) throw new Error(data.error)
+  return data as { success: true }
+}
+
 // --- Merge Customers ---
 
 export async function getMergePreview(primaryId: string, secondaryIds: string[]) {

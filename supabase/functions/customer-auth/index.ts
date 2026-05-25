@@ -29,7 +29,11 @@ Deno.serve(async (req) => {
       case 'change_pin':
         return await handleChangePin(supabase, body);
       case 'reset_pin':
-        return await handleResetPin(supabase, body);
+        return await handleResetPin(supabase, req, body);
+      case 'forgot_pin_request':
+        return await handleForgotPinRequest(supabase, body);
+      case 'forgot_pin_complete':
+        return await handleForgotPinComplete(supabase, body);
       default:
         return jsonResponse({ error: `Unknown action: ${action}` });
     }
@@ -214,8 +218,25 @@ async function handleChangePin(supabase: ReturnType<typeof createClient>, body: 
   return jsonResponse({ success: true });
 }
 
-// --- Reset PIN (admin, no current PIN required) ---
-async function handleResetPin(supabase: ReturnType<typeof createClient>, body: Record<string, unknown>) {
+// --- Reset PIN (staff-only, requires Supabase Auth session) ---
+async function handleResetPin(
+  supabase: ReturnType<typeof createClient>,
+  req: Request,
+  body: Record<string, unknown>,
+) {
+  // Require a valid staff Supabase Auth JWT. supabase.functions.invoke() from the
+  // admin frontend automatically attaches the session, so authorized staff calls
+  // pass through unchanged; anon / signed-out callers are now rejected.
+  const authHeader = req.headers.get('Authorization') ?? req.headers.get('authorization');
+  const jwt = authHeader?.replace(/^Bearer\s+/i, '');
+  if (!jwt) {
+    return jsonResponse({ error: 'Unauthorized' });
+  }
+  const { data: userData, error: userErr } = await supabase.auth.getUser(jwt);
+  if (userErr || !userData?.user) {
+    return jsonResponse({ error: 'Unauthorized' });
+  }
+
   const { customer_id, new_pin } = body;
 
   if (!customer_id || !new_pin) {
@@ -249,6 +270,208 @@ async function handleResetPin(supabase: ReturnType<typeof createClient>, body: R
   }
 
   return jsonResponse({ success: true });
+}
+
+// --- Forgot PIN: request a 6-digit code by email (customer-facing) ---
+async function handleForgotPinRequest(
+  supabase: ReturnType<typeof createClient>,
+  body: Record<string, unknown>,
+) {
+  const { last_name, email } = body;
+
+  // Always respond success — never reveal whether the (name, email) pair exists.
+  const successResponse = jsonResponse({ success: true });
+
+  if (!last_name || !email) {
+    return successResponse;
+  }
+
+  const { data: customer } = await supabase
+    .from('customers')
+    .select('id, first_name, last_name, email')
+    .eq('last_name', String(last_name).toUpperCase())
+    .eq('email', String(email))
+    .maybeSingle();
+
+  if (!customer || !customer.email) {
+    return successResponse;
+  }
+
+  // Invalidate any prior unused token for this customer (one outstanding code at a time).
+  await supabase
+    .from('customer_pin_resets')
+    .update({ used_at: new Date().toISOString() })
+    .eq('customer_id', customer.id)
+    .is('used_at', null);
+
+  // Generate a 6-digit code, store its sha-256 hash, give it a 15-minute TTL.
+  const code = String(Math.floor(Math.random() * 1_000_000)).padStart(6, '0');
+  const tokenHash = await sha256Hex(code);
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+
+  const { error: insertErr } = await supabase
+    .from('customer_pin_resets')
+    .insert({
+      customer_id: customer.id,
+      token_hash: tokenHash,
+      expires_at: expiresAt,
+    });
+
+  if (insertErr) {
+    // Don't leak DB failures to the client; log to function logs only.
+    console.error('forgot_pin_request insert failed:', insertErr.message);
+    return successResponse;
+  }
+
+  try {
+    const displayName = [customer.first_name, customer.last_name].filter(Boolean).join(' ') || 'there';
+    await sendEmailViaResend({
+      to: customer.email,
+      subject: 'Your Dealz PIN reset code',
+      html: forgotPinEmailHtml(displayName, code),
+    });
+  } catch (mailErr) {
+    console.error('forgot_pin_request email failed:', mailErr instanceof Error ? mailErr.message : mailErr);
+    // Still return success — privacy and to allow staff fallback.
+  }
+
+  return successResponse;
+}
+
+// --- Forgot PIN: verify the code and set a new PIN (customer-facing) ---
+async function handleForgotPinComplete(
+  supabase: ReturnType<typeof createClient>,
+  body: Record<string, unknown>,
+) {
+  const { last_name, email, code, new_pin } = body;
+
+  if (!last_name || !email || !code || !new_pin) {
+    return jsonResponse({ error: 'last_name, email, code, and new_pin are required' });
+  }
+  if (!/^\d{6}$/.test(String(code))) {
+    return jsonResponse({ error: 'Code must be 6 digits' });
+  }
+  if (!/^\d{6}$/.test(String(new_pin))) {
+    return jsonResponse({ error: 'PIN must be exactly 6 digits' });
+  }
+
+  const { data: customer } = await supabase
+    .from('customers')
+    .select('id')
+    .eq('last_name', String(last_name).toUpperCase())
+    .eq('email', String(email))
+    .maybeSingle();
+
+  // Generic error for any mismatch path — never reveal which field was wrong.
+  const invalid = jsonResponse({ error: 'Code is invalid or has expired' });
+
+  if (!customer) {
+    return invalid;
+  }
+
+  const { data: token } = await supabase
+    .from('customer_pin_resets')
+    .select('id, token_hash, attempts, expires_at, used_at')
+    .eq('customer_id', customer.id)
+    .is('used_at', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!token) {
+    return invalid;
+  }
+
+  if (new Date(token.expires_at).getTime() < Date.now()) {
+    return invalid;
+  }
+
+  if (token.attempts >= 5) {
+    // Burn the token so further guesses are pointless even if expiry hasn't hit.
+    await supabase
+      .from('customer_pin_resets')
+      .update({ used_at: new Date().toISOString() })
+      .eq('id', token.id);
+    return jsonResponse({ error: 'Too many attempts. Please request a new code.' });
+  }
+
+  const submittedHash = await sha256Hex(String(code));
+  if (submittedHash !== token.token_hash) {
+    await supabase
+      .from('customer_pin_resets')
+      .update({ attempts: token.attempts + 1 })
+      .eq('id', token.id);
+    return invalid;
+  }
+
+  // Code is valid — update the PIN and consume the token.
+  const newPinHash = await hashPin(supabase, String(new_pin));
+  const { error: updateErr } = await supabase
+    .from('customers')
+    .update({ pin_hash: newPinHash })
+    .eq('id', customer.id);
+
+  if (updateErr) {
+    return jsonResponse({ error: `Failed to update PIN: ${updateErr.message}` });
+  }
+
+  await supabase
+    .from('customer_pin_resets')
+    .update({ used_at: new Date().toISOString() })
+    .eq('id', token.id);
+
+  return jsonResponse({ success: true });
+}
+
+// --- Email + hash helpers ---
+
+async function sha256Hex(input: string): Promise<string> {
+  const data = new TextEncoder().encode(input);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+async function sendEmailViaResend(args: { to: string; subject: string; html: string }) {
+  const apiKey = Deno.env.get('RESEND_API_KEY');
+  const from = Deno.env.get('EMAIL_FROM');
+  if (!apiKey || !from) {
+    throw new Error('RESEND_API_KEY or EMAIL_FROM not configured');
+  }
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ from, to: args.to, subject: args.subject, html: args.html }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Resend ${res.status}: ${text}`);
+  }
+}
+
+function forgotPinEmailHtml(name: string, code: string): string {
+  return `<!doctype html>
+<html><body style="font-family: -apple-system, Segoe UI, sans-serif; color:#111; max-width:480px; margin:0 auto; padding:24px;">
+  <h2 style="margin:0 0 16px;">Dealz PIN reset</h2>
+  <p>Hi ${escapeHtml(name)},</p>
+  <p>Use this code to set a new PIN for your Dealz account:</p>
+  <p style="font-size:28px; font-weight:700; letter-spacing:6px; margin:24px 0; text-align:center; background:#f5f5f5; padding:16px; border-radius:8px;">${code}</p>
+  <p style="color:#666; font-size:14px;">This code expires in 15 minutes. If you didn't request a PIN reset, you can safely ignore this email.</p>
+</body></html>`;
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => (
+    c === '&' ? '&amp;' :
+    c === '<' ? '&lt;' :
+    c === '>' ? '&gt;' :
+    c === '"' ? '&quot;' :
+    '&#39;'
+  ));
 }
 
 // --- Helpers ---

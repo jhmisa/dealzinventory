@@ -51,6 +51,7 @@ const KaitoriAssessPage = lazy(() => import('@/pages/kaitori/assess'))
 const KaitoriStatusPage = lazy(() => import('@/pages/kaitori/status'))
 const CustomerLoginPage = lazy(() => import('@/pages/customer/login'))
 const CustomerRegisterPage = lazy(() => import('@/pages/customer/register'))
+const CustomerForgotPinPage = lazy(() => import('@/pages/customer/forgot-pin'))
 const CustomerDashboardPage = lazy(() => import('@/pages/customer/dashboard'))
 const CustomerOrdersPage = lazy(() => import('@/pages/customer/orders'))
 const CustomerOrderDetailPage = lazy(() => import('@/pages/customer/order-detail'))
@@ -230,6 +231,7 @@ export const router = createBrowserRouter([
       { index: true, element: lazyElement(CustomerDashboardPage) },
       { path: 'login', element: lazyElement(CustomerLoginPage) },
       { path: 'register', element: lazyElement(CustomerRegisterPage) },
+      { path: 'forgot-pin', element: lazyElement(CustomerForgotPinPage) },
       { path: 'orders', element: lazyElement(CustomerOrdersPage) },
       { path: 'orders/:id', element: lazyElement(CustomerOrderDetailPage) },
       { path: 'kaitori', element: lazyElement(CustomerKaitoriPage) },

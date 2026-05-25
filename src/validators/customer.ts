@@ -72,3 +72,21 @@ export const adminCreateCustomerSchema = z.object({
 })
 
 export type AdminCreateCustomerFormValues = z.infer<typeof adminCreateCustomerSchema>
+
+export const forgotPinRequestSchema = z.object({
+  last_name: z.string().min(1, 'Last name is required'),
+  email: z.string().email('Valid email required'),
+})
+
+export type ForgotPinRequestFormValues = z.infer<typeof forgotPinRequestSchema>
+
+export const forgotPinCompleteSchema = z.object({
+  code: z.string().length(6, 'Code must be 6 digits').regex(/^\d{6}$/, 'Code must be 6 digits'),
+  new_pin: z.string().length(6, 'PIN must be 6 digits').regex(/^\d{6}$/, 'PIN must be 6 digits'),
+  confirm_pin: z.string().length(6, 'PIN must be 6 digits'),
+}).refine((data) => data.new_pin === data.confirm_pin, {
+  message: 'PINs do not match',
+  path: ['confirm_pin'],
+})
+
+export type ForgotPinCompleteFormValues = z.infer<typeof forgotPinCompleteSchema>
