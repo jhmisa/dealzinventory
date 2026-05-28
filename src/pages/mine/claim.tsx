@@ -22,6 +22,7 @@ import { CustomerAuthContext, useCustomerAuthProvider } from '@/hooks/use-custom
 import { useClaimableByCode, useClaimMine, useExistingOpenOrder } from '@/hooks/use-mine'
 import { CodeInput } from '@/components/mine/code-input'
 import { CONDITION_GRADES, PAYMENT_METHODS } from '@/lib/constants'
+import { getEarliestDeliveryDate } from '@/lib/delivery-date'
 import { formatPrice, cn, formatCustomerName } from '@/lib/utils'
 import type { ShippingAddress } from '@/lib/address-types'
 import type { Customer } from '@/lib/types'
@@ -528,7 +529,7 @@ function MineClaimInner() {
   // Pre-selection before confirming with Proceed button (defaults to 'existing')
   const [orderSelection, setOrderSelection] = useState<'existing' | 'new'>('existing')
   const [selectedAddress, setSelectedAddress] = useState<{ address: ShippingAddress; receiverFirstName?: string | null; receiverLastName?: string | null; receiverPhone?: string | null } | null>(null)
-  const [deliveryDate, setDeliveryDate] = useState<string | null>(null)
+  const [deliveryDate, setDeliveryDate] = useState<string | null>(getEarliestDeliveryDate())
   const [deliveryTimeCode, setDeliveryTimeCode] = useState<string | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<string | null>(null)
   const [orderCreated, setOrderCreated] = useState<{ orderCode: string } | null>(null)
@@ -1000,6 +1001,8 @@ function MineClaimInner() {
                             if (paymentMethod && !INTL_PAYMENT_METHODS.includes(paymentMethod)) {
                               setPaymentMethod(null)
                             }
+                          } else {
+                            setDeliveryDate(prev => prev ?? getEarliestDeliveryDate())
                           }
                         }}
                         deliveryDate={deliveryDate}
@@ -1032,6 +1035,8 @@ function MineClaimInner() {
                           if (addr && 'country' in addr && (addr as { country: string }).country !== 'JP') {
                             setDeliveryDate(null)
                             setDeliveryTimeCode(null)
+                          } else {
+                            setDeliveryDate(prev => prev ?? getEarliestDeliveryDate())
                           }
                         }}
                         deliveryDate={deliveryDate}

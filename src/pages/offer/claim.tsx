@@ -31,6 +31,7 @@ import { useAvailableAccessories } from '@/hooks/use-accessories'
 import { ImageGallery } from '@/components/shared/image-gallery'
 import type { GalleryImage } from '@/components/shared/image-gallery'
 import { CONDITION_GRADES, PAYMENT_METHODS } from '@/lib/constants'
+import { getEarliestDeliveryDate } from '@/lib/delivery-date'
 import { formatPrice, cn, formatCustomerName } from '@/lib/utils'
 import type { ShippingAddress } from '@/lib/address-types'
 import type { Customer } from '@/lib/types'
@@ -455,7 +456,7 @@ function OfferClaimInner() {
 
   const [authStep, setAuthStep] = useState<AuthStep>('choose')
   const [selectedAddress, setSelectedAddress] = useState<{ address: ShippingAddress; receiverFirstName?: string | null; receiverLastName?: string | null; receiverPhone?: string | null } | null>(null)
-  const [deliveryDate, setDeliveryDate] = useState<string | null>(null)
+  const [deliveryDate, setDeliveryDate] = useState<string | null>(getEarliestDeliveryDate())
   const [deliveryTimeCode, setDeliveryTimeCode] = useState<string | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<string | null>(null)
   const [orderCreated, setOrderCreated] = useState<{ orderCode: string } | null>(null)
