@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase'
 import { getItemByCode, getItem } from '@/services/items'
 import { getSellGroupByCode } from '@/services/sell-groups'
 import { getAccessoryByCode } from '@/services/accessories'
-import { getSellGroupDescription } from '@/lib/utils'
+import { getSellGroupDescription, filterHiddenProductMedia } from '@/lib/utils'
 import type { GalleryImage } from '@/components/shared/image-gallery'
 
 export interface ClaimableProduct {
@@ -89,7 +89,8 @@ async function getClaimableItem(code: string): Promise<ClaimableProduct | null> 
     for (const m of visibleItemMedia) {
       media.push({ id: m.id, url: m.file_url, mediaType: m.media_type === 'video' ? 'video' : 'image' })
     }
-    const productMedia = (pm?.product_media ?? []).sort((a, b) => a.sort_order - b.sort_order)
+    const productMedia = filterHiddenProductMedia(pm?.product_media ?? [], item.hidden_product_photo_ids)
+      .sort((a, b) => a.sort_order - b.sort_order)
     for (const m of productMedia) {
       media.push({ id: m.id, url: m.file_url, mediaType: m.media_type === 'video' ? 'video' : 'image' })
     }

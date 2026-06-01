@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase'
-import { getItemDescription, getSellGroupDescription } from '@/lib/utils'
+import { getItemDescription, getSellGroupDescription, filterHiddenProductMedia } from '@/lib/utils'
 import type { Item, ItemInsert, ItemUpdate, ItemCost, ItemMedia } from '@/lib/types'
 
 // Temporary debug function — can be removed later
@@ -433,7 +433,7 @@ export async function searchAvailableItems(query: string, filters: InventorySear
 
   if (error) throw error
 
-  return (data ?? []).map((row: {
+  const rows = (data ?? []) as Array<{
     id: string
     item_code: string
     condition_grade: string | null
@@ -461,22 +461,53 @@ export async function searchAvailableItems(query: string, filters: InventorySear
     has_touchscreen: boolean | null
     supplier_description: string | null
     category_description_fields: string[] | null
-  }) => {
+  }>
+
+  // RPC's hero_media_url / first_product_media_url come straight from product_media without
+  // honoring items.hidden_product_photo_ids. Enrich client-side so hidden photos don't surface
+  // as the thumbnail.
+  type EnrichRow = {
+    id: string
+    hidden_product_photo_ids: string[] | null
+    product_models: { product_media: Array<{ id: string; file_url: string; role: string; sort_order: number }> } | null
+  }
+  const ids = rows.map(r => r.id)
+  let enrichMap = new Map<string, { hero: string | null; first: string | null }>()
+  if (ids.length > 0) {
+    const { data: enrich } = await supabase
+      .from('items')
+      .select('id, hidden_product_photo_ids, product_models(product_media(id, file_url, role, sort_order))')
+      .in('id', ids)
+    enrichMap = new Map((enrich as unknown as EnrichRow[] ?? []).map(e => {
+      const all = e.product_models?.product_media ?? []
+      const visible = filterHiddenProductMedia(all, e.hidden_product_photo_ids)
+        .sort((a, b) => a.sort_order - b.sort_order)
+      const hero = visible.find(m => m.role === 'hero')?.file_url ?? null
+      const first = visible[0]?.file_url ?? null
+      return [e.id, { hero, first }]
+    }))
+  }
+
+  return rows.map((row) => {
     const description = getItemDescription(
       row as unknown as Record<string, unknown>,
       null,
       row.category_description_fields,
     ) || '—'
 
+    const visible = enrichMap.get(row.id)
+    const visibleHero = visible?.hero ?? null
+    const visibleFirst = visible?.first ?? null
+
     const thumbnail_url = row.first_item_thumb_url
-      ?? row.hero_media_url
-      ?? row.first_product_media_url
+      ?? visibleHero
+      ?? visibleFirst
       ?? null
 
     // Display URL: full-size image for attachments
     const display_url = row.first_item_display_url
-      ?? row.hero_media_url
-      ?? row.first_product_media_url
+      ?? visibleHero
+      ?? visibleFirst
       ?? null
 
     return {

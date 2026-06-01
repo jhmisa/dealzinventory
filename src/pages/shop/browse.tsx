@@ -22,7 +22,7 @@ import {
 import { Label } from '@/components/ui/label'
 import { useShopItems, useShopSellGroups, useShopBrands, useShopCategories, useShopEnabled, useShopAccessories, useShopHideNoPrice } from '@/hooks/use-shop'
 import { CONDITION_GRADES } from '@/lib/constants'
-import { formatPrice, cn } from '@/lib/utils'
+import { formatPrice, cn, filterHiddenProductMedia } from '@/lib/utils'
 import type { Accessory, AccessoryMedia } from '@/lib/types'
 
 type SortOption = 'newest' | 'price_asc' | 'price_desc'
@@ -218,7 +218,7 @@ export default function ShopBrowsePage() {
             } | null
             const itemMedia = (item.item_media ?? []) as { file_url: string; sort_order: number; visible: boolean; thumbnail_url: string | null }[]
             const visibleItemMedia = itemMedia.filter(m => m.visible !== false).sort((a, b) => a.sort_order - b.sort_order)
-            const productMedia = pm?.product_media ?? []
+            const productMedia = filterHiddenProductMedia(pm?.product_media ?? [], (item as { hidden_product_photo_ids?: string[] | null }).hidden_product_photo_ids)
             const heroProductImg = productMedia.find(m => m.role === 'hero') ?? productMedia[0]
             const heroImg = visibleItemMedia[0]?.thumbnail_url ?? visibleItemMedia[0]?.file_url ?? heroProductImg?.file_url
             const gradeInfo = CONDITION_GRADES.find(g => g.value === item.condition_grade)

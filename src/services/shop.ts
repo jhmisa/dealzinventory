@@ -51,6 +51,7 @@ export async function getShopItems(filters: ShopFilters = {}) {
     .from('items')
     .select(`
       id, item_code, condition_grade, selling_price, discount, specs_notes, condition_notes,
+      hidden_product_photo_ids,
       product_models!inner(id, brand, model_name, color, short_description, category_id,
         categories(id, name),
         product_media(id, file_url, role, sort_order)

@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useShopItemDetail } from '@/hooks/use-shop'
 import { CONDITION_GRADES, getSpecFieldLabel } from '@/lib/constants'
-import { formatPrice, cn } from '@/lib/utils'
+import { formatPrice, cn, filterHiddenProductMedia } from '@/lib/utils'
 
 type MediaTab = 'photos' | 'videos'
 
@@ -65,7 +65,8 @@ export default function ShopItemDetailPage() {
     .filter(m => m.visible !== false)
     .sort((a, b) => a.sort_order - b.sort_order)
 
-  const productMedia = (pm?.product_media ?? []).sort((a, b) => a.sort_order - b.sort_order)
+  const productMedia = filterHiddenProductMedia(pm?.product_media ?? [], item.hidden_product_photo_ids)
+    .sort((a, b) => a.sort_order - b.sort_order)
 
   // Build unified media list with type info
   const allMedia: MediaItem[] = []

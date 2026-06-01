@@ -189,3 +189,12 @@ export function sumItemCosts(item: { item_costs?: Array<ItemCostRow> | null }): 
 export function getItemTotalCost(item: ItemWithCosts): number {
   return (Number(item.purchase_price) || 0) + sumItemCosts(item)
 }
+
+export function filterHiddenProductMedia<T extends { id: string }>(
+  media: T[],
+  hiddenIds: string[] | null | undefined,
+): T[] {
+  if (!hiddenIds || hiddenIds.length === 0) return media
+  const hidden = new Set(hiddenIds)
+  return media.filter(m => !hidden.has(m.id))
+}
