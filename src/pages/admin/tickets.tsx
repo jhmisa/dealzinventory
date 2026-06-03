@@ -36,6 +36,9 @@ type TicketRow = {
   orders: {
     order_code: string
   } | null
+  conversations: {
+    contact_name: string | null
+  } | null
 }
 
 const STATUS_TABS = [
@@ -66,13 +69,22 @@ const columns: ColumnDef<TicketRow>[] = [
     header: 'Customer',
     cell: ({ row }) => {
       const c = row.original.customers
-      if (!c) return '—'
-      return (
-        <div>
-          <span>{formatCustomerName(c)}</span>
-          <span className="ml-2 text-xs text-muted-foreground">{c.customer_code}</span>
-        </div>
-      )
+      if (c) {
+        return (
+          <div>
+            <span>{formatCustomerName(c)}</span>
+            <span className="ml-2 text-xs text-muted-foreground">{c.customer_code}</span>
+          </div>
+        )
+      }
+      // No linked customer: fall back to the conversation's contact name so the
+      // list matches the messaging panel and ticket-detail page (e.g. "Ra Chel")
+      // instead of a misleading "—". See docs/investigations/incorrect-ticket-linking.md.
+      const contactName = row.original.conversations?.contact_name
+      if (contactName) {
+        return <span className="text-sm italic text-muted-foreground">{contactName}</span>
+      }
+      return '—'
     },
   },
   {
