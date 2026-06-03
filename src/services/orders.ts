@@ -469,6 +469,22 @@ export async function updateOrderLineItem(
   orderItemId: string,
   updates: { unit_price?: number; discount?: number; quantity?: number; description?: string }
 ) {
+  // If quantity changes on an accessory line, reconcile its stock by the delta
+  let stockDelta = 0
+  let accessoryId: string | null = null
+  if (updates.quantity !== undefined) {
+    const { data: existing } = await supabase
+      .from('order_items')
+      .select('accessory_id, quantity')
+      .eq('id', orderItemId)
+      .single()
+    if (existing?.accessory_id) {
+      accessoryId = existing.accessory_id
+      // increasing quantity decrements more stock; decreasing restores it
+      stockDelta = updates.quantity - existing.quantity
+    }
+  }
+
   const { data, error } = await supabase
     .from('order_items')
     .update(updates)
@@ -477,6 +493,24 @@ export async function updateOrderLineItem(
     .single()
 
   if (error) throw error
+
+  if (accessoryId && stockDelta !== 0) {
+    if (stockDelta > 0) {
+      const { data: newQty } = await supabase.rpc('decrement_accessory_stock', {
+        p_accessory_id: accessoryId,
+        p_quantity: stockDelta,
+      })
+      if (newQty === null) {
+        throw new Error('Insufficient stock for accessory. Please refresh and try again.')
+      }
+    } else {
+      await supabase.rpc('increment_accessory_stock', {
+        p_accessory_id: accessoryId,
+        p_quantity: -stockDelta,
+      })
+    }
+  }
+
   return data
 }
 
@@ -519,10 +553,10 @@ export async function addOrderLineItem(orderId: string, item: {
 }
 
 export async function removeOrderLineItem(orderItemId: string) {
-  // Fetch the order_item to get item_id before deleting
+  // Fetch the order_item to get item_id / accessory_id before deleting
   const { data: orderItem } = await supabase
     .from('order_items')
-    .select('item_id')
+    .select('item_id, accessory_id, quantity')
     .eq('id', orderItemId)
     .single()
 
@@ -539,6 +573,14 @@ export async function removeOrderLineItem(orderItemId: string) {
       .from('items')
       .update({ item_status: 'AVAILABLE' as Item['item_status'] })
       .eq('id', orderItem.item_id)
+  }
+
+  // Restore accessory stock (the line was decremented when added)
+  if (orderItem?.accessory_id) {
+    await supabase.rpc('increment_accessory_stock', {
+      p_accessory_id: orderItem.accessory_id,
+      p_quantity: orderItem.quantity,
+    })
   }
 }
 
