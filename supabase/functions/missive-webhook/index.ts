@@ -1,6 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { downloadAttachmentsToStorage } from "../_shared/download-to-storage.ts";
+import {
+  resolveNameFromMissiveConversation,
+  unwrapMissiveConversation,
+} from "../_shared/resolve-contact-name.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -233,18 +237,14 @@ async function processWebhookEvent(
       message.from_field?.address,
     );
 
-    // Resolve contact name from webhook payload fields only
-    let resolvedContactName: string | null = message.from_field?.name
-      ?? conversation.subject
-      ?? (conversation.contacts ?? []).find((c: { name?: string }) => c.name)?.name
-      ?? (conversation.contacts ?? []).find((c: { first_name?: string }) => c.first_name)?.first_name
-      ?? (conversation.authors ?? []).find((a: { name?: string }) => a.name && a.name !== 'Dealz K.K.')?.name
-      ?? message.from_field?.address
-      ?? null;
-    if (resolvedContactName?.startsWith('Message from ')) {
-      resolvedContactName = resolvedContactName.slice('Message from '.length);
-    }
-    if (resolvedContactName) resolvedContactName = resolvedContactName.trim() || null;
+    // Resolve contact name from webhook payload fields only (no API call here).
+    // Note: for brand-new Facebook conversations Missive usually hasn't resolved
+    // the sender's display name yet, so this is often null — backgroundEnrichMessage
+    // retries against the Missive API below.
+    const resolvedContactName: string | null = resolveNameFromMissiveConversation(
+      conversation,
+      message,
+    );
 
     // Look up Inbox folder for auto-unarchive
     const { data: inboxFolder } = await supabase
@@ -390,36 +390,40 @@ async function backgroundEnrichMessage(
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
-    // 1. Resolve contact name from Missive API (if webhook payload didn't have it)
+    // 1. Resolve contact name from Missive API (if webhook payload didn't have it).
+    //
+    // Missive resolves the Facebook display name asynchronously, a few seconds
+    // AFTER it fires our webhook — so a single immediate fetch usually races and
+    // loses. Retry with backoff (still inside EdgeRuntime.waitUntil, after the
+    // 200 ACK) so the name appears on the FIRST message in the common case.
     if (needsContactName && MISSIVE_API_TOKEN) {
-      try {
-        const convRes = await fetchWithTimeout(`${MISSIVE_API_URL}/conversations/${missiveConversationId}`, {
-          headers: { Authorization: `Bearer ${MISSIVE_API_TOKEN}` },
-        });
-        if (convRes.ok) {
-          const convData = await convRes.json();
-          const convDetail = convData?.conversations ?? convData?.conversation;
-          let resolvedName: string | null =
-            convDetail?.subject
-            ?? convDetail?.latest_subject
-            ?? (convDetail?.contacts ?? []).find((c: { name?: string }) => c.name)?.name
-            ?? (convDetail?.contacts ?? []).find((c: { first_name?: string }) => c.first_name)?.first_name
-            ?? (convDetail?.authors ?? []).find((a: { name?: string }) => a.name && a.name !== 'Dealz K.K.')?.name
-            ?? convDetail?.latest_message?.from_field?.name
-            ?? null;
-          if (resolvedName?.startsWith('Message from ')) {
-            resolvedName = resolvedName.slice('Message from '.length);
-          }
-          if (resolvedName) {
-            await supabase
-              .from('conversations')
-              .update({ contact_name: resolvedName })
-              .eq('id', conversationDbId);
-            console.log('Background: resolved contact name:', resolvedName);
-          }
+      // Delays before each attempt (ms). First attempt is immediate.
+      const attemptDelays = [0, 5_000, 10_000, 15_000];
+      for (let i = 0; i < attemptDelays.length; i++) {
+        if (attemptDelays[i] > 0) {
+          await new Promise((r) => setTimeout(r, attemptDelays[i]));
         }
-      } catch (e) {
-        console.warn('Background: failed to fetch conversation from Missive API:', e);
+        try {
+          const convRes = await fetchWithTimeout(`${MISSIVE_API_URL}/conversations/${missiveConversationId}`, {
+            headers: { Authorization: `Bearer ${MISSIVE_API_TOKEN}` },
+          });
+          if (convRes.ok) {
+            const convData = await convRes.json();
+            const resolvedName = resolveNameFromMissiveConversation(
+              unwrapMissiveConversation(convData),
+            );
+            if (resolvedName) {
+              await supabase
+                .from('conversations')
+                .update({ contact_name: resolvedName })
+                .eq('id', conversationDbId);
+              console.log('Background: resolved contact name on attempt', i + 1, ':', resolvedName);
+              break;
+            }
+          }
+        } catch (e) {
+          console.warn('Background: failed to fetch conversation from Missive API (attempt', i + 1, '):', e);
+        }
       }
     }
 
