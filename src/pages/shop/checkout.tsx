@@ -1,325 +1,165 @@
 import { useState } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
-import { ArrowLeft, Check, ShoppingBag } from 'lucide-react'
+import { useParams, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form'
-import { AddressForm } from '@/components/shared'
-import { PhoneInput } from '@/components/shared/phone-input'
-import type { ShippingAddress } from '@/lib/address-types'
+import { CustomerAuthContext, useCustomerAuthProvider, useCustomerAuth } from '@/hooks/use-customer-auth'
 import { useSellGroup } from '@/hooks/use-sell-groups'
 import { useSellGroupByCode } from '@/hooks/use-shop'
 import { useCreateManualOrder } from '@/hooks/use-orders'
 import { pickAvailableItemsFromSellGroup } from '@/services/orders'
-import { CONDITION_GRADES } from '@/lib/constants'
-import { formatPrice, cn } from '@/lib/utils'
+import { formatPrice } from '@/lib/utils'
+import {
+  CheckoutShell,
+  StepProgress,
+  ProductChip,
+  PhotoSheet,
+  useCheckoutFlow,
+  useSellGroupView,
+  STEP_LABELS,
+  ItemStep,
+  AccountStep,
+  AddressStep,
+  ScheduleStep,
+  PaymentStep,
+  ReviewStep,
+  ConfirmedStep,
+} from '@/components/checkout'
 
-// Simple checkout form schema (customer creates account inline)
-const checkoutSchema = z.object({
-  last_name: z.string().min(1, 'Last name is required'),
-  first_name: z.string().optional().or(z.literal('')),
-  email: z.string().email('Valid email required'),
-  phone: z.string().optional().or(z.literal('')),
-  quantity: z.coerce.number().int().min(1, 'At least 1'),
-})
-
-type CheckoutFormValues = z.infer<typeof checkoutSchema>
-
-// This page works for both /shop/checkout/:sellGroupId and /order/:sellGroupCode
-export default function CheckoutPage() {
-  const { sellGroupId, sellGroupCode } = useParams<{ sellGroupId?: string; sellGroupCode?: string }>()
+function CheckoutInner({ sg, isCode }: { sg: unknown; isCode: boolean }) {
   const navigate = useNavigate()
+  const { customer, isAuthenticated } = useCustomerAuth()
+  const flow = useCheckoutFlow(isAuthenticated)
+  const view = useSellGroupView(sg)
+  const createOrder = useCreateManualOrder()
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [orderCode, setOrderCode] = useState<string | null>(null)
+  const [placing, setPlacing] = useState(false)
 
-  // Use id-based or code-based lookup depending on route
-  const { data: sgById } = useSellGroup(sellGroupId ?? '')
-  const { data: sgByCode } = useSellGroupByCode(sellGroupCode ?? '')
-  const sg = sgById ?? sgByCode
-
-  const createOrderMutation = useCreateManualOrder()
-  const [orderCreated, setOrderCreated] = useState<{ orderCode: string } | null>(null)
-  const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(null)
-  const [isPickingItems, setIsPickingItems] = useState(false)
-
-  const form = useForm<CheckoutFormValues>({
-    resolver: zodResolver(checkoutSchema),
-    defaultValues: {
-      last_name: '',
-      first_name: '',
-      email: '',
-      phone: '',
-      quantity: 1,
-    },
-  })
-
-  if (!sg) {
-    if (sellGroupId || sellGroupCode) {
-      return (
-        <div className="text-center py-16">
-          <p className="text-lg text-muted-foreground">Loading product...</p>
-        </div>
-      )
-    }
+  if (!view) {
     return (
-      <div className="text-center py-16">
-        <p className="text-lg text-muted-foreground">Product not found.</p>
-        <Button variant="outline" className="mt-4" asChild>
-          <Link to="/shop">Back to Shop</Link>
-        </Button>
-      </div>
+      <CheckoutShell>
+        <p className="py-16 text-center font-brand text-brand-ash">Loading product…</p>
+      </CheckoutShell>
     )
   }
 
-  const pm = sg.product_models as {
-    brand: string; model_name: string
-    cpu: string | null; ram_gb: string | null; storage_gb: string | null
-  } | null
-  const gradeInfo = CONDITION_GRADES.find(g => g.value === sg.condition_grade)
-  const sgItems = ((sg as { sell_group_items?: Array<{ items: { item_status: string; condition_grade: string; selling_price: number | null } | null }> }).sell_group_items ?? [])
-  const stockCount = sgItems.filter(s => s.items?.item_status === 'AVAILABLE' && s.items?.condition_grade !== 'J').length
-  const repSp = Number(sgItems.map(s => s.items?.selling_price).find(p => p != null) ?? 0)
-  const discountAmount = Number((sg as { discount_amount?: number | null }).discount_amount ?? 0)
-  const effectiveUnitPrice = Math.max(0, repSp - discountAmount)
-
-  const watchQuantity = form.watch('quantity')
-  const totalPrice = effectiveUnitPrice * (watchQuantity || 1)
-
-  // Order success view
-  if (orderCreated) {
-    return (
-      <div className="max-w-md mx-auto text-center py-16 space-y-4">
-        <div className="mx-auto w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
-          <Check className="h-8 w-8 text-green-600" />
-        </div>
-        <h2 className="text-2xl font-bold">Order Placed!</h2>
-        <p className="text-muted-foreground">
-          Your order <span className="font-mono font-medium">{orderCreated.orderCode}</span> has been received.
-        </p>
-        <p className="text-sm text-muted-foreground">
-          We'll confirm your order shortly. You can track your order status in My Account.
-        </p>
-        <Button asChild>
-          <Link to="/shop">Continue Shopping</Link>
-        </Button>
-      </div>
-    )
-  }
-
-  async function handleSubmit(values: CheckoutFormValues) {
-    if (!shippingAddress) {
-      toast.error('Shipping address is required')
+  const handleConfirm = async () => {
+    if (!customer || !flow.data.shippingAddress) {
+      toast.error('Missing account or address')
       return
     }
+    setPlacing(true)
     try {
-      setIsPickingItems(true)
-      // Pick available items from sell group (with discounts)
-      const items = await pickAvailableItemsFromSellGroup(sg!.id, values.quantity)
-
-      createOrderMutation.mutate(
+      const items = await pickAvailableItemsFromSellGroup(
+        (sg as { id: string }).id,
+        flow.data.quantity,
+      )
+      const isOther = flow.data.receiverMode === 'other'
+      createOrder.mutate(
         {
-          customer_id: '00000000-0000-0000-0000-000000000000', // Placeholder — real flow uses customer-auth
-          order_source: sellGroupCode ? 'LIVE_SELLING' : 'SHOP',
-          shipping_address: JSON.stringify(shippingAddress),
+          customer_id: customer.id,
+          order_source: isCode ? 'LIVE_SELLING' : 'SHOP',
+          shipping_address: JSON.stringify(flow.data.shippingAddress),
           shipping_cost: 0,
+          delivery_date: flow.data.deliveryDate,
+          delivery_time_code: flow.data.deliveryTimeCode,
+          payment_method: flow.data.paymentMethod,
+          receiver_first_name: isOther ? flow.data.receiverFirstName : null,
+          receiver_last_name: isOther ? flow.data.receiverLastName : null,
+          receiver_phone: isOther ? flow.data.receiverPhone : null,
           items,
         },
         {
           onSuccess: (order) => {
-            setOrderCreated({ orderCode: order.order_code })
+            setOrderCode(order.order_code)
+            flow.goTo('confirmed')
           },
-          onError: (err) => toast.error(`Order failed: ${err.message}`),
-          onSettled: () => setIsPickingItems(false),
+          onError: (e) => toast.error(`Order failed: ${e.message}`),
+          onSettled: () => setPlacing(false),
         },
       )
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to find available items')
-      setIsPickingItems(false)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to reserve items')
+      setPlacing(false)
     }
   }
 
+  // Confirmed screen has its own full-bleed layout (no chip/progress).
+  if (flow.step === 'confirmed' && orderCode) {
+    return (
+      <CheckoutShell>
+        <ConfirmedStep
+          orderCode={orderCode}
+          firstName={customer?.first_name ?? null}
+          onTrack={() => navigate('/account/orders')}
+          onBackToShop={() => navigate('/shop')}
+        />
+      </CheckoutShell>
+    )
+  }
+
+  const showChrome = flow.step !== 'item'
+  const chipMeta = `${formatPrice(view.effectiveUnitPrice)} · QTY ${flow.data.quantity}${view.grade ? ` · GRADE ${view.gradeLabel}` : ''}`
+
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Back
-      </Button>
+    <CheckoutShell onBack={flow.step === 'item' ? () => navigate(-1) : flow.back}>
+      {showChrome && (
+        <div className="mb-4 space-y-3">
+          <ProductChip
+            thumbnailUrl={view.thumbnailUrl}
+            name={view.name}
+            metaLine={chipMeta}
+            onOpen={() => setSheetOpen(true)}
+          />
+          <StepProgress current={flow.stepNumber} total={flow.totalSteps} label={STEP_LABELS[flow.step].toUpperCase()} />
+        </div>
+      )}
 
-      <h1 className="text-2xl font-bold flex items-center gap-2">
-        <ShoppingBag className="h-6 w-6" />
-        Checkout
-      </h1>
+      {flow.step === 'item' && (
+        <ItemStep
+          view={view}
+          quantity={flow.data.quantity}
+          onQuantityChange={(q) => flow.setData({ quantity: q })}
+          onProceed={flow.next}
+        />
+      )}
+      {flow.step === 'account' && <AccountStep onAuthed={flow.next} />}
+      {flow.step === 'address' && <AddressStep data={flow.data} setData={flow.setData} onContinue={flow.next} />}
+      {flow.step === 'schedule' && <ScheduleStep data={flow.data} setData={flow.setData} onContinue={flow.next} />}
+      {flow.step === 'payment' && <PaymentStep data={flow.data} setData={flow.setData} onContinue={flow.next} />}
+      {flow.step === 'review' && (
+        <ReviewStep
+          view={view}
+          data={flow.data}
+          addressLabel={flow.data.selectedAddressId ? 'Address' : 'Address'}
+          onEdit={flow.goTo}
+          onConfirm={handleConfirm}
+          placing={placing}
+        />
+      )}
 
-      {/* Product Summary */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center gap-4">
-            <div className="flex-1">
-              <h3 className="font-semibold">
-                {pm ? `${pm.brand} ${pm.model_name}` : sg.sell_group_code}
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                {pm?.short_description ?? ''}
-              </p>
-            </div>
-            <div className="text-right">
-              {gradeInfo && (
-                <Badge variant="outline" className={cn('text-xs', gradeInfo.color)}>
-                  Grade {gradeInfo.value}
-                </Badge>
-              )}
-              {discountAmount > 0 ? (
-                <div className="mt-1 flex items-baseline gap-1.5 justify-end">
-                  <p className="text-lg font-bold text-red-600 dark:text-red-400">{formatPrice(effectiveUnitPrice)}</p>
-                  <p className="text-xs text-muted-foreground line-through">{formatPrice(repSp)}</p>
-                </div>
-              ) : (
-                <p className="text-lg font-bold mt-1">{formatPrice(effectiveUnitPrice)}</p>
-              )}
-              <p className="text-xs text-muted-foreground">{stockCount} in stock</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <PhotoSheet
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        title={view.name}
+        subtitle={`${view.primaryItemCode} · GRADE ${view.gradeLabel} · ${formatPrice(view.effectiveUnitPrice)}`}
+        media={view.media}
+        backLabel={`Back to ${STEP_LABELS[flow.step].toLowerCase()}`}
+      />
+    </CheckoutShell>
+  )
+}
 
-      {/* Checkout Form */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Your Details</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="last_name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Last Name *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Tanaka" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="first_name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>First Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Taro" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+// This page serves both /shop/checkout/:sellGroupId and /order/:sellGroupCode.
+export default function CheckoutPage() {
+  const { sellGroupId, sellGroupCode } = useParams<{ sellGroupId?: string; sellGroupCode?: string }>()
+  const authState = useCustomerAuthProvider()
+  const { data: sgById } = useSellGroup(sellGroupId ?? '')
+  const { data: sgByCode } = useSellGroupByCode(sellGroupCode ?? '')
+  const sg = sgById ?? sgByCode
 
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email *</FormLabel>
-                      <FormControl>
-                        <Input type="email" placeholder="you@example.com" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="phone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Phone</FormLabel>
-                      <FormControl>
-                        <PhoneInput value={field.value ?? ''} onChange={field.onChange} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <AddressForm value={shippingAddress} onChange={setShippingAddress} required />
-
-              <FormField
-                control={form.control}
-                name="quantity"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Quantity</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={stockCount || 1}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Order Summary */}
-              <div className="border border-primary/20 bg-primary/5 rounded-lg p-4 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Unit price</span>
-                  <span>{formatPrice(repSp)}</span>
-                </div>
-                {discountAmount > 0 && (
-                  <div className="flex justify-between text-sm text-red-600 dark:text-red-400">
-                    <span>Discount</span>
-                    <span>−{formatPrice(discountAmount)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between text-sm">
-                  <span>Quantity</span>
-                  <span>&times; {watchQuantity || 1}</span>
-                </div>
-                <div className="flex justify-between font-bold text-lg border-t pt-2">
-                  <span>Total</span>
-                  <span>{formatPrice(totalPrice)}</span>
-                </div>
-              </div>
-
-              {stockCount === 0 && (
-                <p className="text-sm text-destructive text-center">
-                  This item is currently out of stock and cannot be ordered.
-                </p>
-              )}
-
-              <Button
-                type="submit"
-                className="w-full"
-                size="lg"
-                disabled={isPickingItems || createOrderMutation.isPending || stockCount === 0}
-              >
-                {isPickingItems || createOrderMutation.isPending ? 'Placing Order...' : `Place Order — ${formatPrice(totalPrice)}`}
-              </Button>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
-    </div>
+  return (
+    <CustomerAuthContext.Provider value={authState}>
+      <CheckoutInner sg={sg ?? null} isCode={!!sellGroupCode} />
+    </CustomerAuthContext.Provider>
   )
 }
