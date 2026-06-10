@@ -43,7 +43,10 @@ export function useSellGroupView(sg: unknown | null | undefined): SellGroupView 
       (i) => i.items?.item_status === 'AVAILABLE' && i.items?.condition_grade !== 'J',
     )
     const stockCount = available.length
-    const unitPrice = Number(items.map((i) => i.items?.selling_price).find((p) => p != null) ?? 0)
+    // Prefer an AVAILABLE item's price (consistent with stockCount); fall back to any
+    // item's price so an out-of-stock group still shows its price on the landing.
+    const priceSource = available.length > 0 ? available : items
+    const unitPrice = Number(priceSource.map((i) => i.items?.selling_price).find((p) => p != null) ?? 0)
     const discountAmount = Number(s.discount_amount ?? 0)
     const grade = s.condition_grade ?? null
     const gradeLabel = CONDITION_GRADES.find((g) => g.value === grade)?.value ?? (grade ?? '—')

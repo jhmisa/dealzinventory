@@ -43,6 +43,7 @@ function CheckoutInner({ sg, isCode }: { sg: unknown; isCode: boolean }) {
   }
 
   const handleConfirm = async () => {
+    if (placing || createOrder.isPending) return
     if (!customer || !flow.data.shippingAddress) {
       toast.error('Missing account or address')
       return
@@ -84,7 +85,9 @@ function CheckoutInner({ sg, isCode }: { sg: unknown; isCode: boolean }) {
   }
 
   // Confirmed screen has its own full-bleed layout (no chip/progress).
-  if (flow.step === 'confirmed' && orderCode) {
+  // Gate on orderCode alone so a successful order always lands here, even if the
+  // step-state update is ever scheduled separately from setOrderCode.
+  if (orderCode) {
     return (
       <CheckoutShell>
         <ConfirmedStep
