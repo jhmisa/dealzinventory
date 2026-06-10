@@ -173,12 +173,13 @@ export const YAMATO_TIME_SLOTS = [
 
 // Shop checkout payment methods. `fee` is INFORMATIONAL ONLY — surcharges are not
 // computed at checkout; staff apply the CC surcharge later (see orders.addCreditCardSurcharge).
+// Order = display order on the checkout Payment step.
 export const SHOP_PAYMENT_METHODS = [
-  { code: 'BANK_TRANSFER', label: 'Bank Transfer', sublabel: '振込', fee: 'NO FEE' },
   { code: 'COD', label: 'Cash on Delivery', sublabel: '代引き', fee: 'NO FEE' },
-  { code: 'CREDIT_CARD', label: 'Credit Card', sublabel: 'VISA · MASTER · JCB', fee: '+4%' },
   { code: 'KONBINI', label: 'Konbini', sublabel: 'コンビニ', fee: 'NO FEE' },
+  { code: 'CREDIT_CARD', label: 'Credit Card', sublabel: 'VISA · MASTER · JCB', fee: '+4%' },
   { code: 'PAYPAL', label: 'PayPal', sublabel: 'PAY IN USD / JPY', fee: '+5%' },
+  { code: 'BANK_TRANSFER', label: 'Bank Transfer', sublabel: '振込', fee: 'NO FEE' },
 ] as const
 
 export type ShopPaymentMethodCode = (typeof SHOP_PAYMENT_METHODS)[number]['code']

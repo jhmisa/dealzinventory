@@ -1,3 +1,4 @@
+import { Banknote, CreditCard, Landmark, Store, Wallet, type LucideIcon } from 'lucide-react'
 import { SHOP_PAYMENT_METHODS } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 import { SelectableCard } from '../selectable-card'
@@ -11,6 +12,14 @@ interface PaymentStepProps {
   onContinue: () => void
 }
 
+const PAYMENT_ICONS: Record<string, LucideIcon> = {
+  COD: Banknote,
+  KONBINI: Store,
+  CREDIT_CARD: CreditCard,
+  PAYPAL: Wallet,
+  BANK_TRANSFER: Landmark,
+}
+
 export function PaymentStep({ data, setData, onContinue }: PaymentStepProps) {
   return (
     <CheckoutStepLayout cta={<StickyCta label="Review order" onClick={onContinue} disabled={!data.paymentMethod} />}>
@@ -20,6 +29,7 @@ export function PaymentStep({ data, setData, onContinue }: PaymentStepProps) {
       <div className="space-y-3">
         {SHOP_PAYMENT_METHODS.map((m) => {
           const isFee = m.fee !== 'NO FEE'
+          const Icon = PAYMENT_ICONS[m.code]
           return (
             <SelectableCard
               key={m.code}
@@ -28,9 +38,16 @@ export function PaymentStep({ data, setData, onContinue }: PaymentStepProps) {
               showSelectedLabel={false}
             >
               <span className="flex items-center justify-between gap-2">
-                <span className="min-w-0">
-                  <span className="block font-brand text-base font-semibold text-brand-ink">{m.label}</span>
-                  <span className="block font-data text-xs uppercase tracking-wider text-brand-umber">{m.sublabel}</span>
+                <span className="flex min-w-0 items-center gap-3">
+                  {Icon && (
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-ash/10 text-brand-ink">
+                      <Icon className="h-5 w-5" strokeWidth={1.75} />
+                    </span>
+                  )}
+                  <span className="min-w-0">
+                    <span className="block font-brand text-base font-semibold text-brand-ink">{m.label}</span>
+                    <span className="block font-data text-xs uppercase tracking-wider text-brand-umber">{m.sublabel}</span>
+                  </span>
                 </span>
                 <span
                   className={cn(
