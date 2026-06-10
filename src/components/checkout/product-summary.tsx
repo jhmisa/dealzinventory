@@ -48,27 +48,25 @@ export function ProductSummary({ view, headerAction, quantity, onQuantityChange 
           <span className="font-brand text-sm text-brand-ash">tax incl.</span>
         </div>
         {showQty && (
-          <div className="flex shrink-0 items-center gap-2">
-            <span className="font-data text-[11px] uppercase tracking-wider text-brand-umber">Qty</span>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                aria-label="Decrease quantity"
-                onClick={() => onQuantityChange(Math.max(1, quantity - 1))}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-ash/15"
-              >
-                <Minus className="h-4 w-4" />
-              </button>
-              <span className="w-5 text-center font-data text-sm font-bold">{quantity}</span>
-              <button
-                type="button"
-                aria-label="Increase quantity"
-                onClick={() => onQuantityChange(Math.min(view.stockCount || 1, quantity + 1))}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-ash/15"
-              >
-                <Plus className="h-4 w-4" />
-              </button>
-            </div>
+          <div className="flex shrink-0 items-center gap-1.5 rounded-full bg-white py-1 pl-3 pr-1 shadow-sm">
+            <span className="mr-0.5 font-data text-[11px] uppercase tracking-wider text-brand-umber">Qty</span>
+            <button
+              type="button"
+              aria-label="Decrease quantity"
+              onClick={() => onQuantityChange(Math.max(1, quantity - 1))}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-ash/15"
+            >
+              <Minus className="h-4 w-4" />
+            </button>
+            <span className="w-5 text-center font-data text-sm font-bold">{quantity}</span>
+            <button
+              type="button"
+              aria-label="Increase quantity"
+              onClick={() => onQuantityChange(Math.min(view.stockCount || 1, quantity + 1))}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-ash/15"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
           </div>
         )}
       </div>
