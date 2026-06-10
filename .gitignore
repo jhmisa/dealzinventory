@@ -45,3 +45,12 @@ supabase/.temp/
 Screenshots/
 /invoice-before.png
 /invoice-after.png
+
+# Backup outputs and credentials (see scripts/backup/)
+backups/
+.env.backup
+.env.restore
+*.dump
+*.tar.zst
+*.age
+*.enc

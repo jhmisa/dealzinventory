@@ -42,6 +42,39 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* MONO brand system — "quiet confidence". Used only by marketing/site
+     pages (src/components/marketing, src/pages/site). Admin/shop unaffected. */
+  --color-brand-ink: #16140f;
+  --color-brand-umber: #4a463e;
+  --color-brand-ash: #a39e92;
+  --color-brand-paper: #f3f1ec;
+  --color-brand-signal: #ff2d16;
+  --font-brand: 'Sora', 'Noto Sans JP', ui-sans-serif, system-ui, sans-serif;
+  --font-data: 'Space Mono', ui-monospace, 'SFMono-Regular', monospace;
+  /* Logo wordmark/mark only. Nexa is a commercial font (self-hosted, see
+     @font-face below + public/fonts/nexa/) and falls back to Montserrat. */
+  --font-logo: 'Nexa', 'Montserrat', 'Sora', 'Noto Sans JP', ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Nexa — logo typeface. Drop the licensed font files into public/fonts/nexa/
+   with these exact names (woff2 preferred). Until present, the logo falls
+   back to Bricolage Grotesque automatically. See docs/BRAND.md. */
+@font-face {
+  font-family: 'Nexa';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/nexa/nexa-bold.woff2') format('woff2'),
+    url('/fonts/nexa/nexa-bold.woff') format('woff');
+}
+@font-face {
+  font-family: 'Nexa';
+  font-style: normal;
+  font-weight: 800 900;
+  font-display: swap;
+  src: url('/fonts/nexa/nexa-heavy.woff2') format('woff2'),
+    url('/fonts/nexa/nexa-heavy.woff') format('woff');
 }
 
 :root {

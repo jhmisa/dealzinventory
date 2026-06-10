@@ -230,6 +230,24 @@ PENDING → CONFIRMED → PACKED → SHIPPED → DELIVERED
 - **Realtime** subscriptions for: shop page stock counts, order status changes
 - **Edge Functions** for: code generation, customer auth, Kaitori quote calculation, item reservation
 
+### Data API grants on new `public` tables
+
+After **Oct 30, 2026**, Supabase stops auto-granting Data API roles (`anon`, `authenticated`, `service_role`) on newly created tables in `public`. Migration `20260528000000_explicit_public_grants.sql` sets `ALTER DEFAULT PRIVILEGES` for the `postgres` role, so any new table created by a future migration inherits the grants automatically — no per-table boilerplate required.
+
+If a new table is created by a *different* role, or you want to be explicit, add this to the migration alongside RLS:
+
+```sql
+GRANT ALL ON public.my_new_table TO anon, authenticated, service_role;
+-- (RLS still gates actual row access)
+```
+
+For sequences:
+```sql
+GRANT USAGE, SELECT ON SEQUENCE public.my_new_table_id_seq TO anon, authenticated, service_role;
+```
+
+Background: https://github.com/orgs/supabase/discussions/45329
+
 ---
 
 ## MCP Servers
