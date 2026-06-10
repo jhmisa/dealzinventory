@@ -22,6 +22,8 @@ interface PhoneInputProps {
   onChange: (e164: string) => void
   placeholder?: string
   className?: string
+  /** Extra classes for the inner number input + country trigger (e.g. checkout white-field style). */
+  inputClassName?: string
   disabled?: boolean
 }
 
@@ -30,6 +32,7 @@ export function PhoneInput({
   onChange,
   placeholder,
   className,
+  inputClassName,
   disabled,
 }: PhoneInputProps) {
   const [open, setOpen] = useState(false)
@@ -109,7 +112,8 @@ export function PhoneInput({
               'hover:bg-accent hover:text-accent-foreground',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
               'disabled:cursor-not-allowed disabled:opacity-50',
-              'shrink-0'
+              'shrink-0',
+              inputClassName
             )}
           >
             <span>{country?.flag}</span>
@@ -158,7 +162,7 @@ export function PhoneInput({
         onChange={(e) => handleDigitsChange(e.target.value)}
         placeholder={placeholder ?? (country?.code === 'JP' ? '90-1234-5678' : '')}
         disabled={disabled}
-        className="flex-1"
+        className={cn('flex-1', inputClassName)}
       />
     </div>
   )

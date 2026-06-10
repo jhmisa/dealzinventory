@@ -1,11 +1,13 @@
 import { useState } from 'react'
-import { LogIn, UserPlus } from 'lucide-react'
+import { Eye, EyeOff, LogIn, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
 import { useCustomerAuth } from '@/hooks/use-customer-auth'
+import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { PhoneInput } from '@/components/shared/phone-input'
 import { StickyCta } from '../sticky-cta'
 import { CheckoutStepLayout } from '../step-layout'
+import { CHECKOUT_FIELD_CLASS } from '../field-styles'
 
 interface AccountStepProps {
   onAuthed: () => void
@@ -21,6 +23,7 @@ export function AccountStep({ onAuthed }: AccountStepProps) {
   const [emailOrPhone, setEmailOrPhone] = useState('')
   const [phone, setPhone] = useState('')
   const [pin, setPin] = useState('')
+  const [showPin, setShowPin] = useState(false)
 
   const handleLogin = async () => {
     try {
@@ -78,21 +81,35 @@ export function AccountStep({ onAuthed }: AccountStepProps) {
       </h1>
       <p className="mb-5 font-brand text-sm text-brand-umber">Last name + email/phone + 6-digit PIN.</p>
       <div className="space-y-3">
-        <Input placeholder="Last name" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+        <Input className={CHECKOUT_FIELD_CLASS} placeholder="Last name" value={lastName} onChange={(e) => setLastName(e.target.value)} />
         {mode === 'register' && (
-          <Input placeholder="First name (optional)" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+          <Input className={CHECKOUT_FIELD_CLASS} placeholder="First name (optional)" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
         )}
-        <Input placeholder="Email or phone" value={emailOrPhone} onChange={(e) => setEmailOrPhone(e.target.value)} />
+        <Input className={CHECKOUT_FIELD_CLASS} placeholder="Email or phone" value={emailOrPhone} onChange={(e) => setEmailOrPhone(e.target.value)} />
         {mode === 'register' && !emailOrPhone.includes('@') ? null : mode === 'register' ? (
-          <PhoneInput value={phone} onChange={setPhone} />
+          <PhoneInput value={phone} onChange={setPhone} inputClassName={CHECKOUT_FIELD_CLASS} />
         ) : null}
-        <Input
-          placeholder="6-digit PIN"
-          inputMode="numeric"
-          maxLength={6}
-          value={pin}
-          onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-        />
+        <div className="relative">
+          <Input
+            className={cn(CHECKOUT_FIELD_CLASS, 'pr-12 tracking-[0.3em]')}
+            type={showPin ? 'text' : 'password'}
+            placeholder="6-digit PIN"
+            inputMode="numeric"
+            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+            maxLength={6}
+            value={pin}
+            onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPin((s) => !s)}
+            aria-label={showPin ? 'Hide PIN' : 'Show PIN'}
+            aria-pressed={showPin}
+            className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-brand-ash transition hover:text-brand-ink"
+          >
+            {showPin ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        </div>
       </div>
     </CheckoutStepLayout>
   )

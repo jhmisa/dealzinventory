@@ -13,6 +13,7 @@ import { AddressCard } from '../address-card'
 import { SelectableCard } from '../selectable-card'
 import { StickyCta } from '../sticky-cta'
 import { CheckoutStepLayout } from '../step-layout'
+import { CHECKOUT_FIELD_CLASS } from '../field-styles'
 import type { CheckoutData } from '../types'
 
 interface AddressStepProps {
@@ -140,17 +141,19 @@ export function AddressStep({ data, setData, onContinue }: AddressStepProps) {
       {data.receiverMode === 'other' && (
         <div className="mt-3 grid grid-cols-2 gap-3">
           <Input
+            className={CHECKOUT_FIELD_CLASS}
             placeholder="First name"
             value={data.receiverFirstName}
             onChange={(e) => setData({ receiverFirstName: e.target.value })}
           />
           <Input
+            className={CHECKOUT_FIELD_CLASS}
             placeholder="Last name"
             value={data.receiverLastName}
             onChange={(e) => setData({ receiverLastName: e.target.value })}
           />
           <div className="col-span-2">
-            <PhoneInput value={data.receiverPhone} onChange={(v) => setData({ receiverPhone: v })} />
+            <PhoneInput value={data.receiverPhone} onChange={(v) => setData({ receiverPhone: v })} inputClassName={CHECKOUT_FIELD_CLASS} />
           </div>
         </div>
       )}
