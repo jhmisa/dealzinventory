@@ -371,6 +371,7 @@ interface ManualOrderInput {
   receiver_first_name?: string | null
   receiver_last_name?: string | null
   receiver_phone?: string | null
+  payment_method?: string | null
   items: {
     item_id: string | null
     accessory_id?: string | null
@@ -407,6 +408,7 @@ export async function createManualOrder(input: ManualOrderInput) {
       receiver_first_name: input.receiver_first_name ?? null,
       receiver_last_name: input.receiver_last_name ?? null,
       receiver_phone: input.receiver_phone ?? null,
+      payment_method: input.payment_method ?? null,
       sell_group_id: null,
     })
     .select()
