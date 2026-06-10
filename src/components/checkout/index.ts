@@ -1,4 +1,5 @@
 export { useCheckoutFlow } from './use-checkout-flow'
+export { CheckoutStepLayout } from './step-layout'
 export * from './types'
 export { CheckoutShell } from './checkout-shell'
 export { StepProgress } from './step-progress'

@@ -2,6 +2,7 @@ import { SHOP_PAYMENT_METHODS } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 import { SelectableCard } from '../selectable-card'
 import { StickyCta } from '../sticky-cta'
+import { CheckoutStepLayout } from '../step-layout'
 import type { CheckoutData } from '../types'
 
 interface PaymentStepProps {
@@ -12,7 +13,7 @@ interface PaymentStepProps {
 
 export function PaymentStep({ data, setData, onContinue }: PaymentStepProps) {
   return (
-    <div className="flex flex-1 flex-col">
+    <CheckoutStepLayout cta={<StickyCta label="Review order" onClick={onContinue} disabled={!data.paymentMethod} />}>
       <h1 className="mb-1 font-brand text-2xl font-extrabold tracking-tight text-brand-ink">How will you pay?</h1>
       <p className="mb-5 font-brand text-sm text-brand-umber">Pick a payment method — pay after we confirm.</p>
 
@@ -47,8 +48,6 @@ export function PaymentStep({ data, setData, onContinue }: PaymentStepProps) {
       <p className="mt-3 font-brand text-xs text-brand-ash">
         Card &amp; PayPal fees are confirmed by our team before you pay — not charged here.
       </p>
-
-      <StickyCta label="Review order" onClick={onContinue} disabled={!data.paymentMethod} />
-    </div>
+    </CheckoutStepLayout>
   )
 }

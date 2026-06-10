@@ -3,6 +3,7 @@ import { serializeAddress } from '@/lib/address-types'
 import { SHOP_PAYMENT_METHODS, YAMATO_TIME_SLOTS } from '@/lib/constants'
 import { formatPrice } from '@/lib/utils'
 import { StickyCta } from '../sticky-cta'
+import { CheckoutStepLayout } from '../step-layout'
 import type { CheckoutData, CheckoutStep } from '../types'
 import type { SellGroupView } from '../use-sell-group-view'
 
@@ -47,7 +48,7 @@ export function ReviewStep({ view, data, addressLabel, onEdit, onConfirm, placin
   const addrEn = data.shippingAddress ? serializeAddress(data.shippingAddress, 'en') : ''
 
   return (
-    <div className="flex flex-1 flex-col">
+    <CheckoutStepLayout cta={<StickyCta label={`Confirm order · ${formatPrice(total)}`} onClick={onConfirm} loading={placing} />}>
       <h1 className="mb-1 font-brand text-2xl font-extrabold tracking-tight text-brand-ink">Quick check before you order</h1>
       <p className="mb-4 font-brand text-sm text-brand-umber">Tap any line to edit.</p>
 
@@ -82,8 +83,6 @@ export function ReviewStep({ view, data, addressLabel, onEdit, onConfirm, placin
           <span className="font-data text-xl font-bold text-brand-ink">{formatPrice(total)}</span>
         </div>
       </div>
-
-      <StickyCta label={`Confirm order · ${formatPrice(total)}`} onClick={onConfirm} loading={placing} />
-    </div>
+    </CheckoutStepLayout>
   )
 }

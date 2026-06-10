@@ -2,6 +2,7 @@ import { Calendar } from 'lucide-react'
 import { YAMATO_TIME_SLOTS } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 import { StickyCta } from '../sticky-cta'
+import { CheckoutStepLayout } from '../step-layout'
 import type { CheckoutData } from '../types'
 
 interface ScheduleStepProps {
@@ -13,7 +14,7 @@ interface ScheduleStepProps {
 export function ScheduleStep({ data, setData, onContinue }: ScheduleStepProps) {
   const todayStr = new Date().toISOString().split('T')[0]
   return (
-    <div className="flex flex-1 flex-col">
+    <CheckoutStepLayout cta={<StickyCta label="Continue to payment" onClick={onContinue} disabled={!data.deliveryDate || !data.deliveryTimeCode} />}>
       <h1 className="mb-1 font-brand text-2xl font-extrabold tracking-tight text-brand-ink">When do you want it?</h1>
       <p className="mb-5 font-brand text-sm text-brand-umber">Choose a delivery date, then a time.</p>
 
@@ -52,12 +53,6 @@ export function ScheduleStep({ data, setData, onContinue }: ScheduleStepProps) {
           )
         })}
       </div>
-
-      <StickyCta
-        label="Continue to payment"
-        onClick={onContinue}
-        disabled={!data.deliveryDate || !data.deliveryTimeCode}
-      />
-    </div>
+    </CheckoutStepLayout>
   )
 }

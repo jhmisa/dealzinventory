@@ -12,6 +12,7 @@ import { PhoneInput } from '@/components/shared/phone-input'
 import { AddressCard } from '../address-card'
 import { SelectableCard } from '../selectable-card'
 import { StickyCta } from '../sticky-cta'
+import { CheckoutStepLayout } from '../step-layout'
 import type { CheckoutData } from '../types'
 
 interface AddressStepProps {
@@ -74,24 +75,16 @@ export function AddressStep({ data, setData, onContinue }: AddressStepProps) {
 
   if (adding) {
     return (
-      <div className="flex flex-1 flex-col">
+      <CheckoutStepLayout cta={<StickyCta label="Save address" showArrow={false} onClick={handleSave} disabled={!draft} loading={saving} secondary={{ label: 'Cancel', onClick: () => { setAdding(false); setDraft(null) } }} />}>
         <h1 className="mb-1 font-brand text-2xl font-extrabold tracking-tight text-brand-ink">Add a new address</h1>
         <p className="mb-4 font-brand text-sm text-brand-umber">Enter your postal code — we'll fill the rest.</p>
         <AddressForm value={draft} onChange={setDraft} required />
-        <StickyCta
-          label="Save address"
-          showArrow={false}
-          onClick={handleSave}
-          disabled={!draft}
-          loading={saving}
-          secondary={{ label: 'Cancel', onClick: () => { setAdding(false); setDraft(null) } }}
-        />
-      </div>
+      </CheckoutStepLayout>
     )
   }
 
   return (
-    <div className="flex flex-1 flex-col">
+    <CheckoutStepLayout cta={<StickyCta label="Continue to schedule" onClick={onContinue} disabled={!canContinue} />}>
       <h1 className="mb-1 font-brand text-2xl font-extrabold tracking-tight text-brand-ink">Where should we ship?</h1>
       <p className="mb-4 font-brand text-sm text-brand-umber">Tap an address to choose it.</p>
 
@@ -161,8 +154,6 @@ export function AddressStep({ data, setData, onContinue }: AddressStepProps) {
           </div>
         </div>
       )}
-
-      <StickyCta label="Continue to schedule" onClick={onContinue} disabled={!canContinue} />
-    </div>
+    </CheckoutStepLayout>
   )
 }

@@ -5,6 +5,7 @@ import { useCustomerAuth } from '@/hooks/use-customer-auth'
 import { Input } from '@/components/ui/input'
 import { PhoneInput } from '@/components/shared/phone-input'
 import { StickyCta } from '../sticky-cta'
+import { CheckoutStepLayout } from '../step-layout'
 
 interface AccountStepProps {
   onAuthed: () => void
@@ -48,7 +49,7 @@ export function AccountStep({ onAuthed }: AccountStepProps) {
 
   if (mode === 'choice') {
     return (
-      <div className="flex flex-1 flex-col">
+      <CheckoutStepLayout cta={<StickyCta label="Create an account" showArrow={false} onClick={() => setMode('register')} secondary={{ label: 'I already have an account', onClick: () => setMode('login') }} />}>
         <h1 className="mb-1 font-brand text-2xl font-extrabold tracking-tight text-brand-ink">
           Let's set up your order
         </h1>
@@ -60,13 +61,7 @@ export function AccountStep({ onAuthed }: AccountStepProps) {
           <p className="font-brand text-sm text-brand-ink">✓ Track your order &amp; delivery</p>
           <p className="font-brand text-sm text-brand-ink">✓ One account to buy &amp; to sell (kaitori)</p>
         </div>
-        <StickyCta
-          label="Create an account"
-          showArrow={false}
-          onClick={() => setMode('register')}
-          secondary={{ label: 'I already have an account', onClick: () => setMode('login') }}
-        />
-      </div>
+      </CheckoutStepLayout>
     )
   }
 
@@ -77,7 +72,7 @@ export function AccountStep({ onAuthed }: AccountStepProps) {
   const submit = mode === 'login' ? handleLogin : handleRegister
 
   return (
-    <div className="flex flex-1 flex-col">
+    <CheckoutStepLayout cta={<StickyCta label={cta} showArrow={false} onClick={submit} disabled={!canSubmit} loading={isLoading} secondary={{ label: mode === 'login' ? 'Create an account instead' : 'I already have an account', onClick: () => setMode(mode === 'login' ? 'register' : 'login') }} />}>
       <h1 className="mb-1 flex items-center gap-2 font-brand text-2xl font-extrabold tracking-tight text-brand-ink">
         {mode === 'login' ? <LogIn className="h-5 w-5" /> : <UserPlus className="h-5 w-5" />} {title}
       </h1>
@@ -99,17 +94,6 @@ export function AccountStep({ onAuthed }: AccountStepProps) {
           onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
         />
       </div>
-      <StickyCta
-        label={cta}
-        showArrow={false}
-        onClick={submit}
-        disabled={!canSubmit}
-        loading={isLoading}
-        secondary={{
-          label: mode === 'login' ? 'Create an account instead' : 'I already have an account',
-          onClick: () => setMode(mode === 'login' ? 'register' : 'login'),
-        }}
-      />
-    </div>
+    </CheckoutStepLayout>
   )
 }

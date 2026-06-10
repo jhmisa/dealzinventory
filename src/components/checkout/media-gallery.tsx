@@ -59,7 +59,7 @@ export function MediaGallery({ media, variant = 'full' }: MediaGalleryProps) {
       </div>
 
       {/* Viewer */}
-      <div className={cn('relative overflow-hidden rounded-2xl bg-brand-ash/15', variant === 'full' ? 'aspect-square' : 'aspect-[4/3]')}>
+      <div className={cn('relative overflow-hidden rounded-2xl bg-brand-ash/15', variant === 'full' ? 'aspect-[4/3]' : 'aspect-video')}>
         {tab === 'videos' && (
           <span className="absolute left-3 top-3 z-10 flex items-center gap-1 rounded-full bg-black/70 px-2 py-1 font-data text-[10px] uppercase tracking-wider text-white">
             <span className="h-1.5 w-1.5 rounded-full bg-brand-signal" /> Tested Live

@@ -106,7 +106,7 @@ function CheckoutInner({ sg, isCode }: { sg: unknown; isCode: boolean }) {
   return (
     <CheckoutShell onBack={flow.step === 'item' ? () => navigate(-1) : flow.back}>
       {showChrome && (
-        <div className="mb-4 space-y-3">
+        <div className="mb-4 shrink-0 space-y-3">
           <ProductChip
             thumbnailUrl={view.thumbnailUrl}
             name={view.name}

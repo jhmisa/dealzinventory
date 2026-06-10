@@ -8,9 +8,9 @@ interface CheckoutShellProps {
 
 export function CheckoutShell({ onBack, children }: CheckoutShellProps) {
   return (
-    <div className="min-h-dvh bg-brand-paper font-brand text-brand-ink">
-      <div className="mx-auto flex min-h-dvh w-full max-w-[420px] flex-col px-5">
-        <header className="flex items-center justify-between py-3">
+    <div className="h-dvh overflow-hidden bg-brand-paper font-brand text-brand-ink">
+      <div className="mx-auto flex h-full w-full max-w-[420px] flex-col px-5">
+        <header className="flex shrink-0 items-center justify-between py-3">
           <button
             type="button"
             onClick={onBack}
@@ -24,7 +24,7 @@ export function CheckoutShell({ onBack, children }: CheckoutShellProps) {
             <HelpCircle className="h-5 w-5 text-brand-ash" />
           </span>
         </header>
-        <main className="flex flex-1 flex-col pb-2">{children}</main>
+        <main className="flex min-h-0 flex-1 flex-col">{children}</main>
       </div>
     </div>
   )

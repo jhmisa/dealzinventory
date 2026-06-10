@@ -20,7 +20,7 @@ export function StickyCta({
   secondary,
 }: StickyCtaProps) {
   return (
-    <div className="sticky bottom-0 z-10 -mx-5 mt-auto bg-gradient-to-t from-brand-paper via-brand-paper to-transparent px-5 pb-[max(16px,env(safe-area-inset-bottom))] pt-4">
+    <div className="-mx-5 shrink-0 border-t border-brand-ash/15 bg-brand-paper px-5 pb-[max(16px,env(safe-area-inset-bottom))] pt-3">
       <button
         type="button"
         onClick={onClick}

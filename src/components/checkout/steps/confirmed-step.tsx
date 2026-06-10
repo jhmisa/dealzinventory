@@ -9,7 +9,7 @@ interface ConfirmedStepProps {
 
 export function ConfirmedStep({ orderCode, firstName, onTrack, onBackToShop }: ConfirmedStepProps) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center text-center">
+    <div className="flex min-h-0 flex-1 flex-col items-center justify-center text-center">
       <div className="relative mb-6">
         <div className="flex h-24 w-24 items-center justify-center rounded-full bg-brand-ink">
           <Check className="h-11 w-11 text-brand-paper" />
