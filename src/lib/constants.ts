@@ -179,7 +179,7 @@ export const SHOP_PAYMENT_METHODS = [
   { code: 'KONBINI', label: 'Konbini', sublabel: 'コンビニ', fee: 'NO FEE' },
   { code: 'CREDIT_CARD', label: 'Credit Card', sublabel: 'VISA · MASTER · JCB', fee: '+4%' },
   { code: 'PAYPAL', label: 'PayPal', sublabel: 'PAY IN USD / JPY', fee: '+5%' },
-  { code: 'BANK_TRANSFER', label: 'Bank Transfer', sublabel: '振込', fee: 'NO FEE' },
+  { code: 'BANK', label: 'Bank Transfer', sublabel: '振込', fee: 'NO FEE' },
 ] as const
 
 export type ShopPaymentMethodCode = (typeof SHOP_PAYMENT_METHODS)[number]['code']

@@ -17,7 +17,7 @@ const PAYMENT_ICONS: Record<string, LucideIcon> = {
   KONBINI: Store,
   CREDIT_CARD: CreditCard,
   PAYPAL: Wallet,
-  BANK_TRANSFER: Landmark,
+  BANK: Landmark,
 }
 
 export function PaymentStep({ data, setData, onContinue }: PaymentStepProps) {

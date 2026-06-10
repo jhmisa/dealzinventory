@@ -465,6 +465,39 @@ export async function createManualOrder(input: ManualOrderInput) {
   return order as Order
 }
 
+// --- Public Shop Order Placement ---
+
+export interface PlaceShopOrderInput {
+  customer_id: string
+  order_source: string
+  sell_group_id: string
+  quantity: number
+  shipping_address: string
+  delivery_date?: string | null
+  delivery_time_code?: string | null
+  payment_method?: string | null
+  receiver_first_name?: string | null
+  receiver_last_name?: string | null
+  receiver_phone?: string | null
+}
+
+/**
+ * Place an order from the public shop checkout.
+ *
+ * Customers use the custom PIN auth (not Supabase Auth), so the anon client
+ * cannot insert into `orders`/`order_items` (RLS is staff-only). This calls the
+ * `place-shop-order` edge function, which runs with the service role and
+ * re-derives price + availability server-side.
+ */
+export async function placeShopOrder(
+  input: PlaceShopOrderInput,
+): Promise<{ order_code: string; order_id: string }> {
+  const { data, error } = await supabase.functions.invoke('place-shop-order', { body: input })
+  if (error) throw error
+  if (data?.error) throw new Error(data.error)
+  return data as { order_code: string; order_id: string }
+}
+
 // --- Order Editing ---
 
 export async function updateOrderLineItem(

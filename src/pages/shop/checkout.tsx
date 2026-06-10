@@ -4,8 +4,7 @@ import { toast } from 'sonner'
 import { CustomerAuthContext, useCustomerAuthProvider, useCustomerAuth } from '@/hooks/use-customer-auth'
 import { useSellGroup } from '@/hooks/use-sell-groups'
 import { useSellGroupByCode } from '@/hooks/use-shop'
-import { useCreateManualOrder } from '@/hooks/use-orders'
-import { pickAvailableItemsFromSellGroup } from '@/services/orders'
+import { placeShopOrder } from '@/services/orders'
 import { formatPrice } from '@/lib/utils'
 import {
   CheckoutShell,
@@ -29,7 +28,6 @@ function CheckoutInner({ sg, isCode }: { sg: unknown; isCode: boolean }) {
   const { customer, isAuthenticated } = useCustomerAuth()
   const flow = useCheckoutFlow(isAuthenticated)
   const view = useSellGroupView(sg)
-  const createOrder = useCreateManualOrder()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [orderCode, setOrderCode] = useState<string | null>(null)
   const [placing, setPlacing] = useState(false)
@@ -43,43 +41,32 @@ function CheckoutInner({ sg, isCode }: { sg: unknown; isCode: boolean }) {
   }
 
   const handleConfirm = async () => {
-    if (placing || createOrder.isPending) return
+    if (placing) return
     if (!customer || !flow.data.shippingAddress) {
       toast.error('Missing account or address')
       return
     }
     setPlacing(true)
     try {
-      const items = await pickAvailableItemsFromSellGroup(
-        (sg as { id: string }).id,
-        flow.data.quantity,
-      )
       const isOther = flow.data.receiverMode === 'other'
-      createOrder.mutate(
-        {
-          customer_id: customer.id,
-          order_source: isCode ? 'LIVE_SELLING' : 'SHOP',
-          shipping_address: JSON.stringify(flow.data.shippingAddress),
-          shipping_cost: 0,
-          delivery_date: flow.data.deliveryDate,
-          delivery_time_code: flow.data.deliveryTimeCode,
-          payment_method: flow.data.paymentMethod,
-          receiver_first_name: isOther ? flow.data.receiverFirstName : null,
-          receiver_last_name: isOther ? flow.data.receiverLastName : null,
-          receiver_phone: isOther ? flow.data.receiverPhone : null,
-          items,
-        },
-        {
-          onSuccess: (order) => {
-            setOrderCode(order.order_code)
-            flow.goTo('confirmed')
-          },
-          onError: (e) => toast.error(`Order failed: ${e.message}`),
-          onSettled: () => setPlacing(false),
-        },
-      )
+      const result = await placeShopOrder({
+        customer_id: customer.id,
+        order_source: isCode ? 'LIVE_SELLING' : 'SHOP',
+        sell_group_id: (sg as { id: string }).id,
+        quantity: flow.data.quantity,
+        shipping_address: JSON.stringify(flow.data.shippingAddress),
+        delivery_date: flow.data.deliveryDate,
+        delivery_time_code: flow.data.deliveryTimeCode,
+        payment_method: flow.data.paymentMethod,
+        receiver_first_name: isOther ? flow.data.receiverFirstName : null,
+        receiver_last_name: isOther ? flow.data.receiverLastName : null,
+        receiver_phone: isOther ? flow.data.receiverPhone : null,
+      })
+      setOrderCode(result.order_code)
+      flow.goTo('confirmed')
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to reserve items')
+      toast.error(`Order failed: ${e instanceof Error ? e.message : 'Unknown error'}`)
+    } finally {
       setPlacing(false)
     }
   }
