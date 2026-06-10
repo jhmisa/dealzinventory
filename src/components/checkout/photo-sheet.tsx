@@ -8,38 +8,57 @@ interface PhotoSheetProps {
   subtitle: string // e.g. "P000315 · GRADE B · ¥16,900"
   media: CheckoutMedia[]
   backLabel: string // e.g. "Back to shipping"
+  /** Spec line / short description shown below the media so specs + photos are viewable together. */
+  description?: string
 }
 
-export function PhotoSheet({ open, onClose, title, subtitle, media, backLabel }: PhotoSheetProps) {
+export function PhotoSheet({ open, onClose, title, subtitle, media, backLabel, description }: PhotoSheetProps) {
   if (!open) return null
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/40" onClick={onClose}>
       <div
-        className="max-h-[88vh] overflow-y-auto rounded-t-3xl bg-brand-paper px-5 pb-[max(16px,env(safe-area-inset-bottom))] pt-3"
+        className="flex h-[90dvh] flex-col rounded-t-3xl bg-brand-paper"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-brand-ash/40" />
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="font-brand text-lg font-bold text-brand-ink">{title}</h2>
-            <p className="font-data text-xs uppercase tracking-wider text-brand-umber">{subtitle}</p>
+        {/* Header (pinned) */}
+        <div className="shrink-0 px-5 pt-3">
+          <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-brand-ash/40" />
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="font-brand text-lg font-bold text-brand-ink">{title}</h2>
+              <p className="font-data text-xs uppercase tracking-wider text-brand-umber">{subtitle}</p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-ash/20"
+            >
+              <X className="h-4 w-4 text-brand-ink" />
+            </button>
           </div>
+        </div>
+
+        {/* Scrollable media + specs */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-2">
+          <MediaGallery media={media} variant="sheet" />
+          {description && (
+            <div className="mt-4">
+              <p className="mb-1 font-data text-[11px] uppercase tracking-[0.12em] text-brand-ash">Specs</p>
+              <p className="font-brand text-sm leading-relaxed text-brand-umber">{description}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Back button (pinned) */}
+        <div className="shrink-0 border-t border-brand-ash/15 px-5 pb-[max(16px,env(safe-area-inset-bottom))] pt-3">
           <button
             type="button"
             onClick={onClose}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-ash/20"
+            className="h-[52px] w-full rounded-2xl bg-brand-ink font-brand text-base font-semibold text-brand-paper"
           >
-            <X className="h-4 w-4 text-brand-ink" />
+            {backLabel}
           </button>
         </div>
-        <MediaGallery media={media} variant="sheet" />
-        <button
-          type="button"
-          onClick={onClose}
-          className="mt-4 h-[52px] w-full rounded-2xl bg-brand-ink font-brand text-base font-semibold text-brand-paper"
-        >
-          {backLabel}
-        </button>
       </div>
     </div>
   )

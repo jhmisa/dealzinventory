@@ -59,7 +59,7 @@ export function MediaGallery({ media, variant = 'full' }: MediaGalleryProps) {
       </div>
 
       {/* Viewer */}
-      <div className={cn('relative overflow-hidden rounded-2xl bg-brand-ash/15', variant === 'full' ? 'aspect-[4/3]' : 'aspect-video')}>
+      <div className={cn('relative overflow-hidden rounded-2xl bg-brand-ash/15', variant === 'full' ? 'aspect-[4/3]' : 'aspect-square')}>
         {tab === 'videos' && (
           <span className="absolute left-3 top-3 z-10 flex items-center gap-1 rounded-full bg-black/70 px-2 py-1 font-data text-[10px] uppercase tracking-wider text-white">
             <span className="h-1.5 w-1.5 rounded-full bg-brand-signal" /> Tested Live
@@ -67,13 +67,13 @@ export function MediaGallery({ media, variant = 'full' }: MediaGalleryProps) {
         )}
         {active ? (
           active.type === 'image' ? (
-            <img src={active.url} alt="" className="h-full w-full object-cover" />
+            <img src={active.url} alt="" className={cn('h-full w-full', variant === 'sheet' ? 'object-contain' : 'object-cover')} />
           ) : (
             <div className="relative h-full w-full">
               <video
                 ref={videoRef}
                 src={active.url}
-                className="h-full w-full object-cover"
+                className={cn('h-full w-full', variant === 'sheet' ? 'object-contain' : 'object-cover')}
                 controls={playing}
                 playsInline
                 preload="metadata"

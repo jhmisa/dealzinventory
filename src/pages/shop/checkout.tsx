@@ -146,6 +146,7 @@ function CheckoutInner({ sg, isCode }: { sg: unknown; isCode: boolean }) {
         title={view.name}
         subtitle={`${view.primaryItemCode} · GRADE ${view.gradeLabel} · ${formatPrice(view.effectiveUnitPrice)}`}
         media={view.media}
+        description={view.shortDescription}
         backLabel={`Back to ${STEP_LABELS[flow.step].toLowerCase()}`}
       />
     </CheckoutShell>
