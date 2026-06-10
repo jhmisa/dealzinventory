@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react'
 import { Calendar } from 'lucide-react'
 import { YAMATO_TIME_SLOTS } from '@/lib/constants'
 import { getEarliestDeliveryDate } from '@/lib/delivery-date'
-import { cn } from '@/lib/utils'
+import { SelectableCard } from '../selectable-card'
 import { StickyCta } from '../sticky-cta'
 import { CheckoutStepLayout } from '../step-layout'
 import type { CheckoutData } from '../types'
@@ -51,25 +51,16 @@ export function ScheduleStep({ data, setData, onContinue }: ScheduleStepProps) {
 
       <p className="mb-2 mt-6 font-data text-[11px] uppercase tracking-[0.12em] text-brand-umber">Delivery time</p>
       <div className="grid grid-cols-2 gap-3">
-        {YAMATO_TIME_SLOTS.map((slot) => {
-          const selected = data.deliveryTimeCode === slot.code
-          return (
-            <button
-              key={slot.code}
-              type="button"
-              onClick={() => setData({ deliveryTimeCode: slot.code })}
-              className={cn(
-                'flex items-center gap-2 rounded-2xl border p-4 font-brand text-sm font-semibold transition',
-                selected
-                  ? 'border-[#EADFCB] bg-[#FAF4EA] text-brand-ink shadow-[0_8px_22px_rgba(22,20,15,0.09)]'
-                  : 'border-brand-ash/40 bg-white text-brand-ink',
-              )}
-            >
-              {selected && <span className="h-2 w-2 rounded-full bg-brand-signal" />}
-              {slot.label_en}
-            </button>
-          )
-        })}
+        {YAMATO_TIME_SLOTS.map((slot) => (
+          <SelectableCard
+            key={slot.code}
+            selected={data.deliveryTimeCode === slot.code}
+            onSelect={() => setData({ deliveryTimeCode: slot.code })}
+            showSelectedLabel={false}
+          >
+            <span className="font-brand text-sm font-semibold text-brand-ink">{slot.label_en}</span>
+          </SelectableCard>
+        ))}
       </div>
     </CheckoutStepLayout>
   )
