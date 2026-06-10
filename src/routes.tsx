@@ -2,6 +2,7 @@ import { lazy, Suspense, type ComponentType } from 'react'
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { AdminLayout } from '@/components/layout/admin-layout'
 import { ShopLayout } from '@/components/layout/shop-layout'
+import { SiteLayout } from '@/components/layout/site-layout'
 import { CustomerLayout } from '@/components/layout/customer-layout'
 import { ProtectedRoute } from '@/components/layout/protected-route'
 import { AdminGuard } from '@/components/layout/admin-only-route'
@@ -83,6 +84,16 @@ const InventoryRemovalDetailPage = lazy(() => import('@/pages/admin/inventory-re
 const SocialMediaPage = lazy(() => import('@/pages/admin/social-media'))
 const SystemFeedbackPage = lazy(() => import('@/pages/admin/system-feedback'))
 const ShopAccessoryDetailPage = lazy(() => import('@/pages/shop/accessory-detail'))
+// Public marketing site
+const HomePage = lazy(() => import('@/pages/site/home'))
+const AboutPage = lazy(() => import('@/pages/site/about'))
+const FaqPage = lazy(() => import('@/pages/site/faq'))
+const SiteTestimonialsPage = lazy(() => import('@/pages/site/testimonials'))
+const OurStoryPage = lazy(() => import('@/pages/site/our-story'))
+const ReturnsWarrantyPage = lazy(() => import('@/pages/site/legal/returns-warranty'))
+const TermsPage = lazy(() => import('@/pages/site/legal/terms'))
+const PrivacyPage = lazy(() => import('@/pages/site/legal/privacy'))
+const TokushohoPage = lazy(() => import('@/pages/site/legal/tokushoho'))
 
 function lazyElement(Component: React.LazyExoticComponent<ComponentType>) {
   return (
@@ -105,7 +116,18 @@ function adminElement(Component: React.LazyExoticComponent<ComponentType>) {
 export const router = createBrowserRouter([
   {
     path: '/',
-    element: <Navigate to="/admin/dashboard" replace />,
+    element: <SiteLayout />,
+    children: [
+      { index: true, element: lazyElement(HomePage) },
+      { path: 'about', element: lazyElement(AboutPage) },
+      { path: 'faq', element: lazyElement(FaqPage) },
+      { path: 'testimonials', element: lazyElement(SiteTestimonialsPage) },
+      { path: 'our-story', element: lazyElement(OurStoryPage) },
+      { path: 'legal/returns-warranty', element: lazyElement(ReturnsWarrantyPage) },
+      { path: 'legal/terms', element: lazyElement(TermsPage) },
+      { path: 'legal/privacy', element: lazyElement(PrivacyPage) },
+      { path: 'legal/tokushoho', element: lazyElement(TokushohoPage) },
+    ],
   },
   {
     path: '/admin/login',
@@ -196,10 +218,14 @@ export const router = createBrowserRouter([
       { index: true, element: lazyElement(ShopBrowsePage) },
       { path: 'product/:id', element: lazyElement(ShopProductDetailPage) },
       { path: 'item/:id', element: lazyElement(ShopItemDetailPage) },
-      { path: 'checkout/:sellGroupId', element: lazyElement(CheckoutPage) },
       { path: 'accessory/:id', element: lazyElement(ShopAccessoryDetailPage) },
     ],
   },
+  // Checkout is a standalone full-screen mobile flow — intentionally NOT wrapped in
+  // ShopLayout so the shop header/footer don't box it in and the sticky CTA pins to
+  // the viewport bottom.
+  { path: '/shop/checkout/:sellGroupId', element: lazyElement(CheckoutPage) },
+  { path: '/order/:sellGroupCode', element: lazyElement(CheckoutPage) },
   {
     path: '/offer/:offerCode',
     element: lazyElement(OfferClaimPage),
@@ -207,13 +233,6 @@ export const router = createBrowserRouter([
   {
     path: '/mine/:code?',
     element: lazyElement(MineClaimPage),
-  },
-  {
-    path: '/order/:sellGroupCode',
-    element: <ShopLayout />,
-    children: [
-      { index: true, element: lazyElement(CheckoutPage) },
-    ],
   },
   {
     path: '/sell',
