@@ -3,9 +3,11 @@ import { humanFileSize } from './image-compression'
 // Recorded voice notes and webcam videos are sent to Facebook Messenger through
 // Missive's Drafts API, which base64-encodes attachments into a JSON payload
 // capped at 10 MB. Phase 0 spike (docs/investigations/messaging-media-recording-spike.md)
-// confirmed clips up to ~7 MB raw / ~9.4 MB base64 deliver and play, and that
-// WebM/Opus + WebM/VP8 play natively on the customer's phone (Facebook re-encodes
-// on its CDN), so no MP4 transcoding is needed.
+// confirmed clips up to ~7 MB raw / ~9.4 MB base64 deliver and play. WebM/VP8
+// VIDEO plays natively (Facebook re-encodes video on its CDN), so recorded video
+// is sent as-is. Audio-only WebM/Opus, however, arrives BLANK on Messenger — so
+// recorded voice notes are transcoded to AAC/M4A before sending (see
+// src/lib/media/transcode-audio.ts). Safari records audio/mp4 directly.
 
 // Hard size budget for a single recorded clip (raw bytes, before base64).
 // 6 MB → ~8.05 MB base64, leaving headroom under Missive's 10 MB payload cap.

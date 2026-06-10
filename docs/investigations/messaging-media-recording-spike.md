@@ -16,7 +16,7 @@
 |------|-------------------|---------:|------------:|:-----------:|:---------------:|
 | `a1_voice.mp3` | audio MP3 | 0.34 MB | 0.46 MB | 201 ✅ | ✅ |
 | `a2_voice.m4a` | audio M4A/AAC | 0.35 MB | 0.47 MB | 201 ✅ | ✅ |
-| `a3_voice.webm` | audio **WebM/Opus** | 0.27 MB | 0.36 MB | 201 ✅ | ✅ |
+| `a3_voice.webm` | audio **WebM/Opus** | 0.27 MB | 0.36 MB | 201 ✅ | **❌ arrived BLANK** |
 | `v1_h264.mp4` | video MP4/H.264+AAC | 0.39 MB | 0.52 MB | 201 ✅ | ✅ |
 | `v2_vp8.webm` | video **WebM/VP8+Opus** | 0.93 MB | 1.25 MB | 201 ✅ | ✅ |
 | `v3_mp4_3mb.mp4` | video MP4 | 3.15 MB | 4.21 MB | 201 ✅ | ✅ |
@@ -25,7 +25,9 @@
 
 ## Findings / Decisions
 
-1. **WebM plays — no transcoding needed.** Both WebM/Opus audio and WebM/VP8 video played inline on the customer phone. Facebook re-encodes incoming video on its CDN, so the browser `MediaRecorder` default output (Chrome → WebM, Safari → MP4) can be sent **as-is**. This removes `ffmpeg.wasm`/server-transcode from scope.
+1. **Video WebM plays; audio WebM does NOT.** WebM/VP8 *video* played inline (Facebook re-encodes incoming video on its CDN), so recorded video is sent **as-is**. But audio-only **WebM/Opus arrived BLANK** — Facebook does not transcode an audio-only WebM. Only **MP3** and **M4A/AAC** audio played.
+   - **Correction (post-ship):** an initial read of this test wrongly marked `a3_voice.webm` as playing; re-checking on the device showed it never arrived. Voice notes shipped as WebM failed for the same reason.
+   - **Fix:** Chrome's `MediaRecorder` can only capture audio as WebM/Opus, so recorded voice notes are **transcoded client-side to AAC/M4A** (via the existing `ffmpeg.wasm` `loadFFmpeg`, see `src/lib/media/transcode-audio.ts`) before sending. Safari records `audio/mp4` directly and skips transcoding. Video still needs no transcoding.
 
 2. **Size is the only real gate.** Every size up to **7.06 MB raw (9.42 MB base64)** was accepted by Missive (201) and played. This is right at Missive's documented **10 MB JSON payload** ceiling, so 7 MB raw is effectively the practical max for a single attachment.
 

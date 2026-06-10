@@ -1,5 +1,6 @@
 import { memo, useState, useCallback, useRef, useEffect } from 'react'
 import { Mic, Video, Square, RotateCcw, Send, Loader2, AlertCircle } from 'lucide-react'
+import { toast } from 'sonner'
 import {
   Dialog,
   DialogContent,
@@ -9,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { cn } from '@/lib/utils'
+import { audioNeedsTranscode, transcodeAudioToM4a } from '@/lib/media/transcode-audio'
 import {
   MEDIA_MAX_BYTES,
   VIDEO_MAX_DURATION_S,
@@ -52,6 +54,7 @@ export const MediaRecorderPanel = memo(function MediaRecorderPanel({
   const [elapsed, setElapsed] = useState(0)
   const [recordedBytes, setRecordedBytes] = useState(0)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [isProcessing, setIsProcessing] = useState(false)
 
   const streamRef = useRef<MediaStream | null>(null)
   const recorderRef = useRef<MediaRecorder | null>(null)
@@ -91,6 +94,7 @@ export const MediaRecorderPanel = memo(function MediaRecorderPanel({
     chunksRef.current = []
     setElapsed(0)
     setRecordedBytes(0)
+    setIsProcessing(false)
   }, [stopTimer, releaseStream, previewUrl])
 
   const handleClose = useCallback(() => {
@@ -233,18 +237,47 @@ export const MediaRecorderPanel = memo(function MediaRecorderPanel({
 
   const oversize = recordedBytes > MEDIA_MAX_BYTES
 
-  const handleSend = useCallback(() => {
+  const handleSend = useCallback(async () => {
     const blob = blobRef.current
     const mime = mimeRef.current
-    if (!blob || !mime || oversize) return
+    if (!blob || !mime || oversize || isProcessing) return
+
+    let outBlob: Blob = blob
+    let outMime = mime.mimeType
+    let outExt = mime.extension
+
+    // Voice notes captured as WebM/Opus (Chrome) don't play on Messenger —
+    // transcode to AAC/M4A first. Safari records audio/mp4 and skips this.
+    if (!isVideo && audioNeedsTranscode(mime.mimeType)) {
+      setIsProcessing(true)
+      try {
+        const t = await transcodeAudioToM4a(blob)
+        outBlob = t.blob
+        outMime = t.mimeType
+        outExt = t.extension
+      } catch (err) {
+        console.error('[voice] transcode failed', err)
+        toast.error('Could not prepare the voice note. Please try again.')
+        setIsProcessing(false)
+        return
+      }
+      setIsProcessing(false)
+    }
+
+    // Transcoded size can differ from the recorded size — re-check the budget.
+    if (outBlob.size > MEDIA_MAX_BYTES) {
+      toast.error('Clip is too large to send. Please record a shorter one.')
+      return
+    }
+
     const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
     const prefix = isVideo ? 'video-message' : 'voice-note'
-    const file = new File([blob], `${prefix}-${stamp}.${mime.extension}`, {
-      type: mime.mimeType,
+    const file = new File([outBlob], `${prefix}-${stamp}.${outExt}`, {
+      type: outMime,
     })
     onCapture(file)
     handleClose()
-  }, [oversize, isVideo, onCapture, handleClose])
+  }, [oversize, isProcessing, isVideo, onCapture, handleClose])
 
   const sizePercent = Math.min(100, (recordedBytes / MEDIA_MAX_BYTES) * 100)
 
@@ -352,13 +385,22 @@ export const MediaRecorderPanel = memo(function MediaRecorderPanel({
               )}
               {phase === 'recorded' && (
                 <>
-                  <Button variant="outline" onClick={reRecord}>
+                  <Button variant="outline" onClick={reRecord} disabled={isProcessing}>
                     <RotateCcw className="mr-2 h-4 w-4" />
                     Re-record
                   </Button>
-                  <Button onClick={handleSend} disabled={oversize}>
-                    <Send className="mr-2 h-4 w-4" />
-                    Send
+                  <Button onClick={handleSend} disabled={oversize || isProcessing}>
+                    {isProcessing ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Converting…
+                      </>
+                    ) : (
+                      <>
+                        <Send className="mr-2 h-4 w-4" />
+                        Send
+                      </>
+                    )}
                   </Button>
                 </>
               )}
