@@ -108,6 +108,7 @@ const AttachmentThumbnail = memo(function AttachmentThumbnail({
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const isImage = attachment.mime_type.startsWith('image/')
   const isVideo = attachment.mime_type.startsWith('video/')
+  const isAudio = attachment.mime_type.startsWith('audio/')
 
   useEffect(() => {
     if (isExternal) return
@@ -162,6 +163,12 @@ const AttachmentThumbnail = memo(function AttachmentThumbnail({
           <MediaLightbox url={url} type="video" onClose={() => setLightboxOpen(false)} />
         )}
       </>
+    )
+  }
+
+  if (isAudio) {
+    return (
+      <audio src={url} controls preload="metadata" className="mt-1.5 h-10 w-[240px] max-w-full" />
     )
   }
 

@@ -151,10 +151,16 @@ Deno.serve(async (req) => {
     }
     console.log('Inserted message:', msg.id);
 
-    // Server-side attachment size guard — belt-and-suspenders in case client
-    // compression is bypassed. Rejects any single attachment over 2 MB.
-    const MAX_ATTACHMENT_BYTES = 2 * 1024 * 1024;
+    // Server-side attachment size guards — belt-and-suspenders in case client
+    // limits are bypassed. Attachments are base64-encoded into the Missive draft
+    // payload, which Missive caps at 10 MB total. Keep mirrored with
+    // src/lib/media-recording.ts (MEDIA_MAX_BYTES) — see the Phase 0 spike note
+    // docs/investigations/messaging-media-recording-spike.md.
+    const MAX_ATTACHMENT_BYTES = 6 * 1024 * 1024; // per recorded clip / file
+    const BASE64_OVERHEAD = 4 / 3;
+    const MAX_PAYLOAD_BYTES = 9 * 1024 * 1024; // headroom below Missive's 10 MB
     if (inputAttachments && inputAttachments.length > 0) {
+      // Per-attachment cap
       for (const att of inputAttachments) {
         if (att.size_bytes && att.size_bytes > MAX_ATTACHMENT_BYTES) {
           // Mark message as FAILED immediately instead of trying to send
@@ -171,10 +177,33 @@ Deno.serve(async (req) => {
             })
             .eq('id', msg.id);
           return jsonResponse({
-            error: `Attachment "${att.filename}" is too large (${(att.size_bytes / 1024 / 1024).toFixed(1)}MB > 2MB). Please compress before uploading.`,
+            error: `Attachment "${att.filename}" is too large (${(att.size_bytes / 1024 / 1024).toFixed(1)}MB > ${(MAX_ATTACHMENT_BYTES / 1024 / 1024).toFixed(0)}MB). Please record/compress a smaller one.`,
             message_id: msg.id,
           });
         }
+      }
+
+      // Total-payload cap: sum of base64-inflated attachments + the body must
+      // stay under Missive's limit, otherwise Missive rejects the whole draft.
+      const estimatedPayload =
+        inputAttachments.reduce((sum, a) => sum + (a.size_bytes ?? 0) * BASE64_OVERHEAD, 0) +
+        (content?.length ?? 0);
+      if (estimatedPayload > MAX_PAYLOAD_BYTES) {
+        await supabase
+          .from('messages')
+          .update({
+            status: 'FAILED',
+            error_details: {
+              reason: 'payload_too_large',
+              estimated_payload_bytes: Math.round(estimatedPayload),
+              max_bytes: MAX_PAYLOAD_BYTES,
+            },
+          })
+          .eq('id', msg.id);
+        return jsonResponse({
+          error: `Message attachments total too large (${(estimatedPayload / 1024 / 1024).toFixed(1)}MB after encoding > ${(MAX_PAYLOAD_BYTES / 1024 / 1024).toFixed(0)}MB). Remove or shorten an attachment.`,
+          message_id: msg.id,
+        });
       }
     }
 

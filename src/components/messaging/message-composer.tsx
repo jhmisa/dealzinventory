@@ -1,5 +1,5 @@
 import { memo, useState, useCallback, useRef, useMemo } from 'react'
-import { Send, Paperclip, MessageSquareText, Package, Ticket, X, FileIcon, Loader2, Archive, ArchiveRestore } from 'lucide-react'
+import { Send, Paperclip, MessageSquareText, Package, Ticket, X, FileIcon, Loader2, Archive, ArchiveRestore, Mic, Video } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -13,6 +13,12 @@ import {
   compressImageForMessaging,
   IMAGE_MAX_INPUT_SIZE_MB,
 } from '@/lib/image-compression'
+import { MediaRecorderPanel } from './media-recorder-panel'
+import {
+  MEDIA_MAX_BYTES,
+  isRecordableMedia,
+  type RecordingKind,
+} from '@/lib/media-recording'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,6 +65,7 @@ export const MessageComposer = memo(function MessageComposer({
   const [attachments, setAttachments] = useState<MessageAttachment[]>([])
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
   const [isCompressing, setIsCompressing] = useState(false)
+  const [recorderKind, setRecorderKind] = useState<RecordingKind | null>(null)
   const [showSlashMenu, setShowSlashMenu] = useState(false)
   const [slashFilter, setSlashFilter] = useState('')
   const [highlightedIndex, setHighlightedIndex] = useState(0)
@@ -155,11 +162,18 @@ export const MessageComposer = memo(function MessageComposer({
 
       for (const file of files) {
         const isImage = file.type.startsWith('image/')
-        const inputLimit = isImage ? MAX_IMAGE_INPUT_SIZE : MAX_NON_IMAGE_FILE_SIZE
+        // Recorded voice notes / video messages (and any pasted/dropped audio
+        // or video) are sent as-is, capped at the Missive-safe media budget.
+        const isMedia = isRecordableMedia(file.type)
+        const inputLimit = isImage
+          ? MAX_IMAGE_INPUT_SIZE
+          : isMedia
+            ? MEDIA_MAX_BYTES
+            : MAX_NON_IMAGE_FILE_SIZE
 
         if (file.size > inputLimit) {
           toast.error(
-            `"${file.name}" exceeds the ${inputLimit / 1024 / 1024}MB limit`,
+            `"${file.name}" exceeds the ${Math.round(inputLimit / 1024 / 1024)}MB limit`,
           )
           continue
         }
@@ -365,7 +379,7 @@ export const MessageComposer = memo(function MessageComposer({
           type="file"
           className="hidden"
           multiple
-          accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
+          accept="image/*,audio/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
           onChange={handleFileSelect}
         />
         <Tooltip>
@@ -386,6 +400,38 @@ export const MessageComposer = memo(function MessageComposer({
             </Button>
           </TooltipTrigger>
           <TooltipContent>Images are auto-compressed. Max 5 attachments.</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1 px-2 text-xs text-muted-foreground"
+              onClick={() => setRecorderKind('audio')}
+              disabled={isBusy || attachments.length >= MAX_ATTACHMENTS}
+            >
+              <Mic className="h-3.5 w-3.5" />
+              Voice
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Record a voice note</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1 px-2 text-xs text-muted-foreground"
+              onClick={() => setRecorderKind('video')}
+              disabled={isBusy || attachments.length >= MAX_ATTACHMENTS}
+            >
+              <Video className="h-3.5 w-3.5" />
+              Video
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Record a video message</TooltipContent>
         </Tooltip>
 
         <Tooltip>
@@ -460,6 +506,17 @@ export const MessageComposer = memo(function MessageComposer({
           </Tooltip>
         )}
       </div>
+
+      {recorderKind && (
+        <MediaRecorderPanel
+          open={recorderKind !== null}
+          kind={recorderKind}
+          onClose={() => setRecorderKind(null)}
+          onCapture={(file) => {
+            void processFiles([file])
+          }}
+        />
+      )}
     </div>
   )
 })
