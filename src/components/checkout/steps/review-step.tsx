@@ -11,6 +11,8 @@ interface ReviewStepProps {
   view: SellGroupView
   data: CheckoutData
   addressLabel: string
+  /** Receiver display name (account holder, or the "someone else" entered on the address step). */
+  receiverName: string
   onEdit: (step: CheckoutStep) => void
   onConfirm: () => void
   placing: boolean
@@ -41,7 +43,7 @@ function SummaryRow({
   )
 }
 
-export function ReviewStep({ view, data, addressLabel, onEdit, onConfirm, placing }: ReviewStepProps) {
+export function ReviewStep({ view, data, addressLabel, receiverName, onEdit, onConfirm, placing }: ReviewStepProps) {
   const total = view.effectiveUnitPrice * data.quantity
   const slot = YAMATO_TIME_SLOTS.find((s) => s.code === data.deliveryTimeCode)
   const payment = SHOP_PAYMENT_METHODS.find((m) => m.code === data.paymentMethod)
@@ -56,7 +58,12 @@ export function ReviewStep({ view, data, addressLabel, onEdit, onConfirm, placin
         <SummaryRow
           icon={<MapPin className="h-4 w-4" />}
           label={`Ship to · ${addressLabel}`}
-          value={<span className="whitespace-pre-line">{addrEn}</span>}
+          value={
+            <>
+              {receiverName && <span className="block font-semibold text-brand-ink">{receiverName}</span>}
+              <span className="block whitespace-pre-line">{addrEn}</span>
+            </>
+          }
           onEdit={() => onEdit('address')}
         />
         <SummaryRow

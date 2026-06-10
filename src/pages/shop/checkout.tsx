@@ -134,6 +134,11 @@ function CheckoutInner({ sg, isCode }: { sg: unknown; isCode: boolean }) {
           view={view}
           data={flow.data}
           addressLabel={flow.data.selectedAddressLabel ?? 'Address'}
+          receiverName={
+            flow.data.receiverMode === 'other'
+              ? [flow.data.receiverFirstName, flow.data.receiverLastName].filter(Boolean).join(' ')
+              : [customer?.first_name, customer?.last_name].filter(Boolean).join(' ')
+          }
           onEdit={flow.goTo}
           onConfirm={handleConfirm}
           placing={placing}
