@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, ImageIcon, Play, Video as VideoIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -20,6 +20,11 @@ export function MediaGallery({ media, variant = 'full' }: MediaGalleryProps) {
   const list = tab === 'photos' ? photos : videos
   const [index, setIndex] = useState(0)
   const active = list[index] ?? list[0]
+  const videoRef = useRef<HTMLVideoElement>(null)
+  // Track which media URL is playing (derived state) so the play overlay reappears
+  // automatically whenever the shown media changes — no effect needed.
+  const [playingUrl, setPlayingUrl] = useState<string | null>(null)
+  const playing = !!active && playingUrl === active.url
 
   const switchTab = (t: 'photos' | 'videos') => {
     setTab(t)
@@ -65,12 +70,30 @@ export function MediaGallery({ media, variant = 'full' }: MediaGalleryProps) {
             <img src={active.url} alt="" className="h-full w-full object-cover" />
           ) : (
             <div className="relative h-full w-full">
-              <video src={active.url} className="h-full w-full object-cover" />
-              <span className="absolute inset-0 flex items-center justify-center">
-                <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white/85">
-                  <Play className="h-6 w-6 fill-brand-ink text-brand-ink" />
-                </span>
-              </span>
+              <video
+                ref={videoRef}
+                src={active.url}
+                className="h-full w-full object-cover"
+                controls={playing}
+                playsInline
+                preload="metadata"
+                onEnded={() => setPlayingUrl(null)}
+              />
+              {!playing && (
+                <button
+                  type="button"
+                  aria-label="Play video"
+                  onClick={() => {
+                    setPlayingUrl(active.url)
+                    void videoRef.current?.play()
+                  }}
+                  className="absolute inset-0 flex items-center justify-center"
+                >
+                  <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white/85">
+                    <Play className="h-6 w-6 fill-brand-ink text-brand-ink" />
+                  </span>
+                </button>
+              )}
             </div>
           )
         ) : (
