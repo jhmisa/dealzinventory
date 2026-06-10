@@ -20,30 +20,27 @@ const ORDER: CheckoutStep[] = ['item', 'account', 'address', 'schedule', 'paymen
 export function useCheckoutFlow(isAuthenticated: boolean): UseCheckoutFlow {
   const [step, setStep] = useState<CheckoutStep>('item')
   const [data, setRawData] = useState<CheckoutData>(INITIAL_CHECKOUT_DATA)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [history, setHistory] = useState<CheckoutStep[]>([])
+  const [, setHistory] = useState<CheckoutStep[]>([])
 
   const setData = useCallback((patch: Partial<CheckoutData>) => {
     setRawData((prev) => ({ ...prev, ...patch }))
   }, [])
 
+  // Note: setters are called independently (never nested inside another updater) so
+  // React StrictMode's double-invocation of updaters can't double-push the history.
   const goTo = useCallback((target: CheckoutStep) => {
-    setStep((current) => {
-      setHistory((h) => [...h, current])
-      return target
-    })
-  }, [])
+    setHistory((h) => [...h, step])
+    setStep(target)
+  }, [step])
 
   const next = useCallback(() => {
-    setStep((current) => {
-      const idx = ORDER.indexOf(current)
-      let nextStep = ORDER[Math.min(idx + 1, ORDER.length - 1)]
-      // Logged-in users skip the Account step entirely.
-      if (nextStep === 'account' && isAuthenticated) nextStep = 'address'
-      setHistory((h) => [...h, current])
-      return nextStep
-    })
-  }, [isAuthenticated])
+    const idx = ORDER.indexOf(step)
+    let nextStep = ORDER[Math.min(idx + 1, ORDER.length - 1)]
+    // Logged-in users skip the Account step entirely.
+    if (nextStep === 'account' && isAuthenticated) nextStep = 'address'
+    setHistory((h) => [...h, step])
+    setStep(nextStep)
+  }, [step, isAuthenticated])
 
   const back = useCallback(() => {
     setHistory((h) => {
