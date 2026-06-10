@@ -1,7 +1,6 @@
 import { X } from 'lucide-react'
 import { MediaGallery } from './media-gallery'
 import { ProductSummary } from './product-summary'
-import { QuantityStepper } from './quantity-stepper'
 import type { SellGroupView } from './use-sell-group-view'
 
 interface PhotoSheetProps {
@@ -18,15 +17,16 @@ export function PhotoSheet({ open, onClose, view, quantity, onQuantityChange, ba
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/40" onClick={onClose}>
       <div
-        className="flex h-[90dvh] flex-col rounded-t-3xl bg-brand-paper"
+        className="flex h-[96dvh] flex-col rounded-t-3xl bg-brand-paper"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header (pinned) — same product summary as the Item landing step */}
-        <div className="shrink-0 px-5 pt-3">
+        {/* Header (pinned) — same product summary as the Item landing, incl. inline qty */}
+        <div className="shrink-0 px-4 pt-3">
           <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-brand-ash/40" />
           <ProductSummary
             view={view}
-            descriptionLines={2}
+            quantity={quantity}
+            onQuantityChange={onQuantityChange}
             headerAction={
               <button
                 type="button"
@@ -39,14 +39,13 @@ export function PhotoSheet({ open, onClose, view, quantity, onQuantityChange, ba
           />
         </div>
 
-        {/* Scrollable: media + quantity */}
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 pb-2 pt-3">
+        {/* Scrollable media */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-2 pt-3">
           <MediaGallery media={view.media} variant="sheet" />
-          <QuantityStepper quantity={quantity} max={view.stockCount} onChange={onQuantityChange} />
         </div>
 
         {/* Back button (pinned) */}
-        <div className="shrink-0 border-t border-brand-ash/15 px-5 pb-[max(16px,env(safe-area-inset-bottom))] pt-3">
+        <div className="shrink-0 border-t border-brand-ash/15 px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-3">
           <button
             type="button"
             onClick={onClose}
