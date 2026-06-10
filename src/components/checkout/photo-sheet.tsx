@@ -20,10 +20,10 @@ export function PhotoSheet({ open, onClose, title, subtitle, media, backLabel, d
         className="flex h-[90dvh] flex-col rounded-t-3xl bg-brand-paper"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header (pinned) */}
+        {/* Header (pinned) — title, key facts, and specs all up top */}
         <div className="shrink-0 px-5 pt-3">
           <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-brand-ash/40" />
-          <div className="mb-3 flex items-start justify-between gap-3">
+          <div className="mb-2 flex items-start justify-between gap-3">
             <div className="min-w-0">
               <h2 className="font-brand text-lg font-bold text-brand-ink">{title}</h2>
               <p className="font-data text-xs uppercase tracking-wider text-brand-umber">{subtitle}</p>
@@ -36,17 +36,14 @@ export function PhotoSheet({ open, onClose, title, subtitle, media, backLabel, d
               <X className="h-4 w-4 text-brand-ink" />
             </button>
           </div>
+          {description && (
+            <p className="mb-3 line-clamp-3 font-brand text-sm leading-snug text-brand-umber">{description}</p>
+          )}
         </div>
 
-        {/* Scrollable media + specs */}
+        {/* Scrollable media */}
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-2">
           <MediaGallery media={media} variant="sheet" />
-          {description && (
-            <div className="mt-4">
-              <p className="mb-1 font-data text-[11px] uppercase tracking-[0.12em] text-brand-ash">Specs</p>
-              <p className="font-brand text-sm leading-relaxed text-brand-umber">{description}</p>
-            </div>
-          )}
         </div>
 
         {/* Back button (pinned) */}

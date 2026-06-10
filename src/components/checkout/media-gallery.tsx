@@ -125,7 +125,7 @@ export function MediaGallery({ media, variant = 'full' }: MediaGalleryProps) {
 
       {/* Thumbnail strip */}
       {list.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto pb-1">
+        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 py-1.5">
           {list.map((m, i) => (
             <button
               key={`${m.url}-${i}`}
