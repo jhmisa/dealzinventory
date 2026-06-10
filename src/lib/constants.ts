@@ -168,6 +168,7 @@ export const YAMATO_TIME_SLOTS = [
   { code: '14', label: '14:00–16:00 (2:00PM–4:00PM)', label_en: '2PM–4PM' },
   { code: '16', label: '16:00–18:00 (4:00PM–6:00PM)', label_en: '4PM–6PM' },
   { code: '04', label: '18:00–20:00 (6:00PM–8:00PM)', label_en: '6PM–8PM' },
+  { code: '19', label: '19:00–21:00 (7:00PM–9:00PM)', label_en: '7PM–9PM' },
 ] as const
 
 // Shop checkout payment methods. `fee` is INFORMATIONAL ONLY — surcharges are not
