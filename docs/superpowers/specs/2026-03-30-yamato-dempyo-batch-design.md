@@ -214,6 +214,7 @@ Our `delivery_time_code` values map to Sheet 2 col AV as numbers (strip leading 
 | '14' | 14 | 1416 | 14:00–16:00 |
 | '16' | 16 | 1618 | 16:00–18:00 |
 | '04' | 4 | 1820 | 18:00–20:00 |
+| '19' | 19 | 1921 | 19:00–21:00 |
 
 ## Payment Method → Yamato Mapping
 

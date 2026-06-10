@@ -124,6 +124,7 @@ function timeCodeToNumber(code: string | null): number | null {
     '14': 14,
     '16': 16,
     '04': 4,
+    '19': 19,
   }
   return map[code] ?? null
 }
