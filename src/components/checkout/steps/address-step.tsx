@@ -43,8 +43,8 @@ export function AddressStep({ data, setData, onContinue }: AddressStepProps) {
     return true
   }, [data])
 
-  const selectAddress = (id: string, addr: ShippingAddress) => {
-    setData({ selectedAddressId: id, shippingAddress: addr })
+  const selectAddress = (id: string, addr: ShippingAddress, label: string) => {
+    setData({ selectedAddressId: id, shippingAddress: addr, selectedAddressLabel: label })
   }
 
   const handleSave = async () => {
@@ -62,7 +62,7 @@ export function AddressStep({ data, setData, onContinue }: AddressStepProps) {
         address: uppercaseAddress(draft) as never,
       })
       await queryClient.invalidateQueries({ queryKey: ['customer-addresses', customerId] })
-      selectAddress(saved.id, saved.address as unknown as ShippingAddress)
+      selectAddress(saved.id, saved.address as unknown as ShippingAddress, saved.label ?? 'New address')
       setAdding(false)
       setDraft(null)
     } catch (e) {
@@ -105,7 +105,7 @@ export function AddressStep({ data, setData, onContinue }: AddressStepProps) {
               address={a}
               displayLabel={a.label ?? `Address ${i + 1}`}
               selected={data.selectedAddressId === a.id}
-              onSelect={() => selectAddress(a.id, a.address as unknown as ShippingAddress)}
+              onSelect={() => selectAddress(a.id, a.address as unknown as ShippingAddress, a.label ?? `Address ${i + 1}`)}
             />
           ))}
           {addresses.length === 0 && (

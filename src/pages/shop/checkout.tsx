@@ -130,7 +130,7 @@ function CheckoutInner({ sg, isCode }: { sg: unknown; isCode: boolean }) {
         <ReviewStep
           view={view}
           data={flow.data}
-          addressLabel={flow.data.selectedAddressId ? 'Address' : 'Address'}
+          addressLabel={flow.data.selectedAddressLabel ?? 'Address'}
           onEdit={flow.goTo}
           onConfirm={handleConfirm}
           placing={placing}

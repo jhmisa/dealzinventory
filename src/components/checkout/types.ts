@@ -26,6 +26,7 @@ export const STEP_LABELS: Record<CheckoutStep, string> = {
 export interface CheckoutData {
   quantity: number
   selectedAddressId: string | null
+  selectedAddressLabel: string | null
   shippingAddress: ShippingAddress | null
   receiverMode: 'me' | 'other'
   receiverFirstName: string
@@ -39,6 +40,7 @@ export interface CheckoutData {
 export const INITIAL_CHECKOUT_DATA: CheckoutData = {
   quantity: 1,
   selectedAddressId: null,
+  selectedAddressLabel: null,
   shippingAddress: null,
   receiverMode: 'me',
   receiverFirstName: '',
