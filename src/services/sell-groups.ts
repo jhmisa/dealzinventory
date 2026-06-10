@@ -56,7 +56,8 @@ export async function getSellGroup(id: string) {
     .from('sell_groups')
     .select(`
       *,
-      product_models(*, product_media(id, file_url, role, sort_order))
+      product_models(*, product_media(id, file_url, media_type, role, sort_order)),
+      sell_group_items(items(id, item_code, selling_price, discount, condition_grade, item_status))
     `)
     .eq('id', id)
     .single()
@@ -116,7 +117,7 @@ export async function getSellGroupByCode(gCode: string) {
       product_models(
         id, brand, model_name, color, short_description, cpu, ram_gb, storage_gb, screen_size, os_family,
         categories(name, description_fields),
-        product_media(id, file_url, media_type, sort_order)
+        product_media(id, file_url, media_type, role, sort_order)
       )
     `)
     .ilike('sell_group_code', gCode.trim())

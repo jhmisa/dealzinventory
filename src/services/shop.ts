@@ -192,7 +192,7 @@ export async function getSellGroupByCode(code: string) {
     .select(`
       *,
       product_models(*, product_media(id, file_url, media_type, role, sort_order)),
-      sell_group_items(items(id, selling_price, discount, condition_grade, item_status))
+      sell_group_items(items(id, item_code, selling_price, discount, condition_grade, item_status))
     `)
     .eq('sell_group_code', code)
     .eq('active', true)
