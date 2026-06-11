@@ -1,0 +1,9 @@
+project_id = "aeiyinpxmazmfubotpdk"
+
+# Missive calls this webhook with an HMAC x-hook-signature header, NOT a JWT
+# Authorization header — platform JWT verification must stay OFF or every
+# delivery is rejected 401 at the gateway and Missive pauses the rule.
+# (This regressed on 2026-06-10 when the function was redeployed without
+# --no-verify-jwt; this file pins it so future deploys can't repeat that.)
+[functions.missive-webhook]
+verify_jwt = false
