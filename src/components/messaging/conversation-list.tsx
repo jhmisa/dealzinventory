@@ -40,7 +40,7 @@ function getLastMessage(conv: ConversationWithRelations) {
 function getDisplayName(conv: ConversationWithRelations): string {
   if (conv.customers) {
     const first = conv.customers.first_name ?? ''
-    return `${conv.customers.last_name} ${first}`.trim()
+    return `${first} ${conv.customers.last_name}`.trim()
   }
   return conv.contact_name || 'Unknown'
 }
