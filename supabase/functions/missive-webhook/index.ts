@@ -344,7 +344,7 @@ async function processWebhookEvent(
 
     console.log('Processed webhook event', eventId, 'in', Date.now() - startMs, 'ms');
 
-    // --- Background enrichment (contact name + attachments) ---
+    // --- Background enrichment (contact name + attachments + full body) ---
     // This runs after the core processing is done but still within waitUntil.
     await backgroundEnrichMessage(
       message.id,
@@ -352,6 +352,7 @@ async function processWebhookEvent(
       conv.id,
       conversation.id,
       !resolvedContactName || (existingConv != null && !existingConv.contact_name),
+      !message.body, // content fell back to preview (truncated at 140 chars by Missive)
     );
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
@@ -383,6 +384,7 @@ async function backgroundEnrichMessage(
   conversationDbId: string,
   missiveConversationId: string,
   needsContactName: boolean,
+  contentFromPreview: boolean,
 ) {
   try {
     const supabase = createClient(
@@ -427,7 +429,9 @@ async function backgroundEnrichMessage(
       }
     }
 
-    // 2. Fetch full message from Missive API to get attachments
+    // 2. Fetch full message from Missive API to get attachments + full body.
+    // For Facebook Messenger the webhook payload has body=null and only a
+    // 140-char preview, so the full text is only available from this endpoint.
     if (MISSIVE_API_TOKEN) {
       try {
         const msgRes = await fetchWithTimeout(`${MISSIVE_API_URL}/messages/${missiveMessageId}`, {
@@ -435,15 +439,35 @@ async function backgroundEnrichMessage(
         });
         if (msgRes.ok) {
           const msgData = await msgRes.json();
-          const rawAttachments = msgData?.messages?.attachments ?? msgData?.message?.attachments ?? [];
-          const missiveAttachments = rawAttachments
+          const detail = msgData?.messages ?? msgData?.message ?? {};
+
+          // Replace truncated preview content with the full message body
+          if (contentFromPreview && detail.body) {
+            const fullContent = stripHtmlAndImageFilenames(detail.body);
+            if (fullContent) {
+              await supabase
+                .from('messages')
+                .update({ content: fullContent })
+                .eq('id', messageDbId);
+              console.log('Background: replaced preview content with full body for message', messageDbId);
+            }
+          }
+
+          // Inline <img> images only exist in the full body for Messenger,
+          // so extract them here too when the webhook payload had no body.
+          const inlineFromDetail = contentFromPreview && detail.body
+            ? extractInlineImages(detail.body)
+            : [];
+
+          const rawAttachments = detail.attachments ?? [];
+          const missiveAttachments = [...inlineFromDetail, ...rawAttachments
             .filter((a: { url?: string }) => a.url)
             .map((a: { url: string; filename?: string; media_type?: string; sub_type?: string; size?: number }) => ({
               file_url: a.url,
               filename: a.filename ?? 'attachment',
               mime_type: a.media_type && a.sub_type ? `${a.media_type}/${a.sub_type}` : 'application/octet-stream',
               ...(a.size ? { size_bytes: a.size } : {}),
-            }));
+            }))];
 
           // Fetch existing attachments (may include inline images from fast-path)
           const { data: existingMsg } = await supabase
