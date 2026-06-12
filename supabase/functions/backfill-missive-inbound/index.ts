@@ -136,7 +136,7 @@ Deno.serve(async (req) => {
     // to distinguish inbound from outbound on the Missive message list.
     let convQuery = supabase
       .from('conversations')
-      .select('id, missive_conversation_id, customer_id, contact_platform_id')
+      .select('id, missive_conversation_id, customer_id, contact_platform_id, folder_id')
       .not('missive_conversation_id', 'is', null)
       .order('last_message_at', { ascending: false, nullsFirst: false });
     if (input.conversation_id) {
@@ -387,14 +387,19 @@ Deno.serve(async (req) => {
           if (ms && (!newestMs || ms > newestMs)) newestMs = ms;
         }
 
-        // Update conversation state if we inserted anything (mirror webhook behavior)
+        // Update conversation state if we inserted anything (mirror webhook behavior).
+        // Unarchive on reply but keep the conversation's existing folder — only
+        // assign Inbox when it has no folder at all, matching the webhook, which
+        // never re-folders existing conversations.
         if (!dryRun && newestMs) {
           await supabase
             .from('conversations')
             .update({
               last_message_at: new Date(newestMs).toISOString(),
               is_archived: false,
-              ...(inboxFolderId ? { folder_id: inboxFolderId } : {}),
+              ...(inboxFolderId && !(conv as { folder_id?: string | null }).folder_id
+                ? { folder_id: inboxFolderId }
+                : {}),
             })
             .eq('id', conv.id);
         }
