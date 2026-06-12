@@ -103,7 +103,15 @@ const columns: ColumnDef<OrderRow>[] = [
   {
     accessorKey: 'order_code',
     header: 'Order',
-    cell: ({ row }) => <CodeDisplay code={row.original.order_code} />,
+    cell: ({ row }) => (
+      <Link
+        to={`/admin/orders/${row.original.id}`}
+        className="hover:underline"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <CodeDisplay code={row.original.order_code} />
+      </Link>
+    ),
   },
   {
     id: 'customer',
@@ -375,7 +383,15 @@ export default function OrderListPage() {
     {
       accessorKey: 'offer_code',
       header: 'Offer',
-      cell: ({ row }) => <CodeDisplay code={row.original.offer_code} />,
+      cell: ({ row }) => (
+        <Link
+          to={`/admin/offers/${row.original.offer_code}`}
+          className="hover:underline"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <CodeDisplay code={row.original.offer_code} />
+        </Link>
+      ),
     },
     {
       id: 'details',
