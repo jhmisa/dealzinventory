@@ -80,6 +80,8 @@ export const ConversationList = memo(function ConversationList({
   onMoveToFolder,
   onArchive,
 }: ConversationListProps) {
+  // While searching, results span all folders — label each row with its folder
+  const showFolderBadge = search.trim().length > 0
   return (
     <div className="flex flex-col h-full min-h-0">
       <div className="flex items-center gap-2 p-2 border-b shrink-0">
@@ -144,8 +146,15 @@ export const ConversationList = memo(function ConversationList({
                           </span>
                         </div>
                       </div>
-                      {(conv.customers || (conv.assigned_staff_id && staffMap?.[conv.assigned_staff_id])) && (
+                      {(showFolderBadge || conv.customers || (conv.assigned_staff_id && staffMap?.[conv.assigned_staff_id])) && (
                         <div className="flex items-center gap-1.5 mt-0.5">
+                          {showFolderBadge && (
+                            <span className="inline-flex items-center rounded border px-1 text-[9px] leading-4 text-muted-foreground/70">
+                              {conv.is_archived
+                                ? 'Archive'
+                                : folders?.find((f) => f.id === conv.folder_id)?.name ?? 'Inbox'}
+                            </span>
+                          )}
                           {conv.customers && (
                             <span className="text-[10px] text-muted-foreground/50">{conv.customers.customer_code}</span>
                           )}

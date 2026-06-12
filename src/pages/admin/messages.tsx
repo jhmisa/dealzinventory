@@ -71,13 +71,17 @@ export default function MessagesPage() {
     }
   }, [folders, selectedFolderId, selectedConvId])
 
+  const isSearching = search.trim().length > 0
+
+  // While searching, drop the folder/archive scoping so results come from everywhere
   const filters = useMemo(() => ({
-    ...(isArchiveView
-      ? { is_archived: true as const }
-      : { is_archived: false as const, folder_id: selectedFolderId ?? undefined }),
-    search: search || undefined,
+    ...(isSearching
+      ? { search: search.trim() }
+      : isArchiveView
+        ? { is_archived: true as const }
+        : { is_archived: false as const, folder_id: selectedFolderId ?? undefined }),
     assigned_staff_id: mineOnly ? user?.id : undefined,
-  }), [selectedFolderId, isArchiveView, search, mineOnly, user])
+  }), [selectedFolderId, isArchiveView, isSearching, search, mineOnly, user])
 
   const { data: conversations = [] } = useConversations(filters)
   const { data: selectedConversation } = useConversation(selectedConvId ?? '')
@@ -110,6 +114,28 @@ export default function MessagesPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedConvId])
+
+  // Selecting a search result jumps to its folder (or Archive) and clears the search
+  const handleSelectConversation = useCallback(
+    (id: string) => {
+      if (isSearching) {
+        const conv = conversations.find((c) => c.id === id)
+        if (conv) {
+          if (conv.is_archived) {
+            setIsArchiveView(true)
+            setSelectedFolderId(null)
+          } else {
+            const inbox = folders.find((f) => f.is_system && f.name === 'Inbox')
+            setIsArchiveView(false)
+            setSelectedFolderId(conv.folder_id ?? inbox?.id ?? null)
+          }
+          setSearch('')
+        }
+      }
+      setSelectedConvId(id)
+    },
+    [isSearching, conversations, folders],
+  )
 
   const handleSend = useCallback(
     (content: string, attachments?: MessageAttachment[]) => {
@@ -237,7 +263,7 @@ export default function MessagesPage() {
           <ConversationList
             conversations={conversations}
             selectedId={selectedConvId}
-            onSelect={setSelectedConvId}
+            onSelect={handleSelectConversation}
             mineOnly={mineOnly}
             onToggleMineOnly={setMineOnly}
             staffMap={staffMap}

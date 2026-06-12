@@ -44,8 +44,10 @@ export async function getConversations(filters: ConversationFilters = {}) {
   if (filters.assigned_staff_id) {
     query = query.eq('assigned_staff_id', filters.assigned_staff_id)
   }
-  // Filter by archive status (default: show non-archived)
-  query = query.eq('is_archived', filters.is_archived ?? false)
+  // Filter by archive status; omit the filter entirely for global search
+  if (filters.is_archived !== undefined) {
+    query = query.eq('is_archived', filters.is_archived)
+  }
 
   if (filters.folder_id) {
     query = query.eq('folder_id', filters.folder_id)
