@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { encodeBase64 } from "jsr:@std/encoding@1/base64";
+import { resolveInvoiceModel, buildOpenRouterVisionBody } from "../_shared/ai-vision.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -596,14 +597,15 @@ Rules:
 - supplier_name is the issuing company/supplier name from the invoice header
 - For the specs object: extract brand, model_name, cpu, ram_gb (text string of GB value, e.g. "8"), storage_gb (text string of GB value, e.g. "256"), screen_size (decimal inches), and serial_number when visible. Omit fields you cannot determine.`;
 
-function detectProvider(apiEndpoint: string): 'anthropic' | 'openai' | 'google' | 'generic' {
+function detectProvider(apiEndpoint: string): 'anthropic' | 'openai' | 'google' | 'openrouter' | 'generic' {
   if (apiEndpoint.includes('anthropic.com')) return 'anthropic';
   if (apiEndpoint.includes('openai.com')) return 'openai';
   if (apiEndpoint.includes('googleapis.com') || apiEndpoint.includes('generativelanguage')) return 'google';
+  if (apiEndpoint.includes('openrouter.ai')) return 'openrouter';
   return 'generic';
 }
 
-async function callAnthropic(apiEndpoint: string, apiKey: string, systemPrompt: string, base64: string, mediaType: string): Promise<string> {
+async function callAnthropic(apiEndpoint: string, apiKey: string, model: string, systemPrompt: string, base64: string, mediaType: string): Promise<string> {
   const response = await fetch(apiEndpoint, {
     method: 'POST',
     headers: {
@@ -612,7 +614,7 @@ async function callAnthropic(apiEndpoint: string, apiKey: string, systemPrompt: 
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-5-20250929',
+      model,
       max_tokens: 4096,
       system: systemPrompt,
       messages: [{
@@ -632,7 +634,7 @@ async function callAnthropic(apiEndpoint: string, apiKey: string, systemPrompt: 
   return result.content?.[0]?.text ?? '';
 }
 
-async function callOpenAI(apiEndpoint: string, apiKey: string, systemPrompt: string, base64: string, mediaType: string): Promise<string> {
+async function callOpenAI(apiEndpoint: string, apiKey: string, model: string, systemPrompt: string, base64: string, mediaType: string): Promise<string> {
   const response = await fetch(apiEndpoint, {
     method: 'POST',
     headers: {
@@ -640,7 +642,7 @@ async function callOpenAI(apiEndpoint: string, apiKey: string, systemPrompt: str
       'Authorization': `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: 'gpt-4o',
+      model,
       messages: [
         { role: 'system', content: systemPrompt },
         {
@@ -662,12 +664,12 @@ async function callOpenAI(apiEndpoint: string, apiKey: string, systemPrompt: str
   return result.choices?.[0]?.message?.content ?? '';
 }
 
-async function callGoogle(apiEndpoint: string, apiKey: string, systemPrompt: string, base64: string, mediaType: string): Promise<string> {
+async function callGoogle(apiEndpoint: string, apiKey: string, model: string, systemPrompt: string, base64: string, mediaType: string): Promise<string> {
   let url = apiEndpoint;
   if (!url.includes(':generateContent')) {
     url = url.replace(/\/+$/, '');
-    if (!url.match(/\/models\/[\w-]+$/)) {
-      url += '/models/gemini-2.0-flash';
+    if (!url.match(/\/models\/[\w.-]+$/)) {
+      url += `/models/${model}`;
     }
     url += ':generateContent';
   }
@@ -731,12 +733,35 @@ async function callGeneric(apiEndpoint: string, apiKey: string, systemPrompt: st
   return result.choices?.[0]?.message?.content ?? result.content?.[0]?.text ?? '';
 }
 
+async function callOpenRouter(apiEndpoint: string, apiKey: string, model: string, systemPrompt: string, base64: string, mediaType: string): Promise<string> {
+  const body = JSON.stringify(buildOpenRouterVisionBody(model, systemPrompt, base64, mediaType));
+  let lastError = '';
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
+    const response = await fetch(apiEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body,
+    });
+    if (response.ok) {
+      const result = await response.json();
+      return result.choices?.[0]?.message?.content ?? '';
+    }
+    lastError = await response.text();
+    if (response.status !== 503 && response.status !== 429) {
+      throw new Error(`AI API error: ${response.status} ${lastError}`);
+    }
+  }
+  throw new Error(`OpenRouter API error after 3 retries: ${lastError}`);
+}
+
 async function parseWithAI(
   fileUrl: string,
   fileType: string,
   supplierType: string | undefined,
   apiEndpoint: string,
-  apiKey: string
+  apiKey: string,
+  modelId: string | null,
 ): Promise<ParseInvoiceResponse> {
   const supplierContext = supplierType === 'auction'
     ? 'This is an auction invoice. Items may have lot numbers, hammer prices, and buyer premiums.'
@@ -753,18 +778,22 @@ async function parseWithAI(
   const mediaType = fileType === 'pdf' ? 'application/pdf' : `image/${fileType === 'jpg' ? 'jpeg' : fileType}`;
   const systemPrompt = SYSTEM_PROMPT_TEMPLATE(supplierContext);
   const provider = detectProvider(apiEndpoint);
+  const model = resolveInvoiceModel(provider === 'generic' ? 'openrouter' : provider, modelId);
 
   try {
     let responseText: string;
     switch (provider) {
       case 'anthropic':
-        responseText = await callAnthropic(apiEndpoint, apiKey, systemPrompt, base64, mediaType);
+        responseText = await callAnthropic(apiEndpoint, apiKey, model, systemPrompt, base64, mediaType);
         break;
       case 'openai':
-        responseText = await callOpenAI(apiEndpoint, apiKey, systemPrompt, base64, mediaType);
+        responseText = await callOpenAI(apiEndpoint, apiKey, model, systemPrompt, base64, mediaType);
         break;
       case 'google':
-        responseText = await callGoogle(apiEndpoint, apiKey, systemPrompt, base64, mediaType);
+        responseText = await callGoogle(apiEndpoint, apiKey, model, systemPrompt, base64, mediaType);
+        break;
+      case 'openrouter':
+        responseText = await callOpenRouter(apiEndpoint, apiKey, model, systemPrompt, base64, mediaType);
         break;
       default:
         responseText = await callGeneric(apiEndpoint, apiKey, systemPrompt, base64, mediaType);
@@ -888,7 +917,8 @@ Deno.serve(async (req: Request) => {
       normalizedType,
       supplier_type,
       aiConfig.api_endpoint_url,
-      aiConfig.api_key_encrypted
+      aiConfig.api_key_encrypted,
+      aiConfig.model_id ?? null,
     );
 
     if (mode === 'test' && result.success) {
