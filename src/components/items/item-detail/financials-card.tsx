@@ -28,8 +28,10 @@ export function FinancialsCard({ item, costs, locked }: FinancialsCardProps) {
 
   const totalCost = getItemTotalCost({ purchase_price: item.purchase_price, item_costs: costs })
   const sellingPrice = item.selling_price ?? 0
-  const margin = sellingPrice - totalCost
-  const marginPct = sellingPrice > 0 ? Math.round((margin / sellingPrice) * 100) : 0
+  const discount = item.discount ?? 0
+  const netSellingPrice = sellingPrice - discount
+  const margin = netSellingPrice - totalCost
+  const marginPct = netSellingPrice > 0 ? Math.round((margin / netSellingPrice) * 100) : 0
 
   const costForm = useForm<ItemCostFormValues>({
     resolver: zodResolver(itemCostSchema),
@@ -181,6 +183,13 @@ export function FinancialsCard({ item, costs, locked }: FinancialsCardProps) {
               </Dialog>
             </div>
           </div>
+
+          {discount > 0 && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Discount</span>
+              <PriceDisplay amount={-discount} />
+            </div>
+          )}
 
           {item.selling_price != null && (
             <div className="flex justify-between">
