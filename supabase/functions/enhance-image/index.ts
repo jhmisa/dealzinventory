@@ -81,10 +81,15 @@ Deno.serve(async (req: Request) => {
     const { config_id, image_url, prompt } = await req.json();
     if (!image_url) return json({ success: false, error: 'image_url is required' }, 400);
 
-    const query = supabase.from('ai_configurations').select('*');
     const { data: aiConfig, error } = config_id
-      ? await query.eq('id', config_id).single()
-      : await query.eq('purpose', 'image_enhancement').eq('is_active', true).maybeSingle();
+      ? await supabase.from('ai_configurations').select('*').eq('id', config_id).single()
+      : await supabase
+          .from('ai_configurations')
+          .select('*')
+          .eq('purpose', 'image_enhancement')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
     if (error || !aiConfig) {
       return json({ success: false, error: 'No active image_enhancement AI configuration found.' }, 400);
