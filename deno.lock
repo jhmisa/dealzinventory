@@ -1,6 +1,9 @@
 {
   "version": "5",
   "specifiers": {
+    "jsr:@std/assert@1": "1.0.19",
+    "jsr:@std/encoding@1": "1.0.10",
+    "jsr:@std/internal@^1.0.12": "1.0.14",
     "jsr:@supabase/functions-js@*": "2.108.0",
     "jsr:@supabase/supabase-js@2": "2.108.0",
     "npm:@dnd-kit/core@^6.3.1": "6.3.1_react@19.2.7_react-dom@19.2.7__react@19.2.7",
@@ -61,6 +64,18 @@
     "npm:zod@^4.3.6": "4.4.3"
   },
   "jsr": {
+    "@std/assert@1.0.19": {
+      "integrity": "eaada96ee120cb980bc47e040f82814d786fe8162ecc53c91d8df60b8755991e",
+      "dependencies": [
+        "jsr:@std/internal"
+      ]
+    },
+    "@std/encoding@1.0.10": {
+      "integrity": "8783c6384a2d13abd5e9e87a7ae0520a30e9f56aeeaa3bdf910a3eaaf5c811a1"
+    },
+    "@std/internal@1.0.14": {
+      "integrity": "291516b3d4c35024d6ffbc0a9df5bf4c64116e05b50012cf846710152d2ffdf7"
+    },
     "@supabase/functions-js@2.108.0": {
       "integrity": "8601892c30d31df6cb9d22334ebfb4a49295586980b8d6db8a74b8ca717bb4c3",
       "dependencies": [
