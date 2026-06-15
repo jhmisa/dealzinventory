@@ -48,6 +48,7 @@ export function AiConfigFormDialog({ open, onOpenChange, editConfig }: AiConfigF
       api_endpoint_url: '',
       api_key_encrypted: '',
       purpose: 'general',
+      model_id: '',
     },
   })
 
@@ -58,6 +59,7 @@ export function AiConfigFormDialog({ open, onOpenChange, editConfig }: AiConfigF
         api_endpoint_url: editConfig?.api_endpoint_url ?? '',
         api_key_encrypted: editConfig ? '••••••••' : '',
         purpose: (editConfig as Record<string, unknown>)?.purpose as string ?? 'general',
+        model_id: editConfig?.model_id ?? '',
       })
       setShowKey(false)
     }
@@ -69,6 +71,7 @@ export function AiConfigFormDialog({ open, onOpenChange, editConfig }: AiConfigF
         service_name: values.service_name,
         api_endpoint_url: values.api_endpoint_url,
         purpose: values.purpose,
+        model_id: values.model_id ?? '',
       }
       if (values.api_key_encrypted !== '••••••••') {
         updates.api_key_encrypted = values.api_key_encrypted
@@ -154,6 +157,22 @@ export function AiConfigFormDialog({ open, onOpenChange, editConfig }: AiConfigF
                   <FormLabel>API Endpoint URL</FormLabel>
                   <FormControl>
                     <Input placeholder="https://api.anthropic.com/v1/messages" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="model_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Model (optional)</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder='e.g. "google/gemini-2.5-flash" or "fal-ai/clarity-upscaler"'
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
