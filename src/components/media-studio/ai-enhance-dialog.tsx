@@ -24,71 +24,6 @@ interface AiEnhanceDialogProps {
   productId: string
 }
 
-/**
- * Extract an image URL (or data URI) from a generic AI API response.
- * Supports Gemini (base64 in candidates), OpenAI, and generic providers.
- */
-function extractImageResult(data: Record<string, unknown>): string | null {
-  // --- Gemini format: candidates[0].content.parts[].inlineData ---
-  if (Array.isArray(data.candidates) && data.candidates.length > 0) {
-    const candidate = data.candidates[0] as Record<string, unknown>
-    const content = candidate.content as Record<string, unknown> | undefined
-    if (content && Array.isArray(content.parts)) {
-      for (const part of content.parts) {
-        const p = part as Record<string, unknown>
-        if (p.inlineData && typeof p.inlineData === 'object') {
-          const inline = p.inlineData as Record<string, unknown>
-          if (typeof inline.data === 'string' && typeof inline.mimeType === 'string') {
-            return `data:${inline.mimeType};base64,${inline.data}`
-          }
-        }
-      }
-    }
-  }
-
-  // Direct image_url field
-  if (typeof data.image_url === 'string') return data.image_url
-
-  // output field
-  if (typeof data.output === 'string') return data.output
-
-  // data.url
-  if (data.data && typeof data.data === 'object' && !Array.isArray(data.data)) {
-    const d = data.data as Record<string, unknown>
-    if (typeof d.url === 'string') return d.url
-  }
-
-  // images[0].url
-  if (Array.isArray(data.images) && data.images.length > 0) {
-    const first = data.images[0] as Record<string, unknown>
-    if (typeof first.url === 'string') return first.url
-  }
-
-  return null
-}
-
-/**
- * Fetch an image URL and return its base64 data + mime type.
- */
-async function imageUrlToBase64(imageUrl: string): Promise<{ base64: string; mimeType: string }> {
-  const response = await fetch(imageUrl)
-  if (!response.ok) throw new Error('Failed to fetch original image for AI processing')
-  const blob = await response.blob()
-  const mimeType = blob.type || 'image/jpeg'
-
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onloadend = () => {
-      const dataUrl = reader.result as string
-      // Strip the data:mime;base64, prefix
-      const base64 = dataUrl.split(',')[1]
-      resolve({ base64, mimeType })
-    }
-    reader.onerror = reject
-    reader.readAsDataURL(blob)
-  })
-}
-
 const BUCKET = 'photo-group-media'
 
 export function AiEnhanceDialog({
@@ -121,78 +56,25 @@ export function AiEnhanceDialog({
     setEnhancedUrl(null)
 
     try {
-      // Replace placeholders in prompt text
+      // Substitute placeholders in the selected prompt text.
       const promptText = selectedPrompt.prompt_text
         .replace(/\{image_url\}/g, originalImageUrl)
         .replace(/\{original_url\}/g, originalImageUrl)
 
-      const apiKey = aiConfig.api_key_encrypted
-      let url = aiConfig.api_endpoint_url
-
-      // Build headers based on provider
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      }
-
-      // Detect provider from URL to set correct auth
-      const isGemini = url.includes('generativelanguage.googleapis.com') || url.includes('google')
-      const isOpenAI = url.includes('openai.com')
-
-      if (isGemini) {
-        // Gemini uses ?key= query parameter
-        const separator = url.includes('?') ? '&' : '?'
-        url = `${url}${separator}key=${apiKey}`
-      } else if (isOpenAI) {
-        headers['Authorization'] = `Bearer ${apiKey}`
-      } else {
-        // Generic: try both common auth patterns
-        headers['Authorization'] = `Bearer ${apiKey}`
-        headers['x-api-key'] = apiKey
-      }
-
-      // Build request body — adapt to provider format
-      let body: string
-      if (isGemini) {
-        // Fetch the original image and convert to base64 for Gemini
-        const { base64, mimeType } = await imageUrlToBase64(originalImageUrl)
-
-        body = JSON.stringify({
-          contents: [{
-            parts: [
-              { text: promptText },
-              { inlineData: { mimeType, data: base64 } },
-            ],
-          }],
-          generationConfig: {
-            responseModalities: ['TEXT', 'IMAGE'],
-          },
-        })
-      } else {
-        body = JSON.stringify({
-          prompt: promptText,
+      const { data, error } = await supabase.functions.invoke('enhance-image', {
+        body: {
+          config_id: aiConfig.id,
           image_url: originalImageUrl,
-        })
-      }
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body,
+          prompt: promptText,
+        },
       })
 
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => response.statusText)
-        throw new Error(`AI API returned ${response.status}: ${errorText}`)
+      if (error) throw error
+      if (!data?.success || !data?.image_url) {
+        throw new Error(data?.error ?? 'Enhancement failed')
       }
 
-      const data = (await response.json()) as Record<string, unknown>
-      const resultUrl = extractImageResult(data)
-
-      if (!resultUrl) {
-        throw new Error('Could not find image URL in API response')
-      }
-
-      setEnhancedUrl(resultUrl)
+      setEnhancedUrl(data.image_url as string)
       toast.success('Enhancement generated')
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
