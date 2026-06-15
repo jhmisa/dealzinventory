@@ -61,7 +61,16 @@ export async function getItems(filters: ItemFilters = {}) {
       item_costs(amount),
       order_items(
         orders(id, order_code, order_status,
-          customers(id, customer_code, first_name, last_name, email, phone)
+          customers(id, customer_code, first_name, last_name, email, phone,
+            conversations(id, last_message_at)
+          )
+        )
+      ),
+      offer_items(
+        offers(id, offer_code, offer_status, fb_name, expires_at,
+          customers(id, customer_code, first_name, last_name, email, phone,
+            conversations(id, last_message_at)
+          )
         )
       )
     `)
@@ -108,7 +117,16 @@ export async function getItem(id: string) {
       sell_group_items(sell_groups(id, sell_group_code, discount_amount, active)),
       order_items(
         orders(id, order_code, order_status,
-          customers(id, customer_code, first_name, last_name, email, phone)
+          customers(id, customer_code, first_name, last_name, email, phone,
+            conversations(id, last_message_at)
+          )
+        )
+      ),
+      offer_items(
+        offers(id, offer_code, offer_status, fb_name, expires_at,
+          customers(id, customer_code, first_name, last_name, email, phone,
+            conversations(id, last_message_at)
+          )
         )
       )
     `)

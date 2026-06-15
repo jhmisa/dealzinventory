@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, AlertTriangle, ClipboardEdit, Copy, Eye, Lock, Printer, QrCode, Send, Unlock, Undo2, Trash2 } from 'lucide-react'
+import { ArrowLeft, AlertTriangle, ClipboardEdit, Copy, Eye, Lock, MessageSquare, Printer, QrCode, Send, Unlock, Undo2, Trash2 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -36,7 +36,7 @@ import { useCreateInventoryRemoval } from '@/hooks/use-inventory-removals'
 import { INVENTORY_REMOVAL_REASONS } from '@/lib/constants'
 import { CreateOfferDialog } from '@/components/offers'
 import { formatPrice, buildShortDescription, formatCustomerName } from '@/lib/utils'
-import { resolveSoldTo } from '@/lib/item-sale'
+import { resolveSoldTo, resolveReservedBy, reservedByMessageLink } from '@/lib/item-sale'
 import { printItemLabel } from '@/components/items/label-print'
 import { toast } from 'sonner'
 import type { Item, ProductModel, ProductMedia, Supplier, ItemCost, ItemMedia } from '@/lib/types'
@@ -109,6 +109,10 @@ export default function ItemDetailPage() {
 
   // Sold-to customer (if the item is in a CONFIRMED-or-later order)
   const soldTo = resolveSoldTo((item as unknown as { order_items?: unknown }).order_items)
+
+  // Reserved-by customer/offer (PENDING order or offer awaiting confirmation)
+  const itemRelations = item as unknown as { order_items?: unknown; offer_items?: unknown }
+  const reservedBy = soldTo ? null : resolveReservedBy(itemRelations.order_items, itemRelations.offer_items)
 
   return (
     <div className="space-y-6">
@@ -323,6 +327,77 @@ export default function ItemDetailPage() {
               <div>
                 <p className="text-xs text-muted-foreground">Phone</p>
                 <p className="text-sm">{soldTo.customer.phone ?? '—'}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Reserved-by card (PENDING order or offer — not yet confirmed) */}
+      {reservedBy && (
+        <Card className="border-blue-300 bg-blue-50/40">
+          <CardContent className="py-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+              <div>
+                <p className="text-xs text-muted-foreground">
+                  {reservedBy.kind === 'order' ? 'Pending Order' : 'Pending Offer'}
+                </p>
+                {reservedBy.kind === 'order' ? (
+                  <Link
+                    to={`/admin/orders/${reservedBy.orderId}`}
+                    className="text-sm font-mono font-semibold text-primary hover:underline"
+                  >
+                    {reservedBy.orderCode}
+                  </Link>
+                ) : (
+                  <Link
+                    to={`/admin/offers/${reservedBy.offerCode}`}
+                    className="text-sm font-mono font-semibold text-primary hover:underline"
+                  >
+                    {reservedBy.offerCode}
+                  </Link>
+                )}
+                <p className="text-xs text-blue-700">Awaiting confirmation</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Reserved By</p>
+                {reservedBy.customer ? (
+                  <Link
+                    to={`/admin/customers/${reservedBy.customer.id}`}
+                    className="text-sm font-semibold text-primary hover:underline"
+                  >
+                    {formatCustomerName(reservedBy.customer)}
+                  </Link>
+                ) : (
+                  <p className="text-sm font-semibold">{reservedBy.kind === 'offer' ? reservedBy.fbName : '—'}</p>
+                )}
+                {(() => {
+                  const messageLink = reservedByMessageLink(reservedBy)
+                  return messageLink ? (
+                    <Link
+                      to={messageLink}
+                      className="mt-0.5 inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                    >
+                      <MessageSquare className="h-3 w-3" /> Message
+                    </Link>
+                  ) : null
+                })()}
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Customer ID</p>
+                <p className="text-sm font-mono">{reservedBy.customer?.customer_code ?? '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Email</p>
+                <p className="text-sm truncate">{reservedBy.customer?.email ?? '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">{reservedBy.kind === 'offer' ? 'Expires' : 'Phone'}</p>
+                <p className="text-sm">
+                  {reservedBy.kind === 'offer'
+                    ? (reservedBy.expiresAt ? new Date(reservedBy.expiresAt).toLocaleString() : '—')
+                    : (reservedBy.customer?.phone ?? '—')}
+                </p>
               </div>
             </div>
           </CardContent>

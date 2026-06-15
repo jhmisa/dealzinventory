@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Plus, Printer, QrCode, Pencil, Copy, AlertTriangle, Image, Play, Star, X, Link2, Radio, Eye } from 'lucide-react'
+import { Plus, Printer, QrCode, Pencil, Copy, AlertTriangle, Image, Play, Star, X, Link2, Radio, Eye, MessageSquare } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -37,7 +37,7 @@ import { ITEM_STATUSES, CONDITION_GRADES } from '@/lib/constants'
 import { formatDate, formatPrice, cn, buildShortDescription, formatCustomerName, getItemDescription, getItemTotalCost, type ItemCostRow } from '@/lib/utils'
 import { toast } from 'sonner'
 import { printItemLabel } from '@/components/items/label-print'
-import { resolveSoldTo } from '@/lib/item-sale'
+import { resolveSoldTo, resolveReservedBy, reservedByMessageLink, type ReservedByInfo } from '@/lib/item-sale'
 import type { Accessory, AccessoryMedia, ConditionGrade } from '@/lib/types'
 import type { LiveSellingSellGroup } from '@/services/sell-groups'
 
@@ -69,7 +69,17 @@ type ItemRow = {
       id: string
       order_code: string
       order_status: string
-      customers: { id: string; customer_code: string; first_name: string | null; last_name: string; email: string | null; phone: string | null } | null
+      customers: { id: string; customer_code: string; first_name: string | null; last_name: string; email: string | null; phone: string | null; conversations?: Array<{ id: string; last_message_at: string | null }> | null } | null
+    } | null
+  }>
+  offer_items?: Array<{
+    offers: {
+      id: string
+      offer_code: string
+      offer_status: string
+      fb_name: string
+      expires_at: string | null
+      customers: { id: string; customer_code: string; first_name: string | null; last_name: string; email: string | null; phone: string | null; conversations?: Array<{ id: string; last_message_at: string | null }> | null } | null
     } | null
   }>
 }
@@ -107,6 +117,69 @@ type InventoryRow =
   | (SellGroupRow & { _kind: 'sell-group' })
 
 type InventoryTypeFilter = 'all' | 'products' | 'accessories' | 'sell-groups'
+
+// Shown in the Sold To / Customer Details column when an item is reserved by a
+// PENDING order or offer — gives staff a name to follow up with before confirmation.
+function ReservedByCell({ reservedBy }: { reservedBy: ReservedByInfo }) {
+  const messageLink = reservedByMessageLink(reservedBy)
+  if (reservedBy.kind === 'order') {
+    return (
+      <div onClick={(e) => e.stopPropagation()} className="text-sm leading-tight">
+        <Link
+          to={`/admin/customers/${reservedBy.customer.id}`}
+          className="font-medium text-primary hover:underline"
+        >
+          {formatCustomerName(reservedBy.customer)}
+        </Link>
+        <div className="text-xs text-muted-foreground">
+          <Link to={`/admin/orders/${reservedBy.orderId}`} className="hover:underline">
+            {reservedBy.orderCode}
+          </Link>
+          {' · '}
+          <span className="text-blue-600">Reserved</span>
+        </div>
+        {messageLink && (
+          <Link
+            to={messageLink}
+            className="mt-0.5 inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+          >
+            <MessageSquare className="h-3 w-3" /> Message
+          </Link>
+        )}
+      </div>
+    )
+  }
+  return (
+    <div onClick={(e) => e.stopPropagation()} className="text-sm leading-tight">
+      {reservedBy.customer ? (
+        <Link
+          to={`/admin/customers/${reservedBy.customer.id}`}
+          className="font-medium text-primary hover:underline"
+        >
+          {formatCustomerName(reservedBy.customer)}
+        </Link>
+      ) : (
+        <span className="font-medium">{reservedBy.fbName}</span>
+      )}
+      <div className="text-xs text-muted-foreground">
+        <Link to={`/admin/offers/${reservedBy.offerCode}`} className="hover:underline">
+          {reservedBy.offerCode}
+        </Link>
+        {' · '}
+        <span className="text-blue-600">Reserved</span>
+        {reservedBy.expiresAt && <> · expires {formatDate(reservedBy.expiresAt)}</>}
+      </div>
+      {messageLink && (
+        <Link
+          to={messageLink}
+          className="mt-0.5 inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+        >
+          <MessageSquare className="h-3 w-3" /> Message
+        </Link>
+      )}
+    </div>
+  )
+}
 
 const INVENTORY_TYPE_OPTIONS = [
   { value: 'all', label: 'All' },
@@ -1095,7 +1168,11 @@ export default function ItemListPage() {
         }
         if (r._kind !== 'item') return <span className="text-xs text-muted-foreground">—</span>
         const soldTo = resolveSoldTo(r.order_items)
-        if (!soldTo) return <span className="text-xs text-muted-foreground">—</span>
+        if (!soldTo) {
+          const reservedBy = resolveReservedBy(r.order_items, r.offer_items)
+          if (reservedBy) return <ReservedByCell reservedBy={reservedBy} />
+          return <span className="text-xs text-muted-foreground">—</span>
+        }
         return (
           <div onClick={(e) => e.stopPropagation()} className="text-sm leading-tight">
             <Link to={`/admin/customers/${soldTo.customer.id}`} className="font-medium text-primary hover:underline">{formatCustomerName(soldTo.customer)}</Link>
@@ -1344,7 +1421,11 @@ export default function ItemListPage() {
       size: 220,
       cell: ({ row }) => {
         const soldTo = resolveSoldTo(row.original.order_items)
-        if (!soldTo) return <span className="text-xs text-muted-foreground">—</span>
+        if (!soldTo) {
+          const reservedBy = resolveReservedBy(row.original.order_items, row.original.offer_items)
+          if (reservedBy) return <ReservedByCell reservedBy={reservedBy} />
+          return <span className="text-xs text-muted-foreground">—</span>
+        }
         return (
           <div onClick={(e) => e.stopPropagation()} className="text-sm leading-tight">
             <Link

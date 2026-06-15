@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { Loader2, MessageSquare } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
+import { supabase } from '@/lib/supabase'
 import { useStaffProfiles } from '@/hooks/use-staff-profiles'
 import { ConversationList, ConversationThread, CustomerPanel, FolderSidebar } from '@/components/messaging'
 import type { MessageAttachment } from '@/lib/types'
@@ -60,6 +61,32 @@ export default function MessagesPage() {
   useEffect(() => {
     if (searchParams.get('conversation')) {
       setSearchParams({}, { replace: true })
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ?contact=<name> deep link: open the most recent conversation with that
+  // contact (exact name match, case-insensitive), or fall back to searching it.
+  useEffect(() => {
+    const contact = searchParams.get('contact')
+    if (!contact || selectedConvId) return
+    setSearchParams({}, { replace: true })
+    let cancelled = false
+    ;(async () => {
+      const { data } = await supabase
+        .from('conversations')
+        .select('id')
+        .ilike('contact_name', contact)
+        .order('last_message_at', { ascending: false, nullsFirst: false })
+        .limit(1)
+      if (cancelled) return
+      if (data && data.length > 0) {
+        setSelectedConvId(data[0].id)
+      } else {
+        setSearch(contact)
+      }
+    })()
+    return () => {
+      cancelled = true
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
