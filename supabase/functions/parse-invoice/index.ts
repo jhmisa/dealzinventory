@@ -898,10 +898,16 @@ Deno.serve(async (req: Request) => {
       }
       aiConfig = data;
     } else {
+      // Look up by purpose (matches getActiveAiConfiguration / the app's stored
+      // configs); pick the most recent if several exist. Avoids the is_active
+      // filter, which the config form never sets and which breaks once a second
+      // purpose (e.g. image_enhancement) is also marked active.
       const { data, error } = await supabase
         .from('ai_configurations')
         .select('*')
-        .eq('is_active', true)
+        .eq('purpose', 'invoice_parsing')
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
       if (error || !data) {
         return new Response(
