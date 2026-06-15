@@ -14,6 +14,9 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
+const MAX_POLLS = 20;
+const POLL_INTERVAL_MS = 3000;
+
 // Submit to Fal queue, then poll until COMPLETED (bounded).
 async function runFal(modelUrl: string, apiKey: string, input: Record<string, unknown>): Promise<string> {
   const submit = await fetch(modelUrl, {
@@ -28,16 +31,20 @@ async function runFal(modelUrl: string, apiKey: string, input: Record<string, un
   const statusUrl: string = submitJson.status_url ?? `${modelUrl}/requests/${submitJson.request_id}/status`;
   const responseUrl: string = submitJson.response_url ?? `${modelUrl}/requests/${submitJson.request_id}`;
 
-  // Poll up to ~60s (20 * 3s).
-  for (let i = 0; i < 20; i++) {
-    await new Promise((r) => setTimeout(r, 3000));
+  // Poll up to ~60s (MAX_POLLS * POLL_INTERVAL_MS).
+  let completed = false;
+  for (let i = 0; i < MAX_POLLS; i++) {
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
     const statusRes = await fetch(statusUrl, { headers: { 'Authorization': `Key ${apiKey}` } });
     if (!statusRes.ok) continue;
     const status = await statusRes.json();
-    if (status.status === 'COMPLETED') break;
+    if (status.status === 'COMPLETED') { completed = true; break; }
     if (status.status === 'FAILED' || status.status === 'ERROR') {
       throw new Error(`Fal job failed: ${JSON.stringify(status)}`);
     }
+  }
+  if (!completed) {
+    throw new Error(`Fal job did not complete within ${(MAX_POLLS * POLL_INTERVAL_MS) / 1000}s`);
   }
 
   const resultRes = await fetch(responseUrl, { headers: { 'Authorization': `Key ${apiKey}` } });
@@ -54,14 +61,21 @@ Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
-  if (!req.headers.get('authorization')) {
-    return json({ success: false, error: 'Missing authorization' }, 401);
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader) {
+    return json({ success: false, error: 'Missing authorization header' }, 401);
   }
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   );
+
+  const token = authHeader.replace('Bearer ', '');
+  const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+  if (authError || !user) {
+    return json({ success: false, error: 'Invalid or expired token' }, 401);
+  }
 
   try {
     const { config_id, image_url, prompt } = await req.json();
