@@ -160,6 +160,18 @@ export function useAvailableAccessories(search: string) {
   })
 }
 
+/**
+ * Search existing accessories for intake matching. Unlike useAvailableAccessories,
+ * this is NOT filtered by stock — a restock target may currently be at 0 stock.
+ */
+export function useSearchAccessoriesForMatch(query: string) {
+  return useQuery({
+    queryKey: queryKeys.accessories.list({ _type: 'match', search: query }),
+    queryFn: () => accessoriesService.searchAccessoriesForMatch(query),
+    enabled: !!query && query.length >= 1,
+  })
+}
+
 export function useAccessoryTabCounts() {
   return useQuery({
     queryKey: queryKeys.accessories.list({ _type: 'tab-counts' }),

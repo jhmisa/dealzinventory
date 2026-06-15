@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, AlertTriangle, Info } from 'lucide-react'
+import { ArrowLeft, AlertTriangle, Info, Link2, Unlink } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { Button } from '@/components/ui/button'
@@ -8,6 +8,9 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from '@/components/ui/command'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   Select,
@@ -34,6 +37,8 @@ import { useProductModelsWithHeroImage } from '@/hooks/use-product-models'
 import { useActiveAiConfiguration } from '@/hooks/use-ai-configurations'
 import { useCreateIntakeBatch, useUploadInvoiceFile, useParseInvoice, useCreateAccessoryIntakeBatch } from '@/hooks/use-intake-receipts'
 import { getInvoiceSignedUrl } from '@/services/intake-receipts'
+import { searchAccessoriesForMatch } from '@/services/accessories'
+import { useSearchAccessoriesForMatch } from '@/hooks/use-accessories'
 import { batchMatchProducts } from '@/services/product-models'
 import { autoMatchSingle } from '@/lib/product-matcher'
 import { SOURCE_TYPES } from '@/lib/constants'
@@ -45,6 +50,30 @@ interface ExtractedMeta {
   supplier_name?: string
   invoice_date?: string
   invoice_total?: number
+}
+
+/** An existing accessory surfaced by intake matching search. */
+interface AccessoryMatch {
+  id: string
+  accessory_code: string
+  name: string
+  brand: string | null
+  selling_price: number
+  stock_quantity: number
+}
+
+/** A single editable accessory intake line. When `accessory_id` is set the line
+ * is linked to an existing A-code and the batch RPC adds stock instead of
+ * creating a new accessory. */
+interface AccessoryIntakeLine {
+  id: string
+  name: string
+  brand: string
+  quantity: number
+  unit_cost: number
+  selling_price: number
+  accessory_id?: string
+  accessory_code?: string
 }
 
 function loosely_matches(a: string, b: string): boolean {
@@ -224,6 +253,87 @@ function loadDraft(): IntakeDraft | null {
   }
 }
 
+/** Per-line control for linking an accessory intake line to an existing A-code.
+ * Renders a searchable popover when unlinked, or a "treat as new" action when linked. */
+function AccessoryLinkControl({
+  linked,
+  onLink,
+  onUnlink,
+}: {
+  linked: boolean
+  onLink: (match: AccessoryMatch) => void
+  onUnlink: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const { data: matches, isLoading } = useSearchAccessoriesForMatch(query)
+
+  if (linked) {
+    return (
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-8 gap-1 text-muted-foreground"
+        onClick={onUnlink}
+      >
+        <Unlink className="h-3.5 w-3.5" />
+        Treat as new
+      </Button>
+    )
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="h-8 gap-1">
+          <Link2 className="h-3.5 w-3.5" />
+          Link existing
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 p-0" align="end">
+        <Command shouldFilter={false}>
+          <CommandInput
+            placeholder="Search by name or A-code..."
+            value={query}
+            onValueChange={setQuery}
+          />
+          <CommandList>
+            {query.length === 0 ? (
+              <div className="py-4 text-center text-sm text-muted-foreground">
+                Type to search existing accessories
+              </div>
+            ) : isLoading ? (
+              <div className="py-4 text-center text-sm text-muted-foreground">Searching…</div>
+            ) : (
+              <>
+                <CommandEmpty>No matching accessories</CommandEmpty>
+                {matches?.map((m) => (
+                  <CommandItem
+                    key={m.id}
+                    value={m.id}
+                    onSelect={() => {
+                      onLink(m)
+                      setQuery('')
+                      setOpen(false)
+                    }}
+                    className="flex items-center justify-between gap-2"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-mono text-xs text-muted-foreground shrink-0">{m.accessory_code}</span>
+                      <span className="truncate">{m.brand ? `${m.brand} ${m.name}` : m.name}</span>
+                    </div>
+                    <Badge variant="outline" className="text-xs shrink-0">{m.stock_quantity} in stock</Badge>
+                  </CommandItem>
+                ))}
+              </>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 export default function BulkIntakePage() {
   const navigate = useNavigate()
 
@@ -340,15 +450,7 @@ export default function BulkIntakePage() {
   const isProcessing = uploadMutation.isPending || parseMutation.isPending
 
   // Accessory intake line items state
-  const [accessoryLineItems, setAccessoryLineItems] = useState<Array<{
-    id: string
-    name: string
-    brand: string
-    quantity: number
-    unit_cost: number
-    selling_price: number
-    accessory_id?: string
-  }>>([])
+  const [accessoryLineItems, setAccessoryLineItems] = useState<AccessoryIntakeLine[]>([])
 
   const [accessorySuccessData, setAccessorySuccessData] = useState<{
     receiptCode: string
@@ -375,6 +477,31 @@ export default function BulkIntakePage() {
 
   function deleteAccessoryLineItem(id: string) {
     setAccessoryLineItems(prev => prev.filter(item => item.id !== id))
+  }
+
+  // Link a line to an existing accessory (A-code) → batch RPC will add stock to it.
+  function linkAccessoryLineItem(id: string, match: AccessoryMatch) {
+    setAccessoryLineItems(prev => prev.map(item =>
+      item.id === id
+        ? {
+            ...item,
+            accessory_id: match.id,
+            accessory_code: match.accessory_code,
+            name: match.name,
+            brand: match.brand ?? '',
+            selling_price: match.selling_price,
+          }
+        : item,
+    ))
+  }
+
+  // Unlink → line reverts to creating a new accessory; keep the typed name/qty/cost.
+  function unlinkAccessoryLineItem(id: string) {
+    setAccessoryLineItems(prev => prev.map(item =>
+      item.id === id
+        ? { ...item, accessory_id: undefined, accessory_code: undefined }
+        : item,
+    ))
   }
 
   async function handleCreateAccessories() {
@@ -451,6 +578,51 @@ export default function BulkIntakePage() {
         invoice_total: result.invoice_total,
       })
 
+      // Accessory suppliers use a separate, quantity-based line-item list.
+      // Route extracted items there, auto-matching each line to an existing
+      // A-code so the batch adds stock instead of creating a duplicate.
+      if (isAccessorySupplier) {
+        const accessoryItems: AccessoryIntakeLine[] = await Promise.all(
+          result.line_items.map(async (item): Promise<AccessoryIntakeLine> => {
+            const base: AccessoryIntakeLine = {
+              id: crypto.randomUUID(),
+              name: item.product_description,
+              brand: '',
+              quantity: item.quantity,
+              unit_cost: item.unit_price,
+              selling_price: 0,
+            }
+            try {
+              const matches = await searchAccessoriesForMatch(item.product_description)
+              const target = item.product_description.toLowerCase().trim()
+              const exact = matches.find(m => m.name.toLowerCase().trim() === target)
+              if (exact) {
+                return {
+                  ...base,
+                  name: exact.name,
+                  brand: exact.brand ?? '',
+                  selling_price: exact.selling_price,
+                  accessory_id: exact.id,
+                  accessory_code: exact.accessory_code,
+                }
+              }
+            } catch {
+              // Matching is best-effort; fall back to creating a new accessory.
+            }
+            return base
+          }),
+        )
+        setAccessoryLineItems(accessoryItems)
+        setStep('verify')
+        const matchedCount = accessoryItems.filter(i => i.accessory_id).length
+        toast.success(
+          matchedCount > 0
+            ? `Extracted ${accessoryItems.length} line items — ${matchedCount} matched to existing stock`
+            : `Extracted ${accessoryItems.length} line items`,
+        )
+        return
+      }
+
       // Convert parsed items to LineItemRow
       const newItems: LineItemRow[] = result.line_items.map((item) => ({
         id: crypto.randomUUID(),
@@ -476,7 +648,7 @@ export default function BulkIntakePage() {
       console.error('Invoice parse failed:', err)
       toast.error(`Failed: ${message}`)
     }
-  }, [supplierId, activeAiConfig, uploadMutation, parseMutation])
+  }, [supplierId, activeAiConfig, uploadMutation, parseMutation, isAccessorySupplier])
 
   // Line item management
   function updateLineItem(id: string, field: keyof LineItemRow, value: string | number | null) {
@@ -802,57 +974,90 @@ export default function BulkIntakePage() {
                 </p>
               ) : (
                 <div className="space-y-3">
-                  {accessoryLineItems.map((item, idx) => (
-                    <div key={item.id} className="grid grid-cols-[1fr_1fr_80px_100px_100px_40px] gap-2 items-end">
-                      <div>
-                        {idx === 0 && <Label className="text-xs">Name *</Label>}
-                        <Input
-                          value={item.name}
-                          onChange={(e) => updateAccessoryLineItem(item.id, 'name', e.target.value)}
-                          placeholder="USB-C Cable"
-                        />
+                  {accessoryLineItems.map((item) => {
+                    const isLinked = !!item.accessory_id
+                    return (
+                      <div key={item.id} className="rounded-md border p-3 space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            {isLinked ? (
+                              <Badge variant="secondary" className="shrink-0 gap-1">
+                                <Link2 className="h-3 w-3" />
+                                Existing {item.accessory_code} · adds stock
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="shrink-0">New accessory</Badge>
+                            )}
+                            {isLinked && <span className="truncate text-sm font-medium">{item.name}</span>}
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <AccessoryLinkControl
+                              linked={isLinked}
+                              onLink={(m) => linkAccessoryLineItem(item.id, m)}
+                              onUnlink={() => unlinkAccessoryLineItem(item.id)}
+                            />
+                            <Button
+                              variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                              onClick={() => deleteAccessoryLineItem(item.id)}
+                              aria-label="Remove line"
+                            >×</Button>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-[1fr_1fr_80px_100px_100px] gap-2 items-end">
+                          <div>
+                            <Label className="text-xs">Name *</Label>
+                            <Input
+                              value={item.name}
+                              disabled={isLinked}
+                              onChange={(e) => updateAccessoryLineItem(item.id, 'name', e.target.value)}
+                              placeholder="USB-C Cable"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Brand</Label>
+                            <Input
+                              value={item.brand}
+                              disabled={isLinked}
+                              onChange={(e) => updateAccessoryLineItem(item.id, 'brand', e.target.value)}
+                              placeholder="Anker"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Qty *</Label>
+                            <Input
+                              type="number" min={1}
+                              value={item.quantity}
+                              onChange={(e) => updateAccessoryLineItem(item.id, 'quantity', Number(e.target.value) || 1)}
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Unit Cost</Label>
+                            <Input
+                              type="number" min={0}
+                              value={item.unit_cost}
+                              onChange={(e) => updateAccessoryLineItem(item.id, 'unit_cost', Number(e.target.value) || 0)}
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Sell Price</Label>
+                            <Input
+                              type="number" min={0}
+                              value={item.selling_price}
+                              disabled={isLinked}
+                              onChange={(e) => updateAccessoryLineItem(item.id, 'selling_price', Number(e.target.value) || 0)}
+                            />
+                          </div>
+                        </div>
+
+                        {isLinked && (
+                          <p className="text-xs text-muted-foreground">
+                            Linked to existing stock — only quantity and unit cost are recorded. Name, brand and sell price stay as the existing accessory's.
+                          </p>
+                        )}
                       </div>
-                      <div>
-                        {idx === 0 && <Label className="text-xs">Brand</Label>}
-                        <Input
-                          value={item.brand}
-                          onChange={(e) => updateAccessoryLineItem(item.id, 'brand', e.target.value)}
-                          placeholder="Anker"
-                        />
-                      </div>
-                      <div>
-                        {idx === 0 && <Label className="text-xs">Qty *</Label>}
-                        <Input
-                          type="number" min={1}
-                          value={item.quantity}
-                          onChange={(e) => updateAccessoryLineItem(item.id, 'quantity', Number(e.target.value) || 1)}
-                        />
-                      </div>
-                      <div>
-                        {idx === 0 && <Label className="text-xs">Unit Cost</Label>}
-                        <Input
-                          type="number" min={0}
-                          value={item.unit_cost}
-                          onChange={(e) => updateAccessoryLineItem(item.id, 'unit_cost', Number(e.target.value) || 0)}
-                        />
-                      </div>
-                      <div>
-                        {idx === 0 && <Label className="text-xs">Sell Price</Label>}
-                        <Input
-                          type="number" min={0}
-                          value={item.selling_price}
-                          onChange={(e) => updateAccessoryLineItem(item.id, 'selling_price', Number(e.target.value) || 0)}
-                        />
-                      </div>
-                      <div>
-                        {idx === 0 && <Label className="text-xs">&nbsp;</Label>}
-                        <Button
-                          variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-destructive"
-                          onClick={() => deleteAccessoryLineItem(item.id)}
-                        >×</Button>
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </CardContent>
