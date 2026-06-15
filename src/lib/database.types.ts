@@ -229,6 +229,7 @@ export type Database = {
           id: string
           is_active: boolean | null
           last_test_at: string | null
+          model_id: string | null
           purpose: string
           service_name: string
           updated_at: string | null
@@ -241,6 +242,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           last_test_at?: string | null
+          model_id?: string | null
           purpose?: string
           service_name: string
           updated_at?: string | null
@@ -253,6 +255,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           last_test_at?: string | null
+          model_id?: string | null
           purpose?: string
           service_name?: string
           updated_at?: string | null
@@ -456,6 +459,58 @@ export type Database = {
         }
         Relationships: []
       }
+      conversation_customer_audit: {
+        Row: {
+          changed_by: string | null
+          changed_by_email: string | null
+          conversation_id: string
+          created_at: string
+          id: string
+          new_customer_id: string | null
+          old_customer_id: string | null
+        }
+        Insert: {
+          changed_by?: string | null
+          changed_by_email?: string | null
+          conversation_id: string
+          created_at?: string
+          id?: string
+          new_customer_id?: string | null
+          old_customer_id?: string | null
+        }
+        Update: {
+          changed_by?: string | null
+          changed_by_email?: string | null
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          new_customer_id?: string | null
+          old_customer_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_customer_audit_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_customer_audit_new_customer_id_fkey"
+            columns: ["new_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_customer_audit_old_customer_id_fkey"
+            columns: ["old_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversations: {
         Row: {
           ai_enabled: boolean
@@ -574,6 +629,82 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "customer_addresses_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_merge_logs: {
+        Row: {
+          id: string
+          merged_at: string
+          merged_customer_codes: string[]
+          merged_customer_ids: string[]
+          merged_customer_names: string[]
+          performed_by: string | null
+          primary_customer_id: string
+        }
+        Insert: {
+          id?: string
+          merged_at?: string
+          merged_customer_codes: string[]
+          merged_customer_ids: string[]
+          merged_customer_names: string[]
+          performed_by?: string | null
+          primary_customer_id: string
+        }
+        Update: {
+          id?: string
+          merged_at?: string
+          merged_customer_codes?: string[]
+          merged_customer_ids?: string[]
+          merged_customer_names?: string[]
+          performed_by?: string | null
+          primary_customer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_merge_logs_primary_customer_id_fkey"
+            columns: ["primary_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_pin_resets: {
+        Row: {
+          attempts: number
+          created_at: string
+          customer_id: string
+          expires_at: string
+          id: string
+          token_hash: string
+          used_at: string | null
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          customer_id: string
+          expires_at: string
+          id?: string
+          token_hash: string
+          used_at?: string | null
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          customer_id?: string
+          expires_at?: string
+          id?: string
+          token_hash?: string
+          used_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_pin_resets_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
@@ -1652,6 +1783,97 @@ export type Database = {
         }
         Relationships: []
       }
+      live_session_sales: {
+        Row: {
+          amount: number | null
+          customer_name: string | null
+          description: string | null
+          id: string
+          item_code: string | null
+          item_id: string | null
+          order_code: string | null
+          order_id: string | null
+          session_id: string
+          sold_at: string
+        }
+        Insert: {
+          amount?: number | null
+          customer_name?: string | null
+          description?: string | null
+          id?: string
+          item_code?: string | null
+          item_id?: string | null
+          order_code?: string | null
+          order_id?: string | null
+          session_id: string
+          sold_at?: string
+        }
+        Update: {
+          amount?: number | null
+          customer_name?: string | null
+          description?: string | null
+          id?: string
+          item_code?: string | null
+          item_id?: string | null
+          order_code?: string | null
+          order_id?: string | null
+          session_id?: string
+          sold_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_session_sales_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "live_session_sales_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "live_session_sales_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "live_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      live_sessions: {
+        Row: {
+          created_at: string
+          ended_at: string | null
+          id: string
+          staff_name: string | null
+          staff_user_id: string
+          started_at: string
+          total_sold: number
+        }
+        Insert: {
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          staff_name?: string | null
+          staff_user_id: string
+          started_at?: string
+          total_sold?: number
+        }
+        Update: {
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          staff_name?: string | null
+          staff_user_id?: string
+          started_at?: string
+          total_sold?: number
+        }
+        Relationships: []
+      }
       message_folders: {
         Row: {
           created_at: string
@@ -2219,6 +2441,8 @@ export type Database = {
       }
       postal_codes: {
         Row: {
+          chome_en: string | null
+          chome_ja: string | null
           city_en: string
           city_ja: string
           created_at: string | null
@@ -2230,6 +2454,8 @@ export type Database = {
           town_ja: string
         }
         Insert: {
+          chome_en?: string | null
+          chome_ja?: string | null
           city_en: string
           city_ja: string
           created_at?: string | null
@@ -2241,6 +2467,8 @@ export type Database = {
           town_ja?: string
         }
         Update: {
+          chome_en?: string | null
+          chome_ja?: string | null
           city_en?: string
           city_ja?: string
           created_at?: string | null
@@ -2513,6 +2741,7 @@ export type Database = {
           customer_description: string
           customer_id: string
           id: string
+          migrated_ticket_id: string | null
           order_id: string
           reason_category: string
           received_at: string | null
@@ -2531,6 +2760,7 @@ export type Database = {
           customer_description: string
           customer_id: string
           id?: string
+          migrated_ticket_id?: string | null
           order_id: string
           reason_category: string
           received_at?: string | null
@@ -2549,6 +2779,7 @@ export type Database = {
           customer_description?: string
           customer_id?: string
           id?: string
+          migrated_ticket_id?: string | null
           order_id?: string
           reason_category?: string
           received_at?: string | null
@@ -2567,6 +2798,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "return_requests_migrated_ticket_id_fkey"
+            columns: ["migrated_ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
             referencedColumns: ["id"]
           },
           {
@@ -2931,6 +3169,71 @@ export type Database = {
         }
         Relationships: []
       }
+      system_feedback: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          feedback_code: string
+          id: string
+          status: Database["public"]["Enums"]["system_feedback_status"]
+          title: string
+          type: Database["public"]["Enums"]["system_feedback_type"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          feedback_code?: string
+          id?: string
+          status?: Database["public"]["Enums"]["system_feedback_status"]
+          title: string
+          type?: Database["public"]["Enums"]["system_feedback_type"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          feedback_code?: string
+          id?: string
+          status?: Database["public"]["Enums"]["system_feedback_status"]
+          title?: string
+          type?: Database["public"]["Enums"]["system_feedback_type"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      system_feedback_media: {
+        Row: {
+          created_at: string
+          feedback_id: string
+          file_url: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          feedback_id: string
+          file_url: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          feedback_id?: string
+          file_url?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "system_feedback_media_feedback_id_fkey"
+            columns: ["feedback_id"]
+            isOneToOne: false
+            referencedRelation: "system_feedback"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       system_settings: {
         Row: {
           description: string | null
@@ -2952,6 +3255,276 @@ export type Database = {
         }
         Relationships: []
       }
+      ticket_media: {
+        Row: {
+          file_url: string
+          id: string
+          media_type: string
+          sort_order: number | null
+          ticket_id: string
+          uploaded_at: string
+        }
+        Insert: {
+          file_url: string
+          id?: string
+          media_type?: string
+          sort_order?: number | null
+          ticket_id: string
+          uploaded_at?: string
+        }
+        Update: {
+          file_url?: string
+          id?: string
+          media_type?: string
+          sort_order?: number | null
+          ticket_id?: string
+          uploaded_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_media_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_notes: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          metadata: Json | null
+          note_type: string
+          staff_id: string | null
+          ticket_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          note_type?: string
+          staff_id?: string | null
+          ticket_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          note_type?: string
+          staff_id?: string | null
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_notes_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_types: {
+        Row: {
+          created_at: string
+          icon: string
+          id: string
+          is_active: boolean
+          label: string
+          name: string
+          slug: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          icon?: string
+          id?: string
+          is_active?: boolean
+          label: string
+          name: string
+          slug: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          icon?: string
+          id?: string
+          is_active?: boolean
+          label?: string
+          name?: string
+          slug?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      tickets: {
+        Row: {
+          assigned_staff_id: string | null
+          closed_at: string | null
+          conversation_id: string | null
+          created_at: string
+          created_by_id: string | null
+          created_by_role: string
+          customer_id: string | null
+          description: string
+          id: string
+          order_id: string | null
+          priority: Database["public"]["Enums"]["ticket_priority"]
+          resolution_notes: string | null
+          resolved_at: string | null
+          return_data: Json | null
+          subject: string
+          ticket_code: string
+          ticket_status: Database["public"]["Enums"]["ticket_status"]
+          ticket_type_id: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_staff_id?: string | null
+          closed_at?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          created_by_id?: string | null
+          created_by_role?: string
+          customer_id?: string | null
+          description: string
+          id?: string
+          order_id?: string | null
+          priority?: Database["public"]["Enums"]["ticket_priority"]
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          return_data?: Json | null
+          subject: string
+          ticket_code: string
+          ticket_status?: Database["public"]["Enums"]["ticket_status"]
+          ticket_type_id: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_staff_id?: string | null
+          closed_at?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          created_by_id?: string | null
+          created_by_role?: string
+          customer_id?: string | null
+          description?: string
+          id?: string
+          order_id?: string | null
+          priority?: Database["public"]["Enums"]["ticket_priority"]
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          return_data?: Json | null
+          subject?: string
+          ticket_code?: string
+          ticket_status?: Database["public"]["Enums"]["ticket_status"]
+          ticket_type_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tickets_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tickets_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tickets_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tickets_ticket_type_id_fkey"
+            columns: ["ticket_type_id"]
+            isOneToOne: false
+            referencedRelation: "ticket_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      webhook_delivery_log: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          missive_conversation_id: string | null
+          missive_message_id: string
+          processing_ms: number | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          missive_conversation_id?: string | null
+          missive_message_id: string
+          processing_ms?: number | null
+          status: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          missive_conversation_id?: string | null
+          missive_message_id?: string
+          processing_ms?: number | null
+          status?: string
+        }
+        Relationships: []
+      }
+      webhook_events: {
+        Row: {
+          attempts: number
+          created_at: string
+          error_message: string | null
+          id: string
+          missive_conversation_id: string | null
+          missive_message_id: string
+          processed_at: string | null
+          processing_ms: number | null
+          raw_payload: Json
+          status: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          missive_conversation_id?: string | null
+          missive_message_id: string
+          processed_at?: string | null
+          processing_ms?: number | null
+          raw_payload: Json
+          status?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          missive_conversation_id?: string | null
+          missive_message_id?: string
+          processed_at?: string | null
+          processing_ms?: number | null
+          raw_payload?: Json
+          status?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -2962,7 +3535,16 @@ export type Database = {
         Args: { pin_hash: string; pin_text: string }
         Returns: boolean
       }
+      check_message_health: { Args: never; Returns: undefined }
       check_yamato_tracking: { Args: never; Returns: undefined }
+      cities_in_prefecture: {
+        Args: { p_prefecture_ja: string }
+        Returns: {
+          city_en: string
+          city_ja: string
+        }[]
+      }
+      cleanup_webhook_delivery_log: { Args: never; Returns: undefined }
       create_accessory_intake_batch: {
         Args: {
           p_date_received: string
@@ -3018,6 +3600,7 @@ export type Database = {
         Returns: string
       }
       generate_pending_drafts: { Args: never; Returns: undefined }
+      generate_sf_code: { Args: never; Returns: string }
       get_available_brands: {
         Args: never
         Returns: {
@@ -3036,6 +3619,14 @@ export type Database = {
         Returns: number
       }
       match_product_model: { Args: { p_description: string }; Returns: string }
+      merge_customers: {
+        Args: {
+          p_performed_by?: string
+          p_primary_id: string
+          p_secondary_ids: string[]
+        }
+        Returns: Json
+      }
       normalize_brand: { Args: { input: string }; Returns: string }
       parse_specs_from_description: {
         Args: { p_description: string }
@@ -3053,17 +3644,22 @@ export type Database = {
           search_query: string
         }
         Returns: {
+          battery_health_pct: number
           brand: string
+          category_description_fields: string[]
           color: string
           condition_grade: string
           condition_notes: string
           cpu: string
+          discount: number
           first_item_display_url: string
           first_item_thumb_url: string
           first_product_media_url: string
           gpu: string
+          has_touchscreen: boolean
           hero_media_url: string
           id: string
+          is_unlocked: boolean
           item_code: string
           model_name: string
           model_number: string
@@ -3073,6 +3669,7 @@ export type Database = {
           screen_size: number
           selling_price: number
           storage_gb: string
+          supplier_description: string
           year: number
         }[]
       }
@@ -3107,7 +3704,19 @@ export type Database = {
           isSetofReturn: true
         }
       }
-      trigger_message_sync: { Args: never; Returns: undefined }
+      towns_in_city: {
+        Args: { p_city_ja: string; p_prefecture_ja: string }
+        Returns: {
+          chome_en: string
+          chome_ja: string
+          postal_code: string
+          town_en: string
+          town_ja: string
+        }[]
+      }
+      trigger_contact_name_backfill: { Args: never; Returns: undefined }
+      trigger_message_sync_fast: { Args: never; Returns: undefined }
+      trigger_message_sync_full: { Args: never; Returns: undefined }
     }
     Enums: {
       ac_adapter_status: "CORRECT" | "INCORRECT" | "MISSING"
@@ -3162,7 +3771,7 @@ export type Database = {
       media_role: "hero" | "gallery" | "video"
       media_type: "image" | "video"
       message_channel: "facebook" | "email" | "sms"
-      message_role: "customer" | "assistant" | "staff" | "system"
+      message_role: "customer" | "assistant" | "staff" | "system" | "internal"
       message_status: "DRAFT" | "SENDING" | "SENT" | "FAILED" | "REJECTED"
       message_type: "REPLY" | "REVIEW_REQUEST" | "DELIVERY_ALERT"
       offer_status: "PENDING" | "CLAIMED" | "EXPIRED" | "CANCELLED"
@@ -3195,6 +3804,15 @@ export type Database = {
         | "wholesaler"
         | "individual_kaitori"
         | "accessory"
+      system_feedback_status: "OPEN" | "IN_PROGRESS" | "DONE"
+      system_feedback_type: "BUG" | "FEATURE_REQUEST"
+      ticket_priority: "LOW" | "NORMAL" | "HIGH" | "URGENT"
+      ticket_status:
+        | "OPEN"
+        | "IN_PROGRESS"
+        | "RESOLVED"
+        | "CLOSED"
+        | "CANCELLED"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3379,7 +3997,7 @@ export const Constants = {
       media_role: ["hero", "gallery", "video"],
       media_type: ["image", "video"],
       message_channel: ["facebook", "email", "sms"],
-      message_role: ["customer", "assistant", "staff", "system"],
+      message_role: ["customer", "assistant", "staff", "system", "internal"],
       message_status: ["DRAFT", "SENDING", "SENT", "FAILED", "REJECTED"],
       message_type: ["REPLY", "REVIEW_REQUEST", "DELIVERY_ALERT"],
       offer_status: ["PENDING", "CLAIMED", "EXPIRED", "CANCELLED"],
@@ -3415,6 +4033,12 @@ export const Constants = {
         "individual_kaitori",
         "accessory",
       ],
+      system_feedback_status: ["OPEN", "IN_PROGRESS", "DONE"],
+      system_feedback_type: ["BUG", "FEATURE_REQUEST"],
+      ticket_priority: ["LOW", "NORMAL", "HIGH", "URGENT"],
+      ticket_status: ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED", "CANCELLED"],
     },
   },
 } as const
+A new version of Supabase CLI is available: v2.106.0 (currently installed v2.90.0)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
