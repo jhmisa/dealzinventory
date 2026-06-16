@@ -1,4 +1,5 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import type { VisionImage } from "./ai-vision.ts";
 
 // ---------- Types ----------
 
@@ -457,4 +458,102 @@ async function getRecentMessages(
   if (error || !data) return [];
   // Reverse so they're in chronological order
   return (data as MessageSummary[]).reverse();
+}
+
+// ---------- Vision: latest customer screenshots ----------
+
+export interface ImageAttachmentMeta {
+  file_url: string;
+  mime_type: string;
+}
+
+interface MessageWithAttachments {
+  role: string;
+  attachments: unknown;
+}
+
+// Pure: collect image attachments from the trailing run of customer messages
+// (everything after the last non-customer message), capped at maxImages.
+export function selectLatestCustomerImageAttachments(
+  messages: MessageWithAttachments[],
+  maxImages: number,
+): ImageAttachmentMeta[] {
+  // Walk backwards, stop at the first non-customer message.
+  const burst: MessageWithAttachments[] = [];
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role !== 'customer') break;
+    burst.unshift(messages[i]);
+  }
+
+  const out: ImageAttachmentMeta[] = [];
+  for (const msg of burst) {
+    if (!Array.isArray(msg.attachments)) continue;
+    for (const att of msg.attachments as Array<Record<string, unknown>>) {
+      const mime = String(att?.mime_type ?? '');
+      const url = att?.file_url;
+      if (mime.startsWith('image/') && typeof url === 'string') {
+        out.push({ file_url: url, mime_type: mime });
+        if (out.length >= maxImages) return out;
+      }
+    }
+  }
+  return out;
+}
+
+// IO: download image attachments from the messaging-attachments bucket and
+// base64-encode them for inline vision requests. Skips anything that fails
+// or is too large. Mirrors the encoding used by send-message.
+const MAX_VISION_IMAGE_BYTES = 5 * 1024 * 1024; // keep request payloads sane
+
+async function downloadImagesAsBase64(
+  supabase: ReturnType<typeof createClient>,
+  metas: ImageAttachmentMeta[],
+): Promise<VisionImage[]> {
+  const images: VisionImage[] = [];
+  for (const meta of metas) {
+    try {
+      const { data, error } = await supabase.storage
+        .from('messaging-attachments')
+        .download(meta.file_url);
+      if (error || !data) {
+        console.error(`Vision: failed to download ${meta.file_url}:`, error);
+        continue;
+      }
+      const arrayBuffer = await data.arrayBuffer();
+      if (arrayBuffer.byteLength > MAX_VISION_IMAGE_BYTES) {
+        console.warn(`Vision: skipping ${meta.file_url} (${arrayBuffer.byteLength} bytes > cap)`);
+        continue;
+      }
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      images.push({ base64: btoa(binary), mediaType: meta.mime_type });
+    } catch (err) {
+      console.error(`Vision: error processing ${meta.file_url}:`, err);
+    }
+  }
+  return images;
+}
+
+// IO: fetch the latest customer screenshots for a conversation, ready to send to a model.
+export async function getLatestCustomerImages(
+  supabase: ReturnType<typeof createClient>,
+  conversationId: string,
+  maxImages = 3,
+): Promise<VisionImage[]> {
+  const { data, error } = await supabase
+    .from('messages')
+    .select('role, attachments, created_at')
+    .eq('conversation_id', conversationId)
+    .in('status', ['SENT', 'DRAFT'])
+    .order('created_at', { ascending: false })
+    .limit(20);
+
+  if (error || !data) return [];
+
+  // Reverse to chronological so the trailing-customer-burst logic works.
+  const chronological = (data as MessageWithAttachments[]).slice().reverse();
+  const metas = selectLatestCustomerImageAttachments(chronological, maxImages);
+  if (metas.length === 0) return [];
+  return downloadImagesAsBase64(supabase, metas);
 }
