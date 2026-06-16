@@ -38,3 +38,59 @@ export function buildOpenRouterVisionBody(
     ],
   };
 }
+
+// An image ready to attach to a multimodal model request.
+export interface VisionImage {
+  base64: string;
+  mediaType: string;
+}
+
+// Pragmatic capability check: which provider/model combos accept images.
+export function modelSupportsVision(provider: string, modelId: string): boolean {
+  const m = (modelId ?? '').toLowerCase();
+  switch (provider) {
+    case 'anthropic':
+      return m.includes('claude');
+    case 'openai':
+      return m.includes('gpt-4o') || m.includes('gpt-4.1') || m.includes('o4') || m.includes('gpt-5');
+    case 'google':
+      return m.includes('gemini');
+    case 'openrouter':
+      return m.includes('gemini') || m.includes('claude') || m.includes('gpt-4o') ||
+        m.includes('gpt-4.1') || m.includes('gpt-5') || m.includes('llama-3.2') || m.includes('vision');
+    default:
+      return false;
+  }
+}
+
+// Anthropic message content: plain string when no images, else text + image blocks.
+export function toAnthropicContent(text: string, images: VisionImage[]): string | unknown[] {
+  if (images.length === 0) return text;
+  return [
+    { type: 'text', text },
+    ...images.map((img) => ({
+      type: 'image',
+      source: { type: 'base64', media_type: img.mediaType, data: img.base64 },
+    })),
+  ];
+}
+
+// OpenAI / OpenRouter message content: plain string when no images, else text + image_url parts.
+export function toOpenAIContent(text: string, images: VisionImage[]): string | unknown[] {
+  if (images.length === 0) return text;
+  return [
+    { type: 'text', text },
+    ...images.map((img) => ({
+      type: 'image_url',
+      image_url: { url: `data:${img.mediaType};base64,${img.base64}` },
+    })),
+  ];
+}
+
+// Gemini parts: always an array (Gemini requires parts[]), text first then inline images.
+export function toGeminiParts(text: string, images: VisionImage[]): unknown[] {
+  return [
+    { text },
+    ...images.map((img) => ({ inline_data: { mime_type: img.mediaType, data: img.base64 } })),
+  ];
+}
