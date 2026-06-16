@@ -40,6 +40,10 @@ Deno.test('shouldRouteOutOfInbox does not move when already in the target folder
 Deno.test('shouldRouteOutOfInbox does not move when there is no target', () => {
   assertEquals(shouldRouteOutOfInbox('inbox-id', 'inbox-id', null), false);
   assertEquals(shouldRouteOutOfInbox(null, 'inbox-id', null), false);
+  // Inbox id unknown (lookup failed): an unfiled conversation still routes; one already
+  // filed in a real folder does not.
+  assertEquals(shouldRouteOutOfInbox(null, null, 'order-id'), true);
+  assertEquals(shouldRouteOutOfInbox('concern-id', null, 'order-id'), false);
 });
 
 Deno.test('isEscalatingIntent is true only for kaitori and complaint', () => {
@@ -49,4 +53,6 @@ Deno.test('isEscalatingIntent is true only for kaitori and complaint', () => {
   assertEquals(isEscalatingIntent('product_inquiry'), false);
   assertEquals(isEscalatingIntent('return'), false);
   assertEquals(isEscalatingIntent('general'), false);
+  assertEquals(isEscalatingIntent('tracking'), false);
+  assertEquals(isEscalatingIntent('unknown'), false);
 });

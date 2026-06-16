@@ -11,6 +11,7 @@ const INTENT_FOLDER: Record<string, string> = {
   product_inquiry: 'Prospects',
   tracking: 'Order',
   order_status: 'Order',
+  // product return = handled in the Aftersales folder
   return: 'Aftersales',
   complaint: 'Concern',
   kaitori: 'Kaitori',
