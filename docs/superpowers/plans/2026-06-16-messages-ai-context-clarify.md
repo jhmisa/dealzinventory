@@ -361,7 +361,7 @@ Deno.test('buildEnhancedPrompt keeps the persona and appends both rule blocks', 
   assertEquals(out.includes('Response Strategy for Product Inquiries'), true);
   // new clarify rule appended
   assertEquals(out.includes('Resolve before assuming'), true);
-  assertEquals(out.includes('never re-ask'), true);
+  assertEquals(out.includes('NEVER re-ask'), true);
 });
 ```
 
