@@ -128,6 +128,7 @@ export async function generateAndSaveDraft(
       intent: aiResponse.intent,
       data_used: aiResponse.data_used,
       escalation_reason: aiResponse.escalation_reason,
+      needs_clarification: aiResponse.needs_clarification ?? false,
     }),
   });
 
