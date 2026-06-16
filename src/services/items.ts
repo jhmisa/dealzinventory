@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { fetchAllPages } from '@/lib/fetch-all-pages'
 import { getItemDescription, getSellGroupDescription, filterHiddenProductMedia } from '@/lib/utils'
 import type { Item, ItemInsert, ItemUpdate, ItemCost, ItemMedia } from '@/lib/types'
 
@@ -52,57 +53,66 @@ export async function getItems(filters: ItemFilters = {}) {
     ? await resolveGCodeToItemIds(filters.search.trim())
     : null
 
-  let query = supabase
-    .from('items')
-    .select(`
-      *,
-      suppliers(supplier_name),
-      product_models(*, categories(name, description_fields), product_media(file_url, role, sort_order)),
-      item_costs(amount),
-      order_items(
-        orders(id, order_code, order_status,
-          customers(id, customer_code, first_name, last_name, email, phone,
-            conversations(id, last_message_at)
+  // Build a fresh, fully-filtered query per page. Rebuilt each call because a
+  // PostgREST query builder is single-use once awaited.
+  const buildQuery = () => {
+    let query = supabase
+      .from('items')
+      .select(`
+        *,
+        suppliers(supplier_name),
+        product_models(*, categories(name, description_fields), product_media(file_url, role, sort_order)),
+        item_costs(amount),
+        order_items(
+          orders(id, order_code, order_status,
+            customers(id, customer_code, first_name, last_name, email, phone,
+              conversations(id, last_message_at)
+            )
+          )
+        ),
+        offer_items(
+          offers(id, offer_code, offer_status, fb_name, expires_at,
+            customers(id, customer_code, first_name, last_name, email, phone,
+              conversations(id, last_message_at)
+            )
           )
         )
-      ),
-      offer_items(
-        offers(id, offer_code, offer_status, fb_name, expires_at,
-          customers(id, customer_code, first_name, last_name, email, phone,
-            conversations(id, last_message_at)
-          )
-        )
-      )
-    `)
-    .order('created_at', { ascending: false })
+      `)
+      .order('created_at', { ascending: false })
+      // Stable tiebreaker so rows can't shift across page boundaries (skips/dupes).
+      .order('id', { ascending: true })
 
-  if (filters.search) {
-    query = applySearchFilter(query, filters.search, gCodeItemIds) as typeof query
-  }
-  if (filters.status) {
-    query = query.eq('item_status', filters.status)
-  }
-  if (filters.grade) {
-    if (filters.grade === 'UNGRADED') {
-      query = query.is('condition_grade', null)
-    } else {
-      query = query.eq('condition_grade', filters.grade)
+    if (filters.search) {
+      query = applySearchFilter(query, filters.search, gCodeItemIds) as typeof query
     }
-  }
-  if (filters.source) {
-    query = query.eq('source_type', filters.source)
-  }
-  if (filters.supplierId) {
-    query = query.eq('supplier_id', filters.supplierId)
-  }
-  if (filters.isLiveSelling) {
-    query = query.eq('is_live_selling', true)
+    if (filters.status) {
+      query = query.eq('item_status', filters.status)
+    }
+    if (filters.grade) {
+      if (filters.grade === 'UNGRADED') {
+        query = query.is('condition_grade', null)
+      } else {
+        query = query.eq('condition_grade', filters.grade)
+      }
+    }
+    if (filters.source) {
+      query = query.eq('source_type', filters.source)
+    }
+    if (filters.supplierId) {
+      query = query.eq('supplier_id', filters.supplierId)
+    }
+    if (filters.isLiveSelling) {
+      query = query.eq('is_live_selling', true)
+    }
+    return query
   }
 
-  const { data, error } = await query
-
-  if (error) throw error
-  return data ?? []
+  // The Items page fetches every item in the active tab (the "All" tab applies no
+  // status filter) to drive client-side filtering and dropdown options. Supabase
+  // caps a single request at max-rows (1000); page through all rows so items past
+  // row 1000 aren't silently dropped.
+  type ItemRow = NonNullable<Awaited<ReturnType<typeof buildQuery>>['data']>[number]
+  return fetchAllPages<ItemRow>((from, to) => buildQuery().range(from, to))
 }
 
 export async function getItem(id: string) {

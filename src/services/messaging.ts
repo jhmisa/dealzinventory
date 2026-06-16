@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { fetchAllPages } from '@/lib/fetch-all-pages'
 import type {
   Conversation,
   ConversationWithRelations,
@@ -29,55 +30,64 @@ export interface ConversationFilters {
 }
 
 export async function getConversations(filters: ConversationFilters = {}) {
-  let query = supabase
-    .from('conversations')
-    .select(`
-      *,
-      customers:customer_id(id, customer_code, last_name, first_name),
-      messages(id, role, content, status, ai_confidence, created_at)
-    `)
-    .order('last_message_at', { ascending: false })
-
-  if (filters.needs_review !== undefined) {
-    query = query.eq('needs_human_review', filters.needs_review)
-  }
-  if (filters.assigned_staff_id) {
-    query = query.eq('assigned_staff_id', filters.assigned_staff_id)
-  }
-  // Filter by archive status; omit the filter entirely for global search
-  if (filters.is_archived !== undefined) {
-    query = query.eq('is_archived', filters.is_archived)
-  }
-
-  if (filters.folder_id) {
-    query = query.eq('folder_id', filters.folder_id)
-  }
+  // Search matches both contact_name and linked customer fields. PostgREST can't
+  // .or() across joins, so resolve matching customer IDs up-front.
+  let searchCustomerIds: string[] | null = null
   if (filters.search) {
-    // Search both the conversation's contact_name and linked customer fields.
-    // PostgREST does not support .or() on joined tables, so we pre-fetch
-    // matching customer IDs and combine with a contact_name filter.
     const { data: matchingCustomers } = await supabase
       .from('customers')
       .select('id')
       .or(`last_name.ilike.%${filters.search}%,first_name.ilike.%${filters.search}%,customer_code.ilike.%${filters.search}%`)
-    const customerIds = (matchingCustomers ?? []).map(c => c.id)
-
-    // Build an OR filter: contact_name match OR customer_id in matched IDs
-    const orParts: string[] = [`contact_name.ilike.%${filters.search}%`]
-    if (customerIds.length > 0) {
-      orParts.push(`customer_id.in.(${customerIds.join(',')})`)
-    }
-    query = query.or(orParts.join(','))
+    searchCustomerIds = (matchingCustomers ?? []).map(c => c.id)
   }
 
-  // Only fetch the latest message per conversation for the list view
-  query = query
-    .order('created_at', { referencedTable: 'messages', ascending: false })
-    .limit(1, { referencedTable: 'messages' })
+  // Build a fresh, fully-filtered query per page. Rebuilt each call because a
+  // PostgREST query builder is single-use once awaited.
+  const buildQuery = () => {
+    let query = supabase
+      .from('conversations')
+      .select(`
+        *,
+        customers:customer_id(id, customer_code, last_name, first_name),
+        messages(id, role, content, status, ai_confidence, created_at)
+      `)
+      .order('last_message_at', { ascending: false })
+      // Stable tiebreaker so rows can't shift across page boundaries (skips/dupes).
+      .order('id', { ascending: true })
 
-  const { data, error } = await query
-  if (error) throw error
-  return (data ?? []) as ConversationWithRelations[]
+    if (filters.needs_review !== undefined) {
+      query = query.eq('needs_human_review', filters.needs_review)
+    }
+    if (filters.assigned_staff_id) {
+      query = query.eq('assigned_staff_id', filters.assigned_staff_id)
+    }
+    // Filter by archive status; omit the filter entirely for global search
+    if (filters.is_archived !== undefined) {
+      query = query.eq('is_archived', filters.is_archived)
+    }
+    if (filters.folder_id) {
+      query = query.eq('folder_id', filters.folder_id)
+    }
+    if (filters.search) {
+      // Build an OR filter: contact_name match OR customer_id in matched IDs
+      const orParts: string[] = [`contact_name.ilike.%${filters.search}%`]
+      if (searchCustomerIds && searchCustomerIds.length > 0) {
+        orParts.push(`customer_id.in.(${searchCustomerIds.join(',')})`)
+      }
+      query = query.or(orParts.join(','))
+    }
+
+    // Only fetch the latest message per conversation for the list view
+    return query
+      .order('created_at', { referencedTable: 'messages', ascending: false })
+      .limit(1, { referencedTable: 'messages' })
+  }
+
+  // The Archive view fetches every archived conversation (well over 1000). Supabase
+  // caps a single request at max-rows (1000); page through all rows so conversations
+  // past row 1000 aren't silently hidden.
+  const rows = await fetchAllPages((from, to) => buildQuery().range(from, to))
+  return rows as ConversationWithRelations[]
 }
 
 export async function getConversation(id: string) {

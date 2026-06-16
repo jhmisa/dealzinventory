@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { fetchAllPages } from '@/lib/fetch-all-pages'
 import type { Customer, CustomerUpdate } from '@/lib/types'
 import type { ShippingAddress } from '@/lib/address-types'
 import { uppercaseAddress } from '@/lib/address-types'
@@ -17,13 +18,18 @@ export async function getCustomers(filters: CustomerFilters = {}) {
     return data ?? []
   }
 
-  const { data, error } = await supabase
-    .from('customers')
-    .select('*')
-    .order('created_at', { ascending: false })
-
-  if (error) throw error
-  return data ?? []
+  // The Customers page lists every customer (no server-side pagination) and filters
+  // client-side. At ~960 rows this is about to cross Supabase's max-rows cap (1000),
+  // which would silently drop customers; page through all rows to stay correct.
+  return fetchAllPages<Customer>((from, to) =>
+    supabase
+      .from('customers')
+      .select('*')
+      .order('created_at', { ascending: false })
+      // Stable tiebreaker so rows can't shift across page boundaries (skips/dupes).
+      .order('id', { ascending: true })
+      .range(from, to),
+  )
 }
 
 export async function getCustomer(id: string) {

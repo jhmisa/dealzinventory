@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { fetchAllPages } from '@/lib/fetch-all-pages'
 import type { Order, OrderInsert, OrderUpdate, Item } from '@/lib/types'
 
 interface OrderFilters {
@@ -35,43 +36,52 @@ export async function getOrders(filters: OrderFilters = {}) {
     receiverOrderIds = receiverOrders?.map((o) => o.id) ?? []
   }
 
-  let query = supabase
-    .from('orders')
-    .select(`
-      *,
-      customers(customer_code, last_name, first_name, email, phone),
-      sell_groups(sell_group_code, condition_grade, discount_amount,
-        product_models(brand, model_name, cpu, ram_gb, storage_gb, short_description)
-      ),
-      order_items(count)
-    `)
-    .order('delivery_date', { ascending: true, nullsFirst: false })
-    .order('created_at', { ascending: false })
+  // Build a fresh, fully-filtered query for a given page. Rebuilt per page because
+  // a PostgREST query builder is single-use once awaited.
+  const buildQuery = () => {
+    let query = supabase
+      .from('orders')
+      .select(`
+        *,
+        customers(customer_code, last_name, first_name, email, phone),
+        sell_groups(sell_group_code, condition_grade, discount_amount,
+          product_models(brand, model_name, cpu, ram_gb, storage_gb, short_description)
+        ),
+        order_items(count)
+      `)
+      .order('delivery_date', { ascending: true, nullsFirst: false })
+      .order('created_at', { ascending: false })
+      // Stable tiebreaker so rows can't shift across page boundaries (skips/dupes).
+      .order('id', { ascending: true })
 
-  if (filters.search) {
-    // Match orders by order_code, customer, or receiver name
-    const orParts = [`order_code.ilike.%${filters.search}%`]
-    if (matchingCustomerIds && matchingCustomerIds.length > 0) {
-      orParts.push(`customer_id.in.(${matchingCustomerIds.join(',')})`)
+    if (filters.search) {
+      // Match orders by order_code, customer, or receiver name
+      const orParts = [`order_code.ilike.%${filters.search}%`]
+      if (matchingCustomerIds && matchingCustomerIds.length > 0) {
+        orParts.push(`customer_id.in.(${matchingCustomerIds.join(',')})`)
+      }
+      if (receiverOrderIds && receiverOrderIds.length > 0) {
+        orParts.push(`id.in.(${receiverOrderIds.join(',')})`)
+      }
+      query = query.or(orParts.join(','))
     }
-    if (receiverOrderIds && receiverOrderIds.length > 0) {
-      orParts.push(`id.in.(${receiverOrderIds.join(',')})`)
+    if (filters.status) {
+      query = query.eq('order_status', filters.status)
     }
-    query = query.or(orParts.join(','))
-  }
-  if (filters.status) {
-    query = query.eq('order_status', filters.status)
-  }
-  if (filters.source) {
-    query = query.eq('order_source', filters.source)
-  }
-  if (filters.customerId) {
-    query = query.eq('customer_id', filters.customerId)
+    if (filters.source) {
+      query = query.eq('order_source', filters.source)
+    }
+    if (filters.customerId) {
+      query = query.eq('customer_id', filters.customerId)
+    }
+    return query
   }
 
-  const { data, error } = await query
-  if (error) throw error
-  return data ?? []
+  // The orders page fetches every order (no status filter) to compute tab counts
+  // and filter/sort client-side. Supabase caps a single request at max-rows (1000),
+  // so an unbounded query silently drops orders past row 1000. Page through all rows.
+  type OrderRow = NonNullable<Awaited<ReturnType<typeof buildQuery>>['data']>[number]
+  return fetchAllPages<OrderRow>((from, to) => buildQuery().range(from, to))
 }
 
 export async function getOrder(id: string) {
