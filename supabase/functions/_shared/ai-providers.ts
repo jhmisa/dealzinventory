@@ -1,3 +1,5 @@
+import { type TokenUsage } from "./ai-cost.ts";
+
 // ---------- Types ----------
 
 export interface AIProvider {
@@ -14,6 +16,24 @@ export interface AIResponse {
   intent: string;
   data_used: string[];
   escalation_reason: string | null;
+  usage?: TokenUsage;
+}
+
+// Normalize token usage across provider response shapes.
+export function extractUsage(provider: string, data: unknown): TokenUsage {
+  const d = (data ?? {}) as Record<string, unknown>;
+  if (provider === 'google') {
+    const u = (d.usageMetadata ?? {}) as Record<string, unknown>;
+    return {
+      input_tokens: Number(u.promptTokenCount ?? 0),
+      output_tokens: Number(u.candidatesTokenCount ?? 0),
+    };
+  }
+  const u = (d.usage ?? {}) as Record<string, unknown>;
+  return {
+    input_tokens: Number(u.input_tokens ?? u.prompt_tokens ?? 0),
+    output_tokens: Number(u.output_tokens ?? u.completion_tokens ?? 0),
+  };
 }
 
 interface ChatMessage {
@@ -116,7 +136,7 @@ async function callClaude(
 
   const data = await res.json();
   const text = data.content?.[0]?.text ?? '';
-  return parseAIResponse(text);
+  return { ...parseAIResponse(text), usage: extractUsage('anthropic', data) };
 }
 
 // ---------- OpenAI (GPT) ----------
@@ -159,7 +179,7 @@ async function callOpenAI(
 
   const data = await res.json();
   const text = data.choices?.[0]?.message?.content ?? '';
-  return parseAIResponse(text);
+  return { ...parseAIResponse(text), usage: extractUsage('openai', data) };
 }
 
 // ---------- OpenRouter (OpenAI-compatible) ----------
@@ -205,7 +225,7 @@ async function callOpenRouter(
     if (res.ok) {
       const data = await res.json();
       const text = data.choices?.[0]?.message?.content ?? '';
-      return parseAIResponse(text);
+      return { ...parseAIResponse(text), usage: extractUsage('openrouter', data) };
     }
 
     lastError = await res.text();
@@ -262,7 +282,7 @@ async function callGemini(
     if (res.ok) {
       const data = await res.json();
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-      return parseAIResponse(text);
+      return { ...parseAIResponse(text), usage: extractUsage('google', data) };
     }
 
     lastError = await res.text();
