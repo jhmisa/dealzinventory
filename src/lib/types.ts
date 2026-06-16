@@ -389,6 +389,7 @@ export interface Conversation {
   unmatched_contact: boolean
   assigned_staff_id: string | null
   ai_enabled: boolean
+  ai_intent: string | null
   unread_count: number
   last_message_at: string | null
   created_at: string
