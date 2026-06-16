@@ -23,6 +23,7 @@ export interface AIResponse {
   intent: string;
   data_used: string[];
   escalation_reason: string | null;
+  needs_clarification?: boolean;
   usage?: TokenUsage;
 }
 
@@ -149,7 +150,7 @@ async function callClaude(
   }
 
   // Add the latest customer message context prompt
-  const fullSystem = `${systemPrompt}\n\n---\n\n# Current Customer Context\n${contextBlock}\n\n---\n\nRespond with a JSON object containing:\n- "reply": your message to the customer\n- "confidence": 0.0-1.0 how confident you are this reply is correct and complete\n- "intent": one of tracking|order_status|product_inquiry|complaint|return|kaitori|general|unknown\n- "data_used": array of data references used e.g. ["order:ORD000123"]\n- "escalation_reason": null if no escalation needed, otherwise a short reason string\n\nRespond ONLY with the JSON object, no markdown fences.`;
+  const fullSystem = `${systemPrompt}\n\n---\n\n# Current Customer Context\n${contextBlock}\n\n---\n\nRespond with a JSON object containing:\n- "reply": your message to the customer\n- "confidence": 0.0-1.0 how confident you are this reply is correct and complete\n- "intent": one of tracking|order_status|product_inquiry|complaint|return|kaitori|general|unknown\n- "data_used": array of data references used e.g. ["order:ORD000123"]\n- "escalation_reason": null if no escalation needed, otherwise a short reason string\n- "needs_clarification": true if your reply is a question asking the customer to clarify their request (instead of answering it), otherwise false\n\nRespond ONLY with the JSON object, no markdown fences.`;
 
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -188,7 +189,7 @@ async function callOpenAI(
   const openaiMessages: Array<{ role: string; content: string | unknown[] }> = [
     {
       role: 'system',
-      content: `${systemPrompt}\n\n---\n\n# Current Customer Context\n${contextBlock}\n\n---\n\nRespond with a JSON object containing:\n- "reply": your message to the customer\n- "confidence": 0.0-1.0 how confident you are this reply is correct and complete\n- "intent": one of tracking|order_status|product_inquiry|complaint|return|kaitori|general|unknown\n- "data_used": array of data references used e.g. ["order:ORD000123"]\n- "escalation_reason": null if no escalation needed, otherwise a short reason string\n\nRespond ONLY with the JSON object, no markdown fences.`,
+      content: `${systemPrompt}\n\n---\n\n# Current Customer Context\n${contextBlock}\n\n---\n\nRespond with a JSON object containing:\n- "reply": your message to the customer\n- "confidence": 0.0-1.0 how confident you are this reply is correct and complete\n- "intent": one of tracking|order_status|product_inquiry|complaint|return|kaitori|general|unknown\n- "data_used": array of data references used e.g. ["order:ORD000123"]\n- "escalation_reason": null if no escalation needed, otherwise a short reason string\n- "needs_clarification": true if your reply is a question asking the customer to clarify their request (instead of answering it), otherwise false\n\nRespond ONLY with the JSON object, no markdown fences.`,
     },
     ...consolidateMessages(messages).map((m) => ({
       role: m.role === 'customer' ? 'user' as const : 'assistant' as const,
@@ -242,7 +243,7 @@ async function callOpenRouter(
   const openrouterMessages: Array<{ role: string; content: string | unknown[] }> = [
     {
       role: 'system',
-      content: `${systemPrompt}\n\n---\n\n# Current Customer Context\n${contextBlock}\n\n---\n\nRespond with a JSON object containing:\n- "reply": your message to the customer\n- "confidence": 0.0-1.0 how confident you are this reply is correct and complete\n- "intent": one of tracking|order_status|product_inquiry|complaint|return|kaitori|general|unknown\n- "data_used": array of data references used e.g. ["order:ORD000123"]\n- "escalation_reason": null if no escalation needed, otherwise a short reason string\n\nRespond ONLY with the JSON object, no markdown fences.`,
+      content: `${systemPrompt}\n\n---\n\n# Current Customer Context\n${contextBlock}\n\n---\n\nRespond with a JSON object containing:\n- "reply": your message to the customer\n- "confidence": 0.0-1.0 how confident you are this reply is correct and complete\n- "intent": one of tracking|order_status|product_inquiry|complaint|return|kaitori|general|unknown\n- "data_used": array of data references used e.g. ["order:ORD000123"]\n- "escalation_reason": null if no escalation needed, otherwise a short reason string\n- "needs_clarification": true if your reply is a question asking the customer to clarify their request (instead of answering it), otherwise false\n\nRespond ONLY with the JSON object, no markdown fences.`,
     },
     ...consolidateMessages(messages).map((m) => ({
       role: m.role === 'customer' ? 'user' as const : 'assistant' as const,
@@ -326,7 +327,7 @@ async function callGemini(
   const body = JSON.stringify({
     systemInstruction: {
       parts: [{
-        text: `${systemPrompt}\n\n---\n\n# Current Customer Context\n${contextBlock}\n\n---\n\nRespond with a JSON object containing:\n- "reply": your message to the customer\n- "confidence": 0.0-1.0 how confident you are this reply is correct and complete\n- "intent": one of tracking|order_status|product_inquiry|complaint|return|kaitori|general|unknown\n- "data_used": array of data references used e.g. ["order:ORD000123"]\n- "escalation_reason": null if no escalation needed, otherwise a short reason string\n\nRespond ONLY with the JSON object, no markdown fences.`,
+        text: `${systemPrompt}\n\n---\n\n# Current Customer Context\n${contextBlock}\n\n---\n\nRespond with a JSON object containing:\n- "reply": your message to the customer\n- "confidence": 0.0-1.0 how confident you are this reply is correct and complete\n- "intent": one of tracking|order_status|product_inquiry|complaint|return|kaitori|general|unknown\n- "data_used": array of data references used e.g. ["order:ORD000123"]\n- "escalation_reason": null if no escalation needed, otherwise a short reason string\n- "needs_clarification": true if your reply is a question asking the customer to clarify their request (instead of answering it), otherwise false\n\nRespond ONLY with the JSON object, no markdown fences.`,
       }],
     },
     contents: geminiContents,
@@ -368,7 +369,7 @@ async function callGemini(
 
 // ---------- Response parser ----------
 
-function parseAIResponse(text: string): AIResponse {
+export function parseAIResponse(text: string): AIResponse {
   // Try multiple strategies to extract JSON from the response
   const strategies = [
     // 1. Raw text as-is
@@ -393,6 +394,7 @@ function parseAIResponse(text: string): AIResponse {
           intent: String(parsed.intent ?? 'unknown'),
           data_used: Array.isArray(parsed.data_used) ? parsed.data_used.map(String) : [],
           escalation_reason: parsed.escalation_reason ? String(parsed.escalation_reason) : null,
+          needs_clarification: parsed.needs_clarification === true,
         };
       }
     } catch {
@@ -409,6 +411,7 @@ function parseAIResponse(text: string): AIResponse {
       intent: 'general',
       data_used: [],
       escalation_reason: null,
+      needs_clarification: false,
     };
   }
 
@@ -418,5 +421,6 @@ function parseAIResponse(text: string): AIResponse {
     intent: 'unknown',
     data_used: [],
     escalation_reason: 'AI response could not be parsed as structured JSON',
+    needs_clarification: false,
   };
 }

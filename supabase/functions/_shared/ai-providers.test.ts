@@ -58,3 +58,26 @@ Deno.test('consolidate preserves alternation and merges a customer burst', () =>
     { role: 'customer', content: 'c' },
   ]);
 });
+
+import { parseAIResponse } from './ai-providers.ts';
+
+Deno.test('parseAIResponse reads needs_clarification = true', () => {
+  const text = JSON.stringify({
+    reply: 'Order ORD000123 po ba ito?',
+    confidence: 0.8,
+    intent: 'order_status',
+    data_used: ['order:ORD000123'],
+    escalation_reason: null,
+    needs_clarification: true,
+  });
+  assertEquals(parseAIResponse(text).needs_clarification, true);
+});
+
+Deno.test('parseAIResponse defaults needs_clarification to false when absent', () => {
+  const text = JSON.stringify({ reply: 'Available po ang iPhone 13.', confidence: 0.9 });
+  assertEquals(parseAIResponse(text).needs_clarification, false);
+});
+
+Deno.test('parseAIResponse defaults needs_clarification to false on non-JSON reply', () => {
+  assertEquals(parseAIResponse('just a plain sentence reply').needs_clarification, false);
+});
