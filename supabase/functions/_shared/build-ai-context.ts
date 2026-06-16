@@ -451,7 +451,9 @@ async function getRecentMessages(
     .from('messages')
     .select('role, content, created_at')
     .eq('conversation_id', conversationId)
-    .in('status', ['SENT', 'DRAFT'])
+    // SENT only: a rejected/stale DRAFT must not look like a reply we actually sent,
+    // or the model thinks it already answered and re-asks / contradicts itself.
+    .eq('status', 'SENT')
     .order('created_at', { ascending: false })
     .limit(20);
 
