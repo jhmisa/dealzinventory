@@ -150,23 +150,27 @@ export async function generateAndSaveDraft(
   if (targetFolderName) {
     try {
       // Resolve Inbox + target folder ids by name (ids are random per-env; name is the stable key).
-      const { data: folders } = await supabase
+      const { data: folders, error: foldersErr } = await supabase
         .from('message_folders')
         .select('id, name')
         .in('name', ['Inbox', targetFolderName]);
+      if (foldersErr) console.error('Intent routing: folder lookup failed (non-fatal):', foldersErr);
       const folderRows = (folders ?? []) as Array<{ id: string; name: string }>;
       const inboxId = folderRows.find((f) => f.name === 'Inbox')?.id ?? null;
       const targetId = folderRows.find((f) => f.name === targetFolderName)?.id ?? null;
 
       // Read the conversation's current folder to enforce triage-out-of-inbox-only.
-      const { data: convo } = await supabase
+      const { data: convo, error: convoErr } = await supabase
         .from('conversations')
         .select('folder_id')
         .eq('id', conversationId)
         .maybeSingle();
+      if (convoErr) console.error('Intent routing: current-folder lookup failed (non-fatal):', convoErr);
       const currentFolderId = (convo as { folder_id: string | null } | null)?.folder_id ?? null;
 
-      if (shouldRouteOutOfInbox(currentFolderId, inboxId, targetId)) {
+      // Only move if we actually confirmed the current folder — a failed read must not be
+      // treated as "unfiled" and trigger a move.
+      if (!convoErr && shouldRouteOutOfInbox(currentFolderId, inboxId, targetId)) {
         conversationUpdate.folder_id = targetId;
       }
     } catch (routeErr) {
