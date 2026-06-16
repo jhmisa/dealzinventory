@@ -1,4 +1,11 @@
 import { type TokenUsage } from "./ai-cost.ts";
+import {
+  modelSupportsVision,
+  toAnthropicContent,
+  toOpenAIContent,
+  toGeminiParts,
+  type VisionImage,
+} from "./ai-vision.ts";
 
 // ---------- Types ----------
 
@@ -80,19 +87,23 @@ export async function generateAIReply(
   systemPrompt: string,
   contextBlock: string,
   messages: ChatMessage[],
+  latestImages: VisionImage[] = [],
 ): Promise<AIResponse> {
   // Inject inventory response strategy into every prompt
   const enhancedPrompt = `${systemPrompt}\n\n${INVENTORY_RESPONSE_RULE}`;
 
+  // Only forward images to vision-capable models; otherwise ignore them.
+  const images = modelSupportsVision(provider.provider, provider.model_id) ? latestImages : [];
+
   switch (provider.provider) {
     case 'anthropic':
-      return callClaude(provider, enhancedPrompt, contextBlock, messages);
+      return callClaude(provider, enhancedPrompt, contextBlock, messages, images);
     case 'openai':
-      return callOpenAI(provider, enhancedPrompt, contextBlock, messages);
+      return callOpenAI(provider, enhancedPrompt, contextBlock, messages, images);
     case 'google':
-      return callGemini(provider, enhancedPrompt, contextBlock, messages);
+      return callGemini(provider, enhancedPrompt, contextBlock, messages, images);
     case 'openrouter':
-      return callOpenRouter(provider, enhancedPrompt, contextBlock, messages);
+      return callOpenRouter(provider, enhancedPrompt, contextBlock, messages, images);
     default:
       throw new Error(`Unsupported provider: ${provider.provider}`);
   }
@@ -105,11 +116,23 @@ async function callClaude(
   systemPrompt: string,
   contextBlock: string,
   messages: ChatMessage[],
+  images: VisionImage[] = [],
 ): Promise<AIResponse> {
-  const anthropicMessages = consolidateMessages(messages).map((m) => ({
-    role: m.role === 'customer' ? 'user' as const : 'assistant' as const,
-    content: m.content,
-  }));
+  const anthropicMessages: Array<{ role: 'user' | 'assistant'; content: string | unknown[] }> =
+    consolidateMessages(messages).map((m) => ({
+      role: m.role === 'customer' ? 'user' as const : 'assistant' as const,
+      content: m.content as string | unknown[],
+    }));
+
+  // Attach images to the most recent user turn.
+  if (images.length > 0) {
+    for (let i = anthropicMessages.length - 1; i >= 0; i--) {
+      if (anthropicMessages[i].role === 'user') {
+        anthropicMessages[i].content = toAnthropicContent(anthropicMessages[i].content as string, images);
+        break;
+      }
+    }
+  }
 
   // Add the latest customer message context prompt
   const fullSystem = `${systemPrompt}\n\n---\n\n# Current Customer Context\n${contextBlock}\n\n---\n\nRespond with a JSON object containing:\n- "reply": your message to the customer\n- "confidence": 0.0-1.0 how confident you are this reply is correct and complete\n- "intent": one of tracking|order_status|product_inquiry|complaint|return|kaitori|general|unknown\n- "data_used": array of data references used e.g. ["order:ORD000123"]\n- "escalation_reason": null if no escalation needed, otherwise a short reason string\n\nRespond ONLY with the JSON object, no markdown fences.`;
@@ -146,17 +169,28 @@ async function callOpenAI(
   systemPrompt: string,
   contextBlock: string,
   messages: ChatMessage[],
+  images: VisionImage[] = [],
 ): Promise<AIResponse> {
-  const openaiMessages = [
+  const openaiMessages: Array<{ role: string; content: string | unknown[] }> = [
     {
       role: 'system',
       content: `${systemPrompt}\n\n---\n\n# Current Customer Context\n${contextBlock}\n\n---\n\nRespond with a JSON object containing:\n- "reply": your message to the customer\n- "confidence": 0.0-1.0 how confident you are this reply is correct and complete\n- "intent": one of tracking|order_status|product_inquiry|complaint|return|kaitori|general|unknown\n- "data_used": array of data references used e.g. ["order:ORD000123"]\n- "escalation_reason": null if no escalation needed, otherwise a short reason string\n\nRespond ONLY with the JSON object, no markdown fences.`,
     },
     ...consolidateMessages(messages).map((m) => ({
       role: m.role === 'customer' ? 'user' as const : 'assistant' as const,
-      content: m.content,
+      content: m.content as string | unknown[],
     })),
   ];
+
+  // Attach images to the most recent user turn.
+  if (images.length > 0) {
+    for (let i = openaiMessages.length - 1; i >= 0; i--) {
+      if (openaiMessages[i].role === 'user') {
+        openaiMessages[i].content = toOpenAIContent(openaiMessages[i].content as string, images);
+        break;
+      }
+    }
+  }
 
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -189,17 +223,28 @@ async function callOpenRouter(
   systemPrompt: string,
   contextBlock: string,
   messages: ChatMessage[],
+  images: VisionImage[] = [],
 ): Promise<AIResponse> {
-  const openrouterMessages = [
+  const openrouterMessages: Array<{ role: string; content: string | unknown[] }> = [
     {
       role: 'system',
       content: `${systemPrompt}\n\n---\n\n# Current Customer Context\n${contextBlock}\n\n---\n\nRespond with a JSON object containing:\n- "reply": your message to the customer\n- "confidence": 0.0-1.0 how confident you are this reply is correct and complete\n- "intent": one of tracking|order_status|product_inquiry|complaint|return|kaitori|general|unknown\n- "data_used": array of data references used e.g. ["order:ORD000123"]\n- "escalation_reason": null if no escalation needed, otherwise a short reason string\n\nRespond ONLY with the JSON object, no markdown fences.`,
     },
     ...consolidateMessages(messages).map((m) => ({
       role: m.role === 'customer' ? 'user' as const : 'assistant' as const,
-      content: m.content,
+      content: m.content as string | unknown[],
     })),
   ];
+
+  // Attach images to the most recent user turn.
+  if (images.length > 0) {
+    for (let i = openrouterMessages.length - 1; i >= 0; i--) {
+      if (openrouterMessages[i].role === 'user') {
+        openrouterMessages[i].content = toOpenAIContent(openrouterMessages[i].content as string, images);
+        break;
+      }
+    }
+  }
 
   // Retry up to 3 times with exponential backoff for 503/429 errors
   let lastError = '';
@@ -246,10 +291,21 @@ async function callGemini(
   systemPrompt: string,
   contextBlock: string,
   messages: ChatMessage[],
+  images: VisionImage[] = [],
 ): Promise<AIResponse> {
-  const geminiContents = consolidateMessages(messages).map((m) => ({
+  const consolidated = consolidateMessages(messages);
+  const lastUserIdx = (() => {
+    for (let i = consolidated.length - 1; i >= 0; i--) {
+      if (consolidated[i].role === 'customer') return i;
+    }
+    return -1;
+  })();
+
+  const geminiContents = consolidated.map((m, idx) => ({
     role: m.role === 'customer' ? 'user' : 'model',
-    parts: [{ text: m.content }],
+    parts: (images.length > 0 && idx === lastUserIdx)
+      ? toGeminiParts(m.content, images)
+      : [{ text: m.content }],
   }));
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${provider.model_id}:generateContent?key=${provider.api_key_encrypted}`;
