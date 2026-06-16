@@ -1,5 +1,5 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { buildCustomerContext, formatContextForPrompt } from "./build-ai-context.ts";
+import { buildCustomerContext, formatContextForPrompt, getLatestCustomerImages } from "./build-ai-context.ts";
 import { generateAIReply, type AIProvider } from "./ai-providers.ts";
 import { estimateCostUsd } from "./ai-cost.ts";
 
@@ -75,12 +75,16 @@ export async function generateAndSaveDraft(
     content: m.content,
   }));
 
+  // 4b. Fetch the latest customer screenshots (if any) for multimodal context.
+  const latestImages = await getLatestCustomerImages(supabase, conversationId, 3);
+
   // 5. Generate AI reply
   const aiResponse = await generateAIReply(
     provider as AIProvider,
     fullSystemPrompt,
     contextBlock,
     chatMessages,
+    latestImages,
   );
 
   // 5b. Record token usage + estimated cost (best-effort; never block the draft).
@@ -94,7 +98,7 @@ export async function generateAndSaveDraft(
       input_tokens: usage.input_tokens,
       output_tokens: usage.output_tokens,
       estimated_cost_usd: estimateCostUsd((provider as AIProvider).model_id, usage),
-      had_images: false,
+      had_images: latestImages.length > 0,
     });
   } catch (logErr) {
     console.error('ai_usage_log insert failed (non-fatal):', logErr);
