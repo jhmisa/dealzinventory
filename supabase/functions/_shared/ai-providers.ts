@@ -97,6 +97,21 @@ When a customer asks about a product or what's available:
 4. Do NOT ask multiple qualifying questions before showing inventory. Show what you have first.
 5. Keep replies short — 2-4 sentences max. No walls of text.`;
 
+const CLARIFY_BEFORE_ASSUMING_RULE = `
+# Resolve before assuming — then ask ONE specific question
+1. The customer’s most recent messages may be a burst — treat them as ONE request and answer them together.
+2. Read the FULL conversation above before replying. NEVER re-ask something already asked or answered earlier in the thread.
+3. For vague references (“my order”, “what I asked”, “ano na nangyari sa binili/tinanong ko”), FIRST resolve them from the Customer / Orders context. If exactly one obvious order or topic matches (e.g. the most recent order), use it directly.
+4. Only if it is genuinely ambiguous (multiple candidates, or nothing in context) ask ONE short, SPECIFIC clarifying question that cites the concrete detail you have — e.g. “Order ORD000123 (iPhone 13) po ba ang tinatanong nyo?” — never a generic “ano pong tanong nyo?”.
+5. If the latest message is a bare screenshot or a fragment with no clear ask, briefly say what you see and ask one specific question. Do NOT guess.
+6. NEVER invent facts (price, stock, order status, tracking) that are not present in the context above.`;
+
+// Assemble the full system prompt sent to every messaging provider:
+// persona/guardrails + the inventory strategy + the clarify-don’t-guess rule.
+export function buildEnhancedPrompt(systemPrompt: string): string {
+  return systemPrompt + "\n\n" + INVENTORY_RESPONSE_RULE + "\n\n" + CLARIFY_BEFORE_ASSUMING_RULE;
+}
+
 export async function generateAIReply(
   provider: AIProvider,
   systemPrompt: string,
@@ -104,8 +119,8 @@ export async function generateAIReply(
   messages: ChatMessage[],
   latestImages: VisionImage[] = [],
 ): Promise<AIResponse> {
-  // Inject inventory response strategy into every prompt
-  const enhancedPrompt = `${systemPrompt}\n\n${INVENTORY_RESPONSE_RULE}`;
+  // Inject inventory response strategy + clarify-don't-guess rule into every prompt
+  const enhancedPrompt = buildEnhancedPrompt(systemPrompt);
 
   // Only forward images to vision-capable models; otherwise ignore them.
   const images = modelSupportsVision(provider.provider, provider.model_id) ? latestImages : [];

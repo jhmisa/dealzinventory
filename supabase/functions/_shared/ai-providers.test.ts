@@ -81,3 +81,16 @@ Deno.test('parseAIResponse defaults needs_clarification to false when absent', (
 Deno.test('parseAIResponse defaults needs_clarification to false on non-JSON reply', () => {
   assertEquals(parseAIResponse('just a plain sentence reply').needs_clarification, false);
 });
+
+import { buildEnhancedPrompt } from './ai-providers.ts';
+
+Deno.test('buildEnhancedPrompt keeps the persona and appends both rule blocks', () => {
+  const out = buildEnhancedPrompt('PERSONA-PROMPT');
+  // persona retained
+  assertEquals(out.includes('PERSONA-PROMPT'), true);
+  // existing inventory rule retained
+  assertEquals(out.includes('Response Strategy for Product Inquiries'), true);
+  // new clarify rule appended
+  assertEquals(out.includes('Resolve before assuming'), true);
+  assertEquals(out.includes('NEVER re-ask'), true);
+});
