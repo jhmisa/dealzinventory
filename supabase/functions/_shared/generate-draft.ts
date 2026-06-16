@@ -2,6 +2,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { buildCustomerContext, formatContextForPrompt, getLatestCustomerImages } from "./build-ai-context.ts";
 import { generateAIReply, type AIProvider } from "./ai-providers.ts";
 import { estimateCostUsd } from "./ai-cost.ts";
+import { modelSupportsVision } from "./ai-vision.ts";
 
 /**
  * Generate an AI draft reply for a conversation and save it as a DRAFT message.
@@ -76,7 +77,15 @@ export async function generateAndSaveDraft(
   }));
 
   // 4b. Fetch the latest customer screenshots (if any) for multimodal context.
-  const latestImages = await getLatestCustomerImages(supabase, conversationId, 3);
+  // Only do the storage I/O when the active model can actually use images,
+  // which also keeps the had_images telemetry below accurate.
+  const supportsVision = modelSupportsVision(
+    (provider as AIProvider).provider,
+    (provider as AIProvider).model_id,
+  );
+  const latestImages = supportsVision
+    ? await getLatestCustomerImages(supabase, conversationId, 3)
+    : [];
 
   // 5. Generate AI reply
   const aiResponse = await generateAIReply(
