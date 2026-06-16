@@ -129,8 +129,38 @@ export async function buildCustomerContext(
 
 // ---------- Summary formatters for AI prompt ----------
 
+// Render a single order line item as a human-readable string for the prompt.
+// Prefers "Brand Model (P-code)"; falls back to the bare P-code when the
+// product model is unknown.
+export function formatOrderItem(
+  item: { item_code: string; product_models: { brand: string; model_name: string } | null },
+): string {
+  const pm = item.product_models;
+  if (pm && (pm.brand || pm.model_name)) {
+    return `${pm.brand ?? ''} ${pm.model_name ?? ''} (${item.item_code})`.replace(/\s+/g, ' ').trim();
+  }
+  return item.item_code;
+}
+
+// Return the order_code of the single most recent order across active + recent,
+// so the formatter can mark it (resolves "my order" / "binili ko"). Null if none.
+export function mostRecentOrderCode(
+  activeOrders: { order_code: string; created_at: string }[],
+  recentOrders: { order_code: string; created_at: string }[],
+): string | null {
+  const all = [...activeOrders, ...recentOrders];
+  if (all.length === 0) return null;
+  let best = all[0];
+  for (const o of all) {
+    if (o.created_at > best.created_at) best = o;
+  }
+  return best.order_code;
+}
+
 export function formatContextForPrompt(context: AIContext): string {
   const sections: string[] = [];
+  const recentCode = mostRecentOrderCode(context.activeOrders, context.recentOrders);
+  const mark = (code: string) => (code === recentCode ? ' ← most recent' : '');
 
   if (context.customer) {
     const c = context.customer;
@@ -141,7 +171,7 @@ export function formatContextForPrompt(context: AIContext): string {
 
   if (context.activeOrders.length > 0) {
     const lines = context.activeOrders.map((o) => {
-      let line = `- ${o.order_code}: status=${o.order_status}, total=¥${o.total_price}`;
+      let line = `- ${o.order_code}${mark(o.order_code)}: status=${o.order_status}, total=¥${o.total_price}`;
       if (o.tracking_number) line += `, tracking=${o.tracking_number}`;
       if (o.yamato_status) line += `, yamato=${o.yamato_status}`;
       if (o.shipped_date) line += `, shipped=${o.shipped_date}`;
@@ -155,7 +185,7 @@ export function formatContextForPrompt(context: AIContext): string {
 
   if (context.recentOrders.length > 0) {
     const lines = context.recentOrders.map(
-      (o) => `- ${o.order_code}: ${o.order_status}, ¥${o.total_price}, ${o.created_at.slice(0, 10)}`
+      (o) => `- ${o.order_code}${mark(o.order_code)}: ${o.order_status}, ¥${o.total_price}, ${o.created_at.slice(0, 10)}`
     );
     sections.push(`## Recent Orders (last 5)\n${lines.join('\n')}`);
   }
@@ -229,7 +259,7 @@ async function getActiveOrders(
     .select(`
       order_code, order_status, total_price, tracking_number,
       yamato_status, shipped_date, delivery_date, delivery_issue_flag, created_at,
-      order_items(items(item_code))
+      order_items(items(item_code, product_models(brand, model_name)))
     `)
     .eq('customer_id', customerId)
     .in('order_status', activeStatuses)
@@ -247,9 +277,9 @@ async function getActiveOrders(
     delivery_date: o.delivery_date as string | null,
     delivery_issue_flag: o.delivery_issue_flag as boolean,
     created_at: o.created_at as string,
-    items: ((o.order_items as Array<{ items: { item_code: string } | null }>) ?? [])
+    items: ((o.order_items as Array<{ items: { item_code: string; product_models: { brand: string; model_name: string } | null } | null }>) ?? [])
       .filter((oi) => oi.items)
-      .map((oi) => oi.items!.item_code),
+      .map((oi) => formatOrderItem(oi.items!)),
   }));
 }
 
@@ -260,7 +290,7 @@ async function getRecentOrders(
 ): Promise<OrderSummary[]> {
   const { data, error } = await supabase
     .from('orders')
-    .select('order_code, order_status, total_price, tracking_number, yamato_status, shipped_date, delivery_date, delivery_issue_flag, created_at')
+    .select('order_code, order_status, total_price, tracking_number, yamato_status, shipped_date, delivery_date, delivery_issue_flag, created_at, order_items(items(item_code, product_models(brand, model_name)))')
     .eq('customer_id', customerId)
     .order('created_at', { ascending: false })
     .limit(limit);
@@ -277,7 +307,9 @@ async function getRecentOrders(
     delivery_date: o.delivery_date as string | null,
     delivery_issue_flag: o.delivery_issue_flag as boolean,
     created_at: o.created_at as string,
-    items: [],
+    items: ((o.order_items as Array<{ items: { item_code: string; product_models: { brand: string; model_name: string } | null } | null }>) ?? [])
+      .filter((oi) => oi.items)
+      .map((oi) => formatOrderItem(oi.items!)),
   }));
 }
 
