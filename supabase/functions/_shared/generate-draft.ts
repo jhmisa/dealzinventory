@@ -1,6 +1,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { buildCustomerContext, formatContextForPrompt } from "./build-ai-context.ts";
 import { generateAIReply, type AIProvider } from "./ai-providers.ts";
+import { estimateCostUsd } from "./ai-cost.ts";
 
 /**
  * Generate an AI draft reply for a conversation and save it as a DRAFT message.
@@ -81,6 +82,23 @@ export async function generateAndSaveDraft(
     contextBlock,
     chatMessages,
   );
+
+  // 5b. Record token usage + estimated cost (best-effort; never block the draft).
+  try {
+    const usage = aiResponse.usage ?? { input_tokens: 0, output_tokens: 0 };
+    await supabase.from('ai_usage_log').insert({
+      conversation_id: conversationId,
+      purpose: 'messaging',
+      provider: (provider as AIProvider).provider,
+      model_id: (provider as AIProvider).model_id,
+      input_tokens: usage.input_tokens,
+      output_tokens: usage.output_tokens,
+      estimated_cost_usd: estimateCostUsd((provider as AIProvider).model_id, usage),
+      had_images: false,
+    });
+  } catch (logErr) {
+    console.error('ai_usage_log insert failed (non-fatal):', logErr);
+  }
 
   // 6. Determine if human review is needed
   const needsReview = aiResponse.confidence < 0.5 || aiResponse.escalation_reason !== null;
