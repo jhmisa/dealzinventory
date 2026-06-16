@@ -3,6 +3,7 @@ import { buildCustomerContext, formatContextForPrompt, getLatestCustomerImages }
 import { generateAIReply, type AIProvider } from "./ai-providers.ts";
 import { estimateCostUsd } from "./ai-cost.ts";
 import { modelSupportsVision } from "./ai-vision.ts";
+import { folderNameForIntent, shouldRouteOutOfInbox, isEscalatingIntent } from "./intent-routing.ts";
 
 /**
  * Generate an AI draft reply for a conversation and save it as a DRAFT message.
@@ -113,8 +114,12 @@ export async function generateAndSaveDraft(
     console.error('ai_usage_log insert failed (non-fatal):', logErr);
   }
 
-  // 6. Determine if human review is needed
-  const needsReview = aiResponse.confidence < 0.5 || aiResponse.escalation_reason !== null;
+  // 6. Determine if human review is needed.
+  // Sensitive intents (kaitori = money, complaint) always escalate regardless of confidence.
+  const needsReview =
+    aiResponse.confidence < 0.5 ||
+    aiResponse.escalation_reason !== null ||
+    isEscalatingIntent(aiResponse.intent);
 
   // 7. Save draft message
   await supabase.from('messages').insert({
@@ -132,9 +137,45 @@ export async function generateAndSaveDraft(
     }),
   });
 
-  // 8. Update conversation review state
+  // 8. Route by intent + update conversation state.
+  // Always persist the classified intent + review flag; conditionally move the conversation
+  // into its mapped folder (triage-out-of-inbox-only). Routing is best-effort: any lookup
+  // failure falls back to updating intent + review flag without moving.
+  const conversationUpdate: Record<string, unknown> = {
+    needs_human_review: needsReview || !customerId,
+    ai_intent: aiResponse.intent,
+  };
+
+  const targetFolderName = folderNameForIntent(aiResponse.intent);
+  if (targetFolderName) {
+    try {
+      // Resolve Inbox + target folder ids by name (ids are random per-env; name is the stable key).
+      const { data: folders } = await supabase
+        .from('message_folders')
+        .select('id, name')
+        .in('name', ['Inbox', targetFolderName]);
+      const folderRows = (folders ?? []) as Array<{ id: string; name: string }>;
+      const inboxId = folderRows.find((f) => f.name === 'Inbox')?.id ?? null;
+      const targetId = folderRows.find((f) => f.name === targetFolderName)?.id ?? null;
+
+      // Read the conversation's current folder to enforce triage-out-of-inbox-only.
+      const { data: convo } = await supabase
+        .from('conversations')
+        .select('folder_id')
+        .eq('id', conversationId)
+        .maybeSingle();
+      const currentFolderId = (convo as { folder_id: string | null } | null)?.folder_id ?? null;
+
+      if (shouldRouteOutOfInbox(currentFolderId, inboxId, targetId)) {
+        conversationUpdate.folder_id = targetId;
+      }
+    } catch (routeErr) {
+      console.error('Intent routing failed (non-fatal):', routeErr);
+    }
+  }
+
   await supabase
     .from('conversations')
-    .update({ needs_human_review: needsReview || !customerId })
+    .update(conversationUpdate)
     .eq('id', conversationId);
 }
