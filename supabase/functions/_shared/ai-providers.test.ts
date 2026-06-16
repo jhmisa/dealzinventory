@@ -21,3 +21,40 @@ Deno.test('extractUsage defaults to zero when missing', () => {
   assertEquals(extractUsage('anthropic', {}), { input_tokens: 0, output_tokens: 0 });
   assertEquals(extractUsage('openai', null), { input_tokens: 0, output_tokens: 0 });
 });
+
+import { normalizeRole, consolidateForTest } from './ai-providers.ts';
+
+Deno.test('normalizeRole maps staff and assistant to one assistant side', () => {
+  assertEquals(normalizeRole('customer'), 'customer');
+  assertEquals(normalizeRole('assistant'), 'assistant');
+  assertEquals(normalizeRole('staff'), 'assistant');
+  assertEquals(normalizeRole('anything-else'), 'assistant');
+});
+
+Deno.test('consolidate merges a staff reply and an AI reply into one assistant turn', () => {
+  const out = consolidateForTest([
+    { role: 'customer', content: 'hi' },
+    { role: 'staff', content: 'hello from staff' },
+    { role: 'assistant', content: 'and from AI' },
+    { role: 'customer', content: 'ok thanks' },
+  ]);
+  assertEquals(out, [
+    { role: 'customer', content: 'hi' },
+    { role: 'assistant', content: 'hello from staff\nand from AI' },
+    { role: 'customer', content: 'ok thanks' },
+  ]);
+});
+
+Deno.test('consolidate preserves alternation and merges a customer burst', () => {
+  const out = consolidateForTest([
+    { role: 'customer', content: 'a' },
+    { role: 'customer', content: 'b' },
+    { role: 'staff', content: 'reply' },
+    { role: 'customer', content: 'c' },
+  ]);
+  assertEquals(out, [
+    { role: 'customer', content: 'a\nb' },
+    { role: 'assistant', content: 'reply' },
+    { role: 'customer', content: 'c' },
+  ]);
+});

@@ -59,16 +59,30 @@ interface ChatMessage {
 function consolidateMessages(messages: ChatMessage[]): ChatMessage[] {
   if (messages.length === 0) return [];
 
-  const result: ChatMessage[] = [{ ...messages[0] }];
-  for (let i = 1; i < messages.length; i++) {
+  const result: ChatMessage[] = [];
+  for (const m of messages) {
+    const role = normalizeRole(m.role);
     const prev = result[result.length - 1];
-    if (messages[i].role === prev.role) {
-      prev.content += '\n' + messages[i].content;
+    if (prev && prev.role === role) {
+      prev.content += '\n' + m.content;
     } else {
-      result.push({ ...messages[i] });
+      result.push({ role, content: m.content });
     }
   }
   return result;
+}
+
+// Collapse message roles to the two sides an LLM chat API understands.
+// Customer messages are the "user" side; everything we send back
+// (AI 'assistant' drafts AND human 'staff' replies) is the "assistant" side.
+export function normalizeRole(role: string): 'customer' | 'assistant' {
+  return role === 'customer' ? 'customer' : 'assistant';
+}
+
+// Test-only re-export so the pure consolidation logic can be unit-tested
+// without going through a provider network call.
+export function consolidateForTest(messages: ChatMessage[]): ChatMessage[] {
+  return consolidateMessages(messages);
 }
 
 // ---------- Provider-agnostic dispatcher ----------
