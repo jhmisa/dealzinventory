@@ -1177,35 +1177,37 @@ git commit -m "feat(ai): include customer screenshots when generating message dr
 
 ---
 
-## Task 9: Swap the messaging model to Claude Sonnet 4.5 (operational)
+## Task 9: Swap the messaging model to OpenAI GPT-4o (operational)
 
 **Files:** none (database row + verification).
 
 > **Why operational:** the provider/model is a DB row in `ai_providers` with the API key in `api_key_encrypted`. Keys are never committed. This task is executed against the dev database, not as code.
+>
+> **Model choice:** Joey chose OpenAI (ChatGPT). Default to `gpt-4o` — proven, vision-capable, cheaper, and already in the `MODEL_PRICES` table (Task 1). To use `gpt-5` instead, set `model_id='gpt-5'` below and add a `'gpt-5'` row to `MODEL_PRICES` in `ai-cost.ts` so cost telemetry stays accurate (otherwise it falls back to the conservative default price). `modelSupportsVision('openai', ...)` already returns true for both. The provider abstraction means switching to Claude later is the same one-row change — keep the option open for a future Taglish bake-off.
 
-- [ ] **Step 1: Confirm an Anthropic key is available**
+- [ ] **Step 1: Confirm an OpenAI key is available**
 
-You need a valid Anthropic API key. If a messaging provider row already uses `provider='anthropic'`, reuse its key. Otherwise obtain the key from the project secrets.
+You need a valid OpenAI API key. If a messaging provider row already uses `provider='openai'`, reuse its key. Otherwise obtain the key from the project secrets.
 
-- [ ] **Step 2: Point the active messaging provider at Claude Sonnet 4.5**
+- [ ] **Step 2: Point the active messaging provider at GPT-4o**
 
-If an `anthropic` messaging row already exists, activate it and set the model (Supabase MCP `execute_sql` / CLI):
+If an `openai` messaging row already exists, activate it and set the model (Supabase MCP `execute_sql` / CLI):
 
 ```sql
 -- Deactivate whatever is currently active for messaging
 update ai_providers set is_active = false where purpose = 'messaging' and is_active = true;
 
--- Activate / upsert the Anthropic Sonnet 4.5 row (replace <ANTHROPIC_KEY> and the existing id if present)
+-- Activate the OpenAI GPT-4o row (replace the model if you chose gpt-5)
 update ai_providers
-set is_active = true, model_id = 'claude-sonnet-4-5-20250929'
-where purpose = 'messaging' and provider = 'anthropic';
+set is_active = true, model_id = 'gpt-4o'
+where purpose = 'messaging' and provider = 'openai';
 ```
 
-If no `anthropic` row exists, insert one (the unique index `idx_ai_providers_active_purpose` guarantees only one active per purpose, so deactivate others first as above):
+If no `openai` row exists, insert one (the unique index `idx_ai_providers_active_purpose` guarantees only one active per purpose, so deactivate others first as above):
 
 ```sql
 insert into ai_providers (name, provider, model_id, api_key_encrypted, purpose, is_active)
-values ('Claude Sonnet 4.5 (messaging)', 'anthropic', 'claude-sonnet-4-5-20250929', '<ANTHROPIC_KEY>', 'messaging', true);
+values ('GPT-4o (messaging)', 'openai', 'gpt-4o', '<OPENAI_KEY>', 'messaging', true);
 ```
 
 > Alternatively, do this through the existing messaging settings UI (`services/messaging.ts` → `setActiveAiProvider`) instead of raw SQL.
@@ -1222,7 +1224,7 @@ order by created_at desc
 limit 5;
 ```
 
-Expected: a recent row with `provider='anthropic'`, `model_id='claude-sonnet-4-5-20250929'`, non-zero tokens, and `had_images=true` for the screenshot test. Manually read the generated DRAFT in the Messages UI and confirm the Taglish reads naturally and references the screenshot content.
+Expected: a recent row with `provider='openai'`, `model_id='gpt-4o'`, non-zero tokens, and `had_images=true` for the screenshot test. Manually read the generated DRAFT in the Messages UI and confirm the Taglish reads naturally and references the screenshot content.
 
 - [ ] **Step 4: Record the baseline cost**
 
