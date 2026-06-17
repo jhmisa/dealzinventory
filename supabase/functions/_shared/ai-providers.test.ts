@@ -144,6 +144,25 @@ Deno.test('runChatCompletionWithTools executes a tool call then returns final co
   assertEquals((calls[0].args as { query: string }).query, 'LUCA tablet');
   assertEquals(result.finalText.includes('G000022'), true);
   assertEquals(result.usage.input_tokens, 30);
+  assertEquals(result.usage.output_tokens, 10); // 2 + 8 summed across both turns
+});
+
+Deno.test('runChatCompletionWithTools survives a throwing executeTool and still returns final content', async () => {
+  const responses = [
+    { choices: [{ finish_reason: 'tool_calls', message: { role: 'assistant', content: null,
+        tool_calls: [{ id: 'c1', type: 'function', function: { name: 'search_inventory', arguments: '{"query":"x"}' } }] } }],
+      usage: { prompt_tokens: 5, completion_tokens: 1 } },
+    { choices: [{ finish_reason: 'stop', message: { content: '{"reply":"pasensya po, di ko ma-check ngayon","confidence":0.4}' } }],
+      usage: { prompt_tokens: 6, completion_tokens: 2 } },
+  ];
+  let i = 0;
+  const fakeFetch = () => Promise.resolve({ ok: true, json: () => Promise.resolve(responses[i++]) } as Response);
+  const result = await runChatCompletionWithTools({
+    fetchImpl: fakeFetch as typeof fetch, url: 'u', apiKey: 'k', model: 'm',
+    messages: [{ role: 'user', content: 'meron pa?' }],
+    executeTool: () => Promise.reject(new Error('rpc down')), maxToolRounds: 3,
+  });
+  assertEquals(result.finalText.includes('pasensya'), true);
 });
 
 Deno.test('runChatCompletionWithTools returns immediately when no tool call', async () => {

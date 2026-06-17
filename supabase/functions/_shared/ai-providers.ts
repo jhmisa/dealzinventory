@@ -302,9 +302,15 @@ export async function runChatCompletionWithTools(args: ToolLoopArgs): Promise<To
       model: args.model,
       max_tokens: 1024,
       messages,
-      response_format: { type: 'json_object' },
     };
-    if (includeTools) body.tools = [SEARCH_INVENTORY_TOOL];
+    if (includeTools) {
+      // While tools are offered, do NOT force json_object — some OpenRouter models
+      // suppress tool_calls when a response_format is pinned. The final round (below)
+      // omits tools and enforces JSON for a clean, parseable answer.
+      body.tools = [SEARCH_INVENTORY_TOOL];
+    } else {
+      body.response_format = { type: 'json_object' };
+    }
 
     // Retry 503/429 with backoff (mirrors existing provider behavior).
     let data: Record<string, unknown> | null = null;
@@ -331,7 +337,9 @@ export async function runChatCompletionWithTools(args: ToolLoopArgs): Promise<To
     const msg = choice?.message;
     const toolCalls = msg?.tool_calls ?? [];
 
-    if (!toolCalls.length) {
+    // No tool calls — or this was the final forced-answer round (tools omitted): return the
+    // model's content. Empty content falls through to the caller, which escalates to a human.
+    if (!toolCalls.length || !includeTools) {
       const content = typeof msg?.content === 'string' ? msg.content : '';
       return { finalText: content, usage: { input_tokens: inTok, output_tokens: outTok } };
     }
