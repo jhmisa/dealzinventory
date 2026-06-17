@@ -147,21 +147,33 @@ Deno.serve(async (req) => {
     // run a real live-inventory search. Accumulate results by code to attach the
     // offered product's photo to the reply.
     const offerCatalog = new Map<string, InventorySearchResult>();
+    // Capture any tool failure verbatim so the playground can surface it (the model
+    // otherwise paraphrases it into a vague "search tool error" escalation).
+    const toolErrors: string[] = [];
     const executeTool = async (name: string, args: unknown): Promise<unknown> => {
       if (name !== 'search_inventory') return { error: `unknown tool: ${name}` };
       const a = (args ?? {}) as Record<string, unknown>;
-      const results = await searchInventory(serviceClient, {
-        query: String(a.query ?? ''),
-        category_id: a.category_id ? String(a.category_id) : undefined,
-        brand: a.brand ? String(a.brand) : undefined,
-        price_min: a.price_min != null ? Number(a.price_min) : undefined,
-        price_max: a.price_max != null ? Number(a.price_max) : undefined,
-      });
-      for (const r of results) offerCatalog.set(r.code, r);
-      return results.map((r) => ({
-        type: r.type, code: r.code, description: r.description,
-        grade: r.grade, price: r.price, available_count: r.available_count, order_url: r.order_url,
-      }));
+      try {
+        const results = await searchInventory(serviceClient, {
+          query: String(a.query ?? ''),
+          category_id: a.category_id ? String(a.category_id) : undefined,
+          brand: a.brand ? String(a.brand) : undefined,
+          price_min: a.price_min != null ? Number(a.price_min) : undefined,
+          price_max: a.price_max != null ? Number(a.price_max) : undefined,
+        });
+        for (const r of results) offerCatalog.set(r.code, r);
+        return results.map((r) => ({
+          type: r.type, code: r.code, description: r.description,
+          grade: r.grade, price: r.price, available_count: r.available_count, order_url: r.order_url,
+        }));
+      } catch (toolErr) {
+        const detail = toolErr instanceof Error
+          ? `${toolErr.message}${toolErr.stack ? `\n${toolErr.stack}` : ''}`
+          : JSON.stringify(toolErr);
+        console.error('search_inventory tool failed:', detail);
+        toolErrors.push(detail);
+        return { error: detail };
+      }
     };
 
     const aiResponse = await generateAIReply(
@@ -188,7 +200,7 @@ Deno.serve(async (req) => {
       })
       .filter((o): o is TestOffer => o !== null);
 
-    return new Response(JSON.stringify({ ...aiResponse, offers }), {
+    return new Response(JSON.stringify({ ...aiResponse, offers, tool_errors: toolErrors }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

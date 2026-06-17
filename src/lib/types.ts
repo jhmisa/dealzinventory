@@ -602,4 +602,6 @@ export interface TestAIResponse {
   data_used: string[]
   escalation_reason: string | null
   offers?: TestAIOffer[]
+  // Raw errors from any tool the AI called (e.g. search_inventory), surfaced for debugging.
+  tool_errors?: string[]
 }

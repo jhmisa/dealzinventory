@@ -57,6 +57,7 @@ import {
 import { useCustomers } from '@/hooks/use-customers'
 import type { AiProvider, MessagingTemplate, MessagingTemplateInsert, KnowledgeBaseEntry, MessagingSpecialist, TestAIMessage, TestAIResponse, TestAIImage } from '@/lib/types'
 import { compressImageForMessaging } from '@/lib/image-compression'
+import { useClipboardPaste } from '@/hooks/use-clipboard-paste'
 
 // ---------- AI Provider Form ----------
 
@@ -572,6 +573,9 @@ export default function MessagingSettingsPage() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [testMessages])
 
+  // Paste images directly into the playground (e.g. from a screenshot tool) — no need to save a file first.
+  useClipboardPaste({ onPaste: (files) => void processImageFiles(files), accept: 'image' })
+
   function handleSavePersona() {
     if (!persona) return
     updatePersona.mutate(
@@ -640,13 +644,14 @@ export default function MessagingSettingsPage() {
     })
   }
 
-  // Compress + base64-encode picked images, then stage them (max 3) for the next Send.
-  async function handlePickImages(files: FileList | null) {
-    if (!files || files.length === 0) return
+  // Compress + base64-encode image files, then stage them (max 3) for the next Send.
+  // Shared by the file picker and clipboard paste.
+  async function processImageFiles(files: File[]) {
+    if (files.length === 0) return
     setImageBusy(true)
     try {
       const room = Math.max(0, 3 - stagedImages.length)
-      const picked = Array.from(files).slice(0, room)
+      const picked = files.filter((f) => f.type.startsWith('image/')).slice(0, room)
       if (picked.length === 0) {
         toast.error('You can attach up to 3 images per message.')
         return
@@ -671,6 +676,10 @@ export default function MessagingSettingsPage() {
       setImageBusy(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
+  }
+
+  function handlePickImages(files: FileList | null) {
+    if (files) void processImageFiles(Array.from(files))
   }
 
   function removeStagedImage(idx: number) {
@@ -1214,6 +1223,14 @@ export default function MessagingSettingsPage() {
                         )}
                       </div>
                     )}
+                    {msg.meta?.tool_errors && msg.meta.tool_errors.length > 0 && (
+                      <div className="rounded-md border border-red-200 bg-red-50 p-2 text-xs">
+                        <p className="font-medium text-red-700 mb-1">Tool error(s) — the AI&apos;s search failed:</p>
+                        {msg.meta.tool_errors.map((err, i) => (
+                          <pre key={i} className="whitespace-pre-wrap break-words font-mono text-[11px] text-red-900">{err}</pre>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -1274,7 +1291,7 @@ export default function MessagingSettingsPage() {
               <Input
                 value={testInput}
                 onChange={(e) => setTestInput(e.target.value)}
-                placeholder="Type a test message..."
+                placeholder="Type a test message... (or paste an image)"
                 className="flex-1"
               />
               <Button type="submit" variant="secondary" disabled={!testInput.trim() && stagedImages.length === 0}>

@@ -111,10 +111,15 @@ export async function searchInventory(
     price_max: args.price_max ?? null,
   };
 
-  const rpc = supabase.rpc as unknown as (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown }>;
+  // Call .rpc as a member access on the client so `this` stays bound — supabase-js'
+  // rpc() reads `this.rest` internally, so a detached `const rpc = supabase.rpc`
+  // reference throws "Cannot read properties of undefined (reading 'rest')".
+  const db = supabase as unknown as {
+    rpc: (fn: string, params: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown }>;
+  };
   const [itemsRes, groupsRes] = await Promise.all([
-    rpc('search_available_inventory', common),
-    rpc('search_available_sell_groups', common),
+    db.rpc('search_available_inventory', common),
+    db.rpc('search_available_sell_groups', common),
   ]);
 
   if (itemsRes.error) throw itemsRes.error;
