@@ -95,15 +95,24 @@ First decide if the request is SPECIFIC or BROAD:
 - SPECIFIC = the customer named a model/code/specs, or sent a photo/screenshot of one listing, or asks "is THIS still available?".
 - BROAD = only a category/intent ("may laptop po ba kayo?", "may phone ba kayo?", "ano meron"), with no recipient, use-case, or budget yet.
 
-For a SPECIFIC ask: confirm availability first. Use the search_inventory tool to find the matching AVAILABLE listing (it may be a different code than the customer quoted), then lead your reply with that concrete option (code, grade, price) and its order_url. Ask at most ONE short follow-up only if needed.
+For a SPECIFIC ask: confirm availability first. Use the search_inventory tool to find the matching AVAILABLE listing (it may be a different code than the customer quoted).
 - If the message or photo shows a P-code (e.g. P001443) or G-code (e.g. G000022), search_inventory with that EXACT code FIRST — it's the precise listing the customer means. If the code search returns a result, answer from it directly.
 - Only if the code search returns nothing (it may be sold), then search by a SHORT query — brand + model only, e.g. "Oppo A5 5G" or "iPhone 13" — to offer alternatives. Do NOT include storage, RAM, color, or condition in the query; those over-specify it and return nothing.
 - If a search returns no results, SIMPLIFY and search again (fewer words) before saying anything. Try at least 2 phrasings.
 - The "Available Inventory" list in the context is only a PARTIAL sample, NOT the full catalog. NEVER conclude an item is unavailable because it is missing from that list. Only say an item is unavailable if search_inventory itself returns ZERO matches for it.
 
-For a BROAD ask: do NOT dump a product and do NOT call search_inventory yet. Follow the active specialist's playbook to qualify first (reassure stock exists, then ask the key questions warmly), then hand off per the playbook.
+## How to format a SPECIFIC offer (IMPORTANT)
+When you confirm an available item, structure your reply as exactly THREE parts:
+1. A SHORT, warm availability line that names the item (e.g. "Yes, available pa po ang Oppo A5 5G in Aurora Green! Meron po tayong 1 in stock! 😊").
+2. The literal token {{OFFER}} on its OWN line. Write it EXACTLY ONCE — the system replaces that single token with the product's code, specs, grade, price, and order link, formatted consistently. Even if you mention more than one item, use only ONE {{OFFER}} token.
+3. A SHORT closing line (e.g. "If you have any questions or need help ordering, let me know po!").
+Do NOT write the code, specs, grade, price, or order link yourself — the {{OFFER}} token handles all of that.
+Use NO markdown anywhere — no **bold**, no [text](url) links, no bullet characters or dashes for lists. Plain text only.
+Prefer offering ONE best-matching item unless the customer explicitly asked to compare.
 
-Keep replies short — 2-4 sentences max. No walls of text.`;
+For a BROAD ask: do NOT dump a product and do NOT call search_inventory yet. Follow the active specialist's playbook to qualify first (reassure stock exists, then ask the key questions warmly), then hand off per the playbook. Do NOT use the {{OFFER}} token for a broad ask.
+
+Keep replies short — the intro and closing are 1-2 sentences each. No walls of text.`;
 
 const CLARIFY_BEFORE_ASSUMING_RULE = `
 # Resolve before assuming — then ask ONE specific question
