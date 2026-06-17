@@ -43,3 +43,21 @@ Deno.test('mapInventoryResults applies item discount to price', () => {
   const out = mapInventoryResults(items, [], 'https://x.app');
   assertEquals(out[0].price, 8500);
 });
+
+Deno.test('mapInventoryResults builds rich description from category description_fields', () => {
+  const items: RawItemRow[] = [{
+    id: 'i9', item_code: 'P001471', condition_grade: 'B', selling_price: 15900, discount: 0,
+    brand: 'Toshiba', model_name: 'Dynabook K50',
+    ram_gb: '8GB', storage_gb: '128GB', cpu: 'Intel Celeron N4020 1.1GHz',
+    gpu: 'Intel UHD Graphics 600', screen_size: 10.1, color: 'Silver', os_family: 'Windows 11',
+    category_description_fields: ['brand', 'model_name', 'ram_gb', 'storage_gb', 'cpu', 'gpu', 'screen_size', 'color', 'os_family'],
+    first_item_display_url: 'https://cdn/k50.jpg', first_item_thumb_url: null,
+    hero_media_url: null, first_product_media_url: null, condition_notes: null,
+  }];
+  const out = mapInventoryResults(items, [], 'https://dealzinventory.vercel.app');
+  const item = out.find((r) => r.code === 'P001471')!;
+  assertEquals(
+    item.description,
+    'Toshiba Dynabook K50 8GB 128GB Intel Celeron N4020 1.1GHz Intel UHD Graphics 600 10.1" Silver Windows 11',
+  );
+});

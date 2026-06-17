@@ -1,4 +1,5 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { getItemDescription } from "./item-description.ts";
 
 export interface RawItemRow {
   id: string;
@@ -13,6 +14,22 @@ export interface RawItemRow {
   hero_media_url: string | null;
   first_product_media_url: string | null;
   condition_notes: string | null;
+  // Spec fields returned by search_available_inventory — used to build the rich,
+  // category-aware description identical to the frontend (Admin Items / Messages tab).
+  model_number?: string | null;
+  storage_gb?: string | null;
+  ram_gb?: string | null;
+  cpu?: string | null;
+  gpu?: string | null;
+  screen_size?: number | null;
+  color?: string | null;
+  os_family?: string | null;
+  year?: number | null;
+  battery_health_pct?: number | null;
+  is_unlocked?: boolean | null;
+  has_touchscreen?: boolean | null;
+  supplier_description?: string | null;
+  category_description_fields?: string[] | null;
 }
 
 export interface RawSellGroupRow {
@@ -92,7 +109,11 @@ export function mapInventoryResults(
     const price = r.selling_price != null ? Math.max(0, r.selling_price - discount) : null;
     const display = r.first_item_display_url ?? r.hero_media_url ?? r.first_product_media_url ?? null;
     const thumb = r.first_item_thumb_url ?? display;
-    const desc = [r.brand, r.model_name].filter(Boolean).join(' ') || '—';
+    const desc = getItemDescription(
+      r as unknown as Record<string, unknown>,
+      null,
+      r.category_description_fields ?? null,
+    ) || [r.brand, r.model_name].filter(Boolean).join(' ') || '—';
     return {
       type: 'item' as const,
       code: r.item_code,
