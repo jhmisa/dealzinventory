@@ -95,7 +95,7 @@ BEGIN
         ORDER BY CASE WHEN pmed.role = 'hero' THEN 0 ELSE 1 END, pmed.sort_order
         LIMIT 1) AS hero_media_url
     FROM sell_groups sg
-    JOIN product_models pm ON pm.id = sg.product_model_id
+    JOIN product_models pm ON pm.id = sg.product_id
     JOIN sell_group_items sgi ON sgi.sell_group_id = sg.id
     JOIN items i ON i.id = sgi.item_id AND i.item_status = 'AVAILABLE'
     WHERE sg.active = true
@@ -127,7 +127,7 @@ GRANT EXECUTE ON FUNCTION search_available_sell_groups(text, int, text, uuid, nu
   TO anon, authenticated, service_role;
 ```
 
-> Note: verify column names `sell_groups.product_model_id`, `sell_groups.discount_amount`, `sell_group_items.sell_group_id/item_id` against `docs/DATABASE_SCHEMA.md` before applying. The client query at `src/services/items.ts:564-580` confirms `product_models` join, `sell_group_items.items`, `discount_amount`, `condition_grade`, and `product_media(file_url, role, sort_order)`.
+> **Live schema confirmed via PostgREST introspection (2026-06-17)** — `DATABASE_SCHEMA.md` is STALE for this table. Actual `sell_groups` columns: `id, sell_group_code, condition_grade, active, created_at, updated_at, product_id, is_live_selling, discount_amount`. The FK to `product_models` is **`product_id`** (NOT `product_model_id`, and there is no `photo_group_id`/`config_group_id`/`base_price`). `sell_group_items`: `id, sell_group_id, item_id, assigned_at`. `product_models` has `category_id`; `product_media` has `product_id, file_url, role, sort_order` (per the existing `search_available_inventory` RPC at `20260430001615_improve_search_inventory.sql`).
 
 - [ ] **Step 2: Apply the migration**
 
