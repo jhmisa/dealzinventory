@@ -10,6 +10,7 @@ import {
   type SpecialistRow,
 } from "./build-specialist-prompt.ts";
 import { searchInventory, deriveOfferCodes, type InventorySearchResult } from "./inventory-search.ts";
+import { assembleOfferReply } from "./offer-reply.ts";
 
 async function buildOfferAttachments(
   supabase: ReturnType<typeof createClient>,
@@ -198,10 +199,14 @@ export async function generateAndSaveDraft(
     ? await buildOfferAttachments(supabase, conversationId, offerCodes, offerCatalog)
     : [];
 
+  // Splice the deterministic emoji offer block into the reply so the SAVED content (what any
+  // send path — manual approve OR future auto-send — transmits verbatim) is the final message.
+  const finalReply = assembleOfferReply(aiResponse.reply, offerCodes, offerCatalog);
+
   await supabase.from('messages').insert({
     conversation_id: conversationId,
     role: 'assistant',
-    content: aiResponse.reply,
+    content: finalReply,
     status: 'DRAFT',
     message_type: 'REPLY',
     ai_confidence: aiResponse.confidence,
