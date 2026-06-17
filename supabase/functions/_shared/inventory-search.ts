@@ -62,7 +62,7 @@ export function mapInventoryResults(
 ): InventorySearchResult[] {
   const itemResults: InventorySearchResult[] = items.map((r) => {
     const discount = Number(r.discount) || 0;
-    const price = r.selling_price != null ? r.selling_price - discount : null;
+    const price = r.selling_price != null ? Math.max(0, r.selling_price - discount) : null;
     const display = r.first_item_display_url ?? r.hero_media_url ?? r.first_product_media_url ?? null;
     const thumb = r.first_item_thumb_url ?? display;
     const desc = [r.brand, r.model_name].filter(Boolean).join(' ') || '—';
@@ -111,7 +111,6 @@ export async function searchInventory(
     price_max: args.price_max ?? null,
   };
 
-  // deno-lint-ignore no-explicit-any
   const rpc = supabase.rpc as unknown as (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown }>;
   const [itemsRes, groupsRes] = await Promise.all([
     rpc('search_available_inventory', common),
@@ -121,6 +120,7 @@ export async function searchInventory(
   if (itemsRes.error) throw itemsRes.error;
   if (groupsRes.error) throw groupsRes.error;
 
+  // Cap total results to keep the LLM tool context small (token budget).
   return mapInventoryResults(
     (itemsRes.data ?? []) as RawItemRow[],
     (groupsRes.data ?? []) as RawSellGroupRow[],
