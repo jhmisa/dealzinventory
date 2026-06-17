@@ -1,9 +1,9 @@
 # Sales Specialist v2 — Design
 
 **Date:** 2026-06-17
-**Status:** Draft for review (Approach A approved in brainstorm; Phase B / audio deferred)
+**Status:** Draft for review (reframed after Joey review — search-tool parity + qualify-then-handoff)
 **Branch:** `sales-specialist-v2-design`
-**Builds on:** Plan 3b specialist playbooks (`messaging_specialists`), Plan 1 vision (`getLatestCustomerImages`)
+**Builds on:** Plan 3b specialist playbooks (`messaging_specialists`), Plan 1 vision (`getLatestCustomerImages`), the existing **Search Inventory** composer feature (`inventory-search-modal.tsx` + `searchAvailableInventory`)
 **Related memory:** `project_sales_specialist_v2`, `project_messages_ai_redesign_progress`, `project_shop_url`, `feedback_consistent_descriptions`
 
 ---
@@ -15,195 +15,185 @@ The messaging AI's **Sales** specialist behaves wrong on broad category asks. Re
 > Customer: **"May laptop po ba kayo?"** ("Do you have laptops?")
 > Bot: dumped a single random Fujitsu LifeBook with link, no qualifying.
 
-That is the wrong move for a vague, underspecified request. The customer hasn't said who it's for, what it's for, or their budget — so a single cold product dump is unhelpful and feels robotic.
+That is the wrong move for a vague request — the customer hasn't said who it's for, what for, or their budget, so a cold single-product dump is unhelpful and robotic.
 
 ### Root cause
-
-The behavior is **not** in the Sales playbook. It comes from a GLOBAL code constant, `INVENTORY_RESPONSE_RULE` in `supabase/functions/_shared/ai-providers.ts` (lines 91–98), appended to **every** messaging prompt via `buildEnhancedPrompt`:
+The behavior is **not** in the Sales playbook. It comes from a GLOBAL constant, `INVENTORY_RESPONSE_RULE` in `supabase/functions/_shared/ai-providers.ts` (lines 91–98), appended to **every** messaging prompt via `buildEnhancedPrompt`:
 
 ```
-2. If there are matches, lead your reply with 1-2 concrete options (model, grade, price, G-code)...
+2. If there are matches, lead your reply with 1-2 concrete options...
 4. Do NOT ask multiple qualifying questions before showing inventory. Show what you have first.
 ```
 
-This is **correct for a SPECIFIC ask** ("meron pa ba nung iPhone 13 128GB?") but **wrong for a BROAD ask** ("may laptop po ba kayo?"). It overrides the Sales playbook's instinct to qualify. The seeded Sales playbook (`messaging_specialists` slug='sales', migration `20260617130000_specialist_playbooks.sql` lines 34–39) actually already says *"If the request is vague, ask qualifying questions"* — but the global rule wins.
-
-**Fixing/scoping that global rule is THE core fix.**
+Correct for a SPECIFIC ask, wrong for a BROAD ask. It overrides the Sales playbook's instinct to qualify (the seeded playbook already says "if vague, ask qualifying questions" — but the global rule wins). **Scoping that rule is part of the fix.**
 
 ---
 
-## 2. Scope
+## 2. What the human agent actually does (the model to copy)
 
-**In scope (Approach A — "Sales Specialist v2 brain"):**
-- Rewrite the Sales playbook into a two-mode brain (specific vs. broad) with per-category tailored qualifying and budget-override intelligence.
-- Scope the global `INVENTORY_RESPONSE_RULE` so "show first, don't qualify" only applies to specific asks.
-- Add a per-item **order link** to the inventory context so the model can paste a real buy link.
-- Conditional endpoint: draft concrete offers OR hand off a fully-qualified lead to a human.
+Two real behaviors, from Joey's screenshots:
 
-**Out of scope (Phase B — DEFERRED):** audio voice-note delivery of the qualifying questions. Joey: *"it would be easy to integrate the audio later."* Not built now. Section 8 records the intent only.
+**A — Broad ask** ("may laptop po ba kayo?"): a good agent doesn't dump a product. They ask who it's for, what for, and the budget — then a human applies judgment about the right device.
 
----
+**B — Specific availability confirmation** ("Meron pa po kayo ganyan" + an image of an item): the agent
+1. **reads the item** from the image (the screenshot showed a live-sell overlay stamped `P000825 … ¥7,900 … Iris Ohyama LUCA Tablet TM101`),
+2. **searches live inventory** for the matching *available* listing — and the answer was a **different code**, `G000022` (the in-stock sell group for that same model; the P-code unit from the video was gone),
+3. **sends the offer** via the **Search Inventory** composer tool — code + description + grade + price + `📸 View & Order: …/mine/G000022` + the product photo — then "last 1 po, mine na po kayo."
 
-## 3. Architecture (LOCKED)
-
-**Playbook-driven brain + minimal enabling code. Single model call. The model self-classifies and self-routes** — consistent with Plan 3b. NOT a separate pre-classifier call.
-
-- The model already classifies `product_inquiry` and routes into the Sales specialist.
-- Within Sales, the **model self-routes** between Mode B (specific) and Mode A (broad) from the same single call — the routing instruction lives in the playbook text.
-- Vision is already on (gpt-4o, `getLatestCustomerImages`) — no change needed to image flow.
-
-So the change is: **(a)** rewrite the DB playbook row, **(b)** three small code/data edits in the edge functions. No new model calls, no new tables.
+The whole design is: **let the AI do exactly this, reusing the existing Search Inventory feature — and hand the judgment cases to a human.**
 
 ---
 
-## 4. The two modes (model self-routes)
+## 3. Scope
 
-### Mode B — specific item
-**Trigger:** customer has already decided — names a model / P-code / G-code / specs, or sends a screenshot of a listing, or asks "meron pa ba nito?" ("is this still available?").
+**In scope:**
+- **Path 1 (broad/underspecified):** AI **gathers context** (qualifies warmly) and **hands a fully-qualified lead to a human**. The AI does NOT pick or draft the offer.
+- **Path 2 (specific availability confirmation):** AI **identifies the item** (vision/text), **searches live inventory via a tool** (same search the human uses), and **if found, makes the offer itself** by reusing the existing inventory-insert pipeline (photo + `/mine/{code}` link). If gone / not found → say so and hand to a human.
+- **Scope `INVENTORY_RESPONSE_RULE`** so broad asks qualify-then-handoff and specific asks search-then-confirm.
+
+**Out of scope (Phase B — DEFERRED):** audio voice-note delivery of the qualifying questions. Joey: *"it would be easy to integrate the audio later."* §9 records intent only.
+
+**Explicitly NOT doing** (dropped after review): hand-building `/mine` link strings inside the prompt context formatter, and stuffing P-codes into the prompt for the model to match against. Both are replaced by the **search tool + existing render pipeline** — we reuse the Search Inventory feature instead of recreating it.
+
+---
+
+## 4. Architecture
+
+**Reuse the existing Search Inventory feature; add a tool so the AI can call it; keep the human in the loop.** Concretely:
+
+1. **Tool-use / function-calling** is added to the messaging AI call: a `search_inventory` tool whose implementation runs the **same query the modal uses** (`searchAvailableInventory`). True parity — the AI searches all live inventory exactly like Kay did, finding the available listing even when it's a different code (P000825 → G000022). *(This is a real departure from the old "single completion" flow — see §6.)*
+2. **The offer is rendered by the existing inventory-insert pipeline** — photo + formatted text + `/mine/{code}` link — NOT reinvented. The AI's job is to choose *which* result code(s) to offer; the render reuses one shared code path (§7).
+3. **Path 1 (broad)** never offers — it qualifies and escalates with a summary, reusing the Plan 3b `needs_human_review` / `escalation_reason` mechanism.
+4. **Vision already flows** (gpt-4o, `getLatestCustomerImages`) — no change.
+
+The Sales playbook (`messaging_specialists` slug='sales') is rewritten to drive this two-path behavior and to decide when to call the tool, when to offer, and when to hand off. Self-routing stays in the playbook; the model still self-classifies `product_inquiry`.
+
+---
+
+## 5. The two paths (model self-routes)
+
+### Path 1 — Broad / underspecified → qualify, then hand to human
+**Trigger:** category-level or vague ask with no recipient/use/budget — "may laptop po ba kayo?", "may phone ba kayo?", "ano meron kayo?".
 
 **Behavior:**
-1. Identify the item — via VISION read the code in the screenshot (often a **P-code**, since staff share individual units that way); else match specs + price against the inventory context. Resolve to the specific unit (P-code) when the customer referenced one, otherwise the pooled group (G-code) — see §6 "Which code to link".
-2. If in stock → `"Opo, available pa po! Eto po yung link po..."` + **order link** at the matching granularity (Section 6).
-3. If gone → say so plainly, offer to find a similar item → slides into Mode A.
-4. **No qualifying questions** — the customer already decided.
+1. **Reassure stock exists, then ask the top questions bundled WARMLY into one friendly sentence** — NOT a checklist, never bombard (Joey's option #2). As the customer answers, **summarize the partial answers** ("confirm you listened"), ask the remaining one.
+2. **Per-category tailored questions** (Joey: "all devices, tailored"):
 
-### Mode A — broad / underspecified
-**Trigger:** a category-level or vague ask — "may laptop po ba kayo?", "may available ba kayong phone?", "ano meron kayo?".
+   | Category | Question slots |
+   |---|---|
+   | **Laptops / computers** | (1) **para kanino** — recipient (anak, pamangkin, self) · (2) **saan gagamitin** — use-case (school / business / gaming) · (3) **ilang taon na ang gagamit** = the **USER'S AGE** (not laptop lifespan) · (4) **magkano budget** |
+   | **Phones** | budget · use · brand / storage |
+   | **Tablets** | budget · use |
 
-**Behavior:** qualify FIRST (Section 5), then offer or hand off (Section 7).
+3. **Hand to a human with the lead fully summarized** — recipient, use-case, age, budget, and any budget-vs-tier note (below). The human decides what to offer. The value: the human picks up a warm, qualified lead instead of a cold start.
+
+**Budget context (informs the handoff note, not an AI offer):** stated budget is a starting point, not the answer. Recipient + age + use determine the right TIER; if the right tier exceeds the stated budget, the AI **notes that in the handoff** (e.g. "budget ¥15k but it's for a college student doing schoolwork → realistically needs a ¥25k+ laptop"). The human makes the upsell call. Examples: young child → tablet/entry; highschool/college schoolwork → real laptop ¥25k+.
+
+> Path 1 deliberately does NOT auto-draft offers. Recommending the right device across budget tiers is a judgment call → human.
+
+### Path 2 — Specific availability confirmation → identify, search, offer
+**Trigger:** customer has decided and is checking availability — "meron pa po kayo nito/ganyan?", names a model / P-code / G-code / specs, or sends a screenshot of a listing.
+
+**Behavior:**
+1. **Identify the item** — via VISION read the code/model/specs/price from the image (often a live-sell overlay with a P-code), or from the text.
+2. **Call `search_inventory`** with what was identified (code, or model + specs). This runs the same search the human's modal runs, across ALL live inventory.
+3. **If an available match is found** → **make the offer**: reuse the inventory-insert pipeline to send code + description + grade + price + `📸 …/mine/{code}` + photo — exactly the human's format. Use whatever code the search returns as available (may differ from what the customer referenced — P000825 → G000022).
+4. **If gone / no available match** → say so plainly ("pasensya po, nabenta na po yung ganyan"), offer to find similar, and hand to a human (slides toward Path 1).
+5. **No qualifying questions** — the customer already decided.
 
 ### Defining broad vs. specific (for the model)
-The playbook gives the model a heuristic, not a rigid rule:
-- **Specific** = the message (or its attached image) pins down a single product or a tight set: a model name, a G-code, a screenshot of one listing, or specs precise enough that one or two SKUs match.
-- **Broad** = only a category/intent is given ("laptop", "phone", "tablet", "ano meron"), with no recipient, use-case, or budget yet.
-- When ambiguous, treat as **broad** and qualify — qualifying is the safer, friendlier default for Sales.
+Heuristic, not a rigid rule:
+- **Specific** = the message or its image pins down a product — a model name, a code, a screenshot of one listing, or specs tight enough that the search returns a clear match.
+- **Broad** = only a category/intent ("laptop", "phone", "ano meron"), no recipient/use/budget.
+- When ambiguous → treat as **broad** and qualify (the safer, friendlier default).
 
 ---
 
-## 5. Mode A qualify-first behavior
+## 6. The `search_inventory` tool (enabling change #1)
 
-**Delivery style = Joey's option #2:** reassure stock exists, then ask the top questions **bundled WARMLY into one friendly sentence** — NOT a checklist, never bombard. As the customer answers, **summarize the partial answers** ("confirm you listened"), ask the one remaining item, then offer/hand off.
+### Why a tool (true parity, Joey's choice)
+The human searched ALL live inventory and found the right available code — not whatever the customer happened to quote. To match that, the AI needs the same search, not a truncated in-prompt list. So the model gets a **function-calling tool** it invokes after identifying the item.
 
-**Per-category tailored questions** (Joey: "all devices, tailored"):
+### Tool contract (draft)
+```
+search_inventory(query: string, category?: string, brand?: string, price_min?: number, price_max?: number)
+  → [{ type: 'item'|'sell_group'|'accessory', code, description, grade, price, thumbnail_url, display_url, available }]
+```
+Mirrors the modal's `InventorySearchFilters` + `AvailableInventoryResult` (`src/services/items.ts:424,439`).
 
-| Category | Question slots |
+### Implementation reality (the real work)
+- **Current flow is a single completion.** `generateAIReply` (`ai-providers.ts:116`) sends one request and parses one JSON reply — **no tool-calling loop today.** Adding tool-use means: send tools → if the model returns a tool call, execute it server-side → feed the result back → get the final reply. This must be built for the **active provider** (per `project_ai_provider_config_split`: OpenRouter / openai / `gpt-4o`, vision on). Other providers fall back to no-tool (Path 1 qualify+handoff still works; Path 2 degrades to "hand to human to check").
+- **The search runs server-side (Deno edge function).** `searchAvailableInventory` is **client-side** today (`src/services/items.ts`, browser supabase client). To call identical logic from the edge tool, extract the query into a **Supabase RPC** (`search_available_inventory`) callable from BOTH the browser service and the edge tool — one source of truth, no duplicated query logic across runtimes. *(RPC vs. porting the TS into a shared Deno module is §10.1.)*
+
+---
+
+## 7. Rendering the offer — reuse the Search Inventory pipeline (enabling change #2)
+
+The offer message must look exactly like the human's (screenshot): code + description + grade + price + `📸 View & Order: {SHOP_BASE}/mine/{code}` + the product photo. This is already built — `inventory-search-modal.tsx:94–155` (`handleAdd` → format text + `uploadAttachment` photo → `onInsertItem`). **Do not reinvent it.**
+
+- The AI emits the chosen **offer code(s)** (from the `search_inventory` results) in its structured output.
+- Those codes are expanded through the **same render path the "+ Add" button uses** — producing the formatted text + `/mine/{code}` link + attached photo.
+- **Base URL:** the frontend uses `VITE_PUBLIC_SHOP_URL` (`inventory-search-modal.tsx:126`), a build-time Vite var not readable by Deno. If any rendering happens server-side, read `Deno.env.get('PUBLIC_SHOP_URL')` (set via `supabase secrets set`), default to the temporary `https://dealzinventory.vercel.app` (`project_shop_url`), strip trailing `/shop`. The link string is built in code, never by the model — so it can't hallucinate a URL or code.
+
+**Open (§10.2):** *where* the expansion happens — (a) **frontend auto-expand** when the draft loads for staff review (reuses 100% of the modal pipeline incl. photo; staff still review/send), or (b) **server-side render** so the draft is stored already-formatted with the photo attached (`messages` rows support attachments — `send-message` base64s them into Missive; the draft insert just doesn't populate one today). Phase 1 drafts are always staff-reviewed, so (a) is the lighter, lower-risk default.
+
+---
+
+## 8. Endpoint summary
+
+| Situation | Ending |
 |---|---|
-| **Laptops / computers** | (1) **para kanino** — recipient (anak, pamangkin, self) · (2) **saan gagamitin** — use-case (school / business / gaming) · (3) **ilang taon na ang gagamit** = the **USER'S AGE** (NOT laptop lifespan) · (4) **magkano budget** |
-| **Phones** | budget · use · brand / storage |
-| **Tablets** | budget · use |
+| **Broad ask** | Qualify warmly → **hand to human** with recipient/use/age/budget + budget-vs-tier note. No AI offer. |
+| **Specific confirm, match available** | **AI makes the offer** (photo + `/mine/{code}`) via the reused pipeline. Staff-gated draft. |
+| **Specific confirm, gone / not found** | Say so, offer to find similar, **hand to human**. |
 
-> The laptop slot #3 is the user's age, corrected from an earlier "laptop lifespan" misread. It feeds tier selection (a 7-year-old vs. a college student need very different machines).
-
-### Budget-override — THE key intelligence
-Stated budget is a **starting point, not the answer.** Recipient + age + use-case determine the right device **TIER.** If the appropriate tier exceeds the stated budget, **recommend the right device anyway, with a reason** (a gentle, honest upsell) — and **route that to a human** (Section 7).
-
-Examples Joey gave:
-- Young child → tablet / entry device, even if they imagined a laptop.
-- Highschool / college doing real schoolwork → a real laptop ¥25,000+ even if they said ¥15,000 — explain why the cheaper one won't serve them.
+**Handoff mechanism:** model sets `escalation_reason` (reuses Plan 3b `needs_human_review`, `ai-providers.ts:25`, parsed line 412). Sales `always_escalate` stays **false** — only these cases escalate; specific-confirm matches still auto-draft the offer. The escalation note carries the qualified summary.
 
 ---
 
-## 6. The order link (enabling change #2)
+## 9. Phase B — audio (DEFERRED, not built now)
 
-### Verified URL pattern
-The canonical "buy now / order" link **staff already share** is **`/mine/{code}`**, NOT a `/shop/product/...` path. Crucially, `/mine/:code?` resolves **both** code types — and staff use both:
-- **`/mine/{P-code}`** — an individual physical unit. `src/pages/admin/items.tsx:1044,1334` share this for single items.
-- **`/mine/{G-code}`** — a sell group (a pool of interchangeable units). `inventory-search-modal.tsx:146`, `sell-group-detail.tsx:92`, `items.tsx:941` share this.
-- Route `/mine/:code?` → `MineClaimPage` (`src/routes.tsx:234`) resolves P-codes, G-codes, and accessory-codes.
-
-> Other shop routes exist but are NOT the right link: `/shop/product/:id` takes a **product_model UUID** (not in AI context), and `/shop/checkout/:sellGroupId` / `/order/:sellGroupCode` jump straight to checkout. `/mine/{code}` is the "view photos + order" page staff hand out — using it keeps the AI link **consistent with what staff manually send** (`feedback_consistent_descriptions`).
-
-### Which code to link — P-code vs G-code
-This is the key distinction (raised in review):
-- **G-code = a pool of interchangeable physical units** (same config + grade + price; `stock_count` can be >1). When the customer's ask matches a pooled listing, link the **G-code** — the order reserves one unit from the pool. This is correct for typical "do you have an iPhone 13 128GB Grade A?" style matches.
-- **P-code = one specific physical unit.** When the customer references an *individual* item — a screenshot of a P-code listing staff previously sent, a unique unit with its own condition notes/photos, or a single-stock item — link the **P-code** so they land on that exact unit.
-
-The model links the code that matches **what the customer actually referenced**. Mode B (screenshot / "meron pa ba nito?") most often needs the **P-code** path, because staff frequently share individual units by P-code.
-
-### The gap this exposes (and the real fix)
-The AI inventory context **today exposes only G-codes** — it has no P-codes at all:
-- `getInventorySummary` → `## Available Inventory` (`build-ai-context.ts:334`): queries `sell_groups`, returns `sell_group_code`; member units are collapsed into a `stock_count` only. **No `item_code`.**
-- `getAvailableItemsSummary` → `## Available Items` (`build-ai-context.ts:397`): queries `items` but aggregates by brand+model and never selects `item_code`. **No `item_code`.**
-
-So as written, the AI literally *cannot* produce a P-code link or match a specific unit. **Enabling change #2 must therefore surface `item_code` (P-codes), not just append a URL.** Concretely:
-
-1. **`## Available Inventory` (sell groups):** add each group's member `item_code`s. Extend the `getInventorySummary` select to pull `sell_group_items(items(item_code, ...))` (it already joins `items`), and render the group's order link as the **G-code** link plus, where the group is a single specific unit, the member **P-code**. Line shape becomes roughly:
-   ```
-   - {brand} {model_name} ({specs}) | Grade {grade} | {price} | {n} in stock | {sell_group_code} | Units: {P-code, …} | Order: {SHOP_BASE}/mine/{sell_group_code}
-   ```
-2. **`## Available Items` (individual units):** add `item_code` to the select and stop collapsing identity away, OR add a per-unit line carrying its P-code and `Order: {SHOP_BASE}/mine/{item_code}`. Exact shape is an open decision (§10.5) — but the block must carry P-codes so individual units are linkable.
-3. The model picks G-code vs P-code per §"Which code to link"; the **link string itself is built in code** (context formatter), never asked of the model, so it can't hallucinate a URL or a code.
-
-**Base URL:** the frontend convention is `VITE_PUBLIC_SHOP_URL` (`inventory-search-modal.tsx:126`), a build-time Vite var **not readable by Deno edge functions.** Introduce a server-side secret read with `Deno.env.get('PUBLIC_SHOP_URL')` (set via `supabase secrets set`), falling back to the temporary `https://dealzinventory.vercel.app` (`project_shop_url` — temporary, changes when the real domain is ready). Strip any trailing `/shop` to match the frontend's normalization.
-
----
-
-## 7. Conditional endpoint (LOCKED — "conditional")
-
-After qualifying (Mode A) or confirming (Mode B), the model picks ONE of two endings:
-
-| Condition | Ending |
-|---|---|
-| Clear match within / near the stated need | **Draft 2 concrete offers** (model, grade, price, the code — G-code for a pooled listing or P-code for a specific unit — and the matching `/mine/{code}` order link). Selling prices are PUBLIC and Phase-1 drafts are gated by staff review, so this is safe. |
-| Budget-override upsell · high-value sale · no clean match | **Hand off to a human, WITH the need already summarized** so the human picks up a fully-qualified lead, not a cold start. |
-
-**Handoff mechanism:** the model sets `escalation_reason` (reuses the Plan 3b `needs_human_review` path). Sales `always_escalate` stays **false** — only these specific conditions escalate, everything else still auto-drafts. The escalation note must contain the qualified summary (recipient, use-case, age, budget, recommended tier + why).
-
----
-
-## 8. Phase B — audio (DEFERRED, not built now)
-
-Record ONE warm human voice note that asks all four laptop questions, opening with an apology — *"sorry po madami akong tanong, gusto ko lang po mabigyan kayo ng magandang offer"* — plus a text-list fallback for non-players. Sent on broad-inquiry detection. Same brain as Phase A.
-
-**Build only after** verifying send-rail audio-attachment support in `supabase/functions/send-message/index.ts` (Missive / Messenger). Recorded here for continuity; **no work in this spec.**
-
----
-
-## 9. Enabling changes — summary
-
-| # | Change | File | Note |
-|---|---|---|---|
-| 1 | **Scope `INVENTORY_RESPONSE_RULE`** so "show first / don't qualify" applies to SPECIFIC asks only (Mode B), not broad ones (Mode A). | `_shared/ai-providers.ts:91–98` | THE core fix. See decision in §10. |
-| 2 | **Surface P-codes AND add order links** to the inventory context: extend `getInventorySummary` / `getAvailableItemsSummary` to carry `item_code` (P-codes) alongside `sell_group_code` (G-codes), then render `/mine/{code}` links at the right granularity. | `_shared/build-ai-context.ts:206,334,397` (+ `Deno.env.get('PUBLIC_SHOP_URL')`) | Context today has **no P-codes** — bigger than a URL append. Link built in code, not by the model. |
-| 3 | **Rewrite the Sales playbook** into the two-mode brain (Modes A/B, per-category questions, budget-override, conditional endpoint). | DB row `messaging_specialists` slug='sales' (migration) | Self-routing lives here. |
-| — | Vision images already flow | — | No change. |
+Record ONE warm human voice note asking the four laptop questions, opening with an apology — *"sorry po madami akong tanong, gusto ko lang po mabigyan kayo ng magandang offer"* — plus a text-list fallback. Sent on broad-inquiry detection. Same brain as Path 1. **Build only after** verifying send-rail audio-attachment support in `send-message/index.ts`. Recorded for continuity; no work here.
 
 ---
 
 ## 10. Open design decisions to settle in planning
 
-1. **Global-rule scoping mechanism (change #1)** — two options:
-   - **(a) Make the global rule mode-aware:** rewrite `INVENTORY_RESPONSE_RULE` so it explicitly says "for a SPECIFIC ask, show 1–2 options first; for a BROAD/category ask, qualify first per the active specialist's playbook." Keeps one global rule, defers the broad-case detail to the playbook.
-   - **(b) Soften the global rule** to only cover specific asks, and move ALL qualifying nuance into the Sales playbook.
-   - **Recommendation:** (a) — the global rule stays the single source of the show-vs-ask decision and explicitly hands the broad case to the playbook; less risk of the two texts contradicting. Note this rule is shared by *all* specialists, so keep the edit category-neutral.
-
-2. **Where the per-category question sets live** — inline in the Sales playbook text vs. KB articles tagged `'sales'`. Leaning **inline in the playbook** (one DB row, one place to edit, no retrieval dependency); the existing KB `'Handling Product Inquiries'` (tagged `sales`) can stay as supporting context.
-
-3. **Exact wording** of the mode-routing instruction and the broad-vs-specific heuristic in the playbook (§4) — to be drafted in the plan.
-
-4. **`## Available Items` block** (currently aggregated by model, no code at all) — decide whether to (a) add per-unit lines carrying `item_code` + a `/mine/{P-code}` link, or (b) drop the block from Sales context entirely to avoid the model linking an un-codeable aggregate. Leaning (a) since individual units are exactly the P-code case.
-
-5. **P-code surfacing shape (change #2)** — exact line format once `item_code`s are added to the context: do sell-group lines list all member P-codes, or only when stock=1? How many P-codes per group before truncating? Keep the context compact (it's prompt budget) while still letting the model match a referenced unit.
-
-6. **P-code vs G-code link rule wording** — the playbook instruction telling the model when to link the specific P-code vs the pooled G-code (§6 "Which code to link"). Draft in the plan.
+1. **Search reuse mechanism (change #1):** Supabase **RPC** `search_available_inventory` (one source of truth, callable from browser + edge) **vs.** porting `searchAvailableInventory` into a shared Deno module. Leaning **RPC** — the search spans `items` + `sell_groups` + media joins; an RPC avoids maintaining the same multi-table query in two runtimes, and the browser modal can adopt it too.
+2. **Offer render location (change #2):** frontend auto-expand at staff review **vs.** server-side render into a draft-with-attachment (§7). Leaning **frontend auto-expand** (lighter, reuses the modal pipeline wholesale, photo included; staff always review in Phase 1).
+3. **Tool-use loop scope:** implement function-calling for the active provider only (openai/openrouter); define the graceful fallback for non-tool providers (Path 1 works; Path 2 → "hand to human to check stock"). Confirm `gpt-4o` via OpenRouter supports the tool-call + vision combo in one turn.
+4. **`INVENTORY_RESPONSE_RULE` scoping:** (a) make it mode-aware ("specific → show/search first; broad → qualify per the active playbook") **vs.** (b) soften it and move all nuance into the Sales playbook. Leaning **(a)** — keeps one global show-vs-ask rule; note it's shared by all specialists, so keep the edit category-neutral.
+5. **Where the per-category question sets live:** inline in the Sales playbook text vs. KB articles tagged `'sales'`. Leaning **inline** (one DB row, no retrieval dependency); existing KB `'Handling Product Inquiries'` stays as supporting context.
+6. **Identify-from-image robustness:** the easy case is a live-sell overlay with a printed P-code/model (vision reads it). Define fallback when the customer sends a raw device photo with no code — search by vision-extracted model/specs, and if the search is ambiguous, confirm with one short question before offering.
+7. **`how-many-results` / tool-call budget:** cap results returned to the model; decide max tool calls per turn to bound cost/latency.
 
 ---
 
-## 11. Gotchas (from Plan 3b)
+## 11. Enabling changes — summary
 
-- Use the Supabase **CLI**, not the MCP (MCP needs interactive OAuth).
-- Apply migrations via `supabase db push`.
+| # | Change | Where | Note |
+|---|---|---|---|
+| 1 | **Add `search_inventory` tool** (function-calling loop) running the same search as the modal, via a shared **RPC**. | `_shared/ai-providers.ts` (tool loop), new migration (RPC), `src/services/items.ts` (adopt RPC) | True parity. New flow shape — see §6. |
+| 2 | **Render offers via the existing inventory-insert pipeline** (photo + `/mine/{code}`); AI emits chosen code(s). | `inventory-search-modal.tsx` pipeline reused (frontend auto-expand) or shared formatter | Do NOT reinvent formatting/links/photo. |
+| 3 | **Scope `INVENTORY_RESPONSE_RULE`** — broad → qualify+handoff, specific → search+confirm. | `_shared/ai-providers.ts:91–98` | Part of the behavioral fix. |
+| 4 | **Rewrite the Sales playbook** — two-path brain, per-category questions, tool-call + offer vs. handoff rules, budget-vs-tier handoff note. | DB row `messaging_specialists` slug='sales' (migration) | Self-routing lives here. |
+| — | Vision images already flow | — | No change. |
+
+---
+
+## 12. Gotchas (from Plan 3b)
+
+- Use the Supabase **CLI**, not the MCP (MCP needs interactive OAuth); migrations via `supabase db push`.
 - Branch off `main`.
-- After merge: `supabase functions deploy generate-pending-drafts test-ai-reply`, then push (per `feedback_deploy_workflow`).
-- Playbook change is a DB migration (UPDATE the `messaging_specialists` row) so it's reproducible, not a manual edit.
+- After merge: `supabase functions deploy generate-pending-drafts test-ai-reply`, then push (`feedback_deploy_workflow`).
+- Playbook + RPC changes are DB migrations (reproducible), not manual edits.
 
 ---
 
-## 12. Success criteria
+## 13. Success criteria
 
-- "May laptop po ba kayo?" → the bot reassures stock exists and asks the laptop questions warmly in one sentence — does NOT dump a single cold product.
-- "Meron pa ba nito?" + screenshot of a P-code listing → bot identifies the **specific unit** and replies with availability + a real `/mine/{P-code}` order link (not just the group).
-- A pooled "do you have an iPhone 13 128GB Grade A?" match → bot links the `/mine/{G-code}` (reserves one from the pool).
-- A college-schoolwork ask with a ¥15,000 budget → bot recommends the right ¥25,000+ tier with a reason AND escalates to a human with the lead summarized.
-- A clean in-budget match → bot drafts 2 concrete offers with the correct code + order link (staff-gated).
-- The AI inventory context carries **both** G-codes and member P-codes, and every offered line has a working `/mine/{code}` link pointing at the right granularity.
+- **Broad:** "May laptop po ba kayo?" → bot reassures stock exists, asks the laptop questions warmly in one sentence, and (once answered) hands a summarized lead to a human — never dumps a cold product, never auto-offers.
+- **Specific match (the screenshot case):** "Meron pa po kayo ganyan" + image of the LUCA tablet → bot reads the item, calls `search_inventory`, finds the available `G000022`, and offers it with photo + `/mine/G000022` link — even though the image showed `P000825`.
+- **Specific, gone:** referenced item sold out → bot says so, offers to find similar, hands to a human.
+- **Parity:** the AI's offer message is visually identical to what the human produces via Search Inventory (same format, link, photo) — because it reuses that pipeline.
+- **Budget-vs-tier:** ¥15k budget for college schoolwork → handoff note flags the realistic ¥25k+ tier; the human, not the AI, makes the upsell.
