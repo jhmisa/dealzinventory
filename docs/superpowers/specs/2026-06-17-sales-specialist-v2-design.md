@@ -1,7 +1,7 @@
 # Sales Specialist v2 — Design
 
 **Date:** 2026-06-17
-**Status:** Draft for review (reframed after Joey review — search-tool parity + qualify-then-handoff)
+**Status:** APPROVED (2026-06-17) — search-tool parity via Supabase RPC + qualify-then-handoff. Ready for planning.
 **Branch:** `sales-specialist-v2-design`
 **Builds on:** Plan 3b specialist playbooks (`messaging_specialists`), Plan 1 vision (`getLatestCustomerImages`), the existing **Search Inventory** composer feature (`inventory-search-modal.tsx` + `searchAvailableInventory`)
 **Related memory:** `project_sales_specialist_v2`, `project_messages_ai_redesign_progress`, `project_shop_url`, `feedback_consistent_descriptions`
@@ -123,7 +123,7 @@ Mirrors the modal's `InventorySearchFilters` + `AvailableInventoryResult` (`src/
 
 ### Implementation reality (the real work)
 - **Current flow is a single completion.** `generateAIReply` (`ai-providers.ts:116`) sends one request and parses one JSON reply — **no tool-calling loop today.** Adding tool-use means: send tools → if the model returns a tool call, execute it server-side → feed the result back → get the final reply. This must be built for the **active provider** (per `project_ai_provider_config_split`: OpenRouter / openai / `gpt-4o`, vision on). Other providers fall back to no-tool (Path 1 qualify+handoff still works; Path 2 degrades to "hand to human to check").
-- **The search runs server-side (Deno edge function).** `searchAvailableInventory` is **client-side** today (`src/services/items.ts`, browser supabase client). To call identical logic from the edge tool, extract the query into a **Supabase RPC** (`search_available_inventory`) callable from BOTH the browser service and the edge tool — one source of truth, no duplicated query logic across runtimes. *(RPC vs. porting the TS into a shared Deno module is §10.1.)*
+- **The search runs server-side (Deno edge function), in-process.** The model emits a tool call; our edge function executes the search itself via a **Supabase RPC** — no public endpoint, no network hop, runs with the function's existing service-role client. `searchAvailableInventory` is **client-side** today (`src/services/items.ts`, browser supabase client); we extract its query into a `search_available_inventory()` Postgres function callable from BOTH the browser service and the edge tool — one source of truth (LOCKED, §10.1).
 
 ---
 
@@ -159,7 +159,7 @@ Record ONE warm human voice note asking the four laptop questions, opening with 
 
 ## 10. Open design decisions to settle in planning
 
-1. **Search reuse mechanism (change #1):** Supabase **RPC** `search_available_inventory` (one source of truth, callable from browser + edge) **vs.** porting `searchAvailableInventory` into a shared Deno module. Leaning **RPC** — the search spans `items` + `sell_groups` + media joins; an RPC avoids maintaining the same multi-table query in two runtimes, and the browser modal can adopt it too.
+1. **Search reuse mechanism (change #1): LOCKED → Supabase RPC.** A `search_available_inventory()` Postgres function is the single source of truth, called by BOTH the edge-function `search_inventory` tool and the browser modal (`searchAvailableInventory` adopts it). No public HTTP endpoint — the AI uses LLM function-calling and our edge function runs the query in-process via the RPC. Rejected: a public REST endpoint (new attack surface, needs its own auth, the model can't call HTTP anyway) and porting the TS query into a duplicate Deno module (two copies of the same multi-table search to maintain).
 2. **Offer render location (change #2):** frontend auto-expand at staff review **vs.** server-side render into a draft-with-attachment (§7). Leaning **frontend auto-expand** (lighter, reuses the modal pipeline wholesale, photo included; staff always review in Phase 1).
 3. **Tool-use loop scope:** implement function-calling for the active provider only (openai/openrouter); define the graceful fallback for non-tool providers (Path 1 works; Path 2 → "hand to human to check stock"). Confirm `gpt-4o` via OpenRouter supports the tool-call + vision combo in one turn.
 4. **`INVENTORY_RESPONSE_RULE` scoping:** (a) make it mode-aware ("specific → show/search first; broad → qualify per the active playbook") **vs.** (b) soften it and move all nuance into the Sales playbook. Leaning **(a)** — keeps one global show-vs-ask rule; note it's shared by all specialists, so keep the edit category-neutral.
