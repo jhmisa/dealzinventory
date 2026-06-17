@@ -188,3 +188,15 @@ Deno.test('runChatCompletionWithTools returns immediately when no tool call', as
   });
   assertEquals(result.finalText, '{"reply":"hi","confidence":0.8}');
 });
+
+Deno.test('parseAIResponse reads offer_codes array', () => {
+  const text = JSON.stringify({
+    reply: 'Available po: G000022', confidence: 0.9, intent: 'product_inquiry',
+    data_used: ['G000022'], escalation_reason: null, offer_codes: ['G000022'],
+  });
+  assertEquals(parseAIResponse(text).offer_codes, ['G000022']);
+});
+
+Deno.test('parseAIResponse defaults offer_codes to empty array', () => {
+  assertEquals(parseAIResponse('{"reply":"hi"}').offer_codes, []);
+});
