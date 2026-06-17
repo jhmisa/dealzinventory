@@ -232,6 +232,7 @@ export const queryKeys = {
     alerts: () => [...queryKeys.messaging.all, 'alerts'] as const,
     needsReviewCount: () => [...queryKeys.messaging.all, 'needs-review-count'] as const,
     knowledgeBase: () => [...queryKeys.messaging.all, 'knowledge-base'] as const,
+    specialists: () => [...queryKeys.messaging.all, 'specialists'] as const,
     systemSetting: (key: string) => [...queryKeys.messaging.all, 'system-setting', key] as const,
   },
 }

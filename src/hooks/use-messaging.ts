@@ -11,6 +11,7 @@ import type {
   MessagingPersonaUpdate,
   KnowledgeBaseEntryInsert,
   KnowledgeBaseEntryUpdate,
+  MessagingSpecialistUpdate,
   TestAIMessage,
 } from '@/lib/types'
 
@@ -317,6 +318,26 @@ export function useDeleteKnowledgeBaseEntry() {
     mutationFn: (id: string) => messagingService.deleteKnowledgeBaseEntry(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.messaging.knowledgeBase() })
+    },
+  })
+}
+
+// ---------- Specialists ----------
+
+export function useSpecialists() {
+  return useQuery({
+    queryKey: queryKeys.messaging.specialists(),
+    queryFn: () => messagingService.getSpecialists(),
+  })
+}
+
+export function useUpdateSpecialist() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: MessagingSpecialistUpdate }) =>
+      messagingService.updateSpecialist(id, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.messaging.specialists() })
     },
   })
 }

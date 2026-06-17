@@ -15,6 +15,8 @@ import type {
   KnowledgeBaseEntry,
   KnowledgeBaseEntryInsert,
   KnowledgeBaseEntryUpdate,
+  MessagingSpecialist,
+  MessagingSpecialistUpdate,
   TestAIMessage,
   TestAIResponse,
 } from '@/lib/types'
@@ -547,6 +549,28 @@ export async function deleteKnowledgeBaseEntry(id: string) {
     .delete()
     .eq('id', id)
   if (error) throw error
+}
+
+// ---------- Specialists ----------
+
+export async function getSpecialists() {
+  const { data, error } = await supabase
+    .from('messaging_specialists')
+    .select('*')
+    .order('sort_order')
+  if (error) throw error
+  return (data ?? []) as MessagingSpecialist[]
+}
+
+export async function updateSpecialist(id: string, updates: MessagingSpecialistUpdate) {
+  const { data, error } = await supabase
+    .from('messaging_specialists')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data as MessagingSpecialist
 }
 
 // ---------- Test AI ----------
