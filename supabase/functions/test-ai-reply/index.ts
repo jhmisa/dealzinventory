@@ -9,6 +9,7 @@ import { generateAIReply, type AIProvider } from "../_shared/ai-providers.ts";
 import { buildSpecialistSystemPrompt, type SpecialistRow } from "../_shared/build-specialist-prompt.ts";
 import { modelSupportsVision, type VisionImage } from "../_shared/ai-vision.ts";
 import { searchInventory, deriveOfferCodes, type InventorySearchResult } from "../_shared/inventory-search.ts";
+import { assembleOfferReply } from "../_shared/offer-reply.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -195,7 +196,13 @@ Deno.serve(async (req) => {
     // photo-group-media is public-read, so it renders directly — no storage upload).
     // Derive codes from the reply (links/bare codes) so the photo shows whenever the AI
     // offers something, not only when it remembered to fill offer_codes.
-    const offers: TestOffer[] = deriveOfferCodes(aiResponse.reply, aiResponse.offer_codes, offerCatalog)
+    const offerCodes = deriveOfferCodes(aiResponse.reply, aiResponse.offer_codes, offerCatalog);
+
+    // Splice the emoji offer block into the reply so the playground shows the EXACT message
+    // a customer would receive (identical to generate-draft's saved content).
+    const finalReply = assembleOfferReply(aiResponse.reply, offerCodes, offerCatalog);
+
+    const offers: TestOffer[] = offerCodes
       .map((code) => {
         const r = offerCatalog.get(code);
         if (!r) return null;
@@ -208,7 +215,7 @@ Deno.serve(async (req) => {
       })
       .filter((o): o is TestOffer => o !== null);
 
-    return new Response(JSON.stringify({ ...aiResponse, offers, tool_errors: toolErrors, tool_calls: toolCalls }), {
+    return new Response(JSON.stringify({ ...aiResponse, reply: finalReply, offers, tool_errors: toolErrors, tool_calls: toolCalls }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
