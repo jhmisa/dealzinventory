@@ -24,6 +24,7 @@ export interface AIResponse {
   data_used: string[];
   escalation_reason: string | null;
   needs_clarification?: boolean;
+  offer_codes?: string[];
   usage?: TokenUsage;
 }
 
@@ -90,12 +91,15 @@ export function consolidateForTest(messages: ChatMessage[]): ChatMessage[] {
 
 const INVENTORY_RESPONSE_RULE = `
 # Response Strategy for Product Inquiries
-When a customer asks about a product or what's available:
-1. FIRST check the Available Inventory / Available Items in the context below.
-2. If there are matches, lead your reply with 1-2 concrete options (model, grade, price, G-code). Present the best match first, then one alternative if available.
-3. THEN ask ONE short qualifying question only if needed (e.g. preferred storage size, budget, or condition grade).
-4. Do NOT ask multiple qualifying questions before showing inventory. Show what you have first.
-5. Keep replies short — 2-4 sentences max. No walls of text.`;
+First decide if the request is SPECIFIC or BROAD:
+- SPECIFIC = the customer named a model/code/specs, or sent a photo/screenshot of one listing, or asks "is THIS still available?".
+- BROAD = only a category/intent ("may laptop po ba kayo?", "may phone ba kayo?", "ano meron"), with no recipient, use-case, or budget yet.
+
+For a SPECIFIC ask: confirm availability first. Use the search_inventory tool to find the matching AVAILABLE listing (it may be a different code than the customer quoted), then lead your reply with that concrete option (code, grade, price) and its order_url. Ask at most ONE short follow-up only if needed.
+
+For a BROAD ask: do NOT dump a product and do NOT call search_inventory yet. Follow the active specialist's playbook to qualify first (reassure stock exists, then ask the key questions warmly), then hand off per the playbook.
+
+Keep replies short — 2-4 sentences max. No walls of text.`;
 
 const CLARIFY_BEFORE_ASSUMING_RULE = `
 # Resolve before assuming — then ask ONE specific question
@@ -119,6 +123,7 @@ export async function generateAIReply(
   contextBlock: string,
   messages: ChatMessage[],
   latestImages: VisionImage[] = [],
+  executeTool?: ToolExecutor,
 ): Promise<AIResponse> {
   // Inject inventory response strategy + clarify-don't-guess rule into every prompt
   const enhancedPrompt = buildEnhancedPrompt(systemPrompt);
@@ -134,7 +139,7 @@ export async function generateAIReply(
     case 'google':
       return callGemini(provider, enhancedPrompt, contextBlock, messages, images);
     case 'openrouter':
-      return callOpenRouter(provider, enhancedPrompt, contextBlock, messages, images);
+      return callOpenRouter(provider, enhancedPrompt, contextBlock, messages, images, executeTool);
     default:
       throw new Error(`Unsupported provider: ${provider.provider}`);
   }
@@ -166,7 +171,7 @@ async function callClaude(
   }
 
   // Add the latest customer message context prompt
-  const fullSystem = `${systemPrompt}\n\n---\n\n# Current Customer Context\n${contextBlock}\n\n---\n\nRespond with a JSON object containing:\n- "reply": your message to the customer\n- "confidence": 0.0-1.0 how confident you are this reply is correct and complete\n- "intent": one of tracking|order_status|product_inquiry|complaint|return|kaitori|general|unknown\n- "data_used": array of data references used e.g. ["order:ORD000123"]\n- "escalation_reason": null if no escalation needed, otherwise a short reason string\n- "needs_clarification": true if your reply is a question asking the customer to clarify their request (instead of answering it), otherwise false\n\nRespond ONLY with the JSON object, no markdown fences.`;
+  const fullSystem = `${systemPrompt}\n\n---\n\n# Current Customer Context\n${contextBlock}\n\n---\n\nRespond with a JSON object containing:\n- "reply": your message to the customer\n- "confidence": 0.0-1.0 how confident you are this reply is correct and complete\n- "intent": one of tracking|order_status|product_inquiry|complaint|return|kaitori|general|unknown\n- "data_used": array of data references used e.g. ["order:ORD000123"]\n- "escalation_reason": null if no escalation needed, otherwise a short reason string\n- "needs_clarification": true if your reply is a question asking the customer to clarify their request (instead of answering it), otherwise false\n- "offer_codes": array of inventory codes you are offering in this reply (from search_inventory results), e.g. ["G000022"]; empty array if none\n\nRespond ONLY with the JSON object, no markdown fences.`;
 
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -205,7 +210,7 @@ async function callOpenAI(
   const openaiMessages: Array<{ role: string; content: string | unknown[] }> = [
     {
       role: 'system',
-      content: `${systemPrompt}\n\n---\n\n# Current Customer Context\n${contextBlock}\n\n---\n\nRespond with a JSON object containing:\n- "reply": your message to the customer\n- "confidence": 0.0-1.0 how confident you are this reply is correct and complete\n- "intent": one of tracking|order_status|product_inquiry|complaint|return|kaitori|general|unknown\n- "data_used": array of data references used e.g. ["order:ORD000123"]\n- "escalation_reason": null if no escalation needed, otherwise a short reason string\n- "needs_clarification": true if your reply is a question asking the customer to clarify their request (instead of answering it), otherwise false\n\nRespond ONLY with the JSON object, no markdown fences.`,
+      content: `${systemPrompt}\n\n---\n\n# Current Customer Context\n${contextBlock}\n\n---\n\nRespond with a JSON object containing:\n- "reply": your message to the customer\n- "confidence": 0.0-1.0 how confident you are this reply is correct and complete\n- "intent": one of tracking|order_status|product_inquiry|complaint|return|kaitori|general|unknown\n- "data_used": array of data references used e.g. ["order:ORD000123"]\n- "escalation_reason": null if no escalation needed, otherwise a short reason string\n- "needs_clarification": true if your reply is a question asking the customer to clarify their request (instead of answering it), otherwise false\n- "offer_codes": array of inventory codes you are offering in this reply (from search_inventory results), e.g. ["G000022"]; empty array if none\n\nRespond ONLY with the JSON object, no markdown fences.`,
     },
     ...consolidateMessages(messages).map((m) => ({
       role: m.role === 'customer' ? 'user' as const : 'assistant' as const,
@@ -247,6 +252,121 @@ async function callOpenAI(
   return { ...parseAIResponse(text), usage: extractUsage('openai', data) };
 }
 
+// ---------- Tool: search_inventory ----------
+
+export const SEARCH_INVENTORY_TOOL = {
+  type: 'function' as const,
+  function: {
+    name: 'search_inventory',
+    description:
+      'Search Dealz live AVAILABLE inventory for products to confirm availability and make an offer. ' +
+      'Use when a customer asks if a specific item is still available, names a model/code, or sends a photo/screenshot of a listing. ' +
+      'Returns matching items (P-codes) and sell groups (G-codes) with code, description, grade, price, and order_url.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Model name, brand, code, or keywords read from the message/image, e.g. "Iris Ohyama LUCA tablet" or "G000022".' },
+        category_id: { type: 'string', description: 'Optional category UUID filter.' },
+        brand: { type: 'string', description: 'Optional exact brand filter.' },
+        price_min: { type: 'number', description: 'Optional minimum yen price.' },
+        price_max: { type: 'number', description: 'Optional maximum yen price.' },
+      },
+      required: ['query'],
+    },
+  },
+};
+
+type ToolCall = { id: string; type: string; function: { name: string; arguments: string } };
+type LoopMessage = { role: string; content: string | unknown[] | null; tool_calls?: ToolCall[]; tool_call_id?: string };
+
+export interface ToolLoopArgs {
+  fetchImpl: typeof fetch;
+  url: string;
+  apiKey: string;
+  model: string;
+  messages: LoopMessage[];
+  executeTool: (name: string, args: unknown) => Promise<unknown>;
+  maxToolRounds: number;
+}
+
+export interface ToolLoopResult {
+  finalText: string;
+  usage: TokenUsage;
+}
+
+export type ToolExecutor = (name: string, args: unknown) => Promise<unknown>;
+
+// Multi-turn OpenAI-compatible chat loop: runs tool calls in-process until the model
+// returns a normal (content) message. Provider-agnostic over any OpenAI-shaped endpoint.
+export async function runChatCompletionWithTools(args: ToolLoopArgs): Promise<ToolLoopResult> {
+  const messages = [...args.messages];
+  let inTok = 0, outTok = 0;
+
+  for (let round = 0; round <= args.maxToolRounds; round++) {
+    // After exhausting tool rounds, force a normal answer (omit tools).
+    const includeTools = round < args.maxToolRounds;
+    const body: Record<string, unknown> = {
+      model: args.model,
+      max_tokens: 1024,
+      messages,
+    };
+    if (includeTools) {
+      // While tools are offered, do NOT force json_object — some OpenRouter models
+      // suppress tool_calls when a response_format is pinned. The final round (below)
+      // omits tools and enforces JSON for a clean, parseable answer.
+      body.tools = [SEARCH_INVENTORY_TOOL];
+    } else {
+      body.response_format = { type: 'json_object' };
+    }
+
+    // Retry 503/429 with backoff (mirrors existing provider behavior).
+    let data: Record<string, unknown> | null = null;
+    let lastError = '';
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
+      const res = await args.fetchImpl(args.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${args.apiKey}` },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) { data = await res.json(); break; }
+      lastError = await res.text();
+      const status = (res as Response).status;
+      if (status !== 503 && status !== 429) throw new Error(`Tool-loop API error ${status}: ${lastError}`);
+      if (attempt === 2) throw new Error(`Tool-loop API error after 3 retries: ${lastError}`);
+    }
+    if (!data) throw new Error('Tool-loop: no response');
+
+    const usage = extractUsage('openrouter', data);
+    inTok += usage.input_tokens; outTok += usage.output_tokens;
+
+    const choice = (data.choices as Array<{ finish_reason?: string; message: LoopMessage }>)?.[0];
+    const msg = choice?.message;
+    const toolCalls = msg?.tool_calls ?? [];
+
+    // No tool calls — or this was the final forced-answer round (tools omitted): return the
+    // model's content. Empty content falls through to the caller, which escalates to a human.
+    if (!toolCalls.length || !includeTools) {
+      const content = typeof msg?.content === 'string' ? msg.content : '';
+      return { finalText: content, usage: { input_tokens: inTok, output_tokens: outTok } };
+    }
+
+    // Record the assistant tool-call turn, then each tool result.
+    messages.push({ role: 'assistant', content: msg!.content ?? null, tool_calls: toolCalls });
+    for (const tc of toolCalls) {
+      let parsed: unknown = {};
+      try { parsed = JSON.parse(tc.function.arguments || '{}'); } catch { parsed = {}; }
+      let result: unknown;
+      try { result = await args.executeTool(tc.function.name, parsed); }
+      catch (err) { result = { error: err instanceof Error ? err.message : 'tool error' }; }
+      messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(result) });
+    }
+  }
+
+  // Unreachable in practice — the final round omits tools and returns content above.
+  return { finalText: '', usage: { input_tokens: inTok, output_tokens: outTok } };
+}
+
 // ---------- OpenRouter (OpenAI-compatible) ----------
 
 async function callOpenRouter(
@@ -255,11 +375,12 @@ async function callOpenRouter(
   contextBlock: string,
   messages: ChatMessage[],
   images: VisionImage[] = [],
+  executeTool?: ToolExecutor,
 ): Promise<AIResponse> {
   const openrouterMessages: Array<{ role: string; content: string | unknown[] }> = [
     {
       role: 'system',
-      content: `${systemPrompt}\n\n---\n\n# Current Customer Context\n${contextBlock}\n\n---\n\nRespond with a JSON object containing:\n- "reply": your message to the customer\n- "confidence": 0.0-1.0 how confident you are this reply is correct and complete\n- "intent": one of tracking|order_status|product_inquiry|complaint|return|kaitori|general|unknown\n- "data_used": array of data references used e.g. ["order:ORD000123"]\n- "escalation_reason": null if no escalation needed, otherwise a short reason string\n- "needs_clarification": true if your reply is a question asking the customer to clarify their request (instead of answering it), otherwise false\n\nRespond ONLY with the JSON object, no markdown fences.`,
+      content: `${systemPrompt}\n\n---\n\n# Current Customer Context\n${contextBlock}\n\n---\n\nRespond with a JSON object containing:\n- "reply": your message to the customer\n- "confidence": 0.0-1.0 how confident you are this reply is correct and complete\n- "intent": one of tracking|order_status|product_inquiry|complaint|return|kaitori|general|unknown\n- "data_used": array of data references used e.g. ["order:ORD000123"]\n- "escalation_reason": null if no escalation needed, otherwise a short reason string\n- "needs_clarification": true if your reply is a question asking the customer to clarify their request (instead of answering it), otherwise false\n- "offer_codes": array of inventory codes you are offering in this reply (from search_inventory results), e.g. ["G000022"]; empty array if none\n\nRespond ONLY with the JSON object, no markdown fences.`,
     },
     ...consolidateMessages(messages).map((m) => ({
       role: m.role === 'customer' ? 'user' as const : 'assistant' as const,
@@ -275,6 +396,20 @@ async function callOpenRouter(
         break;
       }
     }
+  }
+
+  // Tool-enabled path: run the multi-turn loop so the model can call search_inventory.
+  if (executeTool) {
+    const { finalText, usage } = await runChatCompletionWithTools({
+      fetchImpl: fetch,
+      url: 'https://openrouter.ai/api/v1/chat/completions',
+      apiKey: provider.api_key_encrypted,
+      model: provider.model_id,
+      messages: openrouterMessages as LoopMessage[],
+      executeTool,
+      maxToolRounds: 2,
+    });
+    return { ...parseAIResponse(finalText), usage };
   }
 
   // Retry up to 3 times with exponential backoff for 503/429 errors
@@ -343,7 +478,7 @@ async function callGemini(
   const body = JSON.stringify({
     systemInstruction: {
       parts: [{
-        text: `${systemPrompt}\n\n---\n\n# Current Customer Context\n${contextBlock}\n\n---\n\nRespond with a JSON object containing:\n- "reply": your message to the customer\n- "confidence": 0.0-1.0 how confident you are this reply is correct and complete\n- "intent": one of tracking|order_status|product_inquiry|complaint|return|kaitori|general|unknown\n- "data_used": array of data references used e.g. ["order:ORD000123"]\n- "escalation_reason": null if no escalation needed, otherwise a short reason string\n- "needs_clarification": true if your reply is a question asking the customer to clarify their request (instead of answering it), otherwise false\n\nRespond ONLY with the JSON object, no markdown fences.`,
+        text: `${systemPrompt}\n\n---\n\n# Current Customer Context\n${contextBlock}\n\n---\n\nRespond with a JSON object containing:\n- "reply": your message to the customer\n- "confidence": 0.0-1.0 how confident you are this reply is correct and complete\n- "intent": one of tracking|order_status|product_inquiry|complaint|return|kaitori|general|unknown\n- "data_used": array of data references used e.g. ["order:ORD000123"]\n- "escalation_reason": null if no escalation needed, otherwise a short reason string\n- "needs_clarification": true if your reply is a question asking the customer to clarify their request (instead of answering it), otherwise false\n- "offer_codes": array of inventory codes you are offering in this reply (from search_inventory results), e.g. ["G000022"]; empty array if none\n\nRespond ONLY with the JSON object, no markdown fences.`,
       }],
     },
     contents: geminiContents,
@@ -411,6 +546,7 @@ export function parseAIResponse(text: string): AIResponse {
           data_used: Array.isArray(parsed.data_used) ? parsed.data_used.map(String) : [],
           escalation_reason: parsed.escalation_reason ? String(parsed.escalation_reason) : null,
           needs_clarification: parsed.needs_clarification === true,
+          offer_codes: Array.isArray(parsed.offer_codes) ? parsed.offer_codes.map(String) : [],
         };
       }
     } catch {
@@ -428,6 +564,7 @@ export function parseAIResponse(text: string): AIResponse {
       data_used: [],
       escalation_reason: null,
       needs_clarification: false,
+      offer_codes: [],
     };
   }
 
@@ -438,5 +575,6 @@ export function parseAIResponse(text: string): AIResponse {
     data_used: [],
     escalation_reason: 'AI response could not be parsed as structured JSON',
     needs_clarification: false,
+    offer_codes: [],
   };
 }

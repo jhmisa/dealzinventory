@@ -94,3 +94,109 @@ Deno.test('buildEnhancedPrompt keeps the persona and appends both rule blocks', 
   assertEquals(out.includes('Resolve before assuming'), true);
   assertEquals(out.includes('NEVER re-ask'), true);
 });
+
+import { buildEnhancedPrompt as buildEP2 } from './ai-providers.ts';
+
+Deno.test('INVENTORY_RESPONSE_RULE distinguishes specific vs broad asks', () => {
+  const out = buildEP2('PERSONA');
+  // Specific asks still lead with concrete options / search.
+  assertEquals(/specific/i.test(out), true);
+  // Broad/category asks must qualify first instead of dumping a product.
+  assertEquals(/broad|category/i.test(out), true);
+  assertEquals(/qualif/i.test(out), true);
+});
+
+import { runChatCompletionWithTools, SEARCH_INVENTORY_TOOL } from './ai-providers.ts';
+
+Deno.test('SEARCH_INVENTORY_TOOL declares the function name and query param', () => {
+  assertEquals(SEARCH_INVENTORY_TOOL.function.name, 'search_inventory');
+  assertEquals(typeof SEARCH_INVENTORY_TOOL.function.parameters.properties.query, 'object');
+});
+
+Deno.test('runChatCompletionWithTools executes a tool call then returns final content', async () => {
+  const calls: Array<{ name: string; args: unknown }> = [];
+  const responses = [
+    {
+      choices: [{
+        finish_reason: 'tool_calls',
+        message: {
+          role: 'assistant', content: null,
+          tool_calls: [{ id: 'call_1', type: 'function',
+            function: { name: 'search_inventory', arguments: JSON.stringify({ query: 'LUCA tablet' }) } }],
+        },
+      }],
+      usage: { prompt_tokens: 10, completion_tokens: 2 },
+    },
+    {
+      choices: [{ finish_reason: 'stop', message: { role: 'assistant',
+        content: JSON.stringify({ reply: 'Opo available po: G000022', confidence: 0.9, intent: 'product_inquiry', data_used: ['G000022'], escalation_reason: null }) } }],
+      usage: { prompt_tokens: 20, completion_tokens: 8 },
+    },
+  ];
+  let i = 0;
+  const fakeFetch = (_url: string, _init: unknown) =>
+    Promise.resolve({ ok: true, json: () => Promise.resolve(responses[i++]) } as Response);
+
+  const executeTool = (name: string, args: unknown) => {
+    calls.push({ name, args });
+    return Promise.resolve([{ code: 'G000022', price: 7900 }]);
+  };
+
+  const result = await runChatCompletionWithTools({
+    fetchImpl: fakeFetch as typeof fetch,
+    url: 'https://openrouter.ai/api/v1/chat/completions',
+    apiKey: 'k', model: 'openai/gpt-4o',
+    messages: [{ role: 'user', content: 'meron pa po nito?' }],
+    executeTool, maxToolRounds: 3,
+  });
+
+  assertEquals(calls.length, 1);
+  assertEquals(calls[0].name, 'search_inventory');
+  assertEquals((calls[0].args as { query: string }).query, 'LUCA tablet');
+  assertEquals(result.finalText.includes('G000022'), true);
+  assertEquals(result.usage.input_tokens, 30);
+  assertEquals(result.usage.output_tokens, 10); // 2 + 8 summed across both turns
+});
+
+Deno.test('runChatCompletionWithTools survives a throwing executeTool and still returns final content', async () => {
+  const responses = [
+    { choices: [{ finish_reason: 'tool_calls', message: { role: 'assistant', content: null,
+        tool_calls: [{ id: 'c1', type: 'function', function: { name: 'search_inventory', arguments: '{"query":"x"}' } }] } }],
+      usage: { prompt_tokens: 5, completion_tokens: 1 } },
+    { choices: [{ finish_reason: 'stop', message: { content: '{"reply":"pasensya po, di ko ma-check ngayon","confidence":0.4}' } }],
+      usage: { prompt_tokens: 6, completion_tokens: 2 } },
+  ];
+  let i = 0;
+  const fakeFetch = () => Promise.resolve({ ok: true, json: () => Promise.resolve(responses[i++]) } as Response);
+  const result = await runChatCompletionWithTools({
+    fetchImpl: fakeFetch as typeof fetch, url: 'u', apiKey: 'k', model: 'm',
+    messages: [{ role: 'user', content: 'meron pa?' }],
+    executeTool: () => Promise.reject(new Error('rpc down')), maxToolRounds: 3,
+  });
+  assertEquals(result.finalText.includes('pasensya'), true);
+});
+
+Deno.test('runChatCompletionWithTools returns immediately when no tool call', async () => {
+  const fakeFetch = () => Promise.resolve({ ok: true, json: () => Promise.resolve({
+    choices: [{ finish_reason: 'stop', message: { content: '{"reply":"hi","confidence":0.8}' } }],
+    usage: { prompt_tokens: 5, completion_tokens: 1 },
+  }) } as Response);
+  const result = await runChatCompletionWithTools({
+    fetchImpl: fakeFetch as typeof fetch, url: 'u', apiKey: 'k', model: 'm',
+    messages: [{ role: 'user', content: 'hi' }],
+    executeTool: () => Promise.reject(new Error('should not be called')), maxToolRounds: 3,
+  });
+  assertEquals(result.finalText, '{"reply":"hi","confidence":0.8}');
+});
+
+Deno.test('parseAIResponse reads offer_codes array', () => {
+  const text = JSON.stringify({
+    reply: 'Available po: G000022', confidence: 0.9, intent: 'product_inquiry',
+    data_used: ['G000022'], escalation_reason: null, offer_codes: ['G000022'],
+  });
+  assertEquals(parseAIResponse(text).offer_codes, ['G000022']);
+});
+
+Deno.test('parseAIResponse defaults offer_codes to empty array', () => {
+  assertEquals(parseAIResponse('{"reply":"hi"}').offer_codes, []);
+});

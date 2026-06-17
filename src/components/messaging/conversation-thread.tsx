@@ -195,7 +195,7 @@ interface ConversationThreadProps {
   }
   messages: Message[]
   onSend: (content: string, attachments?: MessageAttachment[]) => void
-  onApproveDraft: (messageId: string, content: string) => void
+  onApproveDraft: (messageId: string, content: string, attachments?: MessageAttachment[]) => void
   onRejectDraft: (messageId: string) => void
   onRetryMessage: (messageId: string) => void
   onLinkCustomer: (customerId: string) => void
@@ -391,7 +391,7 @@ export const ConversationThread = memo(function ConversationThread({
                         <div className="max-w-[80%]">
                           <AiDraftCard
                             message={msg}
-                            onApprove={(content) => onApproveDraft(msg.id, content)}
+                            onApprove={(content, attachments) => onApproveDraft(msg.id, content, attachments)}
                             onReject={() => onRejectDraft(msg.id)}
                             isLoading={isSending}
                           />

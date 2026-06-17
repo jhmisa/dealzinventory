@@ -9,6 +9,36 @@ import {
   specialistForIntent,
   type SpecialistRow,
 } from "./build-specialist-prompt.ts";
+import { searchInventory, type InventorySearchResult } from "./inventory-search.ts";
+
+async function buildOfferAttachments(
+  supabase: ReturnType<typeof createClient>,
+  conversationId: string,
+  codes: string[],
+  catalog: Map<string, InventorySearchResult>,
+): Promise<Array<{ file_url: string; filename: string; mime_type: string; size_bytes: number }>> {
+  const out: Array<{ file_url: string; filename: string; mime_type: string; size_bytes: number }> = [];
+  for (const code of codes.slice(0, 3)) {
+    const r = catalog.get(code);
+    if (!r?.display_url) continue;
+    try {
+      const resp = await fetch(r.display_url);
+      if (!resp.ok) continue;
+      const buf = new Uint8Array(await resp.arrayBuffer());
+      const mime = resp.headers.get('content-type') ?? 'image/jpeg';
+      const ext = mime.includes('png') ? 'png' : 'jpg';
+      const path = `ai-offer/${conversationId}/${code}_${buf.byteLength}.${ext}`;
+      const { error } = await supabase.storage
+        .from('messaging-attachments')
+        .upload(path, buf, { contentType: mime, upsert: true });
+      if (error) { console.error('offer photo upload failed (non-fatal):', error); continue; }
+      out.push({ file_url: path, filename: `${code}.${ext}`, mime_type: mime, size_bytes: buf.byteLength });
+    } catch (err) {
+      console.error('offer photo fetch failed (non-fatal):', err);
+    }
+  }
+  return out;
+}
 
 /**
  * Generate an AI draft reply for a conversation and save it as a DRAFT message.
@@ -100,12 +130,35 @@ export async function generateAndSaveDraft(
     : [];
 
   // 5. Generate AI reply
+  // Tool executor: the AI calls search_inventory; we run it in-process via the RPCs.
+  // Accumulate results by code so a later phase can attach the offered product's photo.
+  // The tool is offered on every OpenRouter call; the playbook + INVENTORY_RESPONSE_RULE gate it to SPECIFIC product asks, so non-sales intents simply never call it.
+  const offerCatalog = new Map<string, InventorySearchResult>();
+  const executeTool = async (name: string, args: unknown): Promise<unknown> => {
+    if (name !== 'search_inventory') return { error: `unknown tool: ${name}` };
+    const a = (args ?? {}) as Record<string, unknown>;
+    const results = await searchInventory(supabase, {
+      query: String(a.query ?? ''),
+      category_id: a.category_id ? String(a.category_id) : undefined,
+      brand: a.brand ? String(a.brand) : undefined,
+      price_min: a.price_min != null ? Number(a.price_min) : undefined,
+      price_max: a.price_max != null ? Number(a.price_max) : undefined,
+    });
+    for (const r of results) offerCatalog.set(r.code, r);
+    // Return a compact shape for the model (include order_url so it can paste the link).
+    return results.map((r) => ({
+      type: r.type, code: r.code, description: r.description,
+      grade: r.grade, price: r.price, available_count: r.available_count, order_url: r.order_url,
+    }));
+  };
+
   const aiResponse = await generateAIReply(
     provider as AIProvider,
     fullSystemPrompt,
     contextBlock,
     chatMessages,
     latestImages,
+    executeTool,
   );
 
   // 5b. Record token usage + estimated cost (best-effort; never block the draft).
@@ -137,6 +190,11 @@ export async function generateAndSaveDraft(
     matchedSpecialist.always_escalate === true;
 
   // 7. Save draft message
+  const offerCodes = aiResponse.offer_codes ?? [];
+  const offerAttachments = offerCodes.length
+    ? await buildOfferAttachments(supabase, conversationId, offerCodes, offerCatalog)
+    : [];
+
   await supabase.from('messages').insert({
     conversation_id: conversationId,
     role: 'assistant',
@@ -144,11 +202,13 @@ export async function generateAndSaveDraft(
     status: 'DRAFT',
     message_type: 'REPLY',
     ai_confidence: aiResponse.confidence,
+    attachments: offerAttachments,
     ai_context_summary: JSON.stringify({
       intent: aiResponse.intent,
       data_used: aiResponse.data_used,
       escalation_reason: aiResponse.escalation_reason,
       needs_clarification: aiResponse.needs_clarification ?? false,
+      offer_codes: offerCodes,
     }),
   });
 

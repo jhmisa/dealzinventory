@@ -1,10 +1,11 @@
-import { memo, useState } from 'react'
+import { memo, useState, useEffect } from 'react'
 import { Bot, Check, Pencil, X, Send } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
-import type { Message } from '@/lib/types'
+import type { Message, MessageAttachment } from '@/lib/types'
+import { getAttachmentSignedUrl } from '@/services/messaging'
 
 function confidenceColor(confidence: number | null): string {
   if (confidence === null) return 'bg-gray-100 text-gray-700 border-gray-300'
@@ -13,9 +14,28 @@ function confidenceColor(confidence: number | null): string {
   return 'bg-red-100 text-red-800 border-red-300'
 }
 
+function DraftAttachmentThumb({ attachment }: { attachment: MessageAttachment }) {
+  const [url, setUrl] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    getAttachmentSignedUrl(attachment.file_url).then((signed) => {
+      if (!cancelled) setUrl(signed)
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [attachment.file_url])
+  if (!url) return null
+  return (
+    <img
+      src={url}
+      alt={attachment.filename}
+      className="h-20 w-20 rounded object-cover border"
+    />
+  )
+}
+
 interface AiDraftCardProps {
   message: Message
-  onApprove: (content: string) => void
+  onApprove: (content: string, attachments?: MessageAttachment[]) => void
   onReject: () => void
   isLoading?: boolean
 }
@@ -47,7 +67,16 @@ export const AiDraftCard = memo(function AiDraftCard({
           autoFocus
         />
       ) : (
-        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+        <>
+          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+          {message.attachments && message.attachments.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {message.attachments.map((att) => (
+                <DraftAttachmentThumb key={att.file_url} attachment={att} />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       <div className="flex items-center gap-2">
@@ -55,7 +84,7 @@ export const AiDraftCard = memo(function AiDraftCard({
           <>
             <Button
               size="xs"
-              onClick={() => { onApprove(editedContent); setIsEditing(false) }}
+              onClick={() => { onApprove(editedContent, message.attachments); setIsEditing(false) }}
               disabled={isLoading || !editedContent.trim()}
             >
               <Send className="h-3 w-3" />
@@ -71,7 +100,7 @@ export const AiDraftCard = memo(function AiDraftCard({
           </>
         ) : (
           <>
-            <Button size="xs" onClick={() => onApprove(message.content)} disabled={isLoading}>
+            <Button size="xs" onClick={() => onApprove(message.content, message.attachments)} disabled={isLoading}>
               <Check className="h-3 w-3" />
               Send
             </Button>
