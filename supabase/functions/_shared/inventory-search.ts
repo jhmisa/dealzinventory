@@ -103,11 +103,20 @@ export async function searchInventory(
 ): Promise<InventorySearchResult[]> {
   const q = (args.query ?? '').trim();
 
-  // The RPCs match the query as a single ILIKE substring against brand+model+code, so an
-  // over-specific query like "Oppo A5 5G 4GB 128GB Aurora Green" matches nothing even though
-  // "Oppo A5 5G" is in stock. The model often phrases its first search that way (reading the
-  // full spec line off a photo). Fall back to progressively shorter prefixes (brand+model is
-  // almost always first) so a real item is never reported as "not available" on phrasing alone.
+  // 1. Exact code first. Live-selling photos show the P-code / G-code prominently, so if the
+  //    query contains one (even buried in a longer string like "P001443 Oppo A5 5G"), look it
+  //    up directly — it's the precise listing the customer is asking about. Only fall through
+  //    to a text search if that exact code isn't currently available (e.g. it was sold).
+  const codeMatch = q.match(/\b([pg]\d{4,})\b/i);
+  if (codeMatch) {
+    const byCode = await runInventorySearch(supabase, codeMatch[1].toUpperCase(), args);
+    if (byCode.length > 0) return byCode;
+  }
+
+  // 2. Text search. The RPCs match the query as a single ILIKE substring against brand+model,
+  //    so an over-specific query like "Oppo A5 5G 4GB 128GB Aurora Green" matches nothing even
+  //    though "Oppo A5 5G" is in stock. Fall back to progressively shorter prefixes (brand+model
+  //    is almost always first) so a real item is never reported "not available" on phrasing alone.
   let results = await runInventorySearch(supabase, q, args);
   if (results.length === 0 && q) {
     const tokens = q.split(/\s+/).filter(Boolean);
