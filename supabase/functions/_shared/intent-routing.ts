@@ -36,11 +36,3 @@ export function shouldRouteOutOfInbox(
   if (targetFolderId === currentFolderId) return false;
   return currentFolderId === null || currentFolderId === inboxFolderId;
 }
-
-// Sensitive intents that always need a human regardless of confidence (bias to escalate):
-// money (kaitori) and complaints. Feeds the existing needs_human_review flag.
-const ESCALATING_INTENTS = new Set(['kaitori', 'complaint']);
-
-export function isEscalatingIntent(intent: string): boolean {
-  return ESCALATING_INTENTS.has(intent);
-}
