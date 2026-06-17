@@ -9,6 +9,7 @@ import {
   specialistForIntent,
   type SpecialistRow,
 } from "./build-specialist-prompt.ts";
+import { searchInventory, type InventorySearchResult } from "./inventory-search.ts";
 
 /**
  * Generate an AI draft reply for a conversation and save it as a DRAFT message.
@@ -100,12 +101,34 @@ export async function generateAndSaveDraft(
     : [];
 
   // 5. Generate AI reply
+  // Tool executor: the AI calls search_inventory; we run it in-process via the RPCs.
+  // Accumulate results by code so a later phase can attach the offered product's photo.
+  const offerCatalog = new Map<string, InventorySearchResult>();
+  const executeTool = async (name: string, args: unknown): Promise<unknown> => {
+    if (name !== 'search_inventory') return { error: `unknown tool: ${name}` };
+    const a = (args ?? {}) as Record<string, unknown>;
+    const results = await searchInventory(supabase, {
+      query: String(a.query ?? ''),
+      category_id: a.category_id ? String(a.category_id) : undefined,
+      brand: a.brand ? String(a.brand) : undefined,
+      price_min: a.price_min != null ? Number(a.price_min) : undefined,
+      price_max: a.price_max != null ? Number(a.price_max) : undefined,
+    });
+    for (const r of results) offerCatalog.set(r.code, r);
+    // Return a compact shape for the model (include order_url so it can paste the link).
+    return results.map((r) => ({
+      type: r.type, code: r.code, description: r.description,
+      grade: r.grade, price: r.price, available_count: r.available_count, order_url: r.order_url,
+    }));
+  };
+
   const aiResponse = await generateAIReply(
     provider as AIProvider,
     fullSystemPrompt,
     contextBlock,
     chatMessages,
     latestImages,
+    executeTool,
   );
 
   // 5b. Record token usage + estimated cost (best-effort; never block the draft).
