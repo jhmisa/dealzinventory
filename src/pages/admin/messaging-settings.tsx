@@ -1223,6 +1223,16 @@ export default function MessagingSettingsPage() {
                         )}
                       </div>
                     )}
+                    {msg.meta?.tool_calls && msg.meta.tool_calls.length > 0 && (
+                      <div className="flex flex-col gap-0.5">
+                        {msg.meta.tool_calls.map((tc, i) => (
+                          <span key={i} className="text-[11px] text-muted-foreground font-mono">
+                            🔍 searched "{tc.query}" → {tc.result_count < 0 ? 'error' : `${tc.result_count} result${tc.result_count === 1 ? '' : 's'}`}
+                            {tc.codes.length > 0 && ` (${tc.codes.join(', ')})`}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     {msg.meta?.tool_errors && msg.meta.tool_errors.length > 0 && (
                       <div className="rounded-md border border-red-200 bg-red-50 p-2 text-xs">
                         <p className="font-medium text-red-700 mb-1">Tool error(s) — the AI&apos;s search failed:</p>

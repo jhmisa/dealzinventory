@@ -150,18 +150,23 @@ Deno.serve(async (req) => {
     // Capture any tool failure verbatim so the playground can surface it (the model
     // otherwise paraphrases it into a vague "search tool error" escalation).
     const toolErrors: string[] = [];
+    // Trace every search the model ran (query + result codes) so the playground can show
+    // whether/what it searched — an empty trace means the model answered WITHOUT searching.
+    const toolCalls: { query: string; result_count: number; codes: string[] }[] = [];
     const executeTool = async (name: string, args: unknown): Promise<unknown> => {
       if (name !== 'search_inventory') return { error: `unknown tool: ${name}` };
       const a = (args ?? {}) as Record<string, unknown>;
+      const query = String(a.query ?? '');
       try {
         const results = await searchInventory(serviceClient, {
-          query: String(a.query ?? ''),
+          query,
           category_id: a.category_id ? String(a.category_id) : undefined,
           brand: a.brand ? String(a.brand) : undefined,
           price_min: a.price_min != null ? Number(a.price_min) : undefined,
           price_max: a.price_max != null ? Number(a.price_max) : undefined,
         });
         for (const r of results) offerCatalog.set(r.code, r);
+        toolCalls.push({ query, result_count: results.length, codes: results.map((r) => r.code) });
         return results.map((r) => ({
           type: r.type, code: r.code, description: r.description,
           grade: r.grade, price: r.price, available_count: r.available_count, order_url: r.order_url,
@@ -172,6 +177,7 @@ Deno.serve(async (req) => {
           : JSON.stringify(toolErr);
         console.error('search_inventory tool failed:', detail);
         toolErrors.push(detail);
+        toolCalls.push({ query, result_count: -1, codes: [] });
         return { error: detail };
       }
     };
@@ -200,7 +206,7 @@ Deno.serve(async (req) => {
       })
       .filter((o): o is TestOffer => o !== null);
 
-    return new Response(JSON.stringify({ ...aiResponse, offers, tool_errors: toolErrors }), {
+    return new Response(JSON.stringify({ ...aiResponse, offers, tool_errors: toolErrors, tool_calls: toolCalls }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

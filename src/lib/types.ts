@@ -604,4 +604,6 @@ export interface TestAIResponse {
   offers?: TestAIOffer[]
   // Raw errors from any tool the AI called (e.g. search_inventory), surfaced for debugging.
   tool_errors?: string[]
+  // Trace of each inventory search the AI ran (empty = it answered without searching).
+  tool_calls?: { query: string; result_count: number; codes: string[] }[]
 }

@@ -102,8 +102,31 @@ export async function searchInventory(
   args: InventorySearchArgs,
 ): Promise<InventorySearchResult[]> {
   const q = (args.query ?? '').trim();
+
+  // The RPCs match the query as a single ILIKE substring against brand+model+code, so an
+  // over-specific query like "Oppo A5 5G 4GB 128GB Aurora Green" matches nothing even though
+  // "Oppo A5 5G" is in stock. The model often phrases its first search that way (reading the
+  // full spec line off a photo). Fall back to progressively shorter prefixes (brand+model is
+  // almost always first) so a real item is never reported as "not available" on phrasing alone.
+  let results = await runInventorySearch(supabase, q, args);
+  if (results.length === 0 && q) {
+    const tokens = q.split(/\s+/).filter(Boolean);
+    for (const take of [4, 3, 2]) {
+      if (tokens.length <= take) continue;
+      results = await runInventorySearch(supabase, tokens.slice(0, take).join(' '), args);
+      if (results.length > 0) break;
+    }
+  }
+  return results;
+}
+
+async function runInventorySearch(
+  supabase: ReturnType<typeof createClient>,
+  query: string,
+  args: InventorySearchArgs,
+): Promise<InventorySearchResult[]> {
   const common = {
-    search_query: q,
+    search_query: query,
     result_limit: 10,
     filter_brand: args.brand ?? null,
     filter_category_id: args.category_id ?? null,
