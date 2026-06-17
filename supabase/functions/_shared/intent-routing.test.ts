@@ -2,7 +2,6 @@ import { assertEquals } from 'jsr:@std/assert@1';
 import {
   folderNameForIntent,
   shouldRouteOutOfInbox,
-  isEscalatingIntent,
 } from './intent-routing.ts';
 
 Deno.test('folderNameForIntent maps each known intent to its folder name', () => {
@@ -44,15 +43,4 @@ Deno.test('shouldRouteOutOfInbox does not move when there is no target', () => {
   // filed in a real folder does not.
   assertEquals(shouldRouteOutOfInbox(null, null, 'order-id'), true);
   assertEquals(shouldRouteOutOfInbox('concern-id', null, 'order-id'), false);
-});
-
-Deno.test('isEscalatingIntent is true only for kaitori and complaint', () => {
-  assertEquals(isEscalatingIntent('kaitori'), true);
-  assertEquals(isEscalatingIntent('complaint'), true);
-  assertEquals(isEscalatingIntent('order_status'), false);
-  assertEquals(isEscalatingIntent('product_inquiry'), false);
-  assertEquals(isEscalatingIntent('return'), false);
-  assertEquals(isEscalatingIntent('general'), false);
-  assertEquals(isEscalatingIntent('tracking'), false);
-  assertEquals(isEscalatingIntent('unknown'), false);
 });

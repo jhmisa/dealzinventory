@@ -3,7 +3,12 @@ import { buildCustomerContext, formatContextForPrompt, getLatestCustomerImages }
 import { generateAIReply, type AIProvider } from "./ai-providers.ts";
 import { estimateCostUsd } from "./ai-cost.ts";
 import { modelSupportsVision } from "./ai-vision.ts";
-import { folderNameForIntent, shouldRouteOutOfInbox, isEscalatingIntent } from "./intent-routing.ts";
+import { folderNameForIntent, shouldRouteOutOfInbox } from "./intent-routing.ts";
+import {
+  buildSpecialistSystemPrompt,
+  specialistForIntent,
+  type SpecialistRow,
+} from "./build-specialist-prompt.ts";
 
 /**
  * Generate an AI draft reply for a conversation and save it as a DRAFT message.
@@ -37,35 +42,41 @@ export async function generateAndSaveDraft(
 
   if (!persona?.system_prompt) return;
 
-  // 2b. Fetch active guardrails + knowledge base entries
+  // 2b. Fetch active guardrails + knowledge base entries (with specialist tags).
   const { data: kbEntries } = await supabase
     .from('knowledge_base')
-    .select('entry_type, title, content')
+    .select('entry_type, title, content, specialist_tags')
     .eq('is_active', true)
     .order('sort_order');
 
-  const entries = kbEntries ?? [];
-  const guardrails = entries.filter((e: { entry_type: string }) => e.entry_type === 'guardrail');
-  const knowledge = entries.filter((e: { entry_type: string }) => e.entry_type === 'knowledge');
+  const entries = (kbEntries ?? []) as Array<{
+    entry_type: string;
+    title: string;
+    content: string;
+    specialist_tags: string[] | null;
+  }>;
+  const guardrails = entries
+    .filter((e) => e.entry_type === 'guardrail')
+    .map((e) => ({ title: e.title, content: e.content }));
+  const knowledge = entries
+    .filter((e) => e.entry_type === 'knowledge')
+    .map((e) => ({ title: e.title, content: e.content, specialist_tags: e.specialist_tags ?? [] }));
 
-  // Build full system prompt: guardrails → persona → knowledge
-  let fullSystemPrompt = '';
+  // 2c. Fetch active specialists (per-topic playbooks).
+  const { data: specialistRows } = await supabase
+    .from('messaging_specialists')
+    .select('slug, name, intents, playbook, always_escalate, is_active, sort_order')
+    .eq('is_active', true)
+    .order('sort_order');
+  const specialists = (specialistRows ?? []) as SpecialistRow[];
 
-  if (guardrails.length > 0) {
-    const rules = guardrails
-      .map((g: { title: string; content: string }, i: number) => `${i + 1}. **${g.title}**: ${g.content}`)
-      .join('\n');
-    fullSystemPrompt += `# Rules (NEVER violate)\n${rules}\n\n`;
-  }
-
-  fullSystemPrompt += persona.system_prompt;
-
-  if (knowledge.length > 0) {
-    const articles = knowledge
-      .map((k: { title: string; content: string }) => `## ${k.title}\n${k.content}`)
-      .join('\n\n');
-    fullSystemPrompt += `\n\n# Knowledge Base\n${articles}`;
-  }
+  // Build full system prompt: guardrails → persona → specialist playbooks → shared knowledge.
+  const fullSystemPrompt = buildSpecialistSystemPrompt({
+    guardrails,
+    personaSystemPrompt: persona.system_prompt,
+    knowledge,
+    specialists,
+  });
 
   // 3. Build customer context
   const context = await buildCustomerContext(supabase, customerId, conversationId);
@@ -114,12 +125,16 @@ export async function generateAndSaveDraft(
     console.error('ai_usage_log insert failed (non-fatal):', logErr);
   }
 
-  // 6. Determine if human review is needed.
-  // Sensitive intents (kaitori = money, complaint) always escalate regardless of confidence.
+  // 6. Determine if human review is needed. The matched specialist's always_escalate flag is the
+  // authoritative, DB-editable escalation rule (Aftersales + Kaitori escalate by default).
+  // Fail-safe: if no specialist matches the classified intent (off-list intent, or an empty/
+  // all-inactive specialists table), escalate rather than let an unclassifiable message pass.
+  const matchedSpecialist = specialistForIntent(aiResponse.intent, specialists);
   const needsReview =
     aiResponse.confidence < 0.5 ||
     aiResponse.escalation_reason !== null ||
-    isEscalatingIntent(aiResponse.intent);
+    matchedSpecialist === null ||
+    matchedSpecialist.always_escalate === true;
 
   // 7. Save draft message
   await supabase.from('messages').insert({

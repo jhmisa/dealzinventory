@@ -523,6 +523,7 @@ export interface KnowledgeBaseEntry {
   title: string
   content: string
   category: string
+  specialist_tags: string[]
   is_active: boolean
   sort_order: number
   created_at: string
@@ -534,6 +535,7 @@ export interface KnowledgeBaseEntryInsert {
   title: string
   content: string
   category?: string
+  specialist_tags?: string[]
   is_active?: boolean
   sort_order?: number
 }
@@ -543,8 +545,30 @@ export interface KnowledgeBaseEntryUpdate {
   title?: string
   content?: string
   category?: string
+  specialist_tags?: string[]
   is_active?: boolean
   sort_order?: number
+}
+
+// Messaging Specialists (per-topic playbooks)
+export interface MessagingSpecialist {
+  id: string
+  slug: string
+  name: string
+  intents: string[]
+  playbook: string
+  always_escalate: boolean
+  auto_send_eligible: boolean
+  is_active: boolean
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface MessagingSpecialistUpdate {
+  playbook?: string
+  always_escalate?: boolean
+  is_active?: boolean
 }
 
 // AI Test Playground
