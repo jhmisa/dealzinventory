@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { buildCustomerContext, formatContextForPrompt } from "../_shared/build-ai-context.ts";
 import { generateAIReply, type AIProvider } from "../_shared/ai-providers.ts";
+import { buildSpecialistSystemPrompt, type SpecialistRow } from "../_shared/build-specialist-prompt.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -65,35 +66,40 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Fetch active guardrails + knowledge base
+    // Fetch active guardrails + knowledge base (with specialist tags)
     const { data: kbEntries } = await serviceClient
       .from('knowledge_base')
-      .select('entry_type, title, content')
+      .select('entry_type, title, content, specialist_tags')
       .eq('is_active', true)
       .order('sort_order');
 
-    const entries = kbEntries ?? [];
-    const guardrails = entries.filter((e: { entry_type: string }) => e.entry_type === 'guardrail');
-    const knowledge = entries.filter((e: { entry_type: string }) => e.entry_type === 'knowledge');
+    const entries = (kbEntries ?? []) as Array<{
+      entry_type: string;
+      title: string;
+      content: string;
+      specialist_tags: string[] | null;
+    }>;
+    const guardrails = entries
+      .filter((e) => e.entry_type === 'guardrail')
+      .map((e) => ({ title: e.title, content: e.content }));
+    const knowledge = entries
+      .filter((e) => e.entry_type === 'knowledge')
+      .map((e) => ({ title: e.title, content: e.content, specialist_tags: e.specialist_tags ?? [] }));
 
-    // Build full system prompt: guardrails first, then persona, then knowledge
-    let fullSystemPrompt = '';
+    // Fetch active specialists (per-topic playbooks)
+    const { data: specialistRows } = await serviceClient
+      .from('messaging_specialists')
+      .select('slug, name, intents, playbook, always_escalate, is_active, sort_order')
+      .eq('is_active', true)
+      .order('sort_order');
+    const specialists = (specialistRows ?? []) as SpecialistRow[];
 
-    if (guardrails.length > 0) {
-      const rules = guardrails
-        .map((g: { title: string; content: string }, i: number) => `${i + 1}. **${g.title}**: ${g.content}`)
-        .join('\n');
-      fullSystemPrompt += `# Rules (NEVER violate)\n${rules}\n\n`;
-    }
-
-    fullSystemPrompt += persona.system_prompt;
-
-    if (knowledge.length > 0) {
-      const articles = knowledge
-        .map((k: { title: string; content: string }) => `## ${k.title}\n${k.content}`)
-        .join('\n\n');
-      fullSystemPrompt += `\n\n# Knowledge Base\n${articles}`;
-    }
+    const fullSystemPrompt = buildSpecialistSystemPrompt({
+      guardrails,
+      personaSystemPrompt: persona.system_prompt,
+      knowledge,
+      specialists,
+    });
 
     // Always build context — inventory data doesn't require a customer
     const context = await buildCustomerContext(serviceClient, customer_id ?? null, 'test-playground');
