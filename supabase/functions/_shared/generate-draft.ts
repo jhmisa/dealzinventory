@@ -132,6 +132,7 @@ export async function generateAndSaveDraft(
   // 5. Generate AI reply
   // Tool executor: the AI calls search_inventory; we run it in-process via the RPCs.
   // Accumulate results by code so a later phase can attach the offered product's photo.
+  // The tool is offered on every OpenRouter call; the playbook + INVENTORY_RESPONSE_RULE gate it to SPECIFIC product asks, so non-sales intents simply never call it.
   const offerCatalog = new Map<string, InventorySearchResult>();
   const executeTool = async (name: string, args: unknown): Promise<unknown> => {
     if (name !== 'search_inventory') return { error: `unknown tool: ${name}` };
