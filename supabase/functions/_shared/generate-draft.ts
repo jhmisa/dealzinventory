@@ -127,11 +127,14 @@ export async function generateAndSaveDraft(
 
   // 6. Determine if human review is needed. The matched specialist's always_escalate flag is the
   // authoritative, DB-editable escalation rule (Aftersales + Kaitori escalate by default).
+  // Fail-safe: if no specialist matches the classified intent (off-list intent, or an empty/
+  // all-inactive specialists table), escalate rather than let an unclassifiable message pass.
   const matchedSpecialist = specialistForIntent(aiResponse.intent, specialists);
   const needsReview =
     aiResponse.confidence < 0.5 ||
     aiResponse.escalation_reason !== null ||
-    matchedSpecialist?.always_escalate === true;
+    matchedSpecialist === null ||
+    matchedSpecialist.always_escalate === true;
 
   // 7. Save draft message
   await supabase.from('messages').insert({
