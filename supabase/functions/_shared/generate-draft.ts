@@ -11,6 +11,35 @@ import {
 } from "./build-specialist-prompt.ts";
 import { searchInventory, type InventorySearchResult } from "./inventory-search.ts";
 
+async function buildOfferAttachments(
+  supabase: ReturnType<typeof createClient>,
+  conversationId: string,
+  codes: string[],
+  catalog: Map<string, InventorySearchResult>,
+): Promise<Array<{ file_url: string; filename: string; mime_type: string; size_bytes: number }>> {
+  const out: Array<{ file_url: string; filename: string; mime_type: string; size_bytes: number }> = [];
+  for (const code of codes.slice(0, 3)) {
+    const r = catalog.get(code);
+    if (!r?.display_url) continue;
+    try {
+      const resp = await fetch(r.display_url);
+      if (!resp.ok) continue;
+      const buf = new Uint8Array(await resp.arrayBuffer());
+      const mime = resp.headers.get('content-type') ?? 'image/jpeg';
+      const ext = mime.includes('png') ? 'png' : 'jpg';
+      const path = `ai-offer/${conversationId}/${code}_${buf.byteLength}.${ext}`;
+      const { error } = await supabase.storage
+        .from('messaging-attachments')
+        .upload(path, buf, { contentType: mime, upsert: true });
+      if (error) { console.error('offer photo upload failed (non-fatal):', error); continue; }
+      out.push({ file_url: path, filename: `${code}.${ext}`, mime_type: mime, size_bytes: buf.byteLength });
+    } catch (err) {
+      console.error('offer photo fetch failed (non-fatal):', err);
+    }
+  }
+  return out;
+}
+
 /**
  * Generate an AI draft reply for a conversation and save it as a DRAFT message.
  * Extracted from missive-webhook so it can be shared with the cron-triggered
@@ -160,6 +189,11 @@ export async function generateAndSaveDraft(
     matchedSpecialist.always_escalate === true;
 
   // 7. Save draft message
+  const offerCodes = aiResponse.offer_codes ?? [];
+  const offerAttachments = offerCodes.length
+    ? await buildOfferAttachments(supabase, conversationId, offerCodes, offerCatalog)
+    : [];
+
   await supabase.from('messages').insert({
     conversation_id: conversationId,
     role: 'assistant',
@@ -167,11 +201,13 @@ export async function generateAndSaveDraft(
     status: 'DRAFT',
     message_type: 'REPLY',
     ai_confidence: aiResponse.confidence,
+    attachments: offerAttachments,
     ai_context_summary: JSON.stringify({
       intent: aiResponse.intent,
       data_used: aiResponse.data_used,
       escalation_reason: aiResponse.escalation_reason,
       needs_clarification: aiResponse.needs_clarification ?? false,
+      offer_codes: offerCodes,
     }),
   });
 
