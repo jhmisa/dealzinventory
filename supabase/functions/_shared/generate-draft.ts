@@ -9,7 +9,7 @@ import {
   specialistForIntent,
   type SpecialistRow,
 } from "./build-specialist-prompt.ts";
-import { searchInventory, type InventorySearchResult } from "./inventory-search.ts";
+import { searchInventory, deriveOfferCodes, type InventorySearchResult } from "./inventory-search.ts";
 
 async function buildOfferAttachments(
   supabase: ReturnType<typeof createClient>,
@@ -190,7 +190,10 @@ export async function generateAndSaveDraft(
     matchedSpecialist.always_escalate === true;
 
   // 7. Save draft message
-  const offerCodes = aiResponse.offer_codes ?? [];
+  // Derive offered codes from the reply itself (order links / bare codes), not just the
+  // model's intermittently-filled offer_codes — so the product photo attaches whenever the
+  // draft actually offers an item.
+  const offerCodes = deriveOfferCodes(aiResponse.reply, aiResponse.offer_codes, offerCatalog);
   const offerAttachments = offerCodes.length
     ? await buildOfferAttachments(supabase, conversationId, offerCodes, offerCatalog)
     : [];

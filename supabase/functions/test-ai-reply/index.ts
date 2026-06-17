@@ -8,7 +8,7 @@ import {
 import { generateAIReply, type AIProvider } from "../_shared/ai-providers.ts";
 import { buildSpecialistSystemPrompt, type SpecialistRow } from "../_shared/build-specialist-prompt.ts";
 import { modelSupportsVision, type VisionImage } from "../_shared/ai-vision.ts";
-import { searchInventory, type InventorySearchResult } from "../_shared/inventory-search.ts";
+import { searchInventory, deriveOfferCodes, type InventorySearchResult } from "../_shared/inventory-search.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -193,7 +193,9 @@ Deno.serve(async (req) => {
 
     // Surface the offered product photo(s) for the playground (display_url from
     // photo-group-media is public-read, so it renders directly — no storage upload).
-    const offers: TestOffer[] = (aiResponse.offer_codes ?? [])
+    // Derive codes from the reply (links/bare codes) so the photo shows whenever the AI
+    // offers something, not only when it remembered to fill offer_codes.
+    const offers: TestOffer[] = deriveOfferCodes(aiResponse.reply, aiResponse.offer_codes, offerCatalog)
       .map((code) => {
         const r = offerCatalog.get(code);
         if (!r) return null;

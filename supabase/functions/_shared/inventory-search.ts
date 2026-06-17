@@ -51,6 +51,33 @@ export function buildOrderUrl(base: string, code: string): string {
   return `${root}/mine/${code}`;
 }
 
+// Which product codes is the reply actually offering? The model fills the structured
+// `offer_codes` field only intermittently, but it RELIABLY writes the order link
+// (.../mine/<CODE>) and/or the bare code into its reply text. So derive the codes from the
+// reply itself — links first, then bare P/G codes, then the model's own offer_codes — and
+// keep only those the search actually returned (so we have a photo/price to show). This makes
+// the offered-product photo deterministic instead of dependent on the model's bookkeeping.
+export function deriveOfferCodes(
+  replyText: string,
+  modelOfferCodes: string[] | undefined,
+  catalog: Map<string, InventorySearchResult>,
+): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const add = (raw: string) => {
+    const code = raw.toUpperCase();
+    if (catalog.has(code) && !seen.has(code)) {
+      seen.add(code);
+      out.push(code);
+    }
+  };
+  const text = replyText ?? '';
+  for (const m of text.matchAll(/\/mine\/([a-z]\d{4,})/gi)) add(m[1]);
+  for (const m of text.matchAll(/\b([pg]\d{4,})\b/gi)) add(m[1]);
+  for (const c of modelOfferCodes ?? []) add(c);
+  return out;
+}
+
 function shopBase(): string {
   return Deno.env.get('PUBLIC_SHOP_URL') ?? 'https://dealzinventory.vercel.app';
 }
