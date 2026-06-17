@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Plus, Trash2, Check, Bot, Sparkles, FileText, Pencil, ShieldAlert, BookOpen, FlaskConical, Send, ChevronUp, ChevronDown, RotateCcw, Power, RefreshCw, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react'
+import { Plus, Trash2, Check, Bot, Sparkles, FileText, Pencil, ShieldAlert, BookOpen, FlaskConical, Send, ChevronUp, ChevronDown, RotateCcw, Power, RefreshCw, CheckCircle2, AlertTriangle, Loader2, ImagePlus, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatCustomerName } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -55,7 +55,8 @@ import {
   type MessageSyncProgress,
 } from '@/hooks/use-messaging'
 import { useCustomers } from '@/hooks/use-customers'
-import type { AiProvider, MessagingTemplate, MessagingTemplateInsert, KnowledgeBaseEntry, MessagingSpecialist, TestAIMessage, TestAIResponse } from '@/lib/types'
+import type { AiProvider, MessagingTemplate, MessagingTemplateInsert, KnowledgeBaseEntry, MessagingSpecialist, TestAIMessage, TestAIResponse, TestAIImage } from '@/lib/types'
+import { compressImageForMessaging } from '@/lib/image-compression'
 
 // ---------- AI Provider Form ----------
 
@@ -558,11 +559,14 @@ export default function MessagingSettingsPage() {
   // Test playground state
   const [testMessages, setTestMessages] = useState<(TestAIMessage & { meta?: TestAIResponse })[]>([])
   const [testInput, setTestInput] = useState('')
+  const [stagedImages, setStagedImages] = useState<TestAIImage[]>([])
+  const [imageBusy, setImageBusy] = useState(false)
   const [customerSearch, setCustomerSearch] = useState('')
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | undefined>(undefined)
   const { data: customerResults } = useCustomers(customerSearch || undefined)
   const testAI = useTestAIReply()
   const chatEndRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -636,15 +640,73 @@ export default function MessagingSettingsPage() {
     })
   }
 
-  function handleSendTestMessage() {
-    if (!testInput.trim()) return
-    const newMsg: TestAIMessage = { role: 'customer', content: testInput.trim() }
-    const allMessages = [...testMessages.map(({ role, content }) => ({ role, content })), newMsg]
+  // Compress + base64-encode picked images, then stage them (max 3) for the next Send.
+  async function handlePickImages(files: FileList | null) {
+    if (!files || files.length === 0) return
+    setImageBusy(true)
+    try {
+      const room = Math.max(0, 3 - stagedImages.length)
+      const picked = Array.from(files).slice(0, room)
+      if (picked.length === 0) {
+        toast.error('You can attach up to 3 images per message.')
+        return
+      }
+      const encoded = await Promise.all(
+        picked.map(async (file) => {
+          const compressed = await compressImageForMessaging(file)
+          const dataUrl: string = await new Promise((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result as string)
+            reader.onerror = () => reject(new Error('Failed to read image'))
+            reader.readAsDataURL(compressed)
+          })
+          const base64 = dataUrl.split(',')[1] ?? ''
+          return { base64, mediaType: compressed.type || 'image/webp', previewUrl: dataUrl } as TestAIImage
+        }),
+      )
+      setStagedImages((prev) => [...prev, ...encoded])
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to process image')
+    } finally {
+      setImageBusy(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  function removeStagedImage(idx: number) {
+    setStagedImages((prev) => prev.filter((_, i) => i !== idx))
+  }
+
+  // Send = add the typed message + staged images to the thread. Does NOT call the AI.
+  function handleAddTestMessage() {
+    const content = testInput.trim()
+    if (!content && stagedImages.length === 0) return
+    const newMsg: TestAIMessage & { meta?: TestAIResponse } = {
+      role: 'customer',
+      content,
+      images: stagedImages.length > 0 ? stagedImages : undefined,
+    }
     setTestMessages((prev) => [...prev, newMsg])
     setTestInput('')
+    setStagedImages([])
+  }
+
+  // AI Response = the only trigger that makes the AI read the whole thread and reply.
+  function handleAIRespond() {
+    if (testMessages.length === 0 || testAI.isPending) return
+    const allMessages = testMessages.map(({ role, content }) => ({ role, content }))
+
+    // Latest customer image burst: images on trailing customer turns after the last
+    // assistant message (matches production's getLatestCustomerImages), capped at 3.
+    const burst: { base64: string; mediaType: string }[] = []
+    for (let i = testMessages.length - 1; i >= 0; i--) {
+      if (testMessages[i].role !== 'customer') break
+      for (const img of testMessages[i].images ?? []) burst.push({ base64: img.base64, mediaType: img.mediaType })
+    }
+    const images = burst.slice(0, 3)
 
     testAI.mutate(
-      { messages: allMessages, customerId: selectedCustomerId },
+      { messages: allMessages, customerId: selectedCustomerId, images: images.length > 0 ? images : undefined },
       {
         onSuccess: (response) => {
           setTestMessages((prev) => [
@@ -1033,7 +1095,7 @@ export default function MessagingSettingsPage() {
               <CardDescription>Test the AI before it handles real customers</CardDescription>
             </div>
             {testMessages.length > 0 && (
-              <Button size="sm" variant="outline" onClick={() => setTestMessages([])}>
+              <Button size="sm" variant="outline" onClick={() => { setTestMessages([]); setStagedImages([]) }}>
                 <RotateCcw className="h-4 w-4" />
                 Clear Chat
               </Button>
@@ -1087,21 +1149,55 @@ export default function MessagingSettingsPage() {
             <div className="space-y-4">
               {testMessages.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-12">
-                  Send a message to test the AI. The full system prompt, guardrails, and knowledge base will be used.
+                  Add messages and images with <strong>Send</strong> to build the conversation, then press <strong>AI Response</strong> to make the AI read the whole thread and reply. The full system prompt, guardrails, knowledge base, and live inventory search are used.
                 </p>
               )}
               {testMessages.map((msg, idx) => (
                 <div key={idx} className={`flex ${msg.role === 'customer' ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[80%] space-y-1 ${msg.role === 'customer' ? 'items-end' : 'items-start'}`}>
-                    <div
-                      className={`rounded-lg px-3 py-2 text-sm ${
-                        msg.role === 'customer'
-                          ? 'bg-blue-500 text-white'
-                          : 'bg-muted'
-                      }`}
-                    >
-                      {msg.content}
-                    </div>
+                    {msg.images && msg.images.length > 0 && (
+                      <div className="flex flex-wrap gap-2 justify-end">
+                        {msg.images.map((img, i) => (
+                          <img
+                            key={i}
+                            src={img.previewUrl}
+                            alt="attachment"
+                            className="h-24 w-24 rounded-md border object-cover"
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {msg.content && (
+                      <div
+                        className={`rounded-lg px-3 py-2 text-sm ${
+                          msg.role === 'customer'
+                            ? 'bg-blue-500 text-white'
+                            : 'bg-muted'
+                        }`}
+                      >
+                        {msg.content}
+                      </div>
+                    )}
+                    {msg.meta?.offers && msg.meta.offers.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {msg.meta.offers.map((offer) => (
+                          <div key={offer.code} className="w-32 rounded-md border overflow-hidden bg-background">
+                            {offer.image_url && (
+                              <img src={offer.image_url} alt={offer.code} className="h-32 w-32 object-cover" />
+                            )}
+                            <div className="p-1.5 space-y-0.5">
+                              <p className="text-[11px] font-medium leading-tight truncate" title={offer.description}>{offer.description}</p>
+                              <div className="flex items-center justify-between">
+                                <Badge variant="outline" className="text-[10px]">{offer.code}</Badge>
+                                {offer.price != null && (
+                                  <span className="text-[11px] font-semibold">¥{offer.price.toLocaleString()}</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     {msg.meta && (
                       <div className="flex items-center gap-2 flex-wrap">
                         <ConfidenceBadge confidence={msg.meta.confidence} />
@@ -1132,23 +1228,70 @@ export default function MessagingSettingsPage() {
             </div>
           </ScrollArea>
 
-          {/* Input Bar */}
-          <form
-            onSubmit={(e) => { e.preventDefault(); handleSendTestMessage() }}
-            className="flex gap-2"
-          >
-            <Input
-              value={testInput}
-              onChange={(e) => setTestInput(e.target.value)}
-              placeholder="Type a test message..."
-              className="flex-1"
-              disabled={testAI.isPending}
-            />
-            <Button type="submit" disabled={testAI.isPending || !testInput.trim()}>
-              <Send className="h-4 w-4" />
-              Send
+          {/* Staged image previews (attached to the next Send) */}
+          {stagedImages.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {stagedImages.map((img, idx) => (
+                <div key={idx} className="relative">
+                  <img src={img.previewUrl} alt="staged" className="h-16 w-16 rounded-md border object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => removeStagedImage(idx)}
+                    className="absolute -top-1.5 -right-1.5 rounded-full bg-background border shadow p-0.5 hover:bg-accent"
+                    aria-label="Remove image"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Input Bar — Send adds the message + images to the thread (no AI call) */}
+          <div className="space-y-2">
+            <form
+              onSubmit={(e) => { e.preventDefault(); handleAddTestMessage() }}
+              className="flex gap-2"
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => handlePickImages(e.target.files)}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={imageBusy || stagedImages.length >= 3}
+                aria-label="Attach image"
+              >
+                {imageBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+              </Button>
+              <Input
+                value={testInput}
+                onChange={(e) => setTestInput(e.target.value)}
+                placeholder="Type a test message..."
+                className="flex-1"
+              />
+              <Button type="submit" variant="secondary" disabled={!testInput.trim() && stagedImages.length === 0}>
+                <Send className="h-4 w-4" />
+                Send
+              </Button>
+            </form>
+            <Button
+              type="button"
+              className="w-full"
+              onClick={handleAIRespond}
+              disabled={testMessages.length === 0 || testAI.isPending}
+            >
+              {testAI.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              AI Response
             </Button>
-          </form>
+          </div>
         </CardContent>
       </Card>
 

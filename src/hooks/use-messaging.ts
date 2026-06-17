@@ -346,8 +346,11 @@ export function useUpdateSpecialist() {
 
 export function useTestAIReply() {
   return useMutation({
-    mutationFn: ({ messages, customerId }: { messages: TestAIMessage[]; customerId?: string }) =>
-      messagingService.testAIReply(messages, customerId),
+    mutationFn: ({ messages, customerId, images }: {
+      messages: TestAIMessage[]
+      customerId?: string
+      images?: { base64: string; mediaType: string }[]
+    }) => messagingService.testAIReply(messages, customerId, images),
   })
 }
 

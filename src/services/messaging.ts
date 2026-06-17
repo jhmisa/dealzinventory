@@ -575,9 +575,13 @@ export async function updateSpecialist(id: string, updates: MessagingSpecialistU
 
 // ---------- Test AI ----------
 
-export async function testAIReply(messages: TestAIMessage[], customerId?: string) {
+export async function testAIReply(
+  messages: TestAIMessage[],
+  customerId?: string,
+  images?: { base64: string; mediaType: string }[],
+) {
   const { data, error } = await supabase.functions.invoke('test-ai-reply', {
-    body: { messages, customer_id: customerId },
+    body: { messages, customer_id: customerId, images },
   })
 
   if (error) {

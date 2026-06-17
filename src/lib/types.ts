@@ -572,9 +572,27 @@ export interface MessagingSpecialistUpdate {
 }
 
 // AI Test Playground
+
+// An image attached to a test message. `base64` + `mediaType` are sent to the
+// edge function (vision); `previewUrl` is a local object URL for the thumbnail.
+export interface TestAIImage {
+  base64: string
+  mediaType: string
+  previewUrl: string
+}
+
 export interface TestAIMessage {
   role: 'customer' | 'assistant'
   content: string
+  images?: TestAIImage[]
+}
+
+// A specific product the AI offered, with its photo, for display in the reply.
+export interface TestAIOffer {
+  code: string
+  description: string
+  price: number | null
+  image_url: string | null
 }
 
 export interface TestAIResponse {
@@ -583,4 +601,5 @@ export interface TestAIResponse {
   intent: string
   data_used: string[]
   escalation_reason: string | null
+  offers?: TestAIOffer[]
 }

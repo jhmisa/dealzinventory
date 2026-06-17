@@ -494,6 +494,26 @@ async function getRecentMessages(
   return (data as MessageSummary[]).reverse();
 }
 
+// Load the recent SENT messages from a customer's most recent conversation.
+// Used by the AI Test Playground so the AI sees the customer's real thread
+// (what they and our agents said) — not just their orders/profile. Returns []
+// when the customer has no conversation yet.
+export async function getRecentMessagesByCustomer(
+  supabase: ReturnType<typeof createClient>,
+  customerId: string,
+): Promise<MessageSummary[]> {
+  const { data: convo, error } = await supabase
+    .from('conversations')
+    .select('id')
+    .eq('customer_id', customerId)
+    .order('last_message_at', { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle() as { data: { id: string } | null; error: unknown };
+
+  if (error || !convo?.id) return [];
+  return getRecentMessages(supabase, convo.id);
+}
+
 // ---------- Vision: latest customer screenshots ----------
 
 export interface ImageAttachmentMeta {
