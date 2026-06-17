@@ -59,11 +59,11 @@ So the change is: **(a)** rewrite the DB playbook row, **(b)** three small code/
 ## 4. The two modes (model self-routes)
 
 ### Mode B — specific item
-**Trigger:** customer has already decided — names a model / G-code / specs, or sends a screenshot of a listing, or asks "meron pa ba nito?" ("is this still available?").
+**Trigger:** customer has already decided — names a model / P-code / G-code / specs, or sends a screenshot of a listing, or asks "meron pa ba nito?" ("is this still available?").
 
 **Behavior:**
-1. Identify the item — via VISION find the G-code in the screenshot; else match specs + price against the `## Available Inventory` context.
-2. If in stock → `"Opo, available pa po! Eto po yung link po..."` + **order link** (Section 6).
+1. Identify the item — via VISION read the code in the screenshot (often a **P-code**, since staff share individual units that way); else match specs + price against the inventory context. Resolve to the specific unit (P-code) when the customer referenced one, otherwise the pooled group (G-code) — see §6 "Which code to link".
+2. If in stock → `"Opo, available pa po! Eto po yung link po..."` + **order link** at the matching granularity (Section 6).
 3. If gone → say so plainly, offer to find a similar item → slides into Mode A.
 4. **No qualifying questions** — the customer already decided.
 
@@ -106,30 +106,35 @@ Examples Joey gave:
 ## 6. The order link (enabling change #2)
 
 ### Verified URL pattern
-The canonical "buy now / order" link **staff already share** is **`/mine/{G-code}`**, not a `/shop/product/...` path. Evidence in the codebase:
-- `src/components/messaging/inventory-search-modal.tsx:146` — staff inventory-share builds `📸 View & Order: {baseUrl}/mine/{sell_group_code}`.
-- `src/pages/admin/sell-group-detail.tsx:92`, `src/pages/admin/items.tsx` (multiple) — same `/mine/{code}` share link.
-- Route `/mine/:code?` → `MineClaimPage` (`src/routes.tsx:234`) resolves G-codes, item-codes, and accessory-codes.
+The canonical "buy now / order" link **staff already share** is **`/mine/{code}`**, NOT a `/shop/product/...` path. Crucially, `/mine/:code?` resolves **both** code types — and staff use both:
+- **`/mine/{P-code}`** — an individual physical unit. `src/pages/admin/items.tsx:1044,1334` share this for single items.
+- **`/mine/{G-code}`** — a sell group (a pool of interchangeable units). `inventory-search-modal.tsx:146`, `sell-group-detail.tsx:92`, `items.tsx:941` share this.
+- Route `/mine/:code?` → `MineClaimPage` (`src/routes.tsx:234`) resolves P-codes, G-codes, and accessory-codes.
 
-> Other shop routes exist but are NOT the right link: `/shop/product/:id` takes a **product_model UUID** (not in AI context), and `/shop/checkout/:sellGroupId` / `/order/:sellGroupCode` jump straight to checkout. `/mine/{G-code}` is the "view photos + order" page staff hand out — using it keeps the AI link **consistent with what staff manually send** (`feedback_consistent_descriptions`).
+> Other shop routes exist but are NOT the right link: `/shop/product/:id` takes a **product_model UUID** (not in AI context), and `/shop/checkout/:sellGroupId` / `/order/:sellGroupCode` jump straight to checkout. `/mine/{code}` is the "view photos + order" page staff hand out — using it keeps the AI link **consistent with what staff manually send** (`feedback_consistent_descriptions`).
 
-### Implementation
-The inventory context already carries the G-code but no URL. `formatContextForPrompt` in `supabase/functions/_shared/build-ai-context.ts:206` builds each `## Available Inventory` line as:
+### Which code to link — P-code vs G-code
+This is the key distinction (raised in review):
+- **G-code = a pool of interchangeable physical units** (same config + grade + price; `stock_count` can be >1). When the customer's ask matches a pooled listing, link the **G-code** — the order reserves one unit from the pool. This is correct for typical "do you have an iPhone 13 128GB Grade A?" style matches.
+- **P-code = one specific physical unit.** When the customer references an *individual* item — a screenshot of a P-code listing staff previously sent, a unique unit with its own condition notes/photos, or a single-stock item — link the **P-code** so they land on that exact unit.
 
-```
-- {brand} {model_name} ({specs}) | Grade {grade} | {price} | {n} in stock | {sell_group_code}
-```
+The model links the code that matches **what the customer actually referenced**. Mode B (screenshot / "meron pa ba nito?") most often needs the **P-code** path, because staff frequently share individual units by P-code.
 
-Append the order link to each line so the model can paste it verbatim:
+### The gap this exposes (and the real fix)
+The AI inventory context **today exposes only G-codes** — it has no P-codes at all:
+- `getInventorySummary` → `## Available Inventory` (`build-ai-context.ts:334`): queries `sell_groups`, returns `sell_group_code`; member units are collapsed into a `stock_count` only. **No `item_code`.**
+- `getAvailableItemsSummary` → `## Available Items` (`build-ai-context.ts:397`): queries `items` but aggregates by brand+model and never selects `item_code`. **No `item_code`.**
 
-```
-- {brand} {model_name} ({specs}) | Grade {grade} | {price} | {n} in stock | {sell_group_code} | Order: {SHOP_BASE}/mine/{sell_group_code}
-```
+So as written, the AI literally *cannot* produce a P-code link or match a specific unit. **Enabling change #2 must therefore surface `item_code` (P-codes), not just append a URL.** Concretely:
 
-**Base URL:** the frontend convention is `VITE_PUBLIC_SHOP_URL` (`inventory-search-modal.tsx:126`), which is a build-time Vite var **not readable by Deno edge functions.** So introduce a server-side secret read with `Deno.env.get('PUBLIC_SHOP_URL')` (set via `supabase secrets set`), falling back to the temporary `https://dealzinventory.vercel.app` (`project_shop_url` — temporary, changes when the real domain is ready). Strip any trailing `/shop` to match the frontend's normalization.
+1. **`## Available Inventory` (sell groups):** add each group's member `item_code`s. Extend the `getInventorySummary` select to pull `sell_group_items(items(item_code, ...))` (it already joins `items`), and render the group's order link as the **G-code** link plus, where the group is a single specific unit, the member **P-code**. Line shape becomes roughly:
+   ```
+   - {brand} {model_name} ({specs}) | Grade {grade} | {price} | {n} in stock | {sell_group_code} | Units: {P-code, …} | Order: {SHOP_BASE}/mine/{sell_group_code}
+   ```
+2. **`## Available Items` (individual units):** add `item_code` to the select and stop collapsing identity away, OR add a per-unit line carrying its P-code and `Order: {SHOP_BASE}/mine/{item_code}`. Exact shape is an open decision (§10.5) — but the block must carry P-codes so individual units are linkable.
+3. The model picks G-code vs P-code per §"Which code to link"; the **link string itself is built in code** (context formatter), never asked of the model, so it can't hallucinate a URL or a code.
 
-- The link is built **in code** (context formatter), not asked of the model — so the model can't hallucinate a URL.
-- Do the same for the `## Available Items` block only if those rows carry a G-code; in the current shape they don't (they aggregate by model), so leave them link-less for now and note it.
+**Base URL:** the frontend convention is `VITE_PUBLIC_SHOP_URL` (`inventory-search-modal.tsx:126`), a build-time Vite var **not readable by Deno edge functions.** Introduce a server-side secret read with `Deno.env.get('PUBLIC_SHOP_URL')` (set via `supabase secrets set`), falling back to the temporary `https://dealzinventory.vercel.app` (`project_shop_url` — temporary, changes when the real domain is ready). Strip any trailing `/shop` to match the frontend's normalization.
 
 ---
 
@@ -139,7 +144,7 @@ After qualifying (Mode A) or confirming (Mode B), the model picks ONE of two end
 
 | Condition | Ending |
 |---|---|
-| Clear match within / near the stated need | **Draft 2 concrete offers** (model, grade, price, G-code, order link). Selling prices are PUBLIC and Phase-1 drafts are gated by staff review, so this is safe. |
+| Clear match within / near the stated need | **Draft 2 concrete offers** (model, grade, price, the code — G-code for a pooled listing or P-code for a specific unit — and the matching `/mine/{code}` order link). Selling prices are PUBLIC and Phase-1 drafts are gated by staff review, so this is safe. |
 | Budget-override upsell · high-value sale · no clean match | **Hand off to a human, WITH the need already summarized** so the human picks up a fully-qualified lead, not a cold start. |
 
 **Handoff mechanism:** the model sets `escalation_reason` (reuses the Plan 3b `needs_human_review` path). Sales `always_escalate` stays **false** — only these specific conditions escalate, everything else still auto-drafts. The escalation note must contain the qualified summary (recipient, use-case, age, budget, recommended tier + why).
@@ -159,7 +164,7 @@ Record ONE warm human voice note that asks all four laptop questions, opening wi
 | # | Change | File | Note |
 |---|---|---|---|
 | 1 | **Scope `INVENTORY_RESPONSE_RULE`** so "show first / don't qualify" applies to SPECIFIC asks only (Mode B), not broad ones (Mode A). | `_shared/ai-providers.ts:91–98` | THE core fix. See decision in §10. |
-| 2 | **Add per-item order link** `…/mine/{G-code}` to the inventory context line. | `_shared/build-ai-context.ts:206` (+ `Deno.env.get('PUBLIC_SHOP_URL')`) | Link built in code, not by the model. |
+| 2 | **Surface P-codes AND add order links** to the inventory context: extend `getInventorySummary` / `getAvailableItemsSummary` to carry `item_code` (P-codes) alongside `sell_group_code` (G-codes), then render `/mine/{code}` links at the right granularity. | `_shared/build-ai-context.ts:206,334,397` (+ `Deno.env.get('PUBLIC_SHOP_URL')`) | Context today has **no P-codes** — bigger than a URL append. Link built in code, not by the model. |
 | 3 | **Rewrite the Sales playbook** into the two-mode brain (Modes A/B, per-category questions, budget-override, conditional endpoint). | DB row `messaging_specialists` slug='sales' (migration) | Self-routing lives here. |
 | — | Vision images already flow | — | No change. |
 
@@ -176,7 +181,11 @@ Record ONE warm human voice note that asks all four laptop questions, opening wi
 
 3. **Exact wording** of the mode-routing instruction and the broad-vs-specific heuristic in the playbook (§4) — to be drafted in the plan.
 
-4. **`## Available Items` block** (aggregated, no G-code) — confirm it stays link-less, or whether it should be dropped from Sales context to avoid the model linking the wrong thing.
+4. **`## Available Items` block** (currently aggregated by model, no code at all) — decide whether to (a) add per-unit lines carrying `item_code` + a `/mine/{P-code}` link, or (b) drop the block from Sales context entirely to avoid the model linking an un-codeable aggregate. Leaning (a) since individual units are exactly the P-code case.
+
+5. **P-code surfacing shape (change #2)** — exact line format once `item_code`s are added to the context: do sell-group lines list all member P-codes, or only when stock=1? How many P-codes per group before truncating? Keep the context compact (it's prompt budget) while still letting the model match a referenced unit.
+
+6. **P-code vs G-code link rule wording** — the playbook instruction telling the model when to link the specific P-code vs the pooled G-code (§6 "Which code to link"). Draft in the plan.
 
 ---
 
@@ -193,7 +202,8 @@ Record ONE warm human voice note that asks all four laptop questions, opening wi
 ## 12. Success criteria
 
 - "May laptop po ba kayo?" → the bot reassures stock exists and asks the laptop questions warmly in one sentence — does NOT dump a single cold product.
-- "Meron pa ba nito?" + screenshot → bot identifies the item and replies with availability + a real `/mine/{G-code}` order link.
+- "Meron pa ba nito?" + screenshot of a P-code listing → bot identifies the **specific unit** and replies with availability + a real `/mine/{P-code}` order link (not just the group).
+- A pooled "do you have an iPhone 13 128GB Grade A?" match → bot links the `/mine/{G-code}` (reserves one from the pool).
 - A college-schoolwork ask with a ¥15,000 budget → bot recommends the right ¥25,000+ tier with a reason AND escalates to a human with the lead summarized.
-- A clean in-budget match → bot drafts 2 concrete offers with order links (staff-gated).
-- Every inventory line in the AI context carries a working `/mine/{G-code}` link.
+- A clean in-budget match → bot drafts 2 concrete offers with the correct code + order link (staff-gated).
+- The AI inventory context carries **both** G-codes and member P-codes, and every offered line has a working `/mine/{code}` link pointing at the right granularity.
