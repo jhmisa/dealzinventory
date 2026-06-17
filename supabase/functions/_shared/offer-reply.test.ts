@@ -65,3 +65,16 @@ Deno.test('assembleOfferReply passes plain replies through unchanged', () => {
 Deno.test('assembleOfferReply ignores codes missing from the catalog', () => {
   assertEquals(assembleOfferReply('{{OFFER}}', ['P999999'], new Map()), '');
 });
+
+Deno.test('assembleOfferReply replaces only the first token and strips extras (no duplication)', () => {
+  const catalog = new Map([['P001443', res({})]]);
+  assertEquals(assembleOfferReply('A {{OFFER}} B {{OFFER}} C', ['P001443'], catalog),
+    `A ${formatOfferBlock(res({}))} B C`);
+});
+
+Deno.test('assembleOfferReply preserves double-spaces inside a description', () => {
+  const r = res({ description: 'Toshiba Dynabook K50 8GB 128GB  Intel Celeron' });
+  const catalog = new Map([['P001443', r]]);
+  const out = assembleOfferReply('{{OFFER}}', ['P001443'], catalog);
+  assertEquals(out.includes('128GB  Intel'), true);
+});

@@ -40,21 +40,29 @@ export function assembleOfferReply(
   const text = reply ?? "";
 
   if (blocks.length === 0) {
-    // Remove a stray token and tidy the doubled spaces / blank lines it leaves behind.
-    return text
-      .replace(new RegExp(`\\s*${escapeRegExp(OFFER_TOKEN)}\\s*`, "g"), " ")
-      .replace(/[ \t]{2,}/g, " ")
-      .trim();
+    // No offer — remove any stray token so it never reaches a customer.
+    return stripOfferTokens(text);
   }
 
   const joined = blocks.join("\n\n");
 
   if (text.includes(OFFER_TOKEN)) {
-    return text.split(OFFER_TOKEN).join(joined).trim();
+    // Replace only the FIRST token with the stacked block(s). The function-form replacement
+    // avoids `$` sequences in URLs/descriptions being treated as replacement patterns. Any
+    // extra tokens a mis-prompted model emitted are then stripped so blocks never duplicate.
+    const spliced = text.replace(OFFER_TOKEN, () => joined);
+    return stripOfferTokens(spliced);
   }
 
   // Token missing — append after the reply.
   return `${text.trim()}\n\n${joined}`;
+}
+
+// Remove every {{OFFER}} token and the whitespace hugging it, collapsing to a single space
+// so mid-sentence tokens don't leave a gap. Does NOT globally collapse spaces, so legitimate
+// double-spaces inside a product description are preserved. Trims the result.
+function stripOfferTokens(text: string): string {
+  return text.replace(new RegExp(`\\s*${escapeRegExp(OFFER_TOKEN)}\\s*`, "g"), " ").trim();
 }
 
 function escapeRegExp(s: string): string {
