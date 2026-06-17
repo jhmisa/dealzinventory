@@ -119,6 +119,7 @@ export async function generateAIReply(
   contextBlock: string,
   messages: ChatMessage[],
   latestImages: VisionImage[] = [],
+  executeTool?: ToolExecutor,
 ): Promise<AIResponse> {
   // Inject inventory response strategy + clarify-don't-guess rule into every prompt
   const enhancedPrompt = buildEnhancedPrompt(systemPrompt);
@@ -134,7 +135,7 @@ export async function generateAIReply(
     case 'google':
       return callGemini(provider, enhancedPrompt, contextBlock, messages, images);
     case 'openrouter':
-      return callOpenRouter(provider, enhancedPrompt, contextBlock, messages, images);
+      return callOpenRouter(provider, enhancedPrompt, contextBlock, messages, images, executeTool);
     default:
       throw new Error(`Unsupported provider: ${provider.provider}`);
   }
@@ -289,6 +290,8 @@ export interface ToolLoopResult {
   usage: TokenUsage;
 }
 
+export type ToolExecutor = (name: string, args: unknown) => Promise<unknown>;
+
 // Multi-turn OpenAI-compatible chat loop: runs tool calls in-process until the model
 // returns a normal (content) message. Provider-agnostic over any OpenAI-shaped endpoint.
 export async function runChatCompletionWithTools(args: ToolLoopArgs): Promise<ToolLoopResult> {
@@ -368,6 +371,7 @@ async function callOpenRouter(
   contextBlock: string,
   messages: ChatMessage[],
   images: VisionImage[] = [],
+  executeTool?: ToolExecutor,
 ): Promise<AIResponse> {
   const openrouterMessages: Array<{ role: string; content: string | unknown[] }> = [
     {
@@ -388,6 +392,20 @@ async function callOpenRouter(
         break;
       }
     }
+  }
+
+  // Tool-enabled path: run the multi-turn loop so the model can call search_inventory.
+  if (executeTool) {
+    const { finalText, usage } = await runChatCompletionWithTools({
+      fetchImpl: fetch,
+      url: 'https://openrouter.ai/api/v1/chat/completions',
+      apiKey: provider.api_key_encrypted,
+      model: provider.model_id,
+      messages: openrouterMessages as LoopMessage[],
+      executeTool,
+      maxToolRounds: 2,
+    });
+    return { ...parseAIResponse(finalText), usage };
   }
 
   // Retry up to 3 times with exponential backoff for 503/429 errors
