@@ -1,7 +1,9 @@
 import type { InventorySearchResult } from "./inventory-search.ts";
 
-const OFFER_TOKEN = "{{OFFER}}";
 const MAX_OFFERS = 3; // matches the offered-photo attachment cap
+// Matches {{OFFER:P001443}} (code-bearing, preferred) and bare {{OFFER}} (fallback).
+const OFFER_TOKEN_RE = /\{\{OFFER(?::([A-Za-z0-9]+))?\}\}/g;
+const REMOVED = ""; // transient sentinel marking a token we could not resolve (private-use char, never in real text)
 
 /**
  * Render one offered item as the emoji spec block agents use manually. Plain text only —
@@ -20,51 +22,36 @@ export function formatOfferBlock(r: InventorySearchResult): string {
 }
 
 /**
- * Splice the offered item block(s) into the model's reply. The model is instructed to write
- * intro + the {{OFFER}} token + outro; we replace the token with the assembled block(s).
- * Fallbacks: if the model forgot the token but codes were offered, append the block(s) at
- * the end; if there are no codes, strip any stray token so it never reaches a customer.
- * Only codes present in `catalog` are rendered (we need real data to show).
+ * Splice the offered item block(s) into the model's reply. The model writes a
+ * {{OFFER:CODE}} token naming the exact P-code/G-code it is offering; we replace each token
+ * with that code's emoji block. A bare {{OFFER}} (no code) falls back to the derived
+ * `codes` in order. Tokens whose code is not in `catalog` are stripped so a raw token never
+ * reaches a customer. Interior double-spaces inside a description are preserved (only
+ * whitespace left behind by a stripped token is tidied).
  */
 export function assembleOfferReply(
   reply: string,
   codes: string[],
   catalog: Map<string, InventorySearchResult>,
 ): string {
-  const blocks = codes
+  const text = reply ?? "";
+  const fallback = codes
     .slice(0, MAX_OFFERS)
     .map((c) => catalog.get(c))
-    .filter((r): r is InventorySearchResult => r != null)
-    .map(formatOfferBlock);
+    .filter((r): r is InventorySearchResult => r != null);
+  let fallbackIdx = 0;
 
-  const text = reply ?? "";
+  const spliced = text.replace(OFFER_TOKEN_RE, (_m, code: string | undefined) => {
+    const r = code
+      ? catalog.get(code.toUpperCase()) ?? null
+      : fallback[fallbackIdx++] ?? null;
+    return r ? formatOfferBlock(r) : REMOVED;
+  });
 
-  if (blocks.length === 0) {
-    // No offer — remove any stray token so it never reaches a customer.
-    return stripOfferTokens(text);
-  }
-
-  const joined = blocks.join("\n\n");
-
-  if (text.includes(OFFER_TOKEN)) {
-    // Replace only the FIRST token with the stacked block(s). The function-form replacement
-    // avoids `$` sequences in URLs/descriptions being treated as replacement patterns. Any
-    // extra tokens a mis-prompted model emitted are then stripped so blocks never duplicate.
-    const spliced = text.replace(OFFER_TOKEN, () => joined);
-    return stripOfferTokens(spliced);
-  }
-
-  // Token missing — append after the reply.
-  return `${text.trim()}\n\n${joined}`;
-}
-
-// Remove every {{OFFER}} token and the whitespace hugging it, collapsing to a single space
-// so mid-sentence tokens don't leave a gap. Does NOT globally collapse spaces, so legitimate
-// double-spaces inside a product description are preserved. Trims the result.
-function stripOfferTokens(text: string): string {
-  return text.replace(new RegExp(`\\s*${escapeRegExp(OFFER_TOKEN)}\\s*`, "g"), " ").trim();
-}
-
-function escapeRegExp(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return spliced
+    .replace(new RegExp(`[ \\t]*${REMOVED}[ \\t]*`, "g"), " ") // unresolved token → single space
+    .replace(/[ \t]+\n/g, "\n") // trailing spaces a removed token left before a newline
+    .replace(/\n[ \t]+/g, "\n") // leading spaces a removed token left after a newline
+    .replace(/\n{3,}/g, "\n\n") // collapse blank-line runs left by a removed own-line token
+    .trim();
 }

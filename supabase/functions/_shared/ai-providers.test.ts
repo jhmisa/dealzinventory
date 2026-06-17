@@ -204,7 +204,7 @@ Deno.test('parseAIResponse defaults offer_codes to empty array', () => {
 Deno.test('enhanced prompt instructs single {{OFFER}} token output and forbids markdown', () => {
   const p = buildEnhancedPrompt('PERSONA');
   // The model must emit the placeholder token, not its own spec/price/link.
-  if (!p.includes('{{OFFER}}')) throw new Error('expected {{OFFER}} token instruction');
+  if (!p.includes('{{OFFER:')) throw new Error('expected {{OFFER: token instruction');
   // It must be told not to use markdown.
   if (!/no markdown/i.test(p)) throw new Error('expected a no-markdown instruction');
   // The persona must still be embedded.

@@ -114,10 +114,11 @@ export function mapInventoryResults(
       null,
       r.category_description_fields ?? null,
     ) || [r.brand, r.model_name].filter(Boolean).join(' ') || '—';
+    const notesAlreadyShown = (r.category_description_fields ?? []).includes('condition_notes');
     return {
       type: 'item' as const,
       code: r.item_code,
-      description: r.condition_notes ? `${desc} — ${r.condition_notes}` : desc,
+      description: (r.condition_notes && !notesAlreadyShown) ? `${desc} — ${r.condition_notes}` : desc,
       grade: r.condition_grade,
       price,
       available_count: 1,
