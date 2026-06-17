@@ -90,12 +90,15 @@ export function consolidateForTest(messages: ChatMessage[]): ChatMessage[] {
 
 const INVENTORY_RESPONSE_RULE = `
 # Response Strategy for Product Inquiries
-When a customer asks about a product or what's available:
-1. FIRST check the Available Inventory / Available Items in the context below.
-2. If there are matches, lead your reply with 1-2 concrete options (model, grade, price, G-code). Present the best match first, then one alternative if available.
-3. THEN ask ONE short qualifying question only if needed (e.g. preferred storage size, budget, or condition grade).
-4. Do NOT ask multiple qualifying questions before showing inventory. Show what you have first.
-5. Keep replies short — 2-4 sentences max. No walls of text.`;
+First decide if the request is SPECIFIC or BROAD:
+- SPECIFIC = the customer named a model/code/specs, or sent a photo/screenshot of one listing, or asks "is THIS still available?".
+- BROAD = only a category/intent ("may laptop po ba kayo?", "may phone ba kayo?", "ano meron"), with no recipient, use-case, or budget yet.
+
+For a SPECIFIC ask: confirm availability first. Use the search_inventory tool to find the matching AVAILABLE listing (it may be a different code than the customer quoted), then lead your reply with that concrete option (code, grade, price) and its order_url. Ask at most ONE short follow-up only if needed.
+
+For a BROAD ask: do NOT dump a product and do NOT call search_inventory yet. Follow the active specialist's playbook to qualify first (reassure stock exists, then ask the key questions warmly), then hand off per the playbook.
+
+Keep replies short — 2-4 sentences max. No walls of text.`;
 
 const CLARIFY_BEFORE_ASSUMING_RULE = `
 # Resolve before assuming — then ask ONE specific question

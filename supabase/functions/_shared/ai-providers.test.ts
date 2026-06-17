@@ -95,6 +95,17 @@ Deno.test('buildEnhancedPrompt keeps the persona and appends both rule blocks', 
   assertEquals(out.includes('NEVER re-ask'), true);
 });
 
+import { buildEnhancedPrompt as buildEP2 } from './ai-providers.ts';
+
+Deno.test('INVENTORY_RESPONSE_RULE distinguishes specific vs broad asks', () => {
+  const out = buildEP2('PERSONA');
+  // Specific asks still lead with concrete options / search.
+  assertEquals(/specific/i.test(out), true);
+  // Broad/category asks must qualify first instead of dumping a product.
+  assertEquals(/broad|category/i.test(out), true);
+  assertEquals(/qualif/i.test(out), true);
+});
+
 import { runChatCompletionWithTools, SEARCH_INVENTORY_TOOL } from './ai-providers.ts';
 
 Deno.test('SEARCH_INVENTORY_TOOL declares the function name and query param', () => {
