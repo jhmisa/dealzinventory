@@ -42,6 +42,8 @@ import {
   useCreateKnowledgeBaseEntry,
   useUpdateKnowledgeBaseEntry,
   useDeleteKnowledgeBaseEntry,
+  useSpecialists,
+  useUpdateSpecialist,
   useTestAIReply,
   useSystemSetting,
   useUpdateSystemSetting,
@@ -53,7 +55,7 @@ import {
   type MessageSyncProgress,
 } from '@/hooks/use-messaging'
 import { useCustomers } from '@/hooks/use-customers'
-import type { AiProvider, MessagingTemplate, MessagingTemplateInsert, KnowledgeBaseEntry, TestAIMessage, TestAIResponse } from '@/lib/types'
+import type { AiProvider, MessagingTemplate, MessagingTemplateInsert, KnowledgeBaseEntry, MessagingSpecialist, TestAIMessage, TestAIResponse } from '@/lib/types'
 
 // ---------- AI Provider Form ----------
 
@@ -319,6 +321,8 @@ function KbEntryFormDialog({
   const [content, setContent] = useState(entry?.content ?? '')
   const [category, setCategory] = useState(entry?.category ?? 'Custom')
   const [isActive, setIsActive] = useState(entry?.is_active ?? true)
+  const [specialistTags, setSpecialistTags] = useState<string[]>(entry?.specialist_tags ?? [])
+  const { data: specialists = [] } = useSpecialists()
 
   const createEntry = useCreateKnowledgeBaseEntry()
   const updateEntry = useUpdateKnowledgeBaseEntry()
@@ -329,6 +333,7 @@ function KbEntryFormDialog({
     setContent(entry.content)
     setCategory(entry.category)
     setIsActive(entry.is_active)
+    setSpecialistTags(entry.specialist_tags ?? [])
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -337,7 +342,7 @@ function KbEntryFormDialog({
 
     if (isEdit) {
       updateEntry.mutate(
-        { id: entry.id, updates: { title, content, category, is_active: isActive } },
+        { id: entry.id, updates: { title, content, category, is_active: isActive, specialist_tags: specialistTags } },
         {
           onSuccess: () => { toast.success(`${entryType === 'guardrail' ? 'Rule' : 'Article'} updated`); onOpenChange(false) },
           onError: (err) => toast.error(`Failed: ${err.message}`),
@@ -345,7 +350,7 @@ function KbEntryFormDialog({
       )
     } else {
       createEntry.mutate(
-        { entry_type: entryType, title, content, category, is_active: isActive },
+        { entry_type: entryType, title, content, category, is_active: isActive, specialist_tags: specialistTags },
         {
           onSuccess: () => { toast.success(`${entryType === 'guardrail' ? 'Rule' : 'Article'} created`); onOpenChange(false) },
           onError: (err) => toast.error(`Failed: ${err.message}`),
@@ -385,6 +390,32 @@ function KbEntryFormDialog({
               </Select>
             </div>
           )}
+          {!isGuardrail && (
+            <div className="space-y-2">
+              <Label>Specialists (leave empty for shared knowledge)</Label>
+              <div className="flex flex-wrap gap-2">
+                {specialists.map((s) => {
+                  const on = specialistTags.includes(s.slug)
+                  return (
+                    <Button
+                      key={s.slug}
+                      type="button"
+                      size="sm"
+                      variant={on ? 'default' : 'outline'}
+                      aria-pressed={on}
+                      onClick={() =>
+                        setSpecialistTags((prev) =>
+                          on ? prev.filter((t) => t !== s.slug) : [...prev, s.slug],
+                        )
+                      }
+                    >
+                      {s.name}
+                    </Button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
           <div className="space-y-2">
             <Label>{isGuardrail ? 'Rule Description' : 'Content'}</Label>
             <Textarea
@@ -422,6 +453,61 @@ function ConfidenceBadge({ confidence }: { confidence: number }) {
   return <Badge className="bg-red-100 text-red-800 border-red-300" variant="outline">{(confidence * 100).toFixed(0)}%</Badge>
 }
 
+// ---------- Specialist Editor ----------
+
+function SpecialistEditor({ specialist }: { specialist: MessagingSpecialist }) {
+  const [playbook, setPlaybook] = useState(specialist.playbook)
+  const [alwaysEscalate, setAlwaysEscalate] = useState(specialist.always_escalate)
+  const [isActive, setIsActive] = useState(specialist.is_active)
+  const [dirty, setDirty] = useState(false)
+  const updateSpecialist = useUpdateSpecialist()
+
+  // Re-sync from the latest server data unless the user has unsaved edits (mirrors the persona form).
+  if (!dirty) {
+    if (playbook !== specialist.playbook) setPlaybook(specialist.playbook)
+    if (alwaysEscalate !== specialist.always_escalate) setAlwaysEscalate(specialist.always_escalate)
+    if (isActive !== specialist.is_active) setIsActive(specialist.is_active)
+  }
+
+  function handleSave() {
+    updateSpecialist.mutate(
+      { id: specialist.id, updates: { playbook, always_escalate: alwaysEscalate, is_active: isActive } },
+      {
+        onSuccess: () => { toast.success(`${specialist.name} playbook saved`); setDirty(false) },
+        onError: (err) => toast.error(`Failed: ${err.message}`),
+      },
+    )
+  }
+
+  return (
+    <div className="rounded-lg border p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="font-medium">{specialist.name}</p>
+          <p className="text-xs text-muted-foreground">Intents: {specialist.intents.join(', ')}</p>
+        </div>
+        <Button size="sm" onClick={handleSave} disabled={!dirty || updateSpecialist.isPending}>Save</Button>
+      </div>
+      <Textarea
+        value={playbook}
+        onChange={(e) => { setPlaybook(e.target.value); setDirty(true) }}
+        className="min-h-[140px] text-sm font-mono"
+        placeholder="Per-topic instructions the AI follows for this specialist..."
+      />
+      <div className="flex items-center gap-6">
+        <div className="flex items-center gap-2">
+          <Switch checked={alwaysEscalate} onCheckedChange={(v) => { setAlwaysEscalate(v); setDirty(true) }} />
+          <Label className="text-sm">Always escalate to human</Label>
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch checked={isActive} onCheckedChange={(v) => { setIsActive(v); setDirty(true) }} />
+          <Label className="text-sm">Active</Label>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ---------- Main Page ----------
 
 export default function MessagingSettingsPage() {
@@ -436,6 +522,7 @@ export default function MessagingSettingsPage() {
   const { data: providers = [], isLoading: loadingProviders } = useAiProviders()
   const { data: templates = [], isLoading: loadingTemplates } = useTemplates()
   const { data: kbEntries = [], isLoading: loadingKb } = useKnowledgeBase()
+  const { data: specialists = [], isLoading: loadingSpecialists } = useSpecialists()
   const deleteTemplateMutation = useDeleteTemplate()
   const setActive = useSetActiveAiProvider()
   const deleteProvider = useDeleteAiProvider()
@@ -778,6 +865,25 @@ export default function MessagingSettingsPage() {
                 </Button>
               </div>
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Specialists Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Specialist Playbooks</CardTitle>
+          <CardDescription>
+            Per-topic instructions the AI follows after it classifies a message. "Always escalate" forces human review for that topic.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {loadingSpecialists ? (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          ) : specialists.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No specialists configured.</p>
+          ) : (
+            specialists.map((s) => <SpecialistEditor key={s.id} specialist={s} />)
           )}
         </CardContent>
       </Card>
