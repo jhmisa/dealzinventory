@@ -247,6 +247,111 @@ async function callOpenAI(
   return { ...parseAIResponse(text), usage: extractUsage('openai', data) };
 }
 
+// ---------- Tool: search_inventory ----------
+
+export const SEARCH_INVENTORY_TOOL = {
+  type: 'function' as const,
+  function: {
+    name: 'search_inventory',
+    description:
+      'Search Dealz live AVAILABLE inventory for products to confirm availability and make an offer. ' +
+      'Use when a customer asks if a specific item is still available, names a model/code, or sends a photo/screenshot of a listing. ' +
+      'Returns matching items (P-codes) and sell groups (G-codes) with code, description, grade, price, and order_url.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Model name, brand, code, or keywords read from the message/image, e.g. "Iris Ohyama LUCA tablet" or "G000022".' },
+        category_id: { type: 'string', description: 'Optional category UUID filter.' },
+        brand: { type: 'string', description: 'Optional exact brand filter.' },
+        price_min: { type: 'number', description: 'Optional minimum yen price.' },
+        price_max: { type: 'number', description: 'Optional maximum yen price.' },
+      },
+      required: ['query'],
+    },
+  },
+};
+
+type ToolCall = { id: string; type: string; function: { name: string; arguments: string } };
+type LoopMessage = { role: string; content: string | unknown[] | null; tool_calls?: ToolCall[]; tool_call_id?: string };
+
+export interface ToolLoopArgs {
+  fetchImpl: typeof fetch;
+  url: string;
+  apiKey: string;
+  model: string;
+  messages: LoopMessage[];
+  executeTool: (name: string, args: unknown) => Promise<unknown>;
+  maxToolRounds: number;
+}
+
+export interface ToolLoopResult {
+  finalText: string;
+  usage: TokenUsage;
+}
+
+// Multi-turn OpenAI-compatible chat loop: runs tool calls in-process until the model
+// returns a normal (content) message. Provider-agnostic over any OpenAI-shaped endpoint.
+export async function runChatCompletionWithTools(args: ToolLoopArgs): Promise<ToolLoopResult> {
+  const messages = [...args.messages];
+  let inTok = 0, outTok = 0;
+
+  for (let round = 0; round <= args.maxToolRounds; round++) {
+    // After exhausting tool rounds, force a normal answer (omit tools).
+    const includeTools = round < args.maxToolRounds;
+    const body: Record<string, unknown> = {
+      model: args.model,
+      max_tokens: 1024,
+      messages,
+      response_format: { type: 'json_object' },
+    };
+    if (includeTools) body.tools = [SEARCH_INVENTORY_TOOL];
+
+    // Retry 503/429 with backoff (mirrors existing provider behavior).
+    let data: Record<string, unknown> | null = null;
+    let lastError = '';
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
+      const res = await args.fetchImpl(args.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${args.apiKey}` },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) { data = await res.json(); break; }
+      lastError = await res.text();
+      const status = (res as Response).status;
+      if (status !== 503 && status !== 429) throw new Error(`Tool-loop API error ${status}: ${lastError}`);
+      if (attempt === 2) throw new Error(`Tool-loop API error after 3 retries: ${lastError}`);
+    }
+    if (!data) throw new Error('Tool-loop: no response');
+
+    const usage = extractUsage('openrouter', data);
+    inTok += usage.input_tokens; outTok += usage.output_tokens;
+
+    const choice = (data.choices as Array<{ finish_reason?: string; message: LoopMessage }>)?.[0];
+    const msg = choice?.message;
+    const toolCalls = msg?.tool_calls ?? [];
+
+    if (!toolCalls.length) {
+      const content = typeof msg?.content === 'string' ? msg.content : '';
+      return { finalText: content, usage: { input_tokens: inTok, output_tokens: outTok } };
+    }
+
+    // Record the assistant tool-call turn, then each tool result.
+    messages.push({ role: 'assistant', content: msg!.content ?? null, tool_calls: toolCalls });
+    for (const tc of toolCalls) {
+      let parsed: unknown = {};
+      try { parsed = JSON.parse(tc.function.arguments || '{}'); } catch { parsed = {}; }
+      let result: unknown;
+      try { result = await args.executeTool(tc.function.name, parsed); }
+      catch (err) { result = { error: err instanceof Error ? err.message : 'tool error' }; }
+      messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(result) });
+    }
+  }
+
+  // Unreachable in practice — the final round omits tools and returns content above.
+  return { finalText: '', usage: { input_tokens: inTok, output_tokens: outTok } };
+}
+
 // ---------- OpenRouter (OpenAI-compatible) ----------
 
 async function callOpenRouter(
