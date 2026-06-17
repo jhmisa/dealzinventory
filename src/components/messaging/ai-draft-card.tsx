@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
-import type { Message } from '@/lib/types'
+import type { Message, MessageAttachment } from '@/lib/types'
+import { getAttachmentPublicUrl } from '@/services/messaging'
 
 function confidenceColor(confidence: number | null): string {
   if (confidence === null) return 'bg-gray-100 text-gray-700 border-gray-300'
@@ -15,7 +16,7 @@ function confidenceColor(confidence: number | null): string {
 
 interface AiDraftCardProps {
   message: Message
-  onApprove: (content: string) => void
+  onApprove: (content: string, attachments?: MessageAttachment[]) => void
   onReject: () => void
   isLoading?: boolean
 }
@@ -47,7 +48,21 @@ export const AiDraftCard = memo(function AiDraftCard({
           autoFocus
         />
       ) : (
-        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+        <>
+          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+          {message.attachments && message.attachments.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {message.attachments.map((att) => (
+                <img
+                  key={att.file_url}
+                  src={getAttachmentPublicUrl(att.file_url)}
+                  alt={att.filename}
+                  className="h-20 w-20 rounded object-cover border"
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       <div className="flex items-center gap-2">
@@ -55,7 +70,7 @@ export const AiDraftCard = memo(function AiDraftCard({
           <>
             <Button
               size="xs"
-              onClick={() => { onApprove(editedContent); setIsEditing(false) }}
+              onClick={() => { onApprove(editedContent, message.attachments); setIsEditing(false) }}
               disabled={isLoading || !editedContent.trim()}
             >
               <Send className="h-3 w-3" />
@@ -71,7 +86,7 @@ export const AiDraftCard = memo(function AiDraftCard({
           </>
         ) : (
           <>
-            <Button size="xs" onClick={() => onApprove(message.content)} disabled={isLoading}>
+            <Button size="xs" onClick={() => onApprove(message.content, message.attachments)} disabled={isLoading}>
               <Check className="h-3 w-3" />
               Send
             </Button>

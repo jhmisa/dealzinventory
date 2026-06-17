@@ -178,10 +178,10 @@ export default function MessagesPage() {
   )
 
   const handleApproveDraft = useCallback(
-    (messageId: string, content: string) => {
+    (messageId: string, content: string, attachments?: MessageAttachment[]) => {
       if (!selectedConvId) return
       sendMessage.mutate(
-        { conversationId: selectedConvId, content, approveDraftId: messageId },
+        { conversationId: selectedConvId, content, approveDraftId: messageId, attachments },
         {
           onError: (err) => toast.error(`Failed to send: ${err.message}`),
         },
