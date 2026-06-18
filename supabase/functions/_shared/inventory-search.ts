@@ -41,6 +41,22 @@ export interface RawSellGroupRow {
   brand: string | null;
   model_name: string | null;
   hero_media_url: string | null;
+  // Spec fields returned by search_available_sell_groups — sourced from a representative
+  // AVAILABLE member item (COALESCE with product_model) so the group description matches
+  // the rich, category-aware P-code item description and the frontend getSellGroupDescription.
+  model_number?: string | null;
+  storage_gb?: string | null;
+  ram_gb?: string | null;
+  cpu?: string | null;
+  gpu?: string | null;
+  screen_size?: number | null;
+  color?: string | null;
+  os_family?: string | null;
+  year?: number | null;
+  battery_health_pct?: number | null;
+  is_unlocked?: boolean | null;
+  has_touchscreen?: boolean | null;
+  category_description_fields?: string[] | null;
 }
 
 export interface InventorySearchResult {
@@ -129,11 +145,15 @@ export function mapInventoryResults(
   });
 
   const groupResults: InventorySearchResult[] = groups.map((g) => {
-    const desc = [g.brand, g.model_name].filter(Boolean).join(' ') || '—';
+    const desc = getItemDescription(
+      g as unknown as Record<string, unknown>,
+      null,
+      g.category_description_fields ?? null,
+    ) || [g.brand, g.model_name].filter(Boolean).join(' ') || '—';
     return {
       type: 'sell_group' as const,
       code: g.sell_group_code,
-      description: `${desc} (${g.available_count ?? 0} available)`,
+      description: desc,
       grade: g.condition_grade,
       price: g.effective_price,
       available_count: g.available_count ?? 0,

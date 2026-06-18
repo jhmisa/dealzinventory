@@ -61,3 +61,22 @@ Deno.test('mapInventoryResults builds rich description from category description
     'Toshiba Dynabook K50 8GB 128GB Intel Celeron N4020 1.1GHz Intel UHD Graphics 600 10.1" Silver Windows 11',
   );
 });
+
+Deno.test('mapInventoryResults builds rich sell-group description, no available-count suffix', () => {
+  const groups: RawSellGroupRow[] = [{
+    id: 'g9', sell_group_code: 'G000099', condition_grade: 'B', effective_price: 15900,
+    available_count: 3, brand: 'Toshiba', model_name: 'Dynabook K50',
+    hero_media_url: 'https://cdn/g99.jpg',
+    ram_gb: '8GB', storage_gb: '128GB', cpu: 'Intel Celeron N4020 1.1GHz',
+    gpu: 'Intel UHD Graphics 600', screen_size: 10.1, color: 'Silver', os_family: 'Windows 11',
+    category_description_fields: ['brand', 'model_name', 'ram_gb', 'storage_gb', 'cpu', 'gpu', 'screen_size', 'color', 'os_family'],
+  }];
+  const out = mapInventoryResults([], groups, 'https://dealzinventory.vercel.app');
+  const group = out.find((r) => r.code === 'G000099')!;
+  assertEquals(
+    group.description,
+    'Toshiba Dynabook K50 8GB 128GB Intel Celeron N4020 1.1GHz Intel UHD Graphics 600 10.1" Silver Windows 11',
+  );
+  assertEquals(group.description.includes('available'), false);
+  assertEquals(group.available_count, 3);
+});
