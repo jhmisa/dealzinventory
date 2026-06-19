@@ -37,14 +37,32 @@ function extractInlineImages(html: string): { file_url: string; filename: string
 }
 
 /**
+ * Decode common HTML entities Missive leaves in message bodies (e.g. `&nbsp;`,
+ * `&#39;`, `&amp;`). `&amp;` is decoded last to avoid double-decoding.
+ */
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(parseInt(dec, 10)))
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&quot;/gi, '"')
+    .replace(/&apos;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&amp;/gi, '&');
+}
+
+/**
  * Strip HTML tags and remove leftover Facebook image ID filenames.
  */
 function stripHtmlAndImageFilenames(html: string): string {
-  return html
-    .replace(/<img[^>]*>/gi, '')
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/\b\d{6,}_\d{6,}\S*/g, '')
+  return decodeHtmlEntities(
+    html
+      .replace(/<img[^>]*>/gi, '')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/\b\d{6,}_\d{6,}\S*/g, ''),
+  )
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }

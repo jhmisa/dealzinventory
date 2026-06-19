@@ -164,6 +164,26 @@ export function convertEmoticonsToEmoji(text: string): string {
   return result
 }
 
+/**
+ * Decode the HTML entities that Missive (and other HTML email/chat sources) leave
+ * in message bodies after tags are stripped — e.g. `&nbsp;`, `&#39;`, `&amp;`.
+ * Without this, raw entity codes render literally in plain-text message bubbles.
+ * `&amp;` is decoded last so we never double-decode (e.g. `&amp;#39;` stays `&#39;`,
+ * not `'`). Mirrors the decoder in the missive-webhook / backfill Edge Functions.
+ */
+export function decodeHtmlEntities(text: string | null | undefined): string {
+  if (!text) return ''
+  return text
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(parseInt(dec, 10)))
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&quot;/gi, '"')
+    .replace(/&apos;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&amp;/gi, '&')
+}
+
 // --- Cost calculations ---
 
 /** A single row from the item_costs embed — shape matches what PostgREST returns. */

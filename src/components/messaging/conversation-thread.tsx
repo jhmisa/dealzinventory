@@ -1,7 +1,7 @@
 import { memo, useRef, useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { User, AlertCircle, RotateCw, Bot, UserCheck, FileIcon, ExternalLink, X } from 'lucide-react'
-import { cn, formatCustomerName } from '@/lib/utils'
+import { cn, formatCustomerName, decodeHtmlEntities } from '@/lib/utils'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
@@ -434,7 +434,7 @@ export const ConversationThread = memo(function ConversationThread({
                             {staffMap[msg.sent_by].display_name}
                           </p>
                         )}
-                        <p className="whitespace-pre-wrap">{linkifyText(msg.content)}</p>
+                        <p className="whitespace-pre-wrap">{linkifyText(decodeHtmlEntities(msg.content))}</p>
                         {/* Attachments */}
                         {msgAttachments.length > 0 && (
                           <div className="space-y-1">
