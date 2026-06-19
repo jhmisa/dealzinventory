@@ -210,7 +210,7 @@ export function useAvailableInventorySearch(query: string, filters: InventorySea
       // Use allSettled so one failing search doesn't break the others
       const results = await Promise.allSettled([
         itemsService.searchAvailableItems(query, filters),
-        hasQuery ? searchAvailableAccessories(query) : Promise.resolve([]),
+        (hasQuery || hasFilters) ? searchAvailableAccessories(query, filters) : Promise.resolve([]),
         (hasQuery || hasFilters) ? itemsService.searchAvailableSellGroups(query, filters) : Promise.resolve([]),
       ])
       const items = results[0].status === 'fulfilled' ? results[0].value : []

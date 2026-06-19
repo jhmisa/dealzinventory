@@ -589,6 +589,7 @@ export async function searchAvailableSellGroups(query: string, filters: Inventor
       .eq('active', true)
       .eq('sell_group_items.items.item_status', 'AVAILABLE')
     if (filters.brand) q = q.eq('product_models.brand', filters.brand)
+    if (filters.categoryId) q = q.eq('product_models.category_id', filters.categoryId)
     return q.order('sell_group_code').limit(20)
   }
 

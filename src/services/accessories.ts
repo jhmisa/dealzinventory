@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import type { InventorySearchFilters } from '@/services/items'
 import type {
   Accessory,
   AccessoryInsert,
@@ -341,14 +342,13 @@ export interface AvailableAccessoryResult {
   accessory_id: string
 }
 
-export async function searchAvailableAccessories(query: string): Promise<AvailableAccessoryResult[]> {
+export async function searchAvailableAccessories(query: string, filters: InventorySearchFilters = {}): Promise<AvailableAccessoryResult[]> {
   const trimmed = query.trim()
-  if (!trimmed) return []
+  const hasQuery = trimmed.length > 0
+  const hasFilters = !!(filters.brand || filters.categoryId || filters.priceMin != null || filters.priceMax != null)
+  if (!hasQuery && !hasFilters) return []
 
-  // Escape special PostgREST filter characters in the search term
-  const escaped = trimmed.replace(/[,()\\]/g, (c) => `\\${c}`)
-
-  const { data, error } = await supabase
+  let query_ = supabase
     .from('accessories')
     .select(`
       id, accessory_code, name, brand, selling_price,
@@ -356,9 +356,18 @@ export async function searchAvailableAccessories(query: string): Promise<Availab
     `)
     .eq('active', true)
     .gt('stock_quantity', 0)
-    .or(`accessory_code.ilike.%${escaped}%,name.ilike.%${escaped}%,brand.ilike.%${escaped}%`)
-    .order('name')
-    .limit(20)
+
+  if (hasQuery) {
+    // Escape special PostgREST filter characters in the search term
+    const escaped = trimmed.replace(/[,()\\]/g, (c) => `\\${c}`)
+    query_ = query_.or(`accessory_code.ilike.%${escaped}%,name.ilike.%${escaped}%,brand.ilike.%${escaped}%`)
+  }
+  if (filters.categoryId) query_ = query_.eq('category_id', filters.categoryId)
+  if (filters.brand) query_ = query_.eq('brand', filters.brand)
+  if (filters.priceMin != null) query_ = query_.gte('selling_price', filters.priceMin)
+  if (filters.priceMax != null) query_ = query_.lte('selling_price', filters.priceMax)
+
+  const { data, error } = await query_.order('name').limit(20)
 
   if (error) throw error
 
