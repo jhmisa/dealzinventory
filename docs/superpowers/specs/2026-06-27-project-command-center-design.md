@@ -141,11 +141,11 @@ Hooks go in a new **committed** `.claude/settings.json` (project scope). The exi
 
 ### 6.2 Commit-time hook — guarantees updating
 
-- **Event:** `PreToolUse`, matched on `Bash` calls whose command contains `git commit`.
+- **Event:** `PostToolUse`, matched on `Bash` calls whose command contains `git commit`. (Refines the original PreToolUse idea — only SessionStart/UserPromptSubmit stdout reaches Claude's context; the working non-blocking channel for a tool hook is PostToolUse exit-2-to-stderr, which feeds the reminder back to Claude *after* the commit runs.)
 - **Script:** `.claude/hooks/pre-commit-check.sh`
 - **Behavior:** Non-blocking reminder. When a `git commit` is about to run, if `docs/PROJECT_STATE.md` is **not** among the staged/modified files, inject a reminder:
   > "Committing changes — check off completed todo(s) in the active plan and update `docs/PROJECT_STATE.md` (Now / Recently shipped / touched-by) before or with this commit."
-- **Non-blocking:** it reminds, it does not prevent the commit (exit 0 + injected context, never exit 2). Rationale: blocking would be hostile to small/WIP commits; the reminder at the natural "work is saved" checkpoint is enough.
+- **Non-blocking:** it reminds, it does not prevent the commit (commit already ran; exit 2 feeds the reminder to Claude without blocking anything or prompting the user). Rationale: blocking would be hostile to small/WIP commits; the reminder at the natural "work is saved" checkpoint is enough.
 - **Why commit-time, not every-turn:** a `Stop` hook fires after every reply and would nag mid-thought. The commit is Joey's real "I'm done" moment (it precedes `push-to-main`), so the reminder lands once, at the right time. This is the mechanical form of "todos get checked after commit."
 
 ### 6.3 Who checks the boxes
