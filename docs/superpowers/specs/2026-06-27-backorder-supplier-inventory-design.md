@@ -43,6 +43,9 @@ We want to:
 - Prepayment / deposit gating for pre-orders (may be added later).
 - Bulk import of the existing Google Sheet backlog (possible follow-up).
 - Automatic supplier ordering (staff place the iosys order manually, outside the app).
+- **Adapters for suppliers other than iosys.** v1 builds the iosys adapter only;
+  the fetch/parse layer is structured so future suppliers each add one adapter
+  without touching the rest of the system (see Ingestion → adapter pattern).
 
 ---
 
@@ -127,13 +130,28 @@ line until a real P-code exists.
 ## Ingestion & parsing (paste-to-add)
 
 **Edge function** `fetch-supplier-product` (new):
-- Input: an iosys URL or bare product code.
-- Resolves the product code from the URL (`.../<slug>/<code>`), fetches the iosys
-  product page, and parses: brand, model text, storage, color, iosys *rank*,
-  iosys price (cost), stock count, and product image URL.
-- Returns a structured payload; never writes — the form confirms before persist.
+- Input: a supplier product URL (or bare code) — the function detects which
+  supplier adapter to use from the URL/host (or an explicit supplier hint).
+- Returns a **normalized** structured payload regardless of source: brand, model
+  text, storage, color, supplier rank/grade, supplier price (cost), stock count,
+  product image URL, and the canonical product code. Never writes — the form
+  confirms before persist.
 - Robustness: if a field can't be parsed it's left blank for staff to fill;
   parse failures surface as a clear error, not a crash.
+
+**Per-supplier adapter pattern (extensibility — designed in now, only iosys built):**
+- The function dispatches to a **supplier adapter** behind a single interface,
+  e.g. `parseProduct(input) → NormalizedSupplierProduct`. Adapters are selected
+  by host/URL pattern (and fall back to an explicit supplier choice in the form).
+- **v1 ships exactly one adapter: `iosys`.** No other supplier is implemented.
+- Adding a future supplier (different website, different scraping) means writing a
+  new adapter that emits the same `NormalizedSupplierProduct` shape — **nothing
+  downstream changes**: the add form, `backorder_lines`, search, messaging, and
+  the B→P swap are all supplier-agnostic and key off `supplier_id`.
+- Grade/rank mapping (supplier rank → our `condition_grade`) lives **inside each
+  adapter**, since rank vocabularies differ per supplier.
+- The data model is already supplier-neutral: `supplier_id`, `supplier_url`,
+  `supplier_product_code` carry whichever supplier the line came from.
 
 **Add form** (the `Add Backorder` modal):
 - Paste box → fetch → prefilled fields.
