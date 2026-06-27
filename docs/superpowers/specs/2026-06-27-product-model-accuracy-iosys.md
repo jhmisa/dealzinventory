@@ -16,6 +16,16 @@ Two different numbers with very different granularity:
 ## 3. Key finding — kaitori requires SKU granularity
 `kaitori_price_list` keys pricing on **`product_model_id` + battery/body/screen condition only** (no storage/carrier columns). Therefore, for kaitori buy-price to be absolute, the **`product_model` itself must encode storage + color + carrier**. Today it does not (rows are per model+color, `storage_gb` blank, `carrier` an unverified default), so a 128GB docomo unit and a 256GB SIM-Free unit collapse to one price — the integrity gap the owner flagged. **Conclusion: product_models must become SKU-precise (one row per part number).**
 
+## 3b. REVISED granularity decision (2026-06-27, after Phase 1 evidence) — supersedes Decision A
+Phase 1 harvest + live data analysis disproved the premise of §3. Evidence:
+- **Apple part_number is carrier-AGNOSTIC** — e.g. iPhone 11 128GB White `MHDJ3J/A` appears under both docomo and SIM-Free iosys paths. Carrier = who sold the unit, not part of the SKU.
+- **part_number is FINER than a sellable SKU** — `M`/`F`/`N` prefixes = retail/refurbished/replacement; older models carry release-batch variants (`MHDC` vs `MWLU`). So part_number can't be the unique key of a (model,color,storage[,carrier]) row.
+- **Region is in the part_number** (`MKQR2J/A` Japan vs `MKQR2TH/A` Thailand).
+- **`items` already carry their own** `storage_gb`(78/78), `color`(77/78), `carrier`(68/78), `is_unlocked`(78/78) — carrier already lives at the unit level. Only 10 iPhone items lack carrier.
+- **`kaitori_price_list` is EMPTY** (0 rows) and keys on product_model_id + battery/screen/body condition — freely reshapeable.
+
+**DECISION C (owner-confirmed 2026-06-27):** `product_models` granularity = **(brand, model_name, color, storage_gb)**. The canonical Apple `part_number` (prefer `M`-prefix, `J`-region) is stored as an ATTRIBUTE, not the key. **Carrier/lock are NOT in product_models** — they stay per-unit on `items`, and the empty `kaitori_price_list` will gain `carrier` + `is_unlocked` columns so buy-price can vary by carrier/lock at the pricing layer (Phase 5). Unique key = (brand, model_name, color, storage_gb). This solves the owner's storage integrity gap with no carrier row-explosion and no carrier-guessing for existing units.
+
 ## 4b. CORRECTED current-state (re-verified live 2026-06-27, Phase 0)
 The §4 read below was partly wrong. Verified against the live DB via `supabase db query --linked`:
 - **400 product_models total**, across many brands (Apple 115, Samsung 42, Xiaomi 35, Oppo 25, Dell 22, … PCs included) — NOT an iPhone-only table. iosys scope = phones/tablets; PCs are out of iosys range.
