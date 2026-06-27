@@ -3,10 +3,13 @@ import { queryKeys } from '@/lib/query-keys'
 import * as suppliersService from '@/services/suppliers'
 import type { SupplierInsert, SupplierUpdate } from '@/lib/types'
 
-export function useSuppliers(search?: string) {
+export function useSuppliers(
+  search?: string,
+  opts?: { excludeReferenceOnly?: boolean },
+) {
   return useQuery({
-    queryKey: queryKeys.suppliers.list({ search }),
-    queryFn: () => suppliersService.getSuppliers(search),
+    queryKey: queryKeys.suppliers.list({ search, ...opts }),
+    queryFn: () => suppliersService.getSuppliers(search, opts),
   })
 }
 

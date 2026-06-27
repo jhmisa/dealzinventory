@@ -502,6 +502,8 @@ export type Database = {
           created_by: string | null
           id: string
           lead_time_days: number
+          lead_time_min_days: number
+          markup_jpy: number
           product_id: string
           quantity_received: number
           quantity_reserved: number
@@ -529,6 +531,8 @@ export type Database = {
           created_by?: string | null
           id?: string
           lead_time_days?: number
+          lead_time_min_days?: number
+          markup_jpy?: number
           product_id: string
           quantity_received?: number
           quantity_reserved?: number
@@ -556,6 +560,8 @@ export type Database = {
           created_by?: string | null
           id?: string
           lead_time_days?: number
+          lead_time_min_days?: number
+          markup_jpy?: number
           product_id?: string
           quantity_received?: number
           quantity_reserved?: number
@@ -3421,6 +3427,7 @@ export type Database = {
           contact_info: string | null
           created_at: string
           id: string
+          is_reference_only: boolean
           notes: string | null
           supplier_name: string
           supplier_type: Database["public"]["Enums"]["supplier_type"]
@@ -3430,6 +3437,7 @@ export type Database = {
           contact_info?: string | null
           created_at?: string
           id?: string
+          is_reference_only?: boolean
           notes?: string | null
           supplier_name: string
           supplier_type: Database["public"]["Enums"]["supplier_type"]
@@ -3439,6 +3447,7 @@ export type Database = {
           contact_info?: string | null
           created_at?: string
           id?: string
+          is_reference_only?: boolean
           notes?: string | null
           supplier_name?: string
           supplier_type?: Database["public"]["Enums"]["supplier_type"]

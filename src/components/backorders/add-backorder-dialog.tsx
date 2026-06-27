@@ -96,10 +96,12 @@ const defaultValues: BackorderFormValues = {
   cpu: '',
   screen_size: undefined,
   supplier_price: undefined,
+  markup_jpy: 4000,
   supplier_url: '',
   supplier_product_code: '',
   supplier_stock: undefined,
   quantity_total: 1,
+  lead_time_min_days: 4,
   lead_time_days: 7,
 }
 
@@ -129,6 +131,20 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
 
   const supplierList = suppliers ?? []
   const productList = products ?? []
+
+  // Keep selling price = supplier price + markup as either changes. Selling remains directly
+  // editable; a manual edit holds until supplier price or markup changes again.
+  const watchedSupplierPrice = form.watch('supplier_price')
+  const watchedMarkup = form.watch('markup_jpy')
+  useEffect(() => {
+    const sp = Number(watchedSupplierPrice)
+    if (Number.isNaN(sp)) return
+    const mk = Number(watchedMarkup)
+    form.setValue('selling_price', sp + (Number.isNaN(mk) ? 0 : mk), {
+      shouldValidate: true,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedSupplierPrice, watchedMarkup])
 
   function resetAll() {
     form.reset(defaultValues)
@@ -170,19 +186,24 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
       form.setValue('supplier_product_code', product.supplierProductCode ?? '')
       form.setValue('supplier_url', url.trim())
 
-      // Default selling price to supplier cost if not yet set (staff can edit).
-      if (product.supplierPrice && !form.getValues('selling_price')) {
-        form.setValue('selling_price', product.supplierPrice)
+      // Selling price = supplier cost + markup (staff can still edit either). Recompute on
+      // fetch so a freshly pasted listing immediately shows supplier + ¥markup.
+      if (product.supplierPrice != null) {
+        const markup = Number(form.getValues('markup_jpy')) || 0
+        form.setValue('selling_price', product.supplierPrice + markup)
       }
 
       // Hint for model selection (brand + model text).
       const hint = [product.brandText, product.modelText].filter(Boolean).join(' ').trim()
       setParsedHint(hint)
 
-      // Try to auto-match a supplier named like the parsed brand (e.g. iosys).
-      const matchSupplier = supplierList.find((s) =>
+      // Auto-match the iosys SOURCING supplier. Prefer the reference-only listing
+      // (e.g. "Iosys Tsushin Haiban-ka (Online)") since backorders are sourced from it,
+      // falling back to any iosys supplier.
+      const iosys = supplierList.filter((s) =>
         s.supplier_name?.toLowerCase().includes('iosys'),
       )
+      const matchSupplier = iosys.find((s) => s.is_reference_only) ?? iosys[0]
       if (matchSupplier && !form.getValues('supplier_id')) {
         form.setValue('supplier_id', matchSupplier.id)
       }
@@ -293,10 +314,12 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
         cpu: values.cpu?.trim() || null,
         screen_size: values.screen_size ?? null,
         supplier_price: values.supplier_price ?? null,
+        markup_jpy: values.markup_jpy,
         supplier_url: values.supplier_url?.trim() || null,
         supplier_product_code: values.supplier_product_code?.trim() || null,
         supplier_stock: values.supplier_stock ?? null,
         quantity_total: values.quantity_total,
+        lead_time_min_days: values.lead_time_min_days,
         lead_time_days: values.lead_time_days,
       })
 
@@ -546,6 +569,26 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
                 )}
               />
 
+              {/* Markup — added to supplier price to derive the selling price */}
+              <FormField
+                control={form.control}
+                name="markup_jpy"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Markup (JPY)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={0}
+                        {...field}
+                        value={field.value ?? ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               {/* Supplier stock */}
               <FormField
                 control={form.control}
@@ -581,13 +624,28 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
                 )}
               />
 
-              {/* Lead time */}
+              {/* Lead time — working-day range (min .. max). Shown to customers as
+                  "min–max working days" on pre-order offers. */}
+              <FormField
+                control={form.control}
+                name="lead_time_min_days"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Lead Time Min (working days)</FormLabel>
+                    <FormControl>
+                      <Input type="number" min={0} {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <FormField
                 control={form.control}
                 name="lead_time_days"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Lead Time (days)</FormLabel>
+                    <FormLabel>Lead Time Max (working days)</FormLabel>
                     <FormControl>
                       <Input type="number" min={0} {...field} />
                     </FormControl>

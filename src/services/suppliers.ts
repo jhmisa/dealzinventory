@@ -1,7 +1,10 @@
 import { supabase } from '@/lib/supabase'
 import type { Supplier, SupplierInsert, SupplierUpdate } from '@/lib/types'
 
-export async function getSuppliers(search?: string) {
+export async function getSuppliers(
+  search?: string,
+  opts?: { excludeReferenceOnly?: boolean },
+) {
   let query = supabase
     .from('suppliers')
     .select('*, items(count)')
@@ -9,6 +12,11 @@ export async function getSuppliers(search?: string) {
 
   if (search) {
     query = query.ilike('supplier_name', `%${search}%`)
+  }
+  // Reference-only suppliers (e.g. an iosys online listing) are a sourcing/price reference,
+  // not a physical intake source — callers like Intake exclude them from selection.
+  if (opts?.excludeReferenceOnly) {
+    query = query.eq('is_reference_only', false)
   }
 
   const { data, error } = await query

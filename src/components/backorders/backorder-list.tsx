@@ -34,6 +34,16 @@ function getBackorderDescription(line: BackorderLineListItem): string {
   )
 }
 
+// Lead time as a working-day range: "4–7d" (min..max), collapsing an equal/absent bound.
+function formatLeadRange(min: number | null | undefined, max: number | null | undefined): string {
+  const lo = typeof min === 'number' && min > 0 ? min : null
+  const hi = typeof max === 'number' && max > 0 ? max : null
+  if (lo && hi) return lo === hi ? `${hi}d` : `${lo}–${hi}d`
+  if (hi) return `${hi}d`
+  if (lo) return `${lo}d`
+  return '—'
+}
+
 export function BackorderList() {
   const [statusTab, setStatusTab] = useState<string>('all')
 
@@ -125,7 +135,7 @@ export function BackorderList() {
                       </span>
                     </td>
                     <td className="px-3 py-2 align-top text-center whitespace-nowrap text-muted-foreground">
-                      ~{line.lead_time_days}d
+                      {formatLeadRange(line.lead_time_min_days, line.lead_time_days)}
                     </td>
                     <td className="px-3 py-2 align-top">
                       <StatusBadge status={line.status} config={BACKORDER_STATUSES} />

@@ -91,7 +91,7 @@ Deno.test('mapBackorderRow maps backorder line, mirroring sell-group description
   };
   const row: RawBackorderRow = {
     id: 'b1', backorder_code: 'B000001', condition_grade: 'B', selling_price: 15900,
-    available: 272, lead_time_days: 9, brand: 'Toshiba', model_name: 'Dynabook K50',
+    available: 272, lead_time_days: 7, lead_time_min_days: 4, brand: 'Toshiba', model_name: 'Dynabook K50',
     hero_media_url: 'https://cdn/b1.jpg', model_number: null, ram_gb: specFields.ram_gb,
     storage_gb: specFields.storage_gb, cpu: specFields.cpu, gpu: specFields.gpu,
     screen_size: specFields.screen_size, color: specFields.color, os_family: specFields.os_family,
@@ -107,7 +107,8 @@ Deno.test('mapBackorderRow maps backorder line, mirroring sell-group description
   assertEquals(result.type, 'backorder');
   assertEquals(result.code, 'B000001');
   assertEquals(result.available_count, 272);
-  assertEquals(result.lead_time_days, 9);
+  assertEquals(result.lead_time_days, 7);
+  assertEquals(result.lead_time_min_days, 4);
   assertEquals(result.price, 15900);
   assertEquals(result.description, expectedDesc);
   assertEquals(result.thumbnail_url, 'https://cdn/b1.jpg');

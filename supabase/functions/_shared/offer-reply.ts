@@ -6,6 +6,20 @@ const OFFER_TOKEN_RE = /\{\{OFFER(?::([A-Za-z0-9]+))?\}\}/g;
 const REMOVED = ""; // transient sentinel marking a token we could not resolve (private-use char, never in real text)
 
 /**
+ * Render a backorder lead time as a working-day range. lead_time_days is the upper bound (max),
+ * lead_time_min_days the lower bound. Returns null when neither is a positive number (→ plain
+ * "Pre-order"); collapses an equal/absent bound to a single figure.
+ */
+function formatLeadTime(min: number | null | undefined, max: number | null | undefined): string | null {
+  const lo = typeof min === "number" && min > 0 ? min : null;
+  const hi = typeof max === "number" && max > 0 ? max : null;
+  if (lo && hi) return lo === hi ? `${hi} working days` : `${lo}–${hi} working days`;
+  if (hi) return `${hi} working days`;
+  if (lo) return `${lo} working days`;
+  return null;
+}
+
+/**
  * Render one offered item as the emoji spec block agents use manually. Plain text only —
  * NO markdown — so Facebook Messenger shows it cleanly and the bare URL stays clickable.
  * Grade/price lines are omitted when their data is null.
@@ -18,12 +32,9 @@ export function formatOfferBlock(r: InventorySearchResult): string {
   if (r.grade) lines.push(`🏅 Rank ${r.grade}`);
   if (r.price != null) lines.push(`💴 ¥${r.price.toLocaleString("en-US")}`);
   if (r.type === "backorder") {
-    // Pre-order badge + lead-time line. Lead time may be missing (null/0) → plain "Pre-order".
-    lines.push(
-      r.lead_time_days
-        ? `⏳ Pre-order · ~${r.lead_time_days} days`
-        : `⏳ Pre-order`,
-    );
+    // Pre-order badge + working-day lead-time range. Both bounds may be missing → plain "Pre-order".
+    const lead = formatLeadTime(r.lead_time_min_days, r.lead_time_days);
+    lines.push(lead ? `⏳ Pre-order · ${lead}` : `⏳ Pre-order`);
   }
   lines.push(`📸 Buy Now & View Photos: ${r.order_url}`);
   return lines.join("\n");

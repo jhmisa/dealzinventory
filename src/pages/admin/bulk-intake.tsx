@@ -382,8 +382,9 @@ export default function BulkIntakePage() {
     sessionStorage.setItem(INTAKE_DRAFT_KEY, JSON.stringify(data))
   }, [step, mode, supplierId, sourceType, dateReceived, notes, invoiceFileUrl, selectedFileName, lineItems, extractedMeta])
 
-  // Data hooks
-  const { data: suppliers } = useSuppliers()
+  // Data hooks — reference-only suppliers (e.g. iosys online listing) are a backorder
+  // sourcing reference, not a physical intake source, so they are excluded here.
+  const { data: suppliers } = useSuppliers(undefined, { excludeReferenceOnly: true })
   const { data: products } = useProductModelsWithHeroImage()
   const { data: activeAiConfig } = useActiveAiConfiguration('invoice_parsing')
 

@@ -70,6 +70,7 @@ export interface RawBackorderRow {
   selling_price: number | null;
   available: number | null;
   lead_time_days: number | null;
+  lead_time_min_days?: number | null;
   brand: string | null;
   model_name: string | null;
   hero_media_url: string | null;
@@ -98,8 +99,10 @@ export interface InventorySearchResult {
   thumbnail_url: string | null;
   display_url: string | null;
   order_url: string;
-  // Backorder-only: estimated lead time in days. Optional so item/sell-group results are unaffected.
+  // Backorder-only: estimated working-day lead time as a range. lead_time_days is the upper
+  // bound (max), lead_time_min_days the lower bound. Optional so item/sell-group results are unaffected.
   lead_time_days?: number | null;
+  lead_time_min_days?: number | null;
 }
 
 export interface InventorySearchArgs {
@@ -217,6 +220,7 @@ export function mapBackorderRow(b: RawBackorderRow, base: string): InventorySear
     display_url: b.hero_media_url,
     order_url: buildOrderUrl(base, b.backorder_code),
     lead_time_days: b.lead_time_days,
+    lead_time_min_days: b.lead_time_min_days ?? null,
   };
 }
 

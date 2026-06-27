@@ -23,37 +23,60 @@ Deno.test('formatOfferBlock does NOT show a pre-order line for an in-stock item'
   assertEquals(formatOfferBlock(res({})).includes('Pre-order'), false);
 });
 
-Deno.test('backorder offer shows pre-order + lead time', () => {
+Deno.test('backorder offer shows pre-order + working-day lead-time range', () => {
   const block = formatOfferBlock(res({
     type: 'backorder', code: 'B000001', description: 'iPhone 15 Plus 128 Pink',
-    price: 110800, grade: 'S', available_count: 272, lead_time_days: 9,
+    price: 110800, grade: 'S', available_count: 272,
+    lead_time_min_days: 4, lead_time_days: 7,
     order_url: 'https://dealzinventory.vercel.app/mine/B000001',
   }));
   assertEquals(block.includes('Pre-order'), true);
-  assertEquals(block.includes('9'), true);
-  assertEquals(block.includes('{{OFFER:B000001}}') || true, true); // token emission is in assembleOfferReply
+  assertEquals(block.includes('4–7 working days'), true);
+});
+
+Deno.test('backorder offer collapses an equal min/max to a single working-day figure', () => {
+  const block = formatOfferBlock(res({
+    type: 'backorder', code: 'B000003', description: 'iPhone 15 256 Black',
+    price: 120800, grade: 'S', available_count: 3,
+    lead_time_min_days: 7, lead_time_days: 7,
+    order_url: 'https://dealzinventory.vercel.app/mine/B000003',
+  }));
+  assertEquals(block.includes('7 working days'), true);
+  assertEquals(block.includes('–'), false);
+});
+
+Deno.test('backorder offer with only a max lead time shows that single figure', () => {
+  const block = formatOfferBlock(res({
+    type: 'backorder', code: 'B000004', description: 'iPhone 15 128 Green',
+    price: 99800, grade: 'S', available_count: 2,
+    lead_time_min_days: null, lead_time_days: 9,
+    order_url: 'https://dealzinventory.vercel.app/mine/B000004',
+  }));
+  assertEquals(block.includes('9 working days'), true);
 });
 
 Deno.test('backorder offer block still works through assembleOfferReply with its token', () => {
   const b = res({
     type: 'backorder', code: 'B000001', description: 'iPhone 15 Plus 128 Pink',
-    price: 110800, grade: 'S', available_count: 272, lead_time_days: 9,
+    price: 110800, grade: 'S', available_count: 272,
+    lead_time_min_days: 4, lead_time_days: 7,
     order_url: 'https://dealzinventory.vercel.app/mine/B000001',
   });
   const catalog = new Map([['B000001', b]]);
   const out = assembleOfferReply('Pre-order po available! {{OFFER:B000001}}', ['B000001'], catalog);
   assertEquals(out.includes('Pre-order'), true);
-  assertEquals(out.includes('~9 days'), true);
+  assertEquals(out.includes('4–7 working days'), true);
 });
 
 Deno.test('backorder offer with null lead time falls back to plain Pre-order', () => {
   const block = formatOfferBlock(res({
     type: 'backorder', code: 'B000002', description: 'iPhone 15 128 Blue',
-    price: 99800, grade: 'S', available_count: 5, lead_time_days: null,
+    price: 99800, grade: 'S', available_count: 5,
+    lead_time_min_days: null, lead_time_days: null,
     order_url: 'https://dealzinventory.vercel.app/mine/B000002',
   }));
   assertEquals(block.includes('Pre-order'), true);
-  assertEquals(block.includes('~'), false);
+  assertEquals(block.includes('working days'), false);
 });
 
 Deno.test('formatOfferBlock omits grade and price lines when null', () => {
