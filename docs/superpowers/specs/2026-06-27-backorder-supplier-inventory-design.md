@@ -78,8 +78,7 @@ One row per iosys listing we choose to pre-stock. Mirrors the spec columns on
 | `quantity_reserved` | int | +1 per customer confirm |
 | `quantity_received` | int | +1 per intake B→P swap |
 | `lead_time_days` | int | drives the pre-order label; defaults from supplier, editable |
-| `photo_group_id` | uuid FK → photo_groups, nullable | reuse our photos when model+color match |
-| `supplier_image_url` | text, nullable | scraped iosys image, fallback when no photo group |
+| `photo_group_id` | uuid FK → photo_groups, nullable | reuse our photos when model+color match (takes precedence over media rows) |
 | `status` | enum: ACTIVE / PAUSED / CLOSED | only ACTIVE is searchable/offerable |
 | `created_at`, `updated_at` | timestamptz | |
 | `created_by` | uuid | staff who added it |
@@ -87,6 +86,41 @@ One row per iosys listing we choose to pre-stock. Mirrors the spec columns on
 **Computed availability:** `available = quantity_total - quantity_reserved - quantity_received`.
 Expose via a generated column or a view used by search. Only lines with
 `status = ACTIVE` and `available > 0` are offerable.
+
+### New table: `backorder_line_media`
+
+A backorder line can hold multiple curated photos (mirrors `photo_group_media`).
+Used only when `photo_group_id` is null; otherwise the reused photo group's media
+wins.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid PK | |
+| `backorder_line_id` | uuid FK → backorder_lines (ON DELETE CASCADE) | |
+| `file_url` | text | points at **our** storage (copied), not a hotlink |
+| `source` | enum: `iosys` / `web` / `manual` | provenance of the candidate |
+| `sort_order` | integer | 0 = hero |
+| `created_at` | timestamptz | |
+
+**Photo sourcing (curate-then-keep):**
+- On paste-to-add, the iosys adapter returns the listing's **full gallery** of
+  image URLs (not just one). An optional **"Search web for more"** button calls a
+  pluggable image-search provider for extra candidates.
+- Candidates render as a selectable grid; staff **delete the ones they don't
+  want**. Kept candidates are **downloaded and re-uploaded into our storage**
+  (bucket `backorder-media`, public read / staff write) and stored as
+  `backorder_line_media` rows — so an offer never breaks if iosys delists.
+- If a `photo_group` already exists for the mapped model+color, staff can instead
+  reuse it (`photo_group_id` set); then no media rows are needed.
+- These are lightweight placeholder photos, superseded by the real photo group
+  once the unit is intaken — full 1080/256 WebP processing is **not** required
+  here (single copied image per kept photo is fine).
+
+**Image-search provider (pluggable, optional):** behind one interface keyed by an
+env var (e.g. `IMAGE_SEARCH_PROVIDER` + API key). v1 may ship with the provider
+unconfigured — the "Search web for more" button is hidden/disabled until a key is
+set, so the iosys gallery path works with zero extra setup. (Provider + key is a
+setup decision for Joey; see Open questions.)
 
 **Code generation:** add `CREATE SEQUENCE b_code_seq START 1;` and mint via the
 existing `generate_code('B', 'b_code_seq')` RPC (same pattern as P/G/PG).
@@ -208,8 +242,11 @@ status, with a procurement summary:
   pick/create one before saving — same expectation as a normal item. This is what
   guarantees identical spec formatting.
 - iosys *rank* → `condition_grade` (editable).
-- Photo: if a `photo_group` exists for the mapped model+color, default to reuse;
-  otherwise store the scraped `supplier_image_url`.
+- Photo: the adapter returns the iosys **gallery** (multiple images). Staff curate
+  a selectable grid (delete unwanted; optional "Search web for more"); kept images
+  are copied into `backorder-media` and saved as `backorder_line_media` rows. If a
+  `photo_group` exists for the mapped model+color, staff may reuse it instead
+  (`photo_group_id` set, no media rows). See **Photo sourcing** above.
 - Staff set `selling_price` (cost auto-filled), `quantity_total`, `lead_time_days`.
 - Confirm → mint B-code.
 
@@ -228,7 +265,8 @@ status, with a procurement summary:
 - **Offer block** reuses the existing code-assembled emoji format with two
   additions for backorder results: a **pre-order badge** and a **lead-time line**
   (`⏳ Pre-order · ~{lead_time_days} days`).
-- Photo / `/mine` resolution: `photo_group_id` if present, else `supplier_image_url`.
+- Photo / `/mine` resolution: `photo_group_id` media if present, else the hero
+  `backorder_line_media` row (lowest `sort_order`).
 
 ---
 
@@ -265,6 +303,10 @@ P-code"). The swap action runs the scan + verify + hard-block flow above. See
 - **New edge function:** `fetch-supplier-product`.
 - **`_shared/inventory-search.ts`:** add backorder search path + `'backorder'` type.
 - **Messaging offer assembly:** pre-order badge + lead-time line for backorder results.
+- **New table + bucket:** `backorder_line_media` + `backorder-media` storage bucket.
+- **Image sourcing:** iosys adapter returns the gallery (`imageUrls: string[]`); a
+  pluggable image-search provider module (optional, env-keyed) for "Search web for
+  more"; a copy-to-storage step for kept candidates.
 - **New service:** `src/services/backorders.ts`.
 - **New pages/components:** `src/pages/admin/backorders.tsx`, add-backorder modal,
   fulfillment/swap view; sidebar entry.
@@ -272,6 +314,9 @@ P-code"). The swap action runs the scan + verify + hard-block flow above. See
 
 ## Open questions / future work
 
+- **Image-search provider + API key** for "Search web for more" — needs a decision
+  (e.g. Google Custom Search JSON API, SerpAPI, Brave). v1 ships with iosys-gallery
+  working and the web-search button disabled until a key is configured.
 - **Prepayment gating** for pre-orders — deferred; revisit if customers ghost.
 - **Bulk-sheet import** of the existing backlog — possible follow-up.
 - **Stock/price freshness** — snapshot + manual refresh for v1; no auto-cron.

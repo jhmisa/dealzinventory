@@ -63,7 +63,6 @@ CREATE TABLE public.backorder_lines (
   available integer GENERATED ALWAYS AS (quantity_total - quantity_reserved - quantity_received) STORED,
   lead_time_days integer NOT NULL DEFAULT 7,
   photo_group_id uuid REFERENCES public.photo_groups(id),
-  supplier_image_url text,
   status backorder_line_status NOT NULL DEFAULT 'ACTIVE',
   created_by uuid REFERENCES auth.users(id),
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -89,7 +88,39 @@ CREATE POLICY backorder_lines_anon_read ON public.backorder_lines
 
 GRANT ALL ON public.backorder_lines TO anon, authenticated, service_role;
 GRANT USAGE, SELECT ON SEQUENCE public.b_code_seq TO anon, authenticated, service_role;
+
+-- Curated photos for a backorder line (used only when photo_group_id is null)
+DO $$ BEGIN
+  CREATE TYPE backorder_media_source AS ENUM ('iosys','web','manual');
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+CREATE TABLE public.backorder_line_media (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  backorder_line_id uuid NOT NULL REFERENCES public.backorder_lines(id) ON DELETE CASCADE,
+  file_url text NOT NULL,
+  source backorder_media_source NOT NULL DEFAULT 'iosys',
+  sort_order integer NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_backorder_line_media_line ON public.backorder_line_media(backorder_line_id, sort_order);
+
+ALTER TABLE public.backorder_line_media ENABLE ROW LEVEL SECURITY;
+CREATE POLICY backorder_media_auth_all ON public.backorder_line_media
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY backorder_media_anon_read ON public.backorder_line_media
+  FOR SELECT TO anon USING (true);
+GRANT ALL ON public.backorder_line_media TO anon, authenticated, service_role;
+
+-- Public-read storage bucket for copied candidate photos
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('backorder-media', 'backorder-media', true)
+ON CONFLICT (id) DO NOTHING;
 ```
+
+> Mirror the storage RLS policy pattern of the existing `photo-group-media` bucket
+> (public read; authenticated write) — copy those `storage.objects` policies and
+> swap the bucket id. Find them with
+> `grep -rn "photo-group-media" supabase/migrations`.
 
 > **Before writing:** confirm the trigger function name. Run
 > `grep -rn "FUNCTION public.set_updated_at\|updated_at()" supabase/migrations | head`.
@@ -216,7 +247,7 @@ RETURNS TABLE (
   available integer,
   lead_time_days integer,
   photo_group_id uuid,
-  supplier_image_url text,
+  hero_media_url text,
   category_id uuid,
   description_fields jsonb
 )
@@ -226,11 +257,15 @@ LANGUAGE sql STABLE AS $$
     pm.brand, pm.model_name,
     bl.color, bl.storage_gb, bl.ram_gb, bl.cpu, bl.screen_size,
     bl.condition_grade, bl.selling_price, bl.available, bl.lead_time_days,
-    bl.photo_group_id, bl.supplier_image_url,
+    bl.photo_group_id, hero.file_url,
     c.id, c.description_fields
   FROM public.backorder_lines bl
   JOIN public.product_models pm ON pm.id = bl.product_id
   LEFT JOIN public.categories c ON c.id = pm.category_id
+  LEFT JOIN LATERAL (
+    SELECT file_url FROM public.backorder_line_media m
+    WHERE m.backorder_line_id = bl.id ORDER BY m.sort_order LIMIT 1
+  ) hero ON true
   WHERE bl.status = 'ACTIVE'
     AND bl.available > 0
     AND (search_query IS NULL
@@ -285,7 +320,7 @@ Deno.test("maps a backorder line into a pre-order labeled result", () => {
     brand: "Apple", model_name: "iPhone 15 Plus",
     color: "Pink", storage_gb: 128, ram_gb: null, cpu: null, screen_size: 6.7,
     condition_grade: "S", selling_price: 110800, available: 272, lead_time_days: 9,
-    photo_group_id: null, supplier_image_url: "https://iosys/x.jpg",
+    photo_group_id: null, hero_media_url: "https://ourstorage/backorder-media/x.webp",
     category_id: "c1", description_fields: ["model_name","storage_gb","color"],
   }
   const r = mapBackorderRow(row)
@@ -296,7 +331,7 @@ Deno.test("maps a backorder line into a pre-order labeled result", () => {
   assertEquals(r.price, 110800)
   // spec line uses the SAME formatter as items/sell-groups
   assertEquals(r.description, "iPhone 15 Plus 128 Pink")
-  assertEquals(r.thumbnail_url, "https://iosys/x.jpg") // falls back to supplier image
+  assertEquals(r.thumbnail_url, "https://ourstorage/backorder-media/x.webp") // our copied hero
 })
 ```
 
@@ -328,7 +363,7 @@ export interface InventorySearchResult {
 
 export function mapBackorderRow(row: any): InventorySearchResult {
   const description = buildDescriptionFromFields(row, row.description_fields) // existing shared helper
-  const photo = row.photo_group_id ? null : row.supplier_image_url
+  const photo = row.photo_group_id ? null : (row.hero_media_url ?? null)
   return {
     type: "backorder",
     code: row.backorder_code,
@@ -394,7 +429,7 @@ export interface NormalizedSupplierProduct {
   conditionGrade: "S" | "A" | "B" | "C" | "D" | "J" | null
   supplierPrice: number | null     // our cost (JPY)
   stock: number | null
-  imageUrl: string | null
+  imageUrls: string[]              // full listing gallery (may be empty)
 }
 
 export interface SupplierAdapter {
@@ -434,6 +469,7 @@ Deno.test("iosys: parses model, price, stock, rank->grade", () => {
   assertEquals(p.storageGb, 128)
   assertEquals(typeof p.supplierPrice, "number")
   assertEquals(p.conditionGrade, "S") // iosys "新品/New" -> S
+  assertEquals(p.imageUrls.length > 0, true) // gallery scraped
 })
 ```
 
@@ -487,13 +523,15 @@ export const iosysAdapter: SupplierAdapter = {
       conditionGrade: mapRank(rankText),
       supplierPrice: price,
       stock,
-      imageUrl: pick(html, /...og:image.../),
+      imageUrls: pickAll(html, /...gallery <img> srcs.../), // all listing photos; dedupe, absolute-ize URLs
     }
   },
 }
 ```
 
-> Implement `safeHost`, `pick`, `parseYen`, `parseStorage` as small local helpers.
+> Implement `safeHost`, `pick`, `pickAll`, `parseYen`, `parseStorage` as small local
+> helpers. `pickAll` returns all matches (gallery image srcs), deduped and resolved
+> to absolute URLs.
 > Tune selectors against the saved fixture until the test passes — the fixture is
 > the contract. Do NOT hardcode values to pass the test; parse them.
 
@@ -617,6 +655,93 @@ Expected: JSON `product` with brand/model/price/stock populated.
 ```bash
 git add supabase/functions/fetch-supplier-product/index.ts
 git commit -m "feat(edge): fetch-supplier-product (pluggable supplier adapters)"
+```
+
+### Task 7b: Optional web image-search provider (pluggable, degrades gracefully)
+
+**Files:**
+- Create: `supabase/functions/_shared/image-search/types.ts`
+- Create: `supabase/functions/_shared/image-search/provider.ts`
+- Create: `supabase/functions/search-product-images/index.ts`
+
+- [ ] **Step 1: Interface + env-keyed provider**
+
+`types.ts`:
+```ts
+export interface ImageSearchProvider {
+  key: string
+  isConfigured(): boolean
+  search(query: string, limit: number): Promise<string[]> // image URLs
+}
+```
+
+`provider.ts` — a single provider selected by `IMAGE_SEARCH_PROVIDER` env var, with
+its API key from env. If unset, `isConfigured()` returns false.
+
+```ts
+import { ImageSearchProvider } from "./types.ts"
+
+// Default: Google Custom Search JSON API (searchType=image). Swappable later.
+export const imageSearchProvider: ImageSearchProvider = {
+  key: "google_cse",
+  isConfigured: () => !!Deno.env.get("IMAGE_SEARCH_API_KEY") && !!Deno.env.get("IMAGE_SEARCH_CX"),
+  async search(query, limit) {
+    const key = Deno.env.get("IMAGE_SEARCH_API_KEY")!
+    const cx = Deno.env.get("IMAGE_SEARCH_CX")!
+    const url = `https://www.googleapis.com/customsearch/v1?key=${key}&cx=${cx}&searchType=image&num=${Math.min(limit,10)}&q=${encodeURIComponent(query)}`
+    const res = await fetch(url)
+    if (!res.ok) return []
+    const data = await res.json()
+    return (data.items ?? []).map((i: any) => i.link).filter(Boolean)
+  },
+}
+```
+
+- [ ] **Step 2: Edge function** `search-product-images/index.ts` — POST `{ query, limit? }`;
+  if `!imageSearchProvider.isConfigured()` return `{ configured: false, images: [] }`
+  (200) so the UI knows to keep the button disabled; else return
+  `{ configured: true, images }`. Reuse the CORS/json boilerplate from Task 7.
+
+- [ ] **Step 3: Type-check + deploy + commit**
+
+```bash
+deno check supabase/functions/search-product-images/index.ts
+supabase functions deploy search-product-images
+git add supabase/functions/_shared/image-search/ supabase/functions/search-product-images/
+git commit -m "feat(edge): optional pluggable web image-search provider"
+```
+
+> When Joey provides a key, set it once: `supabase secrets set IMAGE_SEARCH_PROVIDER=google_cse IMAGE_SEARCH_API_KEY=... IMAGE_SEARCH_CX=...`. Until then the function reports `configured:false` and the UI button stays disabled — the iosys-gallery path needs no key.
+
+### Task 7c: Server-side copy-to-storage for kept photos
+
+**Files:**
+- Create: `supabase/functions/save-backorder-photos/index.ts`
+
+Browsers can't reliably fetch cross-origin iosys/web images and re-upload (CORS),
+so the copy runs server-side.
+
+- [ ] **Step 1: Implement** — POST `{ backorder_line_id, image_urls: string[] }`.
+  Use a service-role Supabase client (mirror an existing function that writes
+  storage — find with `grep -rln "service_role\|SERVICE_ROLE" supabase/functions`).
+  For each URL in order: `fetch` the bytes, `storage.from('backorder-media').upload(path, blob)`
+  where `path = \`${backorder_line_id}/${i}_${crypto.randomUUID()}.\${ext}\``, get the
+  public URL, then `insert into backorder_line_media (backorder_line_id, file_url, source, sort_order)`.
+  Skip (don't fail the whole batch) any URL that 404s. Return the created media rows.
+
+- [ ] **Step 2: Type-check + deploy + smoke**
+
+```bash
+deno check supabase/functions/save-backorder-photos/index.ts
+supabase functions deploy save-backorder-photos
+```
+Smoke: POST a real line id + 2 image URLs → 2 rows + 2 objects in `backorder-media`.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add supabase/functions/save-backorder-photos/index.ts
+git commit -m "feat(edge): copy kept backorder photos into our storage"
 ```
 
 ---
@@ -830,8 +955,22 @@ export async function updateBackorderLine(id: string, updates: BackorderLineUpda
 export async function fetchSupplierProduct(url: string) {
   const { data, error } = await supabase.functions.invoke("fetch-supplier-product", { body: { url } })
   if (error) throw error
-  return data.product as NormalizedSupplierProduct
+  return data.product as NormalizedSupplierProduct // includes imageUrls[]
 }
+export async function searchProductImages(query: string, limit = 8): Promise<{ configured: boolean; images: string[] }> {
+  const { data, error } = await supabase.functions.invoke("search-product-images", { body: { query, limit } })
+  if (error) throw error
+  return data
+}
+export async function saveBackorderPhotos(backorderLineId: string, imageUrls: string[]) {
+  const { data, error } = await supabase.functions.invoke("save-backorder-photos", {
+    body: { backorder_line_id: backorderLineId, image_urls: imageUrls },
+  })
+  if (error) throw error
+  return data
+}
+export async function listBackorderMedia(backorderLineId: string) { /* select * from backorder_line_media order by sort_order */ }
+export async function deleteBackorderMedia(mediaId: string) { /* delete row + best-effort storage remove */ }
 export async function listToFulfill() { /* order_items where backorder_line_id not null and status <> FULFILLED, joined to order/customer/line; group client-side */ }
 export async function markBackorderOrdered(orderItemId: string) {
   const { error } = await supabase.rpc("mark_backorder_ordered", { p_order_item_id: orderItemId })
@@ -905,13 +1044,15 @@ git commit -m "feat(ui): backorder list view"
 - Create: `src/components/backorders/add-backorder-dialog.tsx`
 - Create: `src/validators/backorder.ts` (Zod)
 
-- [ ] **Step 1: Zod schema** (`backorder.ts`): `product_id` (required), `condition_grade`, `color`, `storage_gb`, `ram_gb`, `cpu`, `screen_size`, `supplier_id` (required), `supplier_price`, `selling_price` (required), `supplier_url`, `supplier_product_code`, `supplier_stock`, `quantity_total` (>=1), `lead_time_days` (>=0), `photo_group_id`, `supplier_image_url`.
+- [ ] **Step 1: Zod schema** (`backorder.ts`): `product_id` (required), `condition_grade`, `color`, `storage_gb`, `ram_gb`, `cpu`, `screen_size`, `supplier_id` (required), `supplier_price`, `selling_price` (required), `supplier_url`, `supplier_product_code`, `supplier_stock`, `quantity_total` (>=1), `lead_time_days` (>=0), `photo_group_id` (optional). Photos
+themselves are saved separately via `saveBackorderPhotos` after the line is created.
 
 - [ ] **Step 2: Dialog flow:**
-  1. Paste box → `fetchSupplierProduct(url)` → prefill RHF fields from `NormalizedSupplierProduct`.
-  2. **Product-model mapping** (required): a model combobox pre-filtered by parsed brand/model text; on select, fill `product_id`. If a matching `photo_group` exists for model+color, default `photo_group_id`; else keep `supplier_image_url`.
-  3. Staff confirm → `createBackorderLine` (generates B-code). Invalidate `['backorder-lines']`.
-  4. Toast success/error per convention.
+  1. Paste box → `fetchSupplierProduct(url)` → prefill RHF fields from `NormalizedSupplierProduct` (specs + price + stock).
+  2. **Product-model mapping** (required): a model combobox pre-filtered by parsed brand/model text; on select, fill `product_id`. If a matching `photo_group` exists for model+color, offer **"use our photo group"** (sets `photo_group_id`, hides the photo grid).
+  3. **Photo curate grid:** seed with `product.imageUrls` (iosys gallery) as selected candidates. Each tile has a remove (✗) toggle. A **"Search web for more"** button calls `searchProductImages(\`${brand} ${model} ${color}\`)`; if `configured === false`, the button is disabled with a tooltip ("set IMAGE_SEARCH_API_KEY to enable"). Appends returned URLs as candidates. (No photo group case only.)
+  4. Staff confirm → `createBackorderLine` (generates B-code) → if not using a photo group, `saveBackorderPhotos(lineId, keptUrls)` to copy them into storage + create media rows. Invalidate `['backorder-lines']`.
+  5. Toast success/error per convention.
 
 - [ ] **Step 3: Verify** build/lint; manually add one real iosys URL end-to-end → row appears with a spec line identical to how the same model reads on the Items page. Commit:
 ```bash
@@ -1017,7 +1158,8 @@ git commit -m "feat(messaging): pre-order badge + lead time on backorder offers"
 - B-code table + sequence → Task 1
 - order_items linkage + status + CHECK → Task 2
 - search RPC + `'backorder'` result type + shared formatter → Tasks 3, 4
-- pluggable per-supplier fetch/parse (iosys only) + rank→grade → Tasks 5, 6, 7
+- pluggable per-supplier fetch/parse (iosys only) + rank→grade + gallery → Tasks 5, 6, 7
+- photos: iosys gallery + optional web search + copy-to-storage + `backorder_line_media` → Tasks 1, 7b, 7c, 13
 - core-spec hard-block verifier (client + server) → Tasks 8, 9
 - reserve-on-confirm + services + types → Task 10
 - placement in Inventory sidebar → Task 11
