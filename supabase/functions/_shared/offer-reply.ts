@@ -17,6 +17,14 @@ export function formatOfferBlock(r: InventorySearchResult): string {
   ];
   if (r.grade) lines.push(`🏅 Rank ${r.grade}`);
   if (r.price != null) lines.push(`💴 ¥${r.price.toLocaleString("en-US")}`);
+  if (r.type === "backorder") {
+    // Pre-order badge + lead-time line. Lead time may be missing (null/0) → plain "Pre-order".
+    lines.push(
+      r.lead_time_days
+        ? `⏳ Pre-order · ~${r.lead_time_days} days`
+        : `⏳ Pre-order`,
+    );
+  }
   lines.push(`📸 Buy Now & View Photos: ${r.order_url}`);
   return lines.join("\n");
 }

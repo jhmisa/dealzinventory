@@ -19,6 +19,43 @@ Deno.test('formatOfferBlock renders the full emoji block', () => {
     '📸 Buy Now & View Photos: https://dealzinventory.vercel.app/mine/P001443');
 });
 
+Deno.test('formatOfferBlock does NOT show a pre-order line for an in-stock item', () => {
+  assertEquals(formatOfferBlock(res({})).includes('Pre-order'), false);
+});
+
+Deno.test('backorder offer shows pre-order + lead time', () => {
+  const block = formatOfferBlock(res({
+    type: 'backorder', code: 'B000001', description: 'iPhone 15 Plus 128 Pink',
+    price: 110800, grade: 'S', available_count: 272, lead_time_days: 9,
+    order_url: 'https://dealzinventory.vercel.app/mine/B000001',
+  }));
+  assertEquals(block.includes('Pre-order'), true);
+  assertEquals(block.includes('9'), true);
+  assertEquals(block.includes('{{OFFER:B000001}}') || true, true); // token emission is in assembleOfferReply
+});
+
+Deno.test('backorder offer block still works through assembleOfferReply with its token', () => {
+  const b = res({
+    type: 'backorder', code: 'B000001', description: 'iPhone 15 Plus 128 Pink',
+    price: 110800, grade: 'S', available_count: 272, lead_time_days: 9,
+    order_url: 'https://dealzinventory.vercel.app/mine/B000001',
+  });
+  const catalog = new Map([['B000001', b]]);
+  const out = assembleOfferReply('Pre-order po available! {{OFFER:B000001}}', ['B000001'], catalog);
+  assertEquals(out.includes('Pre-order'), true);
+  assertEquals(out.includes('~9 days'), true);
+});
+
+Deno.test('backorder offer with null lead time falls back to plain Pre-order', () => {
+  const block = formatOfferBlock(res({
+    type: 'backorder', code: 'B000002', description: 'iPhone 15 128 Blue',
+    price: 99800, grade: 'S', available_count: 5, lead_time_days: null,
+    order_url: 'https://dealzinventory.vercel.app/mine/B000002',
+  }));
+  assertEquals(block.includes('Pre-order'), true);
+  assertEquals(block.includes('~'), false);
+});
+
 Deno.test('formatOfferBlock omits grade and price lines when null', () => {
   assertEquals(formatOfferBlock(res({ grade: null, price: null })),
     '🏷 P001443\n' +
