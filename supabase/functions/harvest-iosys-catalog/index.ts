@@ -4,12 +4,13 @@
 // iosys_catalog staging table (ON CONFLICT part_number) — so re-runs are incremental.
 //
 // POST body (all optional):
-//   { maxPagesPerSection?: number, throttleMs?: number, sections?: string[], dryRun?: boolean }
+//   { category?: "iphone"|"ipad", maxPagesPerSection?: number, throttleMs?: number,
+//     sections?: string[], dryRun?: boolean }
 // Returns the harvest stats (and, on dryRun, the rows without writing).
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { harvestCatalog, IPHONE_SECTIONS } from "../_shared/catalog/harvest.ts";
+import { harvestCatalog, IPAD_CATEGORY, IPHONE_CATEGORY } from "../_shared/catalog/harvest.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,12 +35,16 @@ Deno.serve(async (req) => {
     const maxPagesPerSection = Number(body?.maxPagesPerSection) || 30;
     const throttleMs = Number(body?.throttleMs) || 800;
     const dryRun = body?.dryRun === true;
+    const category = String(body?.category ?? "iphone").toLowerCase() === "ipad"
+      ? IPAD_CATEGORY
+      : IPHONE_CATEGORY;
     const sections = Array.isArray(body?.sections)
-      ? IPHONE_SECTIONS.filter((s) => body.sections.includes(s.path))
-      : IPHONE_SECTIONS;
+      ? category.sections.filter((s) => body.sections.includes(s.path))
+      : category.sections;
 
     const progress: string[] = [];
     const res = await harvestCatalog({
+      category,
       sections,
       maxPagesPerSection,
       throttleMs,

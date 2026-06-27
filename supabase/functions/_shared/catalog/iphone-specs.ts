@@ -20,6 +20,11 @@ export const IPHONE_SPECS: Record<string, ModelSpec> = {
   "iPhone SE (2nd generation)": { chipset: "A13 Bionic", screen_size: 4.7, year: 2020, ram_gb: 3, os_family: "iOS" },
   "iPhone SE (3rd generation)": { chipset: "A15 Bionic", screen_size: 4.7, year: 2022, ram_gb: 4, os_family: "iOS" },
 
+  // --- 5s / 6 / 6 Plus (nostalgia line — rarely on iosys, kept for kaitori completeness) ---
+  "iPhone 5s": { chipset: "A7", screen_size: 4.0, year: 2013, ram_gb: 1, os_family: "iOS" },
+  "iPhone 6": { chipset: "A8", screen_size: 4.7, year: 2014, ram_gb: 1, os_family: "iOS" },
+  "iPhone 6 Plus": { chipset: "A8", screen_size: 5.5, year: 2014, ram_gb: 1, os_family: "iOS" },
+
   // --- 6s / 7 (older units still traded) ---
   "iPhone 6s": { chipset: "A9", screen_size: 4.7, year: 2015, ram_gb: 2, os_family: "iOS" },
   "iPhone 6s Plus": { chipset: "A9", screen_size: 5.5, year: 2015, ram_gb: 2, os_family: "iOS" },

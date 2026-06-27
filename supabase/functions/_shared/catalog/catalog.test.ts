@@ -47,7 +47,7 @@ Deno.test("spec: lookup canonicalizes dirty input", () => {
 
 Deno.test("spec: reference has no obviously wrong years", () => {
   for (const [name, s] of Object.entries(IPHONE_SPECS)) {
-    assertEquals(s.year >= 2015 && s.year <= 2026, true, `bad year for ${name}`)
+    assertEquals(s.year >= 2013 && s.year <= 2026, true, `bad year for ${name}`)
     assertEquals(s.os_family, "iOS", `bad os_family for ${name}`)
   }
 })
