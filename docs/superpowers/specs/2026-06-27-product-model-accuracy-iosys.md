@@ -16,7 +16,20 @@ Two different numbers with very different granularity:
 ## 3. Key finding — kaitori requires SKU granularity
 `kaitori_price_list` keys pricing on **`product_model_id` + battery/body/screen condition only** (no storage/carrier columns). Therefore, for kaitori buy-price to be absolute, the **`product_model` itself must encode storage + color + carrier**. Today it does not (rows are per model+color, `storage_gb` blank, `carrier` an unverified default), so a 128GB docomo unit and a 256GB SIM-Free unit collapse to one price — the integrity gap the owner flagged. **Conclusion: product_models must become SKU-precise (one row per part number).**
 
-## 4. Current-state findings (verified 2026-06-27)
+## 4b. CORRECTED current-state (re-verified live 2026-06-27, Phase 0)
+The §4 read below was partly wrong. Verified against the live DB via `supabase db query --linked`:
+- **400 product_models total**, across many brands (Apple 115, Samsung 42, Xiaomi 35, Oppo 25, Dell 22, … PCs included) — NOT an iPhone-only table. iosys scope = phones/tablets; PCs are out of iosys range.
+- Apple 115 = ~18 distinct **iPhone** models / ~45 rows, plus iPads (~25), MacBooks/iMac (~22), Watches (~17), AirPods (~5).
+- **`device_category` is NOT NULL and uniformly = `COMPUTER` for all 400 rows** (enum values: IPHONE/ANDROID/COMPUTER/TABLET/OTHER). So it is *uniformly wrong*, not "unset". Real cleanup must set IPHONE/TABLET/ANDROID per row.
+- `storage_gb` & `ram_gb` are **`text`** columns (staging `iosys_catalog.storage_gb` is `integer`; convert int→text when writing product_models).
+- **carrier dirt**: NULL 216, `Sim-Free` 179, `Sim-free` 1, `Softbank` 1, `None` 2, `Wifi` 1 → normalize to vocab.
+- `part_number` set on only 44/400; `storage_gb` blank on 253/400.
+- **iPhone model_name dirt**: `iPhone 11` vs `IPhone 11`; `iPhone 12` vs `iPhone 12 ` (trailing space); `iPhone 12 Mini` (Apple = lowercase `mini`); `iPhone SE 2` (canonical = `iPhone SE (2nd generation)`); color dirt `Red/RED/(PRODUCT)RED`, `Midnight Black` (not a real iPhone 14 color). → Phase 2 must canonicalize names BEFORE SKU split (`normalizeIphoneModelName()` in `_shared/catalog/iphone-specs.ts`).
+- **iosys title grammar** (from fixture): `iPhone15 Plus A3093 (MU093VC/A) 128GB ピンク 【カナダ版SIMフリー】` = `{model no-space} {A-number} ({part-number}) {storage} {colorJA} 【region+lock】`. NOTE: part-number region suffix VARIES (`VC/A`=Canada import, not always `J/A`=Japan); iosys sells foreign-version SIM-free imports. Store part_number verbatim; surface region so domestic vs import isn't collapsed.
+
+**Phase 0 SHIPPED (migration `20260627130000_product_model_accuracy_phase0.sql`):** added `product_models.color_ja`, `product_models.source_url`; `jp_carrier` enum {SIM-Free,docomo,au,SoftBank,Rakuten}; staging table `iosys_catalog`. Reference modules: `_shared/catalog/apple-colors.ts` (JA→EN), `_shared/catalog/iphone-specs.ts` (model→spec + normalizer). Tests green (`deno test _shared/catalog/`).
+
+## 4. Current-state findings (verified 2026-06-27)  [SUPERSEDED — see §4b]
 - `product_models` already has: `brand, model_name, color, carrier, is_unlocked, storage_gb (text), ram_gb (text), cpu, chipset, gpu, screen_size, os_family, year, model_number, part_number, device_category (enum), imei_slot_count, category_id, status, match_pattern, match_priority, verified_at, verified_by, short_description, other_features`.
 - `config_groups` is **gone** (specs flattened onto product_models). Single-table model.
 - `device_category` enum is **unset** in live data; categorization is via `category_id` (distinct iPhone / iPad / MacBook category rows). Cleanup should also populate `device_category`.
