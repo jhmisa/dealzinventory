@@ -1,5 +1,5 @@
 import { assertEquals } from 'jsr:@std/assert@1';
-import { mapInventoryResults, buildOrderUrl, type RawItemRow, type RawSellGroupRow } from './inventory-search.ts';
+import { mapInventoryResults, mapBackorderRow, buildOrderUrl, type RawItemRow, type RawSellGroupRow, type RawBackorderRow } from './inventory-search.ts';
 
 Deno.test('buildOrderUrl strips trailing /shop and appends /mine/{code}', () => {
   assertEquals(buildOrderUrl('https://dealzinventory.vercel.app/shop', 'G000022'),
@@ -79,4 +79,38 @@ Deno.test('mapInventoryResults builds rich sell-group description, no available-
   );
   assertEquals(group.description.includes('available'), false);
   assertEquals(group.available_count, 3);
+});
+
+Deno.test('mapBackorderRow maps backorder line, mirroring sell-group description + thumbnail', () => {
+  // Mirror the sell-group mapper test: build a row with the REAL backorder RPC column shape
+  // (id, backorder_code, condition_grade, selling_price, available, lead_time_days, + spec fields).
+  const specFields = {
+    ram_gb: '8GB', storage_gb: '128GB', cpu: 'Intel Celeron N4020 1.1GHz',
+    gpu: 'Intel UHD Graphics 600', screen_size: 10.1, color: 'Silver', os_family: 'Windows 11',
+    category_description_fields: ['brand', 'model_name', 'ram_gb', 'storage_gb', 'cpu', 'gpu', 'screen_size', 'color', 'os_family'],
+  };
+  const row: RawBackorderRow = {
+    id: 'b1', backorder_code: 'B000001', condition_grade: 'B', selling_price: 15900,
+    available: 272, lead_time_days: 9, brand: 'Toshiba', model_name: 'Dynabook K50',
+    hero_media_url: 'https://cdn/b1.jpg', model_number: null, ram_gb: specFields.ram_gb,
+    storage_gb: specFields.storage_gb, cpu: specFields.cpu, gpu: specFields.gpu,
+    screen_size: specFields.screen_size, color: specFields.color, os_family: specFields.os_family,
+    year: null, battery_health_pct: null, is_unlocked: null, has_touchscreen: null,
+    category_description_fields: specFields.category_description_fields,
+  };
+  const result = mapBackorderRow(row, 'https://dealzinventory.vercel.app');
+
+  // The expected description is exactly what the SAME helper produces for the same spec inputs —
+  // identical to the rich sell-group / item description for these fields.
+  const expectedDesc = 'Toshiba Dynabook K50 8GB 128GB Intel Celeron N4020 1.1GHz Intel UHD Graphics 600 10.1" Silver Windows 11';
+
+  assertEquals(result.type, 'backorder');
+  assertEquals(result.code, 'B000001');
+  assertEquals(result.available_count, 272);
+  assertEquals(result.lead_time_days, 9);
+  assertEquals(result.price, 15900);
+  assertEquals(result.description, expectedDesc);
+  assertEquals(result.thumbnail_url, 'https://cdn/b1.jpg');
+  assertEquals(result.display_url, 'https://cdn/b1.jpg');
+  assertEquals(result.order_url, 'https://dealzinventory.vercel.app/mine/B000001');
 });

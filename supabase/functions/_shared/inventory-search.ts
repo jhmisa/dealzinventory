@@ -59,8 +59,37 @@ export interface RawSellGroupRow {
   category_description_fields?: string[] | null;
 }
 
+// Backorder lines surface as pre-order results. search_available_backorder_lines deliberately
+// MIRRORS search_available_sell_groups' return shape (so the shared mapper stays uniform), plus
+// backorder-only fields: backorder_code, available, lead_time_days. There is no photo_group_id —
+// the thumbnail comes only from hero_media_url. battery_health_pct is always null for backorders.
+export interface RawBackorderRow {
+  id: string;
+  backorder_code: string;
+  condition_grade: string | null;
+  selling_price: number | null;
+  available: number | null;
+  lead_time_days: number | null;
+  brand: string | null;
+  model_name: string | null;
+  hero_media_url: string | null;
+  model_number?: string | null;
+  storage_gb?: string | null;
+  ram_gb?: string | null;
+  cpu?: string | null;
+  gpu?: string | null;
+  screen_size?: number | null;
+  color?: string | null;
+  os_family?: string | null;
+  year?: number | null;
+  battery_health_pct?: number | null;
+  is_unlocked?: boolean | null;
+  has_touchscreen?: boolean | null;
+  category_description_fields?: string[] | null;
+}
+
 export interface InventorySearchResult {
-  type: 'item' | 'sell_group';
+  type: 'item' | 'sell_group' | 'backorder';
   code: string;
   description: string;
   grade: string | null;
@@ -69,6 +98,8 @@ export interface InventorySearchResult {
   thumbnail_url: string | null;
   display_url: string | null;
   order_url: string;
+  // Backorder-only: estimated lead time in days. Optional so item/sell-group results are unaffected.
+  lead_time_days?: number | null;
 }
 
 export interface InventorySearchArgs {
@@ -166,6 +197,29 @@ export function mapInventoryResults(
   return [...groupResults, ...itemResults];
 }
 
+// Mirrors the sell-group mapping exactly for all shared fields (same getItemDescription call
+// with category_description_fields + spec fields, same buildOrderUrl using the B-code). Adds the
+// backorder-only lead_time_days and uses `available` / `selling_price` for the count / price.
+export function mapBackorderRow(b: RawBackorderRow, base: string): InventorySearchResult {
+  const desc = getItemDescription(
+    b as unknown as Record<string, unknown>,
+    null,
+    b.category_description_fields ?? null,
+  ) || [b.brand, b.model_name].filter(Boolean).join(' ') || '—';
+  return {
+    type: 'backorder' as const,
+    code: b.backorder_code,
+    description: desc,
+    grade: b.condition_grade,
+    price: b.selling_price,
+    available_count: b.available ?? 0,
+    thumbnail_url: b.hero_media_url,
+    display_url: b.hero_media_url,
+    order_url: buildOrderUrl(base, b.backorder_code),
+    lead_time_days: b.lead_time_days,
+  };
+}
+
 export async function searchInventory(
   supabase: ReturnType<typeof createClient>,
   args: InventorySearchArgs,
@@ -176,7 +230,7 @@ export async function searchInventory(
   //    query contains one (even buried in a longer string like "P001443 Oppo A5 5G"), look it
   //    up directly — it's the precise listing the customer is asking about. Only fall through
   //    to a text search if that exact code isn't currently available (e.g. it was sold).
-  const codeMatch = q.match(/\b([pg]\d{4,})\b/i);
+  const codeMatch = q.match(/\b([pgb]\d{4,})\b/i);
   if (codeMatch) {
     const byCode = await runInventorySearch(supabase, codeMatch[1].toUpperCase(), args);
     if (byCode.length > 0) return byCode;
@@ -218,18 +272,28 @@ async function runInventorySearch(
   const db = supabase as unknown as {
     rpc: (fn: string, params: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown }>;
   };
-  const [itemsRes, groupsRes] = await Promise.all([
+  const [itemsRes, groupsRes, backordersRes] = await Promise.all([
     db.rpc('search_available_inventory', common),
     db.rpc('search_available_sell_groups', common),
+    db.rpc('search_available_backorder_lines', common),
   ]);
 
   if (itemsRes.error) throw itemsRes.error;
   if (groupsRes.error) throw groupsRes.error;
+  if (backordersRes.error) throw backordersRes.error;
 
-  // Cap total results to keep the LLM tool context small (token budget).
-  return mapInventoryResults(
-    (itemsRes.data ?? []) as RawItemRow[],
-    (groupsRes.data ?? []) as RawSellGroupRow[],
-    shopBase(),
-  ).slice(0, 12);
+  const base = shopBase();
+  const backorderResults = ((backordersRes.data ?? []) as RawBackorderRow[])
+    .map((b) => mapBackorderRow(b, base));
+
+  // Cap total results to keep the LLM tool context small (token budget). Backorders are pre-order
+  // fallbacks, so they trail in-stock items/groups before the slice.
+  return [
+    ...mapInventoryResults(
+      (itemsRes.data ?? []) as RawItemRow[],
+      (groupsRes.data ?? []) as RawSellGroupRow[],
+      base,
+    ),
+    ...backorderResults,
+  ].slice(0, 12);
 }
