@@ -25,7 +25,11 @@ dist-ssr
 
 # Secrets and local config
 .mcp.json
-.claude/
+# Ignore most of .claude/ (personal config, local secrets) but allow
+# project-committed hooks and settings.
+.claude/*
+!.claude/hooks
+!.claude/settings.json
 .agent/
 .agents/
 .cursor/
