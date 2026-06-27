@@ -4,7 +4,7 @@
 
 **Goal:** Give the messaging AI an editable Category→Sub-intent taxonomy where each sub-intent carries recognition cues, handling instructions, and a per-intent autonomy switch (OFF / DRAFT / SEND), enforced safely on every inbound draft.
 
-**Architecture:** A new `messaging_sub_intents` table hangs off the existing `messaging_specialists` (the Category level). The draft pipeline gains a cheap **classify pass** (call 1) that picks the legacy intent + most-specific sub-intent; a pure **autonomy resolver** maps that to an effective OFF/DRAFT/SEND under five safety rails; then OFF stops, DRAFT keeps today's behavior, and SEND generates the reply (call 2) and transmits it through a newly-extracted shared Missive-send module (reused by both the staff-approve path and auto-send).
+**Architecture:** A new `messaging_sub_intents` table hangs off the existing `messaging_specialists` (the Category level). The draft pipeline gains a cheap **classify pass** (call 1) that picks the legacy intent + most-specific sub-intent; a pure **autonomy resolver** maps that to an effective OFF/DRAFT/SEND under five safety rails; then OFF stops, DRAFT keeps today's behavior, and SEND generates the reply (call 2) and transmits it through a newly-extracted shared Missive-send module (reused by both the staff-approve path and auto-send). **Routing has two axes:** topic (a physical folder, now resolvable from an optional `target_folder` on the sub-intent/category, falling back to today's hardcoded map) and status (the AI-non-actionable signal `needs_human_review`, which already drives a virtual "Action Required" queue and is auto-cleared by any human reply — no re-filing).
 
 **Tech Stack:** Supabase Postgres + RLS migrations, Deno edge functions (TypeScript), `deno test` for the pure functions. No frontend in this plan (see Plan 2 for the admin UI + service layer).
 
@@ -18,7 +18,7 @@
 
 | File | Responsibility | Action |
 |------|----------------|--------|
-| `supabase/migrations/20260627100000_sub_intent_autonomy.sql` | `messaging_sub_intents` table, RLS/grants, `messages.auto_sent`, nullable `sent_by`, `auto_send_confidence_threshold` setting, seed rows | Create |
+| `supabase/migrations/20260627100000_sub_intent_autonomy.sql` | `messaging_sub_intents` table (incl. `target_folder`), `messaging_specialists.target_folder`, RLS/grants, `messages.auto_sent`, nullable `sent_by`, `auto_send_confidence_threshold` setting, seed rows | Create |
 | `supabase/functions/_shared/sub-intents.ts` | Types + pure functions: `buildClassificationPrompt`, `matchSubIntent`, `resolveAutonomy` | Create |
 | `supabase/functions/_shared/sub-intents.test.ts` | Deno tests for the three pure functions | Create |
 | `supabase/functions/_shared/ai-providers.ts` | Add `parseClassification` + `classifyMessage`; `Classification` type | Modify |
@@ -31,6 +31,7 @@
 - The classifier returns the **legacy `intent`** (free string) plus `sub_intent_slug`. Keeping `intent` means the existing `specialistForIntent()` lookup, folder routing (`folderNameForIntent`), and `conversations.ai_intent` all keep working unchanged. New categories simply own a new intent string in their specialist's `intents[]` (and route to no folder until a mapping is added — safe).
 - The sub-intent's `handling_instructions` are **appended as a high-priority "Active sub-intent" addendum** to the full specialist prompt on the reply pass — not a wholesale prompt replacement — so persona, guardrails, and the `search_inventory` tool stay intact.
 - The new classify path is **isolated** in `classifyMessage` rather than refactoring the four working reply provider functions. The minor fetch duplication is accepted v1 tech debt (DRY later) in exchange for zero risk to the proven reply path.
+- **Topic routing** resolves `sub_intent.target_folder` → `specialist.target_folder` → `folderNameForIntent(intent)`. Seeded specialists keep `target_folder = NULL`, so existing routing (incl. the `return`→Aftersales / `complaint`→Concern split) is unchanged; the columns exist for new categories (Plan 2 UI) to claim a home. **The "Action Required" queue is a Plan 2 UI filter on `needs_human_review`** — this backend only guarantees the flag is set correctly in every AI-non-actionable path (and the existing send path already clears it on reply).
 
 ---
 
@@ -54,12 +55,17 @@ CREATE TABLE IF NOT EXISTS public.messaging_sub_intents (
   handling_instructions text NOT NULL DEFAULT '',
   autonomy              text NOT NULL DEFAULT 'DRAFT'
                           CHECK (autonomy IN ('OFF','DRAFT','SEND')),
+  target_folder         text,                         -- optional topic-folder override (folder name)
   is_active             boolean NOT NULL DEFAULT true,
   sort_order            integer NOT NULL DEFAULT 0,
   created_at            timestamptz NOT NULL DEFAULT now(),
   updated_at            timestamptz NOT NULL DEFAULT now(),
   UNIQUE (specialist_id, slug)
 );
+
+-- Topic-folder home for a Category. NULL keeps today's hardcoded intent->folder routing
+-- (preserves the return->Aftersales / complaint->Concern split); set it for custom categories.
+ALTER TABLE public.messaging_specialists ADD COLUMN IF NOT EXISTS target_folder text;
 
 ALTER TABLE public.messaging_sub_intents ENABLE ROW LEVEL SECURITY;
 
@@ -212,6 +218,7 @@ export interface SubIntentRow {
   recognition_cues: string;
   handling_instructions: string;
   autonomy: Autonomy;
+  target_folder?: string | null;   // optional topic-folder override; falls back to category/intent
   is_active: boolean;
   sort_order: number;
 }
@@ -894,7 +901,7 @@ import { sendViaMissive } from "./send-via-missive.ts";
   // 2d. Fetch active sub-intents (joined to their specialist's slug) + the auto-send threshold.
   const { data: subIntentRows } = await supabase
     .from("messaging_sub_intents")
-    .select("slug, name, recognition_cues, handling_instructions, autonomy, is_active, sort_order, messaging_specialists!inner(slug)")
+    .select("slug, name, recognition_cues, handling_instructions, autonomy, target_folder, is_active, sort_order, messaging_specialists!inner(slug)")
     .eq("is_active", true)
     .order("sort_order");
   const subIntents: SubIntentRow[] = ((subIntentRows ?? []) as Array<Record<string, unknown>>).map((r) => ({
@@ -904,6 +911,7 @@ import { sendViaMissive } from "./send-via-missive.ts";
     recognition_cues: String(r.recognition_cues ?? ""),
     handling_instructions: String(r.handling_instructions ?? ""),
     autonomy: r.autonomy as SubIntentRow["autonomy"],
+    target_folder: (r.target_folder as string | null) ?? null,
     is_active: Boolean(r.is_active),
     sort_order: Number(r.sort_order ?? 0),
   }));
@@ -911,6 +919,23 @@ import { sendViaMissive } from "./send-via-missive.ts";
   const { data: thrRow } = await supabase
     .from("system_settings").select("value").eq("key", "auto_send_confidence_threshold").maybeSingle();
   const autoSendThreshold = Number((thrRow as { value?: string } | null)?.value ?? "0.85");
+```
+
+Also extend the **existing** specialist fetch (`generate-draft.ts:99`) so the matched specialist carries its folder. Change its `.select(...)` to include `target_folder`:
+
+```ts
+  const { data: specialistRows } = await supabase
+    .from('messaging_specialists')
+    .select('slug, name, intents, playbook, always_escalate, target_folder, is_active, sort_order')
+    .eq('is_active', true)
+    .order('sort_order');
+```
+
+And add the optional field to `SpecialistRow` in `supabase/functions/_shared/build-specialist-prompt.ts` (after `sort_order`):
+
+```ts
+  sort_order: number;
+  target_folder?: string | null; // optional topic-folder home for routing (see generate-draft routeAndFlag)
 ```
 
 - [ ] **Step 3: Run the CLASSIFY pass and resolve autonomy** — insert immediately after the images are prepared (`generate-draft.ts:131`, after the `latestImages` assignment) and BEFORE the existing "5. Generate AI reply" block:
@@ -948,9 +973,16 @@ import { sendViaMissive } from "./send-via-missive.ts";
     specialist: classifiedSpecialist, autoSendThreshold,
   });
 
-  // 4d. OFF — do not draft. Route + flag for a human, then stop.
+  // 4c-bis. Resolve the topic folder: sub-intent override -> category home -> legacy intent map.
+  const targetFolderName =
+    matchedSubIntent?.target_folder ??
+    classifiedSpecialist?.target_folder ??
+    folderNameForIntent(classification.intent);
+
+  // 4d. OFF — do not draft. Route to the topic folder + flag for a human (it surfaces in the
+  // Action Required queue, which is just the needs_human_review filter), then stop.
   if (autonomy === "OFF") {
-    await routeAndFlag(supabase, conversationId, customerId, classification.intent, true);
+    await routeAndFlag(supabase, conversationId, customerId, classification.intent, targetFolderName, true);
     return;
   }
 ```
@@ -1033,36 +1065,37 @@ Then change the `generateAIReply` call to pass `replySystemPrompt` instead of `f
       // marked the draft FAILED; surface it for review rather than silently dropping.
       console.error("auto-send failed, leaving as draft for human:", sendResult.error);
       await supabase.from("messages").update({ status: "DRAFT" }).eq("id", inserted.id);
-      await routeAndFlag(supabase, conversationId, customerId, classification.intent, true);
+      await routeAndFlag(supabase, conversationId, customerId, classification.intent, targetFolderName, true);
       return;
     }
     // On success sendViaMissive already cleared needs_human_review + draft_pending_since and
-    // routed nothing; still apply intent folder routing for consistency.
-    await routeAndFlag(supabase, conversationId, customerId, classification.intent, false);
+    // routed nothing; still apply topic-folder routing for consistency.
+    await routeAndFlag(supabase, conversationId, customerId, classification.intent, targetFolderName, false);
     return;
   }
 
-  // 8. DRAFT — route by intent + set review flag (today's behavior).
-  await routeAndFlag(supabase, conversationId, customerId, classification.intent, needsReview || !customerId);
+  // 8. DRAFT — route to the topic folder + set review flag (today's behavior).
+  await routeAndFlag(supabase, conversationId, customerId, classification.intent, targetFolderName, needsReview || !customerId);
 }
 
 /**
- * Persist ai_intent + needs_human_review and, best-effort, move the conversation into the folder
- * mapped to its intent (triage-out-of-inbox-only). Extracted so the OFF, SEND, and DRAFT branches
- * share one routing implementation.
+ * Persist ai_intent + needs_human_review and, best-effort, move the conversation into its resolved
+ * topic folder (triage-out-of-inbox-only). The caller resolves targetFolderName from the taxonomy
+ * (sub-intent override -> category home -> legacy intent map). Extracted so the OFF, SEND, and DRAFT
+ * branches share one routing implementation. `needs_human_review` is the Action Required signal.
  */
 async function routeAndFlag(
   supabase: ReturnType<typeof createClient>,
   conversationId: string,
   customerId: string | null,
   intent: string,
+  targetFolderName: string | null,
   needsHumanReview: boolean,
 ): Promise<void> {
   const conversationUpdate: Record<string, unknown> = {
     needs_human_review: needsHumanReview,
     ai_intent: intent,
   };
-  const targetFolderName = folderNameForIntent(intent);
   if (targetFolderName) {
     try {
       const { data: folders, error: foldersErr } = await supabase
@@ -1148,7 +1181,27 @@ Expected: **no** assistant DRAFT row is created; the conversation has `needs_hum
 With `ai_messaging_enabled = 'false'`, send any message.
 Expected: no classification, no draft, no send (the cron gate short-circuits before `generateAndSaveDraft`).
 
-- [ ] **Step 6: Bump version + final commit** (project rule: one version bump per session)
+- [ ] **Step 6: Verify topic routing + the Action Required signal**
+
+Confirm a complaint-type message still lands in its topic folder unchanged (seeded specialists have `target_folder = NULL` → fall back to the legacy map):
+```bash
+supabase db query "select c.ai_intent, f.name as folder, c.needs_human_review from conversations c left join message_folders f on f.id = c.folder_id where c.id = '<TEST_CONVO_ID>';"
+```
+Expected for an escalating/OFF case: the conversation sits in its topic folder AND `needs_human_review = true` (this is what the Plan 2 "Action Required" view filters on). Then, optionally, set a custom folder on a category to prove the override:
+```bash
+supabase db query "update messaging_specialists set target_folder='Order' where slug='order_tracking';"
+```
+Resend a tracking question and confirm the thread routes to **Order**. (Restore to NULL afterward if you don't want the override.)
+
+- [ ] **Step 7: Verify the Action Required flag auto-clears on reply**
+
+For a conversation currently flagged `needs_human_review = true`, send a staff reply (approve a draft, or post a manual message).
+Expected: `needs_human_review` flips to `false` (so the thread leaves the Action Required view) while `folder_id` is unchanged — i.e. it stays in its topic folder, no re-filing. Verify:
+```bash
+supabase db query "select needs_human_review, folder_id from conversations where id='<TEST_CONVO_ID>';"
+```
+
+- [ ] **Step 8: Bump version + final commit** (project rule: one version bump per session)
 
 Edit `package.json` to bump the minor version, then:
 ```bash
@@ -1160,7 +1213,7 @@ git commit -m "chore: bump version — sub-intent autonomy engine (backend)"
 
 ## Self-Review (completed during authoring)
 
-- **Spec coverage:** Data model (Task 1) ✓; classification picks most-specific sub-intent (Tasks 4, 6, 8) ✓; OFF/DRAFT/SEND semantics with split classify-then-reply (Task 8) ✓; SEND reuses send infra (Tasks 7, 8) ✓; all five safety rails (Task 2 + Step 5 review flag) ✓; auto_sent flagging/observability (Tasks 1, 7, 8) ✓; Tier-2 shipment status via existing context (seed + Task 9) ✓. **UI (spec §6) and the global threshold setting's UI are intentionally deferred to Plan 2** — the setting itself is created here (Task 1) and editable via SQL until then.
+- **Spec coverage:** Data model incl. `target_folder` (Task 1) ✓; classification picks most-specific sub-intent (Tasks 4, 6, 8) ✓; OFF/DRAFT/SEND semantics with split classify-then-reply (Task 8) ✓; SEND reuses send infra (Tasks 7, 8) ✓; all five safety rails (Task 2 + Step 5 review flag) ✓; auto_sent flagging/observability (Tasks 1, 7, 8) ✓; Tier-2 shipment status via existing context (seed + Task 9) ✓; topic routing via configurable `target_folder` with legacy fallback (Tasks 1, 8) ✓; the Action Required signal (`needs_human_review` set in every non-actionable path + auto-cleared on reply) (Task 8 + Task 9 Step 7) ✓. **The admin UI (spec §7) and the Action Required *view* (spec §6) are intentionally deferred to Plan 2** — this backend guarantees the data + flags they read; the threshold and folders are editable via SQL until then.
 - **Placeholder scan:** none — every code step is complete.
-- **Type consistency:** `SubIntentRow`, `Classification`, `Autonomy`, `resolveAutonomy`, `matchSubIntent`, `buildClassificationPrompt`, `classifyMessage`, `parseClassification`, `sendViaMissive` names are used identically across tasks.
-- **Known follow-ups (Plan 2):** admin CRUD UI for categories/sub-intents + the 3-way toggle; `src/services/messaging.ts` data layer; surfacing `auto_sent` distinctly in the Messages thread UI; a settings control for `auto_send_confidence_threshold`.
+- **Type consistency:** `SubIntentRow` (incl. optional `target_folder`), `Classification`, `Autonomy`, `resolveAutonomy`, `matchSubIntent`, `buildClassificationPrompt`, `classifyMessage`, `parseClassification`, `sendViaMissive`, and `routeAndFlag(supabase, conversationId, customerId, intent, targetFolderName, needsHumanReview)` are used identically across tasks.
+- **Known follow-ups (Plan 2):** admin CRUD UI for categories/sub-intents + the 3-way toggle + per-category/sub-intent **target-folder** picker; the **"Action Required" view** (saved filter on `needs_human_review` across folders) in the Messages page; `src/services/messaging.ts` data layer; surfacing `auto_sent` distinctly in the Messages thread UI; a settings control for `auto_send_confidence_threshold`.

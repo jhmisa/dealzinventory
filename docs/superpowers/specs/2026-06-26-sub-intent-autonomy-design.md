@@ -65,6 +65,7 @@ CREATE TABLE messaging_sub_intents (
 - RLS + Data API grants per project convention (ALTER DEFAULT PRIVILEGES already handles new-table grants).
 - Seed sub-intents for the existing specialists (at minimum a sensible set for Sales / Order-Tracking) plus a seeded `promo_raffle` example so the raffle case is fixed out of the box.
 - Each Category keeps a built-in **default / catch-all** behavior (no sub-intent row needed) for messages that match the category but no specific sub-intent.
+- An optional `target_folder` column on both the sub-intent and the Category (`messaging_specialists`) drives topic routing — see §6.
 
 ### 2. Classification (split from reply — two calls)
 
@@ -116,13 +117,31 @@ Apply:
 
 On the messages (or `ai_context_summary`) record, capture: matched `specialist_slug`, `sub_intent_slug`, `confidence`, resolved `autonomy`, and `auto_sent` boolean. Surface auto-sent messages distinctly in the Messages UI so staff can audit what the AI sent unattended.
 
-### 6. Admin UI
+### 6. Routing & the Action Required queue
+
+Routing has **two independent axes** — *where a thread lives* (topic) and *whether a human must act* (status). Keeping them separate is what avoids manual re-filing.
+
+**Topic = a physical folder (the thread's home).** Folder destination becomes part of the editable taxonomy instead of a hardcoded map:
+- Add an optional `target_folder` (folder name) to **Category** (`messaging_specialists`) and an optional override on **sub-intent** (`messaging_sub_intents`).
+- Resolution order when routing: `sub_intent.target_folder` → `specialist.target_folder` → `folderNameForIntent(intent)` (the existing hardcoded map, kept as the final fallback).
+- Leaving `target_folder` NULL on the seeded specialists preserves today's exact routing (including the `return`→Aftersales vs `complaint`→Concern split that a single per-specialist folder would lose). New categories (e.g. YeheyRemit) set `target_folder` to get a home — this also fixes the "custom categories don't route anywhere" gap.
+
+**Status = the Action Required queue (a virtual view, NOT a folder).** Everything the AI cannot action already sets `needs_human_review = true` — that *is* the actionability signal, and it's computed by the autonomy resolver (OFF, always-escalate, unknown/low-confidence/no-match). So:
+- "Action Required" is a **filtered view** = all conversations where `needs_human_review = true`, cutting across every topic folder.
+- The thread still lives in its correct topic folder the whole time.
+- **The existing send path already clears `needs_human_review` on any reply** (`sendViaMissive`). So when a human answers from the Action Required view, the thread auto-drops from the queue — no manual move, no re-filing. Answering *is* the "done" action.
+- Self-maintaining: if the customer writes back and it's still AI-non-actionable, the next classify pass re-flags it and it reappears.
+
+This gives a single place for staff to watch (the B request) without B's re-filing cost, on top of clean per-topic organization (the A mechanism).
+
+### 7. Admin UI
 
 Extend the **Specialist Playbooks** section of `src/pages/admin/messaging-settings.tsx`:
-- Each Category expands to list its sub-intents.
-- Each sub-intent row: Name, Recognition cues, Handling instructions, and a 3-way **OFF / DRAFT / SEND** segmented toggle; active toggle; reorder.
+- Each Category expands to list its sub-intents; the Category row also sets its **target folder**.
+- Each sub-intent row: Name, Recognition cues, Handling instructions, a 3-way **OFF / DRAFT / SEND** segmented toggle, optional **target-folder override**; active toggle; reorder.
 - "Add category" and "Add sub-intent" actions.
 - One global setting: **auto-send confidence threshold** (below which SEND → DRAFT).
+- An **"Action Required" view** in the Messages page: a saved filter on `needs_human_review = true` across all folders.
 
 ---
 
