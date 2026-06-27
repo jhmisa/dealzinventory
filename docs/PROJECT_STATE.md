@@ -12,7 +12,7 @@
 ## Now  (active work)
 - Sub-intent autonomy — interactive E2E test + Plan 2 admin UI (per-intent OFF/DRAFT/SEND). Backend shipped v1.52.0 (merged main). Plan/spec: docs/superpowers/specs/2026-06-26-sub-intent-autonomy-design.md
 - Project command center (this system) — being set up.
-- Backorder / pre-order supplier inventory (B-codes) — design approved, awaiting impl plan. Spec: docs/superpowers/specs/2026-06-27-backorder-supplier-inventory-design.md
+- Backorder / pre-order supplier inventory (B-codes) — design + impl plan locked, NOT yet started (a bug takes priority first). Spec: docs/superpowers/specs/2026-06-27-backorder-supplier-inventory-design.md · Plan: docs/superpowers/plans/2026-06-27-backorder-supplier-inventory.md
 
 ## Recently shipped  (newest first; archive to CHANGELOG.md when >~15)
 - 2026-06-27 · Project command center: state hub + system map + enforcement hooks · touched: docs/, .claude/, CLAUDE.md
