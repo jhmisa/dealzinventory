@@ -101,10 +101,16 @@ line until a real P-code exists.
 
 - `order_items.backorder_line_id` — new nullable uuid FK → backorder_lines.
 - `order_items.item_id` — relax to **nullable** (a pre-order line has no P-code yet).
-- Invariant: each `order_items` row has **exactly one** of `item_id` (fulfilled /
-  in-stock) or `backorder_line_id` (awaiting fulfillment). Enforce with a CHECK.
-- On the manual swap, staff set `item_id` to the fresh P-code; `backorder_line_id`
-  may be retained for provenance.
+- `order_items.backorder_status` — new enum, used only when `backorder_line_id`
+  is set: `AWAITING_ORDER → ORDERED → READY → FULFILLED`. Drives the To Fulfill
+  worklist (see below).
+- Invariant: a pre-order `order_items` row has `backorder_line_id` set with
+  `item_id` null until the swap; an in-stock row has `item_id` set and
+  `backorder_line_id` null. After the swap a fulfilled pre-order row has **both**
+  (`item_id` = the assigned P-code, `backorder_line_id` kept for provenance).
+  Enforce the legal combinations with a CHECK.
+- On the manual swap, staff set `item_id` to the fresh P-code and
+  `backorder_status = FULFILLED`.
 
 ---
 
@@ -115,17 +121,59 @@ line until a real P-code exists.
    → mint `B000001`, `available = quantity_total`.
 2. **Offer** — AI inventory search surfaces the line, labeled pre-order + lead time.
 3. **Confirm** — customer confirms → PENDING order created; an `order_items` row
-   with `backorder_line_id` set, `item_id` null; `quantity_reserved += 1`
-   (available decrements).
-4. **Order from supplier** — staff place the iosys order manually (outside the app).
+   with `backorder_line_id` set, `item_id` null, `backorder_status = AWAITING_ORDER`;
+   `quantity_reserved += 1` (available decrements).
+4. **Order from supplier** — staff place the iosys order manually (outside the app)
+   and mark the pre-order **Ordered** (`backorder_status = ORDERED`).
 5. **Intake** — arriving units are taken through the existing New Intake flow and
-   mint normal **P-codes** as today (no change to intake itself).
-6. **Swap (manual)** — on the backorder fulfillment view, staff link a fresh
-   P-code to an open pre-order `order_item`: set `item_id`, `quantity_received += 1`.
+   mint normal **P-codes** as today (no change to intake itself). When eligible
+   matching stock exists, the waiting pre-order auto-flips to **READY**.
+6. **Swap (manual)** — staff scan/enter a fresh P-code; the system verifies specs
+   (hard-block on core mismatch) and links it: set `item_id`,
+   `backorder_status = FULFILLED`, P-item → RESERVED, `quantity_received += 1`.
    The order proceeds through the normal pipeline from there.
 7. **Close** — when a line is exhausted or retired, staff set `status = CLOSED`.
 
 ---
+
+## Fulfillment worklist & B → P swap
+
+There is **no existing process** for this: today's flow is buy → intake → sell
+(intake is invoice-driven, i.e. already purchased). Backorder inverts it to
+sell → buy → intake, so the procurement/fulfillment worklist is new.
+
+### "To Fulfill" worklist (in `/admin/backorders`)
+
+Aggregates every outstanding pre-order `order_item` across all B-lines, grouped by
+status, with a procurement summary:
+
+| State (`backorder_status`) | Meaning | Staff action |
+|---|---|---|
+| `AWAITING_ORDER` | Customer confirmed; supplier order not yet placed | **Mark ordered** (after placing the iosys order) |
+| `ORDERED` | Supplier order placed; en route | — (waiting on arrival) |
+| `READY` | Matching stock arrived & passed intake | **Swap to P-code** |
+| `FULFILLED` | P-code linked; leaves the worklist into the normal order pipeline | — |
+
+- **Procurement summary** rolls up `AWAITING_ORDER` rows per B-line/supplier:
+  e.g. "order 3× B000001, 2× B000007 from iosys."
+- `READY` is set automatically when at least one **eligible** P-code exists for
+  the line (see eligibility), so actionable items surface without hunting.
+
+### The swap (manual, one unit at a time)
+
+1. Staff open a `READY` pre-order and **scan the QR or type the P-code** (or pick
+   from the system's pre-filtered list of eligible matches).
+2. **Verification** compares the scanned P-item to the B-line and renders a
+   field-by-field ✓/✗. **Core specs hard-block:** `product_model`, `storage_gb`,
+   `color`, `condition_grade` must all match or the swap is refused. Soft fields
+   (e.g. battery note) may warn only.
+3. **Eligibility** — a P-code can be swapped in only if it is `AVAILABLE`
+   (inspected — same bar as any sale), matches the core specs, and is not already
+   in an order or sell-group.
+4. **Confirm** → `order_item.item_id` = P-code, `backorder_status = FULFILLED`,
+   P-item → `RESERVED` (one-item-one-order constraint applies),
+   `quantity_received += 1`. One P-code ↔ one order unit; multiple waiting
+   pre-orders are each an explicit confirm.
 
 ## Ingestion & parsing (paste-to-add)
 
@@ -200,16 +248,20 @@ brand, model. Filters: status, supplier, grade.
 - **Refresh from iosys** — re-run the fetch to update the price/stock snapshot
   (manual; no background cron).
 
-**Fulfillment / swap view:** for a line with open pre-orders, list waiting
-`order_items` and let staff pick a freshly-intaken P-code to link to each — the
-manual B→P swap (sets `item_id`, bumps `quantity_received`).
+**To Fulfill worklist:** a second view/tab on the page showing all outstanding
+pre-orders grouped by `backorder_status` (To order / Ordered / Ready to swap),
+with the procurement summary and per-row actions ("Mark ordered", "Swap to
+P-code"). The swap action runs the scan + verify + hard-block flow above. See
+**Fulfillment worklist & B→P swap**.
 
 ---
 
 ## Affected surfaces (system map)
 
 - **New migration(s):** `backorder_lines` table + `b_code_seq` + `order_items`
-  column changes + `search_available_backorder_lines` RPC + RLS/grants/trigger.
+  column changes (`backorder_line_id`, nullable `item_id`, `backorder_status`
+  enum + CHECK) + `search_available_backorder_lines` RPC + a spec-match/eligibility
+  helper for the swap + RLS/grants/trigger.
 - **New edge function:** `fetch-supplier-product`.
 - **`_shared/inventory-search.ts`:** add backorder search path + `'backorder'` type.
 - **Messaging offer assembly:** pre-order badge + lead-time line for backorder results.
