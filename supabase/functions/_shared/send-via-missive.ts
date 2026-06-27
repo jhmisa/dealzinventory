@@ -157,7 +157,7 @@ export async function sendViaMissive(
   }).eq("id", msg.id);
 
   if (approveDraftId) {
-    await supabase.from("messages").update({ status: sendError ? "FAILED" : "SENT" }).eq("id", approveDraftId);
+    await supabase.from("messages").update({ status: sendError ? "FAILED" : "SENT", auto_sent: autoSent }).eq("id", approveDraftId);
     if (!sendError) await supabase.from("messages").delete().eq("id", msg.id);
   }
 
