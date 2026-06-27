@@ -67,3 +67,23 @@ Deno.test("matchSubIntent returns null when slug belongs to a different speciali
 Deno.test("matchSubIntent ignores inactive rows", () => {
   assertEquals(matchSubIntent("sales", "inactive_one", rows), null);
 });
+
+import { buildClassificationPrompt } from "./sub-intents.ts";
+
+Deno.test("buildClassificationPrompt lists specialists, their intents, and sub-intent cues", () => {
+  const prompt = buildClassificationPrompt({ specialists: [sales], subIntents: rows });
+  // Mentions the specialist + its legacy intent (valid intents the model may emit)
+  if (!prompt.includes("Sales")) throw new Error("missing specialist name");
+  if (!prompt.includes("product_inquiry")) throw new Error("missing legacy intent");
+  // Lists the sub-intent slug + its recognition cues so the model can pick it
+  if (!prompt.includes("promo_raffle")) throw new Error("missing sub-intent slug");
+  // Asks for the structured classification fields
+  if (!prompt.includes("sub_intent_slug")) throw new Error("missing output schema");
+  if (!prompt.includes("confidence")) throw new Error("missing confidence field");
+});
+
+Deno.test("buildClassificationPrompt only includes the active specialist's own sub-intents", () => {
+  const prompt = buildClassificationPrompt({ specialists: [sales], subIntents: rows });
+  // shipment_status belongs to order_tracking (not passed) -> must not appear
+  if (prompt.includes("shipment_status")) throw new Error("leaked another specialist's sub-intent");
+});
