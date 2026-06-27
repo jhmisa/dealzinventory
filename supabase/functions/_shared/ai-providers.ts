@@ -28,6 +28,44 @@ export interface AIResponse {
   usage?: TokenUsage;
 }
 
+export interface Classification {
+  intent: string;
+  sub_intent_slug: string | null;
+  confidence: number;
+}
+
+// Parse the CLASSIFY pass output. Mirrors parseAIResponse's tolerant strategies but for the
+// compact {intent, sub_intent_slug, confidence} shape. On total failure returns a zero-confidence
+// "unknown" so the autonomy resolver downgrades to DRAFT (never auto-sends an unparseable message).
+export function parseClassification(text: string): Classification {
+  const strategies = [
+    () => JSON.parse(text.trim()),
+    () => JSON.parse(text.replace(/^```(?:json)?\n?/m, "").replace(/\n?```$/m, "").trim()),
+    () => {
+      const m = text.match(/\{[\s\S]*"confidence"[\s\S]*\}/);
+      if (!m) throw new Error("no json");
+      return JSON.parse(m[0]);
+    },
+  ];
+  for (const strat of strategies) {
+    try {
+      const p = strat();
+      if (p && typeof p === "object") {
+        const rawSlug = p.sub_intent_slug;
+        const slug = typeof rawSlug === "string" && rawSlug.length > 0 ? rawSlug : null;
+        return {
+          intent: typeof p.intent === "string" && p.intent.length > 0 ? p.intent : "unknown",
+          sub_intent_slug: slug,
+          confidence: Math.min(1, Math.max(0, Number(p.confidence ?? 0))),
+        };
+      }
+    } catch {
+      // try next strategy
+    }
+  }
+  return { intent: "unknown", sub_intent_slug: null, confidence: 0 };
+}
+
 // Normalize token usage across provider response shapes.
 export function extractUsage(provider: string, data: unknown): TokenUsage {
   const d = (data ?? {}) as Record<string, unknown>;

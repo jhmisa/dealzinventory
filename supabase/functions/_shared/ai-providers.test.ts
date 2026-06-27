@@ -210,3 +210,30 @@ Deno.test('enhanced prompt instructs single {{OFFER}} token output and forbids m
   // The persona must still be embedded.
   if (!p.includes('PERSONA')) throw new Error('expected persona text in prompt');
 });
+
+import { parseClassification } from "./ai-providers.ts";
+
+Deno.test("parseClassification reads a clean JSON object", () => {
+  const c = parseClassification('{"intent":"product_inquiry","sub_intent_slug":"promo_raffle","confidence":0.9}');
+  assertEquals(c, { intent: "product_inquiry", sub_intent_slug: "promo_raffle", confidence: 0.9 });
+});
+
+Deno.test("parseClassification strips markdown fences", () => {
+  const c = parseClassification('```json\n{"intent":"tracking","sub_intent_slug":null,"confidence":0.7}\n```');
+  assertEquals(c, { intent: "tracking", sub_intent_slug: null, confidence: 0.7 });
+});
+
+Deno.test("parseClassification clamps confidence and defaults missing fields", () => {
+  const c = parseClassification('{"confidence":5}');
+  assertEquals(c, { intent: "unknown", sub_intent_slug: null, confidence: 1 });
+});
+
+Deno.test("parseClassification falls back safely on garbage", () => {
+  const c = parseClassification("not json at all");
+  assertEquals(c, { intent: "unknown", sub_intent_slug: null, confidence: 0 });
+});
+
+Deno.test("parseClassification coerces empty-string sub_intent_slug to null", () => {
+  const c = parseClassification('{"intent":"general","sub_intent_slug":"","confidence":0.5}');
+  assertEquals(c.sub_intent_slug, null);
+});
