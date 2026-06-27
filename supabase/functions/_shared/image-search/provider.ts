@@ -20,14 +20,19 @@ export const googleCseProvider: ImageSearchProvider = {
   },
 }
 
-// Provider selection: IMAGE_SEARCH_PROVIDER=google_cse uses Google CSE;
-// anything else (incl. unset) uses the free, no-key Bing scraper (DEFAULT).
+// Provider selection via IMAGE_SEARCH_PROVIDER:
+//   bing_scrape -> free, no-key Bing scraper. NOTE: verified 2026-06-27 to return
+//     query-independent JUNK from the Supabase edge egress IP (Bing serves a generic
+//     fallback to flagged datacenter IPs). Only useful behind a residential proxy.
+//   google_cse / unset (DEFAULT) -> key-gated Google CSE. With no key, isConfigured()
+//     is false, so the "Search web for more" button stays DISABLED (no junk shown)
+//     until a real image-search API key is provided.
 function selectProvider(): ImageSearchProvider {
   switch (Deno.env.get("IMAGE_SEARCH_PROVIDER")) {
-    case "google_cse":
-      return googleCseProvider
-    default:
+    case "bing_scrape":
       return bingImageProvider
+    default:
+      return googleCseProvider
   }
 }
 
