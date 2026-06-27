@@ -58,4 +58,4 @@
 - Shared: supabase/functions/_shared
 
 ## Codegen
-- Edge fns: generate-codes (P/PG/G/KT/ORD/C codes)
+- P/PG/G/KT/ORD/C codes are auto-generated server-side via `generate_code(prefix, seq_name)` — a PostgreSQL function using `nextval()` + `lpad` defined in the initial schema migration (20260210000001_initial_schema.sql). No standalone "generate-codes" edge function exists despite the PRD reference.
