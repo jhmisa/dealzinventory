@@ -1,6 +1,13 @@
-import { createClient } from "jsr:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2";
 import { buildCustomerContext, formatContextForPrompt, getLatestCustomerImages } from "./build-ai-context.ts";
-import { generateAIReply, type AIProvider } from "./ai-providers.ts";
+import { generateAIReply, classifyMessage, type AIProvider } from "./ai-providers.ts";
+import {
+  buildClassificationPrompt,
+  matchSubIntent,
+  resolveAutonomy,
+  type SubIntentRow,
+} from "./sub-intents.ts";
+import { sendViaMissive } from "./send-via-missive.ts";
 import { estimateCostUsd } from "./ai-cost.ts";
 import { modelSupportsVision } from "./ai-vision.ts";
 import { folderNameForIntent, shouldRouteOutOfInbox } from "./intent-routing.ts";
@@ -13,7 +20,8 @@ import { searchInventory, deriveOfferCodes, type InventorySearchResult } from ".
 import { assembleOfferReply } from "./offer-reply.ts";
 
 async function buildOfferAttachments(
-  supabase: ReturnType<typeof createClient>,
+  // deno-lint-ignore no-explicit-any
+  supabase: SupabaseClient<any, any, any>,
   conversationId: string,
   codes: string[],
   catalog: Map<string, InventorySearchResult>,
@@ -47,7 +55,8 @@ async function buildOfferAttachments(
  * generate-pending-drafts function.
  */
 export async function generateAndSaveDraft(
-  supabase: ReturnType<typeof createClient>,
+  // deno-lint-ignore no-explicit-any
+  supabase: SupabaseClient<any, any, any>,
   conversationId: string,
   customerId: string | null,
 ): Promise<void> {
@@ -96,10 +105,32 @@ export async function generateAndSaveDraft(
   // 2c. Fetch active specialists (per-topic playbooks).
   const { data: specialistRows } = await supabase
     .from('messaging_specialists')
-    .select('slug, name, intents, playbook, always_escalate, is_active, sort_order')
+    .select('slug, name, intents, playbook, always_escalate, target_folder, is_active, sort_order')
     .eq('is_active', true)
     .order('sort_order');
   const specialists = (specialistRows ?? []) as SpecialistRow[];
+
+  // 2d. Fetch active sub-intents (joined to their specialist's slug) + the auto-send threshold.
+  const { data: subIntentRows } = await supabase
+    .from("messaging_sub_intents")
+    .select("slug, name, recognition_cues, handling_instructions, autonomy, target_folder, is_active, sort_order, messaging_specialists!inner(slug)")
+    .eq("is_active", true)
+    .order("sort_order");
+  const subIntents: SubIntentRow[] = ((subIntentRows ?? []) as Array<Record<string, unknown>>).map((r) => ({
+    specialist_slug: (r.messaging_specialists as { slug: string }).slug,
+    slug: String(r.slug),
+    name: String(r.name),
+    recognition_cues: String(r.recognition_cues ?? ""),
+    handling_instructions: String(r.handling_instructions ?? ""),
+    autonomy: r.autonomy as SubIntentRow["autonomy"],
+    target_folder: (r.target_folder as string | null) ?? null,
+    is_active: Boolean(r.is_active),
+    sort_order: Number(r.sort_order ?? 0),
+  }));
+
+  const { data: thrRow } = await supabase
+    .from("system_settings").select("value").eq("key", "auto_send_confidence_threshold").maybeSingle();
+  const autoSendThreshold = Number((thrRow as { value?: string } | null)?.value ?? "0.85");
 
   // Build full system prompt: guardrails → persona → specialist playbooks → shared knowledge.
   const fullSystemPrompt = buildSpecialistSystemPrompt({
@@ -110,7 +141,7 @@ export async function generateAndSaveDraft(
   });
 
   // 3. Build customer context
-  const context = await buildCustomerContext(supabase, customerId, conversationId);
+  const context = await buildCustomerContext(supabase as ReturnType<typeof createClient>, customerId, conversationId);
   const contextBlock = formatContextForPrompt(context);
 
   // 4. Prepare message history for AI
@@ -127,8 +158,53 @@ export async function generateAndSaveDraft(
     (provider as AIProvider).model_id,
   );
   const latestImages = supportsVision
-    ? await getLatestCustomerImages(supabase, conversationId, 3)
+    ? await getLatestCustomerImages(supabase as ReturnType<typeof createClient>, conversationId, 3)
     : [];
+
+  // 4c. CLASSIFY pass (cheap, no tools). Determines intent + sub-intent + confidence, which in turn
+  // decides autonomy. Doing this first means an OFF sub-intent never pays for reply generation.
+  const classifyPrompt = buildClassificationPrompt({ specialists, subIntents });
+  let classification;
+  try {
+    const res = await classifyMessage(provider as AIProvider, classifyPrompt, contextBlock, chatMessages, latestImages);
+    classification = res.classification;
+    // Best-effort usage log for the classify call.
+    try {
+      await supabase.from("ai_usage_log").insert({
+        conversation_id: conversationId, purpose: "messaging_classify",
+        provider: (provider as AIProvider).provider, model_id: (provider as AIProvider).model_id,
+        input_tokens: res.usage.input_tokens, output_tokens: res.usage.output_tokens,
+        estimated_cost_usd: estimateCostUsd((provider as AIProvider).model_id, res.usage),
+        had_images: latestImages.length > 0,
+      });
+    } catch (e) { console.error("classify usage log failed (non-fatal):", e); }
+  } catch (err) {
+    // Classify failed — fail safe to a low-confidence unknown so autonomy resolves to DRAFT.
+    console.error("classify pass failed (non-fatal, defaulting to DRAFT):", err);
+    classification = { intent: "unknown", sub_intent_slug: null, confidence: 0 };
+  }
+
+  const classifiedSpecialist = specialistForIntent(classification.intent, specialists);
+  const matchedSubIntent = matchSubIntent(
+    classifiedSpecialist?.slug ?? null, classification.sub_intent_slug, subIntents,
+  );
+  const autonomy = resolveAutonomy({
+    subIntent: matchedSubIntent, confidence: classification.confidence,
+    specialist: classifiedSpecialist, autoSendThreshold,
+  });
+
+  // 4c-bis. Resolve the topic folder: sub-intent override -> category home -> legacy intent map.
+  const targetFolderName =
+    matchedSubIntent?.target_folder ??
+    classifiedSpecialist?.target_folder ??
+    folderNameForIntent(classification.intent);
+
+  // 4d. OFF — do not draft. Route to the topic folder + flag for a human (it surfaces in the
+  // Action Required queue, which is just the needs_human_review filter), then stop.
+  if (autonomy === "OFF") {
+    await routeAndFlag(supabase, conversationId, customerId, classification.intent, targetFolderName, true);
+    return;
+  }
 
   // 5. Generate AI reply
   // Tool executor: the AI calls search_inventory; we run it in-process via the RPCs.
@@ -138,7 +214,7 @@ export async function generateAndSaveDraft(
   const executeTool = async (name: string, args: unknown): Promise<unknown> => {
     if (name !== 'search_inventory') return { error: `unknown tool: ${name}` };
     const a = (args ?? {}) as Record<string, unknown>;
-    const results = await searchInventory(supabase, {
+    const results = await searchInventory(supabase as ReturnType<typeof createClient>, {
       query: String(a.query ?? ''),
       category_id: a.category_id ? String(a.category_id) : undefined,
       brand: a.brand ? String(a.brand) : undefined,
@@ -153,9 +229,15 @@ export async function generateAndSaveDraft(
     }));
   };
 
+  // Append the matched sub-intent's handling as a high-priority addendum so the reply follows it
+  // (e.g. promo_raffle: "do NOT search inventory"). Falls back to the base prompt for category-default.
+  const replySystemPrompt = matchedSubIntent
+    ? `${fullSystemPrompt}\n\n# Active sub-intent: ${matchedSubIntent.name} (HIGHEST PRIORITY)\n${matchedSubIntent.handling_instructions}`
+    : fullSystemPrompt;
+
   const aiResponse = await generateAIReply(
     provider as AIProvider,
-    fullSystemPrompt,
+    replySystemPrompt,
     contextBlock,
     chatMessages,
     latestImages,
@@ -179,90 +261,108 @@ export async function generateAndSaveDraft(
     console.error('ai_usage_log insert failed (non-fatal):', logErr);
   }
 
-  // 6. Determine if human review is needed. The matched specialist's always_escalate flag is the
-  // authoritative, DB-editable escalation rule (Aftersales + Kaitori escalate by default).
-  // Fail-safe: if no specialist matches the classified intent (off-list intent, or an empty/
-  // all-inactive specialists table), escalate rather than let an unclassifiable message pass.
-  const matchedSpecialist = specialistForIntent(aiResponse.intent, specialists);
+  // 6. Human-review flag for DRAFT/SEND. The classify pass already escalates novel/low-confidence
+  // cases to DRAFT; here we decide whether that DRAFT also needs a human's eye.
   const needsReview =
-    aiResponse.confidence < 0.5 ||
+    classification.confidence < 0.5 ||
     aiResponse.escalation_reason !== null ||
-    matchedSpecialist === null ||
-    matchedSpecialist.always_escalate === true;
+    classifiedSpecialist === null ||
+    classifiedSpecialist.always_escalate === true;
 
-  // 7. Save draft message
-  // Derive offered codes from the reply itself (order links / bare codes), not just the
-  // model's intermittently-filled offer_codes — so the product photo attaches whenever the
-  // draft actually offers an item.
+  // 7. Assemble the final reply (offer codes + emoji block), unchanged.
   const offerCodes = deriveOfferCodes(aiResponse.reply, aiResponse.offer_codes, offerCatalog);
   const offerAttachments = offerCodes.length
     ? await buildOfferAttachments(supabase, conversationId, offerCodes, offerCatalog)
     : [];
-
-  // Splice the deterministic emoji offer block into the reply so the SAVED content (what any
-  // send path — manual approve OR future auto-send — transmits verbatim) is the final message.
   const finalReply = assembleOfferReply(aiResponse.reply, offerCodes, offerCatalog);
 
-  await supabase.from('messages').insert({
+  // 7b. Insert the assistant message as a DRAFT (the canonical content row). For SEND we transmit
+  // it below and stamp auto_sent; for DRAFT it simply waits for staff approval (today's behavior).
+  const { data: inserted } = await supabase.from("messages").insert({
     conversation_id: conversationId,
-    role: 'assistant',
+    role: "assistant",
     content: finalReply,
-    status: 'DRAFT',
-    message_type: 'REPLY',
+    status: "DRAFT",
+    message_type: "REPLY",
     ai_confidence: aiResponse.confidence,
     attachments: offerAttachments,
     ai_context_summary: JSON.stringify({
-      intent: aiResponse.intent,
+      intent: classification.intent,
+      sub_intent_slug: classification.sub_intent_slug,
+      autonomy,
+      classify_confidence: classification.confidence,
       data_used: aiResponse.data_used,
       escalation_reason: aiResponse.escalation_reason,
       needs_clarification: aiResponse.needs_clarification ?? false,
       offer_codes: offerCodes,
     }),
-  });
+  }).select("id").single();
 
-  // 8. Route by intent + update conversation state.
-  // Always persist the classified intent + review flag; conditionally move the conversation
-  // into its mapped folder (triage-out-of-inbox-only). Routing is best-effort: any lookup
-  // failure falls back to updating intent + review flag without moving.
+  // 7c. SEND — transmit immediately via the shared Missive sender (auto-approve this draft).
+  if (autonomy === "SEND" && inserted?.id) {
+    const sendResult = await sendViaMissive(supabase, {
+      conversationId,
+      content: finalReply,
+      attachments: offerAttachments,
+      approveDraftId: inserted.id,
+      sentBy: null,        // system actor
+      autoSent: true,
+    });
+    if (!sendResult.ok) {
+      // Delivery failed — leave it as a draft for a human and flag it. sendViaMissive already
+      // marked the draft FAILED; surface it for review rather than silently dropping.
+      console.error("auto-send failed, leaving as draft for human:", sendResult.error);
+      await supabase.from("messages").update({ status: "DRAFT" }).eq("id", inserted.id);
+      await routeAndFlag(supabase, conversationId, customerId, classification.intent, targetFolderName, true);
+      return;
+    }
+    // On success sendViaMissive already cleared needs_human_review + draft_pending_since and
+    // routed nothing; still apply topic-folder routing for consistency.
+    await routeAndFlag(supabase, conversationId, customerId, classification.intent, targetFolderName, false);
+    return;
+  }
+
+  // 8. DRAFT — route to the topic folder + set review flag (today's behavior).
+  await routeAndFlag(supabase, conversationId, customerId, classification.intent, targetFolderName, needsReview || !customerId);
+}
+
+/**
+ * Persist ai_intent + needs_human_review and, best-effort, move the conversation into its resolved
+ * topic folder (triage-out-of-inbox-only). The caller resolves targetFolderName from the taxonomy
+ * (sub-intent override -> category home -> legacy intent map). Extracted so the OFF, SEND, and DRAFT
+ * branches share one routing implementation. `needs_human_review` is the Action Required signal.
+ */
+async function routeAndFlag(
+  // deno-lint-ignore no-explicit-any
+  supabase: SupabaseClient<any, any, any>,
+  conversationId: string,
+  _customerId: string | null,
+  intent: string,
+  targetFolderName: string | null,
+  needsHumanReview: boolean,
+): Promise<void> {
   const conversationUpdate: Record<string, unknown> = {
-    needs_human_review: needsReview || !customerId,
-    ai_intent: aiResponse.intent,
+    needs_human_review: needsHumanReview,
+    ai_intent: intent,
   };
-
-  const targetFolderName = folderNameForIntent(aiResponse.intent);
   if (targetFolderName) {
     try {
-      // Resolve Inbox + target folder ids by name (ids are random per-env; name is the stable key).
       const { data: folders, error: foldersErr } = await supabase
-        .from('message_folders')
-        .select('id, name')
-        .in('name', ['Inbox', targetFolderName]);
-      if (foldersErr) console.error('Intent routing: folder lookup failed (non-fatal):', foldersErr);
+        .from("message_folders").select("id, name").in("name", ["Inbox", targetFolderName]);
+      if (foldersErr) console.error("Intent routing: folder lookup failed (non-fatal):", foldersErr);
       const folderRows = (folders ?? []) as Array<{ id: string; name: string }>;
-      const inboxId = folderRows.find((f) => f.name === 'Inbox')?.id ?? null;
+      const inboxId = folderRows.find((f) => f.name === "Inbox")?.id ?? null;
       const targetId = folderRows.find((f) => f.name === targetFolderName)?.id ?? null;
-
-      // Read the conversation's current folder to enforce triage-out-of-inbox-only.
       const { data: convo, error: convoErr } = await supabase
-        .from('conversations')
-        .select('folder_id')
-        .eq('id', conversationId)
-        .maybeSingle();
-      if (convoErr) console.error('Intent routing: current-folder lookup failed (non-fatal):', convoErr);
+        .from("conversations").select("folder_id").eq("id", conversationId).maybeSingle();
+      if (convoErr) console.error("Intent routing: current-folder lookup failed (non-fatal):", convoErr);
       const currentFolderId = (convo as { folder_id: string | null } | null)?.folder_id ?? null;
-
-      // Only move if we actually confirmed the current folder — a failed read must not be
-      // treated as "unfiled" and trigger a move.
       if (!convoErr && shouldRouteOutOfInbox(currentFolderId, inboxId, targetId)) {
         conversationUpdate.folder_id = targetId;
       }
     } catch (routeErr) {
-      console.error('Intent routing failed (non-fatal):', routeErr);
+      console.error("Intent routing failed (non-fatal):", routeErr);
     }
   }
-
-  await supabase
-    .from('conversations')
-    .update(conversationUpdate)
-    .eq('id', conversationId);
+  await supabase.from("conversations").update(conversationUpdate).eq("id", conversationId);
 }

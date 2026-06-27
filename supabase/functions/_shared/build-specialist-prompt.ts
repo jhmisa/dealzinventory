@@ -12,6 +12,7 @@ export interface SpecialistRow {
   always_escalate: boolean; // not used here; enforced in generate-draft.ts after the model call
   is_active: boolean;
   sort_order: number;
+  target_folder?: string | null; // optional topic-folder home for routing (see generate-draft routeAndFlag)
 }
 
 export interface GuardrailEntry {

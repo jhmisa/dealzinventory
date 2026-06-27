@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { sendViaMissive, type MessageAttachment } from "../_shared/send-via-missive.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,23 +10,6 @@ const corsHeaders = {
 const MISSIVE_API_TOKEN = Deno.env.get('MISSIVE_API_TOKEN') ?? '';
 const MISSIVE_API_URL = 'https://public.missiveapp.com/v1';
 const MISSIVE_MESSENGER_ACCOUNT_ID = Deno.env.get('MISSIVE_MESSENGER_ACCOUNT_ID') ?? '';
-
-// ---------- Types ----------
-
-interface MessageAttachment {
-  file_url: string;
-  filename: string;
-  mime_type: string;
-  size_bytes?: number;
-}
-
-interface SendMessageInput {
-  conversation_id: string;
-  content: string;
-  // If approving an AI draft, pass the draft message ID
-  approve_draft_id?: string;
-  attachments?: MessageAttachment[];
-}
 
 // ---------- Main handler ----------
 
@@ -101,270 +85,26 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
-    const { conversation_id, content, approve_draft_id, attachments: inputAttachments } = body as unknown as SendMessageInput;
-
-    if (!conversation_id || !content) {
-      return jsonResponse({ error: 'conversation_id and content are required' });
-    }
-
-    console.log('Sending message for conversation:', conversation_id, 'content length:', content.length);
-
-    // Fetch conversation to get Missive conversation ID
-    const { data: conversation, error: convError } = await supabase
-      .from('conversations')
-      .select('id, missive_conversation_id, contact_platform_id')
-      .eq('id', conversation_id)
-      .single();
-
-    if (convError || !conversation) {
-      console.error('Conversation lookup failed:', convError?.message);
-      return jsonResponse({ error: `Conversation not found: ${convError?.message ?? 'unknown'}` });
-    }
-    console.log('Found conversation:', conversation.id, 'missive_id:', conversation.missive_conversation_id);
-
-    // If approving a draft, update its status first
-    if (approve_draft_id) {
-      await supabase
-        .from('messages')
-        .update({ status: 'SENDING' })
-        .eq('id', approve_draft_id);
-    }
-
-    // Insert outbound message with SENDING status
-    const { data: msg, error: insertError } = await supabase
-      .from('messages')
-      .insert({
-        conversation_id: conversation.id,
-        role: 'staff' as const,
-        content,
-        status: 'SENDING' as const,
-        message_type: 'REPLY' as const,
-        sent_by: user.id,
-        attachments: inputAttachments ?? [],
-      })
-      .select('id')
-      .single();
-
-    if (insertError) {
-      console.error('Message insert failed:', insertError.message);
-      return jsonResponse({ error: `Failed to insert message: ${insertError.message}` });
-    }
-    console.log('Inserted message:', msg.id);
-
-    // Server-side attachment size guards — belt-and-suspenders in case client
-    // limits are bypassed. Attachments are base64-encoded into the Missive draft
-    // payload, which Missive caps at 10 MB total. Keep mirrored with
-    // src/lib/media-recording.ts (MEDIA_MAX_BYTES) — see the Phase 0 spike note
-    // docs/investigations/messaging-media-recording-spike.md.
-    const MAX_ATTACHMENT_BYTES = 6 * 1024 * 1024; // per recorded clip / file
-    const BASE64_OVERHEAD = 4 / 3;
-    const MAX_PAYLOAD_BYTES = 9 * 1024 * 1024; // headroom below Missive's 10 MB
-    if (inputAttachments && inputAttachments.length > 0) {
-      // Per-attachment cap
-      for (const att of inputAttachments) {
-        if (att.size_bytes && att.size_bytes > MAX_ATTACHMENT_BYTES) {
-          // Mark message as FAILED immediately instead of trying to send
-          await supabase
-            .from('messages')
-            .update({
-              status: 'FAILED',
-              error_details: {
-                reason: 'attachment_too_large',
-                filename: att.filename,
-                size_bytes: att.size_bytes,
-                max_bytes: MAX_ATTACHMENT_BYTES,
-              },
-            })
-            .eq('id', msg.id);
-          return jsonResponse({
-            error: `Attachment "${att.filename}" is too large (${(att.size_bytes / 1024 / 1024).toFixed(1)}MB > ${(MAX_ATTACHMENT_BYTES / 1024 / 1024).toFixed(0)}MB). Please record/compress a smaller one.`,
-            message_id: msg.id,
-          });
-        }
-      }
-
-      // Total-payload cap: sum of base64-inflated attachments + the body must
-      // stay under Missive's limit, otherwise Missive rejects the whole draft.
-      const estimatedPayload =
-        inputAttachments.reduce((sum, a) => sum + (a.size_bytes ?? 0) * BASE64_OVERHEAD, 0) +
-        (content?.length ?? 0);
-      if (estimatedPayload > MAX_PAYLOAD_BYTES) {
-        await supabase
-          .from('messages')
-          .update({
-            status: 'FAILED',
-            error_details: {
-              reason: 'payload_too_large',
-              estimated_payload_bytes: Math.round(estimatedPayload),
-              max_bytes: MAX_PAYLOAD_BYTES,
-            },
-          })
-          .eq('id', msg.id);
-        return jsonResponse({
-          error: `Message attachments total too large (${(estimatedPayload / 1024 / 1024).toFixed(1)}MB after encoding > ${(MAX_PAYLOAD_BYTES / 1024 / 1024).toFixed(0)}MB). Remove or shorten an attachment.`,
-          message_id: msg.id,
-        });
-      }
-    }
-
-    // Fetch attachment files from Storage and convert to base64 for Missive
-    const missiveAttachments: Array<{ base64_data: string; filename: string }> = [];
-    if (inputAttachments && inputAttachments.length > 0) {
-      for (const att of inputAttachments) {
-        try {
-          const { data: fileData, error: downloadError } = await supabase.storage
-            .from('messaging-attachments')
-            .download(att.file_url);
-
-          if (downloadError || !fileData) {
-            console.error(`Failed to download attachment ${att.filename}:`, downloadError);
-            continue;
-          }
-
-          const arrayBuffer = await fileData.arrayBuffer();
-          const uint8Array = new Uint8Array(arrayBuffer);
-          let binary = '';
-          for (let i = 0; i < uint8Array.length; i++) {
-            binary += String.fromCharCode(uint8Array[i]);
-          }
-          const base64 = btoa(binary);
-
-          missiveAttachments.push({
-            base64_data: base64,
-            filename: att.filename,
-          });
-        } catch (err) {
-          console.error(`Error processing attachment ${att.filename}:`, err);
-        }
-      }
-    }
-
-    // Send via Missive Drafts API
-    let missiveMessageId: string | null = null;
-    let sendError: { missive_status?: number; missive_error?: string; attempted_at: string; retry_count: number } | null = null;
-
-    // Hard timeout on the Missive call — prevents the message from being stuck
-    // in SENDING forever if Missive hangs. Layer 2 (pg_cron sweep) is a backstop
-    // for anything this misses (Edge Function killed, DB update failure, etc.).
-    const MISSIVE_TIMEOUT_MS = 20_000;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), MISSIVE_TIMEOUT_MS);
-
-    try {
-      if (!MISSIVE_API_TOKEN) {
-        throw new Error('MISSIVE_API_TOKEN not configured');
-      }
-
-      // Use the customer's Facebook PSID stored in our DB (set by webhook on inbound messages)
-      const contactPlatformId = conversation.contact_platform_id;
-      console.log('contact_platform_id from DB:', contactPlatformId);
-
-      if (!contactPlatformId) {
-        throw new Error('No contact_platform_id on conversation — customer must send a message first so we can capture their Facebook ID');
-      }
-
-      const draftPayload: Record<string, unknown> = {
-        send: true,
-        account: MISSIVE_MESSENGER_ACCOUNT_ID,
-        body: content,
-        to_fields: [{ id: contactPlatformId }],
-        conversation: conversation.missive_conversation_id,
-        ...(missiveAttachments.length > 0 && { attachments: missiveAttachments }),
-      };
-
-      console.log('Sending draft payload:', JSON.stringify({ drafts: draftPayload }));
-
-      const missiveRes = await fetch(`${MISSIVE_API_URL}/drafts`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${MISSIVE_API_TOKEN}`,
-        },
-        body: JSON.stringify({ drafts: draftPayload }),
-        signal: controller.signal,
-      });
-
-      if (!missiveRes.ok) {
-        const errBody = await missiveRes.text();
-        console.error('Missive API error:', missiveRes.status, errBody);
-        sendError = {
-          missive_status: missiveRes.status,
-          missive_error: errBody,
-          attempted_at: new Date().toISOString(),
-          retry_count: 0,
-        };
-      } else {
-        const missiveData = await missiveRes.json();
-        missiveMessageId = missiveData?.drafts?.id ?? null;
-        console.log('Missive send success, message ID:', missiveMessageId);
-      }
-    } catch (fetchErr) {
-      console.error('Missive fetch error:', fetchErr);
-      const isTimeout = fetchErr instanceof Error && fetchErr.name === 'AbortError';
-      sendError = {
-        missive_error: isTimeout
-          ? `Missive API timeout after ${MISSIVE_TIMEOUT_MS / 1000}s`
-          : (fetchErr instanceof Error ? fetchErr.message : 'Network error'),
-        attempted_at: new Date().toISOString(),
-        retry_count: 0,
-      };
-    } finally {
-      clearTimeout(timeoutId);
-    }
-
-    // Update message status based on Missive response
-    const newStatus = sendError ? 'FAILED' : 'SENT';
-    const updateFields: Record<string, unknown> = {
-      status: newStatus,
-      ...(missiveMessageId && { missive_message_id: missiveMessageId }),
-      ...(sendError && { error_details: sendError }),
+    const { conversation_id, content, approve_draft_id, attachments: inputAttachments } = body as unknown as {
+      conversation_id: string; content: string; approve_draft_id?: string; attachments?: MessageAttachment[];
     };
-
-    await supabase
-      .from('messages')
-      .update(updateFields)
-      .eq('id', msg.id);
-
-    // If we approved a draft, update that draft's status too
-    if (approve_draft_id) {
-      const draftStatus = sendError ? 'FAILED' : 'SENT';
-      await supabase
-        .from('messages')
-        .update({ status: draftStatus })
-        .eq('id', approve_draft_id);
-
-      // Delete the separate staff message since the draft itself is the message
-      if (!sendError) {
-        await supabase.from('messages').delete().eq('id', msg.id);
-      }
+    if (!conversation_id || !content) {
+      return jsonResponse({ error: "conversation_id and content are required" });
     }
 
-    // Only update conversation state on successful send
-    if (!sendError) {
-      await supabase
-        .from('conversations')
-        .update({
-          last_message_at: new Date().toISOString(),
-          needs_human_review: false,
-          draft_pending_since: null,  // Cancel pending AI draft — staff already replied
-        })
-        .eq('id', conversation.id);
-    }
-
-    if (sendError) {
-      console.error('Send message failed:', JSON.stringify(sendError));
-      return jsonResponse({
-        error: `Message delivery failed: ${sendError.missive_error ?? 'Unknown error'}`,
-        message_id: msg.id,
-        details: sendError,
-      });
-    }
-
-    return jsonResponse({
-      ok: true,
-      message_id: approve_draft_id ?? msg.id,
-      missive_message_id: missiveMessageId,
+    const result = await sendViaMissive(supabase, {
+      conversationId: conversation_id,
+      content,
+      attachments: inputAttachments,
+      approveDraftId: approve_draft_id,
+      sentBy: user.id,
+      autoSent: false,
     });
+
+    if (!result.ok) {
+      return jsonResponse({ error: result.error, message_id: result.messageId });
+    }
+    return jsonResponse({ ok: true, message_id: result.messageId, missive_message_id: result.missiveMessageId });
   } catch (err) {
     // Absolute last resort — log everything and still return 200 JSON
     console.error('FATAL send-message error:', err);

@@ -28,6 +28,44 @@ export interface AIResponse {
   usage?: TokenUsage;
 }
 
+export interface Classification {
+  intent: string;
+  sub_intent_slug: string | null;
+  confidence: number;
+}
+
+// Parse the CLASSIFY pass output. Mirrors parseAIResponse's tolerant strategies but for the
+// compact {intent, sub_intent_slug, confidence} shape. On total failure returns a zero-confidence
+// "unknown" so the autonomy resolver downgrades to DRAFT (never auto-sends an unparseable message).
+export function parseClassification(text: string): Classification {
+  const strategies = [
+    () => JSON.parse(text.trim()),
+    () => JSON.parse(text.replace(/^```(?:json)?\n?/m, "").replace(/\n?```$/m, "").trim()),
+    () => {
+      const m = text.match(/\{[\s\S]*"confidence"[\s\S]*\}/);
+      if (!m) throw new Error("no json");
+      return JSON.parse(m[0]);
+    },
+  ];
+  for (const strat of strategies) {
+    try {
+      const p = strat();
+      if (p && typeof p === "object") {
+        const rawSlug = p.sub_intent_slug;
+        const slug = typeof rawSlug === "string" && rawSlug.length > 0 ? rawSlug : null;
+        return {
+          intent: typeof p.intent === "string" && p.intent.length > 0 ? p.intent : "unknown",
+          sub_intent_slug: slug,
+          confidence: Math.min(1, Math.max(0, Number(p.confidence ?? 0))),
+        };
+      }
+    } catch {
+      // try next strategy
+    }
+  }
+  return { intent: "unknown", sub_intent_slug: null, confidence: 0 };
+}
+
 // Normalize token usage across provider response shapes.
 export function extractUsage(provider: string, data: unknown): TokenUsage {
   const d = (data ?? {}) as Record<string, unknown>;
@@ -590,4 +628,82 @@ export function parseAIResponse(text: string): AIResponse {
     needs_clarification: false,
     offer_codes: [],
   };
+}
+
+// Run the cheap CLASSIFY pass. No tools, small output. Returns the parsed classification + usage.
+// Reuses each provider's chat endpoint with the classification system prompt. Images are forwarded
+// to vision-capable models so screenshot-driven cues (e.g. a raffle promo) classify correctly.
+export async function classifyMessage(
+  provider: AIProvider,
+  classificationPrompt: string,
+  contextBlock: string,
+  messages: ChatMessage[],
+  latestImages: VisionImage[] = [],
+): Promise<{ classification: Classification; usage: TokenUsage }> {
+  const images = modelSupportsVision(provider.provider, provider.model_id) ? latestImages : [];
+  const system = `${classificationPrompt}\n\n---\n\n# Current Customer Context\n${contextBlock}`;
+  const convo = consolidateMessages(messages);
+
+  // Anthropic uses a separate system field; the OpenAI-compatible providers use a system message.
+  if (provider.provider === "anthropic") {
+    const anthropicMessages = convo.map((m) => ({
+      role: m.role === "customer" ? ("user" as const) : ("assistant" as const),
+      content: m.content as string | unknown[],
+    }));
+    if (images.length > 0) {
+      for (let i = anthropicMessages.length - 1; i >= 0; i--) {
+        if (anthropicMessages[i].role === "user") {
+          anthropicMessages[i].content = toAnthropicContent(anthropicMessages[i].content as string, images);
+          break;
+        }
+      }
+    }
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": provider.api_key_encrypted, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({ model: provider.model_id, max_tokens: 256, system, messages: anthropicMessages }),
+    });
+    if (!res.ok) throw new Error(`Classify (anthropic) error ${res.status}: ${await res.text()}`);
+    const data = await res.json();
+    return { classification: parseClassification(data.content?.[0]?.text ?? ""), usage: extractUsage("anthropic", data) };
+  }
+
+  if (provider.provider === "google") {
+    const lastUserIdx = (() => { for (let i = convo.length - 1; i >= 0; i--) if (convo[i].role === "customer") return i; return -1; })();
+    const contents = convo.map((m, idx) => ({
+      role: m.role === "customer" ? "user" : "model",
+      parts: images.length > 0 && idx === lastUserIdx ? toGeminiParts(m.content, images) : [{ text: m.content }],
+    }));
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${provider.model_id}:generateContent?key=${provider.api_key_encrypted}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents, generationConfig: { maxOutputTokens: 256, responseMimeType: "application/json" } }),
+    });
+    if (!res.ok) throw new Error(`Classify (google) error ${res.status}: ${await res.text()}`);
+    const data = await res.json();
+    return { classification: parseClassification(data.candidates?.[0]?.content?.parts?.[0]?.text ?? ""), usage: extractUsage("google", data) };
+  }
+
+  // openai + openrouter — OpenAI-compatible chat completions with a system message.
+  const url = provider.provider === "openai"
+    ? "https://api.openai.com/v1/chat/completions"
+    : "https://openrouter.ai/api/v1/chat/completions";
+  const oaMessages: Array<{ role: string; content: string | unknown[] }> = [
+    { role: "system", content: system },
+    ...convo.map((m) => ({ role: m.role === "customer" ? ("user" as const) : ("assistant" as const), content: m.content as string | unknown[] })),
+  ];
+  if (images.length > 0) {
+    for (let i = oaMessages.length - 1; i >= 0; i--) {
+      if (oaMessages[i].role === "user") { oaMessages[i].content = toOpenAIContent(oaMessages[i].content as string, images); break; }
+    }
+  }
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${provider.api_key_encrypted}` },
+    body: JSON.stringify({ model: provider.model_id, max_tokens: 256, messages: oaMessages, response_format: { type: "json_object" } }),
+  });
+  if (!res.ok) throw new Error(`Classify (${provider.provider}) error ${res.status}: ${await res.text()}`);
+  const data = await res.json();
+  return { classification: parseClassification(data.choices?.[0]?.message?.content ?? ""), usage: extractUsage(provider.provider, data) };
 }
