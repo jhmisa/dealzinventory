@@ -69,6 +69,13 @@ export const IPHONE_SPECS: Record<string, ModelSpec> = {
   "iPhone 16 Pro": { chipset: "A18 Pro", screen_size: 6.3, year: 2024, ram_gb: 8, os_family: "iOS" },
   "iPhone 16 Pro Max": { chipset: "A18 Pro", screen_size: 6.9, year: 2024, ram_gb: 8, os_family: "iOS" },
   "iPhone 16e": { chipset: "A18", screen_size: 6.1, year: 2025, ram_gb: 8, os_family: "iOS" },
+
+  // --- 17 / Air (2025) + 17e (2026) — specs verified from Apple/GSMArena/Wikipedia 2026-06 ---
+  "iPhone 17": { chipset: "A19", screen_size: 6.3, year: 2025, ram_gb: 8, os_family: "iOS" },
+  "iPhone 17 Pro": { chipset: "A19 Pro", screen_size: 6.3, year: 2025, ram_gb: 12, os_family: "iOS" },
+  "iPhone 17 Pro Max": { chipset: "A19 Pro", screen_size: 6.9, year: 2025, ram_gb: 12, os_family: "iOS" },
+  "iPhone Air": { chipset: "A19 Pro", screen_size: 6.5, year: 2025, ram_gb: 12, os_family: "iOS" },
+  "iPhone 17e": { chipset: "A19", screen_size: 6.1, year: 2026, ram_gb: 8, os_family: "iOS" },
 }
 
 /**
