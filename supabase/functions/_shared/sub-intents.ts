@@ -37,3 +37,20 @@ export function resolveAutonomy(args: {
   if (confidence < autoSendThreshold) return "DRAFT";            // rule 2
   return "SEND";
 }
+
+/**
+ * Resolve a classified (specialistSlug, subIntentSlug) to its active SubIntentRow.
+ * Returns null for a null slug (category default) or any non-active / cross-specialist slug.
+ */
+export function matchSubIntent(
+  specialistSlug: string | null,
+  subIntentSlug: string | null,
+  subIntents: SubIntentRow[],
+): SubIntentRow | null {
+  if (!specialistSlug || !subIntentSlug) return null;
+  return (
+    subIntents.find(
+      (si) => si.is_active && si.specialist_slug === specialistSlug && si.slug === subIntentSlug,
+    ) ?? null
+  );
+}

@@ -42,3 +42,28 @@ Deno.test("SEND under an always_escalate specialist downgrades to DRAFT", () => 
 Deno.test("SEND with no matched specialist downgrades to DRAFT", () => {
   assertEquals(resolveAutonomy({ subIntent: sub("SEND"), confidence: 0.99, specialist: null, autoSendThreshold: 0.85 }), "DRAFT");
 });
+
+import { matchSubIntent } from "./sub-intents.ts";
+
+const rows: SubIntentRow[] = [
+  { specialist_slug: "sales", slug: "promo_raffle", name: "Promo", recognition_cues: "", handling_instructions: "no search", autonomy: "DRAFT", is_active: true, sort_order: 0 },
+  { specialist_slug: "order_tracking", slug: "shipment_status", name: "Ship", recognition_cues: "", handling_instructions: "report", autonomy: "DRAFT", is_active: true, sort_order: 0 },
+  { specialist_slug: "sales", slug: "inactive_one", name: "Old", recognition_cues: "", handling_instructions: "", autonomy: "SEND", is_active: false, sort_order: 0 },
+];
+
+Deno.test("matchSubIntent finds the row by specialist + slug", () => {
+  const r = matchSubIntent("sales", "promo_raffle", rows);
+  assertEquals(r?.handling_instructions, "no search");
+});
+
+Deno.test("matchSubIntent returns null when slug is null (category default)", () => {
+  assertEquals(matchSubIntent("sales", null, rows), null);
+});
+
+Deno.test("matchSubIntent returns null when slug belongs to a different specialist", () => {
+  assertEquals(matchSubIntent("sales", "shipment_status", rows), null);
+});
+
+Deno.test("matchSubIntent ignores inactive rows", () => {
+  assertEquals(matchSubIntent("sales", "inactive_one", rows), null);
+});
