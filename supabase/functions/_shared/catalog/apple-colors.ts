@@ -57,6 +57,17 @@ export const JA_TO_EN_COLOR: Record<string, string> = {
   "ウルトラマリン": "Ultramarine",
   "ティール": "Teal",
   "デザートチタニウム": "Desert Titanium",
+
+  // --- 17-series / Air (2025+) ---
+  "セージ": "Sage",
+  "ラベンダー": "Lavender",
+  "コズミックオレンジ": "Cosmic Orange",
+  "スカイブルー": "Sky Blue",
+  "クラウドホワイト": "Cloud White",
+  "ライトゴールド": "Light Gold",
+  "ミストブルー": "Mist Blue",
+  "ディープブルー": "Deep Blue",
+  "ソフトピンク": "Soft Pink",
 }
 
 /** Resolve a Japanese color token to canonical English, or null if unmapped. */

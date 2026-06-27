@@ -89,6 +89,9 @@ export function normalizeIphoneModelName(raw: string | null | undefined): string
   // Fix the "iPhone" prefix casing regardless of how it was typed.
   s = s.replace(/^i?phone/i, "iPhone")
   if (!/^iPhone/.test(s)) return raw.trim() // not an iPhone — pass through
+  // iosys titles use the no-space form ("iPhone16 Pro Max", "iPhoneAir"). Insert a
+  // space after "iPhone" when it is directly followed by an alphanumeric.
+  s = s.replace(/^iPhone(?=[0-9A-Za-z])/, "iPhone ")
 
   // SE generations.
   const se = s.match(/^iPhone SE\s*([123])?(?:\s*(?:nd|rd|st|th)?\s*gen(?:eration)?)?$/i)
