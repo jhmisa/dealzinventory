@@ -3,7 +3,8 @@ import { Plus } from 'lucide-react'
 import { PageHeader } from '@/components/shared'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { BackorderList, AddBackorderDialog, ToFulfill } from '@/components/backorders'
+import { BackorderList, AddBackorderDialog, ToFulfill, SwapDialog } from '@/components/backorders'
+import type { ToFulfillRow } from '@/services/backorders'
 
 const VIEW_TABS = [
   { value: 'lines', label: 'Lines' },
@@ -15,6 +16,8 @@ type ViewTab = (typeof VIEW_TABS)[number]['value']
 export default function BackordersPage() {
   const [addOpen, setAddOpen] = useState(false)
   const [view, setView] = useState<ViewTab>('lines')
+  const [swapRow, setSwapRow] = useState<ToFulfillRow | null>(null)
+  const [swapOpen, setSwapOpen] = useState(false)
 
   return (
     <div className="space-y-4">
@@ -55,9 +58,19 @@ export default function BackordersPage() {
         </nav>
       </div>
 
-      {view === 'lines' ? <BackorderList /> : <ToFulfill />}
+      {view === 'lines' ? (
+        <BackorderList />
+      ) : (
+        <ToFulfill
+          onSwap={(row) => {
+            setSwapRow(row)
+            setSwapOpen(true)
+          }}
+        />
+      )}
 
       <AddBackorderDialog open={addOpen} onOpenChange={setAddOpen} />
+      <SwapDialog row={swapRow} open={swapOpen} onOpenChange={setSwapOpen} />
     </div>
   )
 }

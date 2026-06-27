@@ -158,6 +158,24 @@ export async function getItemByCode(code: string) {
   return data
 }
 
+// Fetch an item by its P-code with the core-spec columns needed by the
+// backorder fulfillment swap dialog (Task 15). Returns null when not found so
+// the caller can show a "not found" message rather than throwing.
+export async function getItemForSwap(code: string) {
+  const { data, error } = await supabase
+    .from('items')
+    .select(
+      'id, item_code, product_id, storage_gb, color, condition_grade, item_status',
+    )
+    .eq('item_code', code)
+    .maybeSingle()
+
+  if (error) throw error
+  return data
+}
+
+export type ItemForSwap = NonNullable<Awaited<ReturnType<typeof getItemForSwap>>>
+
 export async function generateItemCode(): Promise<string> {
   const { data, error } = await supabase.rpc('generate_code', {
     prefix: 'P',

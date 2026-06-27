@@ -33,6 +33,60 @@ export function normalizeStorageGb(v: unknown): number | null {
 }
 
 /**
+ * Core spec fields that must match between an item (P-code) and a backorder line
+ * for a fulfillment swap. Mirrors CORE_FIELDS in the Deno verifier
+ * (supabase/functions/_shared/backorder-match.ts) and the SQL hard-block in
+ * fulfill_backorder_with_item — keep all three in sync.
+ */
+export const BACKORDER_CORE_FIELDS = [
+  'product_id',
+  'storage_gb',
+  'color',
+  'condition_grade',
+] as const
+
+export type BackorderCoreField = (typeof BACKORDER_CORE_FIELDS)[number]
+
+export interface PCodeMatchResult {
+  ok: boolean
+  fields: Array<{
+    field: BackorderCoreField
+    itemValue: unknown
+    lineValue: unknown
+    match: boolean
+  }>
+  blocking: BackorderCoreField[]
+}
+
+function normCompare(v: unknown): unknown {
+  return typeof v === 'string' ? v.trim().toLowerCase() : v
+}
+
+/**
+ * Field-by-field core-spec comparison between an item and a backorder line.
+ * Mirrors verifyPCodeMatch in the Deno verifier so the client preview matches
+ * the authoritative server hard-block. The server re-enforces this in the RPC.
+ *
+ * Rules: storage_gb compares via normalizeStorageGb on both sides (items.storage_gb
+ * is messy free-text, lines.storage_gb is integer); color is case/space-insensitive;
+ * product_id + condition_grade are strict.
+ */
+export function verifyPCodeMatch(
+  item: Record<string, unknown>,
+  line: Record<string, unknown>,
+): PCodeMatchResult {
+  const fields = BACKORDER_CORE_FIELDS.map((f) => {
+    const match =
+      f === 'storage_gb'
+        ? normalizeStorageGb(item[f]) === normalizeStorageGb(line[f])
+        : normCompare(item[f]) === normCompare(line[f])
+    return { field: f, itemValue: item[f], lineValue: line[f], match }
+  })
+  const blocking = fields.filter((f) => !f.match).map((f) => f.field)
+  return { ok: blocking.length === 0, fields, blocking }
+}
+
+/**
  * Compute effective pricing for a sell group from its discount_amount and a representative member item.
  * Under the new model (D1–D3), all members share the same selling_price, so any non-null member works.
  * Returns 0s if no representative item is available.
