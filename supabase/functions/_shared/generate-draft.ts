@@ -336,7 +336,7 @@ async function routeAndFlag(
   // deno-lint-ignore no-explicit-any
   supabase: SupabaseClient<any, any, any>,
   conversationId: string,
-  customerId: string | null,
+  _customerId: string | null,
   intent: string,
   targetFolderName: string | null,
   needsHumanReview: boolean,
