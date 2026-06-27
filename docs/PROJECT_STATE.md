@@ -10,9 +10,9 @@
 - (Canonical copy lives in CLAUDE.md "Operating Context (read first)".)
 
 ## Now  (active work)
+- **▶ NEXT: Build the Backorder / pre-order supplier inventory feature (B-codes).** Design + 17-task impl plan are LOCKED and committed. Start at Phase 1, Task 1. Recommended: superpowers:subagent-driven-development (fresh subagent per task, review between). Plan: docs/superpowers/plans/2026-06-27-backorder-supplier-inventory.md · Spec: docs/superpowers/specs/2026-06-27-backorder-supplier-inventory-design.md. One open non-blocking decision: which web image-search provider/key for the optional "Search web for more" photo button (iosys-gallery path needs no key).
 - Sub-intent autonomy — interactive E2E test + Plan 2 admin UI (per-intent OFF/DRAFT/SEND). Backend shipped v1.52.0 (merged main). Plan/spec: docs/superpowers/specs/2026-06-26-sub-intent-autonomy-design.md
 - Project command center (this system) — being set up.
-- Backorder / pre-order supplier inventory (B-codes) — design + impl plan locked, NOT yet started (a bug takes priority first). Spec: docs/superpowers/specs/2026-06-27-backorder-supplier-inventory-design.md · Plan: docs/superpowers/plans/2026-06-27-backorder-supplier-inventory.md
 
 ## Recently shipped  (newest first; archive to CHANGELOG.md when >~15)
 - 2026-06-27 · Fix: strip Markdown from outbound AI replies (Messenger renders plaintext) — normalizeOutboundText at generate-draft + send-via-missive · touched: supabase/functions/_shared/normalize-markdown.ts(+test), generate-draft.ts, send-via-missive.ts · DEPLOYED (send-message, generate-pending-drafts, test-ai-reply)
