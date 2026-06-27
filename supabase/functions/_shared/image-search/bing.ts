@@ -62,16 +62,25 @@ export const bingImageProvider: ImageSearchProvider = {
   isConfigured: () => true,
   async search(query, limit) {
     try {
+      const q = encodeURIComponent(query)
+      // Force the en-US market in the URL. From a non-US datacenter egress IP
+      // Bing otherwise geo-resolves to a generic/fallback market and returns
+      // off-topic results. mkt/cc/setlang pin it to en-US.
       const url =
-        `https://www.bing.com/images/async?q=${encodeURIComponent(query)}` +
-        `&first=1&count=${Math.max(1, limit)}&mmasync=1`
+        `https://www.bing.com/images/async?q=${q}` +
+        `&first=1&count=${Math.max(1, limit)}&mmasync=1` +
+        `&mkt=en-US&cc=US&setlang=en-US`
       const res = await fetch(url, {
         headers: {
+          // Full browser request context — the same one that produced the
+          // correct fixture. A bare UA+Accept-Language is not enough.
           "User-Agent": BROWSER_UA,
           "Accept":
             "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
           "Accept-Language": "en-US,en;q=0.9",
-          "Referer": "https://www.bing.com/images/search",
+          "Referer": `https://www.bing.com/images/search?q=${q}`,
+          // Pin the edge cookies to the en-US market too.
+          "Cookie": "_EDGE_CD=m=en-us; _EDGE_S=mkt=en-us",
         },
       })
       if (!res.ok) return []
