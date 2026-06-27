@@ -1,4 +1,5 @@
 import { type SupabaseClient } from "jsr:@supabase/supabase-js@2";
+import { normalizeOutboundText } from "./normalize-markdown.ts";
 
 const MISSIVE_API_URL = "https://public.missiveapp.com/v1";
 
@@ -43,7 +44,11 @@ export async function sendViaMissive(
   const supabase = client as any;
   const MISSIVE_API_TOKEN = Deno.env.get("MISSIVE_API_TOKEN") ?? "";
   const MISSIVE_MESSENGER_ACCOUNT_ID = Deno.env.get("MISSIVE_MESSENGER_ACCOUNT_ID") ?? "";
-  const { conversationId, content, attachments: inputAttachments, approveDraftId, sentBy = null, autoSent = false } = opts;
+  const { conversationId, content: rawContent, attachments: inputAttachments, approveDraftId, sentBy = null, autoSent = false } = opts;
+  // Chat channels (Missive → Messenger) render plain text, not Markdown. Enforce
+  // plain text at the send boundary so the model's stray `**bold**` / `[label](url)`
+  // never reach the customer. Idempotent — safe even when already normalized upstream.
+  const content = normalizeOutboundText(rawContent);
 
   const { data: conversation, error: convError } = await supabase
     .from("conversations")

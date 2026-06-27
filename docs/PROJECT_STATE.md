@@ -15,6 +15,7 @@
 - Backorder / pre-order supplier inventory (B-codes) — design + impl plan locked, NOT yet started (a bug takes priority first). Spec: docs/superpowers/specs/2026-06-27-backorder-supplier-inventory-design.md · Plan: docs/superpowers/plans/2026-06-27-backorder-supplier-inventory.md
 
 ## Recently shipped  (newest first; archive to CHANGELOG.md when >~15)
+- 2026-06-27 · Fix: strip Markdown from outbound AI replies (Messenger renders plaintext) — normalizeOutboundText at generate-draft + send-via-missive · touched: supabase/functions/_shared/normalize-markdown.ts(+test), generate-draft.ts, send-via-missive.ts · NOT yet deployed
 - 2026-06-27 · Project command center: state hub + system map + enforcement hooks · touched: docs/, .claude/, CLAUDE.md
 - 2026-06-26 · Sub-intent autonomy engine (backend): classify→autonomy pipeline OFF/DRAFT/SEND · v1.52.0 · touched: supabase/functions (generate-draft, send-message, _shared), messaging tables
 - 2026-06-26 · Fix AI draft cron: ambiguous ai_enabled + missing edge-fn credentials · touched: messaging cron / edge fns

@@ -18,6 +18,7 @@ import {
 } from "./build-specialist-prompt.ts";
 import { searchInventory, deriveOfferCodes, type InventorySearchResult } from "./inventory-search.ts";
 import { assembleOfferReply } from "./offer-reply.ts";
+import { normalizeOutboundText } from "./normalize-markdown.ts";
 
 async function buildOfferAttachments(
   // deno-lint-ignore no-explicit-any
@@ -274,7 +275,9 @@ export async function generateAndSaveDraft(
   const offerAttachments = offerCodes.length
     ? await buildOfferAttachments(supabase, conversationId, offerCodes, offerCatalog)
     : [];
-  const finalReply = assembleOfferReply(aiResponse.reply, offerCodes, offerCatalog);
+  // Strip any Markdown the model emitted (despite the no-markdown rule) so the stored
+  // DRAFT, the staff preview, and the sent message are all identical plain text.
+  const finalReply = normalizeOutboundText(assembleOfferReply(aiResponse.reply, offerCodes, offerCatalog));
 
   // 7b. Insert the assistant message as a DRAFT (the canonical content row). For SEND we transmit
   // it below and stamp auto_sent; for DRAFT it simply waits for staff approval (today's behavior).
