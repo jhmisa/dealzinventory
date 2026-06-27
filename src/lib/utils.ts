@@ -13,6 +13,26 @@ export function formatPrice(yen: number | null | undefined): string {
 }
 
 /**
+ * Normalize a free-text storage value to integer GB. Mirrors the SQL helper
+ * `public._backorder_norm_storage_gb` and the Deno verifier `normalizeStorageGb`
+ * in supabase/functions/_shared/backorder-match.ts (keep all three in sync).
+ *
+ * Rules: extract the leading digit run; if the string matches /tb/i, multiply by
+ * 1000 (TB→GB). Numbers pass through (floored). NULL / no digits → null.
+ * Examples: '128GB'→128, '1TB'→1000, '256GB SSD'→256, '128'→128, 512→512.
+ */
+export function normalizeStorageGb(v: unknown): number | null {
+  if (v == null) return null
+  if (typeof v === 'number') return Number.isFinite(v) ? Math.floor(v) : null
+  if (typeof v !== 'string') return null
+  const m = v.match(/(\d+)/)
+  if (!m) return null
+  const gb = parseInt(m[1], 10)
+  if (Number.isNaN(gb)) return null
+  return /t\s*b/i.test(v) ? gb * 1000 : gb
+}
+
+/**
  * Compute effective pricing for a sell group from its discount_amount and a representative member item.
  * Under the new model (D1–D3), all members share the same selling_price, so any non-null member works.
  * Returns 0s if no representative item is available.

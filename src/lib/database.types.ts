@@ -334,6 +334,53 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_usage_log: {
+        Row: {
+          conversation_id: string | null
+          created_at: string
+          estimated_cost_usd: number
+          had_images: boolean
+          id: string
+          input_tokens: number
+          model_id: string
+          output_tokens: number
+          provider: string
+          purpose: string
+        }
+        Insert: {
+          conversation_id?: string | null
+          created_at?: string
+          estimated_cost_usd?: number
+          had_images?: boolean
+          id?: string
+          input_tokens?: number
+          model_id: string
+          output_tokens?: number
+          provider: string
+          purpose?: string
+        }
+        Update: {
+          conversation_id?: string | null
+          created_at?: string
+          estimated_cost_usd?: number
+          had_images?: boolean
+          id?: string
+          input_tokens?: number
+          model_id?: string
+          output_tokens?: number
+          provider?: string
+          purpose?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_log_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       automated_message_queue: {
         Row: {
           content: string | null
@@ -404,6 +451,140 @@ export type Database = {
             columns: ["template_id"]
             isOneToOne: false
             referencedRelation: "messaging_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      backorder_line_media: {
+        Row: {
+          backorder_line_id: string
+          created_at: string
+          file_url: string
+          id: string
+          sort_order: number
+          source: Database["public"]["Enums"]["backorder_media_source"]
+        }
+        Insert: {
+          backorder_line_id: string
+          created_at?: string
+          file_url: string
+          id?: string
+          sort_order?: number
+          source?: Database["public"]["Enums"]["backorder_media_source"]
+        }
+        Update: {
+          backorder_line_id?: string
+          created_at?: string
+          file_url?: string
+          id?: string
+          sort_order?: number
+          source?: Database["public"]["Enums"]["backorder_media_source"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "backorder_line_media_backorder_line_id_fkey"
+            columns: ["backorder_line_id"]
+            isOneToOne: false
+            referencedRelation: "backorder_lines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      backorder_lines: {
+        Row: {
+          available: number | null
+          backorder_code: string
+          color: string | null
+          condition_grade: Database["public"]["Enums"]["condition_grade"]
+          condition_notes: string | null
+          cpu: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          lead_time_days: number
+          product_id: string
+          quantity_received: number
+          quantity_reserved: number
+          quantity_total: number
+          ram_gb: number | null
+          screen_size: number | null
+          selling_price: number | null
+          status: Database["public"]["Enums"]["backorder_line_status"]
+          storage_gb: number | null
+          supplier_id: string
+          supplier_price: number | null
+          supplier_product_code: string | null
+          supplier_stock: number | null
+          supplier_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          available?: number | null
+          backorder_code: string
+          color?: string | null
+          condition_grade: Database["public"]["Enums"]["condition_grade"]
+          condition_notes?: string | null
+          cpu?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          lead_time_days?: number
+          product_id: string
+          quantity_received?: number
+          quantity_reserved?: number
+          quantity_total?: number
+          ram_gb?: number | null
+          screen_size?: number | null
+          selling_price?: number | null
+          status?: Database["public"]["Enums"]["backorder_line_status"]
+          storage_gb?: number | null
+          supplier_id: string
+          supplier_price?: number | null
+          supplier_product_code?: string | null
+          supplier_stock?: number | null
+          supplier_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          available?: number | null
+          backorder_code?: string
+          color?: string | null
+          condition_grade?: Database["public"]["Enums"]["condition_grade"]
+          condition_notes?: string | null
+          cpu?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          lead_time_days?: number
+          product_id?: string
+          quantity_received?: number
+          quantity_reserved?: number
+          quantity_total?: number
+          ram_gb?: number | null
+          screen_size?: number | null
+          selling_price?: number | null
+          status?: Database["public"]["Enums"]["backorder_line_status"]
+          storage_gb?: number | null
+          supplier_id?: string
+          supplier_price?: number | null
+          supplier_product_code?: string | null
+          supplier_stock?: number | null
+          supplier_url?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "backorder_lines_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product_models"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "backorder_lines_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
         ]
@@ -514,6 +695,7 @@ export type Database = {
       conversations: {
         Row: {
           ai_enabled: boolean
+          ai_intent: string | null
           assigned_staff_id: string | null
           channel: Database["public"]["Enums"]["message_channel"]
           contact_avatar_url: string | null
@@ -534,6 +716,7 @@ export type Database = {
         }
         Insert: {
           ai_enabled?: boolean
+          ai_intent?: string | null
           assigned_staff_id?: string | null
           channel?: Database["public"]["Enums"]["message_channel"]
           contact_avatar_url?: string | null
@@ -554,6 +737,7 @@ export type Database = {
         }
         Update: {
           ai_enabled?: boolean
+          ai_intent?: string | null
           assigned_staff_id?: string | null
           channel?: Database["public"]["Enums"]["message_channel"]
           contact_avatar_url?: string | null
@@ -1756,6 +1940,7 @@ export type Database = {
           id: string
           is_active: boolean
           sort_order: number
+          specialist_tags: string[]
           title: string
           updated_at: string
         }
@@ -1767,6 +1952,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           sort_order?: number
+          specialist_tags?: string[]
           title: string
           updated_at?: string
         }
@@ -1778,6 +1964,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           sort_order?: number
+          specialist_tags?: string[]
           title?: string
           updated_at?: string
         }
@@ -1909,6 +2096,7 @@ export type Database = {
           ai_confidence: number | null
           ai_context_summary: string | null
           attachments: Json | null
+          auto_sent: boolean
           content: string
           conversation_id: string
           created_at: string
@@ -1924,6 +2112,7 @@ export type Database = {
           ai_confidence?: number | null
           ai_context_summary?: string | null
           attachments?: Json | null
+          auto_sent?: boolean
           content: string
           conversation_id: string
           created_at?: string
@@ -1939,6 +2128,7 @@ export type Database = {
           ai_confidence?: number | null
           ai_context_summary?: string | null
           attachments?: Json | null
+          auto_sent?: boolean
           content?: string
           conversation_id?: string
           created_at?: string
@@ -1995,6 +2185,104 @@ export type Database = {
           use_emojis?: boolean
         }
         Relationships: []
+      }
+      messaging_specialists: {
+        Row: {
+          always_escalate: boolean
+          auto_send_eligible: boolean
+          created_at: string
+          id: string
+          intents: string[]
+          is_active: boolean
+          name: string
+          playbook: string
+          slug: string
+          sort_order: number
+          target_folder: string | null
+          updated_at: string
+        }
+        Insert: {
+          always_escalate?: boolean
+          auto_send_eligible?: boolean
+          created_at?: string
+          id?: string
+          intents?: string[]
+          is_active?: boolean
+          name: string
+          playbook?: string
+          slug: string
+          sort_order?: number
+          target_folder?: string | null
+          updated_at?: string
+        }
+        Update: {
+          always_escalate?: boolean
+          auto_send_eligible?: boolean
+          created_at?: string
+          id?: string
+          intents?: string[]
+          is_active?: boolean
+          name?: string
+          playbook?: string
+          slug?: string
+          sort_order?: number
+          target_folder?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      messaging_sub_intents: {
+        Row: {
+          autonomy: string
+          created_at: string
+          handling_instructions: string
+          id: string
+          is_active: boolean
+          name: string
+          recognition_cues: string
+          slug: string
+          sort_order: number
+          specialist_id: string
+          target_folder: string | null
+          updated_at: string
+        }
+        Insert: {
+          autonomy?: string
+          created_at?: string
+          handling_instructions?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          recognition_cues?: string
+          slug: string
+          sort_order?: number
+          specialist_id: string
+          target_folder?: string | null
+          updated_at?: string
+        }
+        Update: {
+          autonomy?: string
+          created_at?: string
+          handling_instructions?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          recognition_cues?: string
+          slug?: string
+          sort_order?: number
+          specialist_id?: string
+          target_folder?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messaging_sub_intents_specialist_id_fkey"
+            columns: ["specialist_id"]
+            isOneToOne: false
+            referencedRelation: "messaging_specialists"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       messaging_templates: {
         Row: {
@@ -2213,6 +2501,10 @@ export type Database = {
       order_items: {
         Row: {
           accessory_id: string | null
+          backorder_line_id: string | null
+          backorder_status:
+            | Database["public"]["Enums"]["backorder_fulfillment_status"]
+            | null
           description: string | null
           discount: number
           id: string
@@ -2225,6 +2517,10 @@ export type Database = {
         }
         Insert: {
           accessory_id?: string | null
+          backorder_line_id?: string | null
+          backorder_status?:
+            | Database["public"]["Enums"]["backorder_fulfillment_status"]
+            | null
           description?: string | null
           discount?: number
           id?: string
@@ -2237,6 +2533,10 @@ export type Database = {
         }
         Update: {
           accessory_id?: string | null
+          backorder_line_id?: string | null
+          backorder_status?:
+            | Database["public"]["Enums"]["backorder_fulfillment_status"]
+            | null
           description?: string | null
           discount?: number
           id?: string
@@ -2253,6 +2553,13 @@ export type Database = {
             columns: ["accessory_id"]
             isOneToOne: false
             referencedRelation: "accessories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_backorder_line_id_fkey"
+            columns: ["backorder_line_id"]
+            isOneToOne: false
+            referencedRelation: "backorder_lines"
             referencedColumns: ["id"]
           },
           {
@@ -3530,6 +3837,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _backorder_norm_storage_gb: { Args: { p_raw: string }; Returns: number }
       _hash_pin: { Args: { pin_text: string }; Returns: string }
       _verify_pin: {
         Args: { pin_hash: string; pin_text: string }
@@ -3591,6 +3899,10 @@ export type Database = {
       }
       expire_pending_offers: { Args: never; Returns: undefined }
       fail_stale_sending_messages: { Args: never; Returns: number }
+      fulfill_backorder_with_item: {
+        Args: { p_item_id: string; p_order_item_id: string }
+        Returns: undefined
+      }
       generate_code: {
         Args: { prefix: string; seq_name: string }
         Returns: string
@@ -3618,6 +3930,10 @@ export type Database = {
         Args: { p_accessory_id: string; p_quantity: number }
         Returns: number
       }
+      mark_backorder_ordered: {
+        Args: { p_order_item_id: string }
+        Returns: undefined
+      }
       match_product_model: { Args: { p_description: string }; Returns: string }
       merge_customers: {
         Args: {
@@ -3634,6 +3950,48 @@ export type Database = {
       }
       process_message_queue: { Args: never; Returns: undefined }
       queue_review_requests: { Args: never; Returns: undefined }
+      reserve_backorder_unit: {
+        Args: {
+          p_backorder_line_id: string
+          p_order_id: string
+          p_unit_price: number
+        }
+        Returns: string
+      }
+      search_available_backorder_lines: {
+        Args: {
+          filter_brand?: string
+          filter_category_id?: string
+          price_max?: number
+          price_min?: number
+          result_limit?: number
+          search_query: string
+        }
+        Returns: {
+          available: number
+          backorder_code: string
+          battery_health_pct: number
+          brand: string
+          category_description_fields: string[]
+          color: string
+          condition_grade: string
+          cpu: string
+          gpu: string
+          has_touchscreen: boolean
+          hero_media_url: string
+          id: string
+          is_unlocked: boolean
+          lead_time_days: number
+          model_name: string
+          model_number: string
+          os_family: string
+          ram_gb: string
+          screen_size: number
+          selling_price: number
+          storage_gb: string
+          year: number
+        }[]
+      }
       search_available_inventory: {
         Args: {
           filter_brand?: string
@@ -3670,6 +4028,39 @@ export type Database = {
           selling_price: number
           storage_gb: string
           supplier_description: string
+          year: number
+        }[]
+      }
+      search_available_sell_groups: {
+        Args: {
+          filter_brand?: string
+          filter_category_id?: string
+          price_max?: number
+          price_min?: number
+          result_limit?: number
+          search_query: string
+        }
+        Returns: {
+          available_count: number
+          battery_health_pct: number
+          brand: string
+          category_description_fields: string[]
+          color: string
+          condition_grade: string
+          cpu: string
+          effective_price: number
+          gpu: string
+          has_touchscreen: boolean
+          hero_media_url: string
+          id: string
+          is_unlocked: boolean
+          model_name: string
+          model_number: string
+          os_family: string
+          ram_gb: string
+          screen_size: number
+          sell_group_code: string
+          storage_gb: string
           year: number
         }[]
       }
@@ -3726,6 +4117,13 @@ export type Database = {
         | "DAMAGED"
         | "WRITE_OFF"
         | "CORRECTION"
+      backorder_fulfillment_status:
+        | "AWAITING_ORDER"
+        | "ORDERED"
+        | "READY"
+        | "FULFILLED"
+      backorder_line_status: "ACTIVE" | "PAUSED" | "CLOSED"
+      backorder_media_source: "iosys" | "web" | "manual"
       battery_condition: "GOOD" | "FAIR" | "POOR"
       body_condition: "GOOD" | "FAIR" | "POOR" | "DAMAGED"
       condition_grade: "S" | "A" | "B" | "C" | "D" | "J"
@@ -3948,6 +4346,14 @@ export const Constants = {
         "WRITE_OFF",
         "CORRECTION",
       ],
+      backorder_fulfillment_status: [
+        "AWAITING_ORDER",
+        "ORDERED",
+        "READY",
+        "FULFILLED",
+      ],
+      backorder_line_status: ["ACTIVE", "PAUSED", "CLOSED"],
+      backorder_media_source: ["iosys", "web", "manual"],
       battery_condition: ["GOOD", "FAIR", "POOR"],
       body_condition: ["GOOD", "FAIR", "POOR", "DAMAGED"],
       condition_grade: ["S", "A", "B", "C", "D", "J"],
@@ -4040,5 +4446,3 @@ export const Constants = {
     },
   },
 } as const
-A new version of Supabase CLI is available: v2.106.0 (currently installed v2.90.0)
-We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
