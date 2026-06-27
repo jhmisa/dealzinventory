@@ -1,5 +1,15 @@
 # CLAUDE.md — Dealz K.K. Inventory System
 
+## Operating Context (read first)
+
+- **Project state lives in [`docs/PROJECT_STATE.md`](docs/PROJECT_STATE.md).** Read it at the start of work; update it before/with every commit (Now / Recently shipped + what it touched).
+- **Supabase: you HAVE full access** via CLI and MCP. Apply migrations automatically via CLI — never ask, never claim "no access."
+- **Deploy:** use the `push-to-main` skill. **Version:** bump `package.json` once per session (semver).
+- **Where things live:** [`docs/SYSTEM_MAP.md`](docs/SYSTEM_MAP.md) maps every feature → service → edge function → table.
+- A `SessionStart` hook auto-loads `PROJECT_STATE.md`; a `PostToolUse` hook reminds you to log commits there.
+
+---
+
 ## Project Overview
 
 Dealz is an inventory, inspection, repair, and selling system for a refurb/resale business operating in Japan. It handles items sourced from auctions, wholesalers, and individual Kaitori (direct purchase from individuals). The system tracks items from intake through inspection, repair, and selling via live-selling links and a public shop page. It also supports a Kaitori flow where individuals sell their devices (phones, laptops, tablets) to us.
