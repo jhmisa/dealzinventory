@@ -29,6 +29,15 @@
 - Edge fns: parse-invoice
 - Tables: items, item_audit_logs, item_defects, intake_receipts, suppliers, inventory_snapshots, inventory_snapshot_items, inventory_removals, canonical_brands
 
+## Backorder / Pre-order (supplier inventory, B-codes)
+- Services: backorders.ts (list/get/create/update lines, fetchSupplierProduct, searchProductImages, saveBackorderPhotos, listToFulfill, markBackorderOrdered, fulfillBackorderWithItem, reserveBackorderUnit, findEligiblePCodes); items.ts getItemForSwap
+- Edge fns: fetch-supplier-product (pluggable supplier adapters → NormalizedSupplierProduct), search-product-images (optional, env-keyed), save-backorder-photos (copy kept photos → storage)
+- Shared modules: _shared/supplier-adapters/{types,iosys,registry}.ts (+iosys fixture), _shared/image-search/{types,provider}.ts, _shared/backorder-match.ts (verifyPCodeMatch), _shared/inventory-search.ts (mapBackorderRow — backorder result type), _shared/offer-reply.ts (⏳ Pre-order badge)
+- RPCs: search_available_backorder_lines, reserve_backorder_unit, mark_backorder_ordered, fulfill_backorder_with_item (core-spec hard-block + item→RESERVED + quantity_received++), generate_code('B','b_code_seq'), _backorder_norm_storage_gb
+- Tables: backorder_lines (B-code, generated `available`), backorder_line_media; order_items.backorder_line_id + backorder_status (enum backorder_fulfillment_status); storage bucket backorder-media
+- Frontend: src/pages/admin/backorders.tsx (Lines / To-Fulfill tabs), src/components/backorders/{backorder-list,add-backorder-dialog,to-fulfill,swap-dialog}.tsx, src/validators/backorder.ts, src/lib/utils.ts (normalizeStorageGb, verifyPCodeMatch)
+- Flow: paste iosys URL → fetch-supplier-product prefill → map product_model + supplier → curate photos → createBackorderLine (B-code) + saveBackorderPhotos. Surfaces in inventory search as pre-order offers (⏳ + lead time). Customer confirm → reserve_backorder_unit (order_item, item_id null). Procure via To-Fulfill worklist → mark_backorder_ordered → on intake, swap dialog scans matching P-code → fulfill_backorder_with_item.
+
 ## Returns
 - Services: returns.ts, supplier-returns.ts
 - Edge fns: create-return-request
