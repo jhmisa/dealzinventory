@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Check, ChevronsUpDown, Image as ImageIcon, Plus } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Check, ChevronsUpDown, Image as ImageIcon, Loader2, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Popover,
@@ -22,25 +22,57 @@ import {
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { ProductForm } from '@/components/items/product-form'
+import { useProductModelSearch } from '@/hooks/use-product-models'
 import type { ProductModelWithHeroImage } from '@/lib/types'
 import type { ProductModelFormValues } from '@/validators/product-model'
 
 interface ProductPickerProps {
   value: string
   onSelect: (productId: string) => void
+  // Off-list rows to always keep available for display (selected row + auto-matched row +
+  // a small default/recent set shown when the search box is empty). NOT the whole table.
   products: ProductModelWithHeroImage[]
   initialSearch?: string
+  categoryId?: string
   onCreate?: (values: ProductModelFormValues) => Promise<string>
   invoiceDescription?: string
 }
 
-export function ProductPicker({ value, onSelect, products, initialSearch, onCreate, invoiceDescription }: ProductPickerProps) {
+export function ProductPicker({
+  value,
+  onSelect,
+  products,
+  initialSearch,
+  categoryId,
+  onCreate,
+  invoiceDescription,
+}: ProductPickerProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
+  const [debounced, setDebounced] = useState('')
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [createLoading, setCreateLoading] = useState(false)
 
+  // Debounce the typed term ~250ms before hitting the server.
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(search.trim()), 250)
+    return () => clearTimeout(t)
+  }, [search])
+
+  const { data: serverResults, isFetching } = useProductModelSearch(debounced, categoryId)
+
+  // Selected/auto-matched row comes from the passed `products` (off-list safe).
   const selected = value ? products.find((p) => p.id === value) : null
+
+  // What the list renders: server results while searching, else the passed default set.
+  // Always include the selected row so it stays visible/checkable even if absent from results.
+  const rows = useMemo(() => {
+    const base = debounced.length > 0 ? (serverResults ?? []) : products
+    if (selected && !base.some((p) => p.id === selected.id)) {
+      return [selected, ...base]
+    }
+    return base
+  }, [debounced, serverResults, products, selected])
 
   async function handleProductCreate(values: ProductModelFormValues) {
     if (!onCreate) return
@@ -96,12 +128,24 @@ export function ProductPicker({ value, onSelect, products, initialSearch, onCrea
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[420px] p-0" align="start">
-        <Command>
-          <CommandInput value={search} onValueChange={setSearch} placeholder="Search products..." className="h-8 text-xs" />
+        <Command shouldFilter={false}>
+          <CommandInput
+            value={search}
+            onValueChange={setSearch}
+            placeholder="Search products..."
+            className="h-8 text-xs"
+          />
           <CommandList className="max-h-[350px]">
+            {isFetching && (
+              <div className="flex items-center justify-center gap-2 py-3 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Searching…
+              </div>
+            )}
             <CommandEmpty>
               <div className="py-2 text-center">
-                <p className="text-sm text-muted-foreground">No products found.</p>
+                <p className="text-sm text-muted-foreground">
+                  {debounced.length === 0 ? 'Type to search products.' : 'No products found.'}
+                </p>
                 {onCreate && (
                   <Button
                     variant="outline"
@@ -134,10 +178,10 @@ export function ProductPicker({ value, onSelect, products, initialSearch, onCrea
                 />
                 <span className="text-muted-foreground">None</span>
               </CommandItem>
-              {products.map((product) => (
+              {rows.map((product) => (
                 <CommandItem
                   key={product.id}
-                  value={`${product.brand} ${product.model_name} ${product.short_description ?? ''} ${product.color} ${product.cpu ?? ''} ${product.ram_gb ?? ''} ${product.storage_gb ?? ''} ${product.model_number ?? ''} ${product.part_number ?? ''}`}
+                  value={product.id}
                   onSelect={() => {
                     onSelect(product.id)
                     setOpen(false)
