@@ -45,9 +45,20 @@ import {
   saveBackorderPhotos,
 } from '@/services/backorders'
 import { backorderSchema, type BackorderFormValues } from '@/validators/backorder'
-import { cn } from '@/lib/utils'
+import { cn, normalizeStorageGb } from '@/lib/utils'
 
 const GRADES = ['S', 'A', 'B', 'C', 'D', 'J'] as const
+
+// The link-parsed specs we treat as the source of truth for THIS unit. Storage + color come
+// from the supplier listing; the selected product model must match them (we warn if it doesn't).
+interface ParsedSupplierSpecs {
+  storageGb: number | null
+  color: string | null
+  colorJa: string | null
+  ramGb: number | null
+  brandText: string | null
+  modelText: string | null
+}
 
 interface AddBackorderDialogProps {
   open: boolean
@@ -115,6 +126,8 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
   const [fetching, setFetching] = useState(false)
   const [saving, setSaving] = useState(false)
   const [parsedHint, setParsedHint] = useState('')
+  // Link-parsed specs (source of truth for this unit) kept for model-match validation.
+  const [parsed, setParsed] = useState<ParsedSupplierSpecs | null>(null)
 
   // Photo curation. Candidates are seeded from the fetched listing (after the
   // dedupe-by-index/prefer-_L normalization). `kept` tracks which survive.
@@ -151,6 +164,7 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
     form.reset(defaultValues)
     setUrl('')
     setParsedHint('')
+    setParsed(null)
     setPhotos([])
     setKept(new Set())
     setFetching(false)
@@ -199,6 +213,17 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
       // Hint for model selection (brand + model text).
       const hint = [product.brandText, product.modelText].filter(Boolean).join(' ').trim()
       setParsedHint(hint)
+
+      // Remember the link specs so we can (a) keep them authoritative and (b) warn if the
+      // chosen product model contradicts the listing.
+      setParsed({
+        storageGb: product.storageGb ?? null,
+        color: product.color ?? null,
+        colorJa: product.colorJa ?? null,
+        ramGb: product.ramGb ?? null,
+        brandText: product.brandText ?? null,
+        modelText: product.modelText ?? null,
+      })
 
       // Auto-match the iosys SOURCING supplier. Prefer the reference-only listing
       // (e.g. "Iosys Tsushin Haiban-ka (Online)") since backorders are sourced from it,
@@ -259,6 +284,49 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
   const watchedProductId = form.watch('product_id')
   const watchedColor = form.watch('color')
   const selectedModel = productList.find((p) => p.id === watchedProductId)
+
+  // When a product model is selected, fill the INTRINSIC specs the supplier listing doesn't
+  // carry (RAM, chip, screen) from the model's absolute catalog values. Storage + color stay
+  // as the link parsed them (the source of truth) — we only fill a field that is still empty,
+  // never overwrite what the listing provided.
+  useEffect(() => {
+    if (!selectedModel) return
+    const fillIfEmpty = (name: keyof BackorderFormValues, val: string | number | undefined) => {
+      if (val == null || val === '') return
+      const cur = form.getValues(name)
+      if (cur == null || cur === '' || (typeof cur === 'number' && Number.isNaN(cur))) {
+        form.setValue(name, val as never)
+      }
+    }
+    const ram = selectedModel.ram_gb != null && selectedModel.ram_gb !== ''
+      ? Number(selectedModel.ram_gb)
+      : undefined
+    // iPhones keep the chip in `chipset` (e.g. "A18 Pro"); `cpu` is for PC/Android. Use whichever exists.
+    const chip = selectedModel.cpu ?? selectedModel.chipset ?? undefined
+    fillIfEmpty('ram_gb', Number.isNaN(ram as number) ? undefined : ram)
+    fillIfEmpty('cpu', chip ?? undefined)
+    fillIfEmpty('screen_size', selectedModel.screen_size ?? undefined)
+    fillIfEmpty('storage_gb', normalizeStorageGb(selectedModel.storage_gb) ?? undefined)
+    fillIfEmpty('color', selectedModel.color ?? undefined)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedProductId])
+
+  // Warn when the chosen model contradicts the fetched listing (the link is the source of truth
+  // for storage + color). Empty/unknown values are not treated as a mismatch.
+  const modelMismatches: string[] = []
+  if (parsed && selectedModel) {
+    const linkStorage = normalizeStorageGb(parsed.storageGb)
+    const modelStorage = normalizeStorageGb(selectedModel.storage_gb)
+    if (linkStorage != null && modelStorage != null && linkStorage !== modelStorage) {
+      modelMismatches.push(`storage — listing ${linkStorage}GB vs model ${modelStorage}GB`)
+    }
+    const linkColor = (parsed.color ?? '').trim().toLowerCase()
+    const modelColor = (selectedModel.color ?? '').trim().toLowerCase()
+    if (linkColor && modelColor && linkColor !== modelColor) {
+      modelMismatches.push(`color — listing "${parsed.color}" vs model "${selectedModel.color}"`)
+    }
+  }
+
   const searchQuery = [
     selectedModel?.brand ?? parsedHint.split(' ')[0] ?? '',
     selectedModel?.model_name ?? parsedHint,
@@ -422,6 +490,12 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
                     />
                   </FormControl>
                   <FormMessage />
+                  {modelMismatches.length > 0 && (
+                    <p className="mt-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                      ⚠ This model doesn&apos;t match the fetched listing: {modelMismatches.join('; ')}.
+                      Pick the product model that matches the supplier link.
+                    </p>
+                  )}
                 </FormItem>
               )}
             />
