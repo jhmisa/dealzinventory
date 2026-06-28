@@ -6,6 +6,7 @@ import {
   parseAndroidListingPage,
   parseAndroidListingTitle,
   PIXEL_CONFIG,
+  XIAOMI_CONFIG,
   XPERIA_CONFIG,
 } from "./android-listing.ts"
 
@@ -13,6 +14,7 @@ const galaxy = (t: string) => parseAndroidListingTitle(t, GALAXY_CONFIG)
 const xperia = (t: string) => parseAndroidListingTitle(t, XPERIA_CONFIG)
 const aquos = (t: string) => parseAndroidListingTitle(t, AQUOS_CONFIG)
 const pixel = (t: string) => parseAndroidListingTitle(t, PIXEL_CONFIG)
+const xiaomi = (t: string) => parseAndroidListingTitle(t, XIAOMI_CONFIG)
 
 Deno.test("galaxy: SM-..Q simfree, ROM in bracket, JA color", () => {
   const s = galaxy("Galaxy A57 5G SM-A576Q オーサムネイビー 【RAM8GB/ROM128GB/国内版 SIMフリー】")
@@ -545,5 +547,161 @@ Deno.test("galaxy: page extraction pulls only coded SKU cards", () => {
   assertEquals(skus.every((s) => s.model_number != null), true)
   // dedupe key uniqueness within a page
   const keys = new Set(skus.map((s) => `${s.model_name}|${s.storage_gb}|${s.color_en ?? s.color_ja}|${s.carrier}`))
+  assertEquals(keys.size, skus.length)
+})
+
+// ---------------------------------------------------------------------------
+// Xiaomi (Xiaomi flagship / Redmi / POCO / Mi) — code-less SIM-free + coded carrier
+// ---------------------------------------------------------------------------
+
+Deno.test("xiaomi: code-less Redmi simfree, RAM/ROM bracket, JA color", () => {
+  const s = xiaomi("Redmi 14C スターリーブルー【RAM4GB/ROM128GB 国内版SIMフリー】")
+  assertEquals(s?.brand, "Xiaomi")
+  assertEquals(s?.model_name, "Redmi 14C")
+  assertEquals(s?.model_number, null) // SIM-free: no code
+  assertEquals(s?.storage_gb, 128)
+  assertEquals(s?.ram_gb, 4)
+  assertEquals(s?.color_ja, "スターリーブルー")
+  assertEquals(s?.color_en, "Starry Blue")
+  assertEquals(s?.carrier, "SIM-Free")
+})
+
+Deno.test("xiaomi: flagship line keeps 'Xiaomi' in model name", () => {
+  const s = xiaomi("Xiaomi 15T Pro グレー【RAM12GB/ROM512GB 国内版SIMフリー】")
+  assertEquals(s?.model_name, "Xiaomi 15T Pro")
+  assertEquals(s?.storage_gb, 512)
+  assertEquals(s?.ram_gb, 12)
+  assertEquals(s?.color_en, "Gray")
+})
+
+Deno.test("xiaomi: no-space flagship Xiaomi11T -> 'Xiaomi 11T', 5G stripped, ASCII color", () => {
+  const s = xiaomi("Xiaomi11T Pro 5G Celestial Blue【RAM8GB/ROM128GB 国内版SIMフリー】")
+  assertEquals(s?.model_name, "Xiaomi 11T Pro")
+  assertEquals(s?.storage_gb, 128)
+  assertEquals(s?.color_en, "Celestial Blue")
+  assertEquals(s?.color_ja, null)
+})
+
+Deno.test("xiaomi: Xiaomi POCO -> drop Xiaomi prefix, keep POCO", () => {
+  const s = xiaomi("Xiaomi POCO F7 Ultra イエロー【RAM16GB/ROM512GB 国内版SIMフリー】")
+  assertEquals(s?.model_name, "POCO F7 Ultra")
+  assertEquals(s?.storage_gb, 512)
+  assertEquals(s?.ram_gb, 16)
+  assertEquals(s?.color_ja, "イエロー")
+  assertEquals(s?.color_en, "Yellow")
+})
+
+Deno.test("xiaomi: POCO Pro Max double tier", () => {
+  const s = xiaomi("Xiaomi POCO X8 Pro Max ブラック【RAM12GB/ROM512GB 国内版SIMフリー】")
+  assertEquals(s?.model_name, "POCO X8 Pro Max")
+  assertEquals(s?.color_en, "Black")
+})
+
+Deno.test("xiaomi: POCO + 5G + Dual-SIM + bare RAM/ROM + ASCII color", () => {
+  const s = xiaomi("Xiaomi POCO F6 Pro 5G Dual-SIM White【12GB/256GB 国内版SIMフリー】")
+  assertEquals(s?.model_name, "POCO F6 Pro") // 5G + Dual-SIM stripped
+  assertEquals(s?.storage_gb, 256) // larger of bare pair
+  assertEquals(s?.ram_gb, 12)
+  assertEquals(s?.color_en, "White")
+})
+
+Deno.test("xiaomi: Xiaomi Redmi Note11 -> 'Redmi Note 11', space-bracket RAM/ROM", () => {
+  const s = xiaomi("Xiaomi Redmi Note11 Graphite Gray【4GB/64GB 国内版SIM FREE】")
+  assertEquals(s?.model_name, "Redmi Note 11")
+  assertEquals(s?.storage_gb, 64)
+  assertEquals(s?.color_en, "Graphite Gray")
+  assertEquals(s?.carrier, "SIM-Free")
+})
+
+Deno.test("xiaomi: Xiaomi Mi11 -> 'Mi 11 Lite', 5G stripped", () => {
+  const s = xiaomi("Xiaomi Mi11 Lite 5G Mint Green【RAM6GB/ROM128GB 国内版SIMフリー】")
+  assertEquals(s?.model_name, "Mi 11 Lite")
+  assertEquals(s?.color_en, "Mint Green")
+})
+
+Deno.test("xiaomi: Redmi12C glued number -> 'Redmi 12C'", () => {
+  const s = xiaomi("Xiaomi Redmi12C グラファイトグレー【RAM4GB ROM128GB 国内版 SIMフリー】")
+  assertEquals(s?.model_name, "Redmi 12C")
+  assertEquals(s?.storage_gb, 128)
+  assertEquals(s?.color_en, "Graphite Gray")
+})
+
+Deno.test("xiaomi: Photography Kit bundle stripped from color", () => {
+  const s = xiaomi("Xiaomi14 Ultra ブラック + Photography Kit【RAM16GB/ROM512GB 国内版SIMフリー】")
+  assertEquals(s?.model_name, "Xiaomi 14 Ultra")
+  assertEquals(s?.color_ja, "ブラック")
+  assertEquals(s?.color_en, "Black")
+  assertEquals(s?.storage_gb, 512)
+})
+
+Deno.test("xiaomi: Note13 Pro+ keeps the + tier", () => {
+  const s = xiaomi("Redmi Note13 Pro+ 5G Aurora Purple【12GB/512GB 国内版SIMフリー】")
+  assertEquals(s?.model_name, "Redmi Note 13 Pro+")
+  assertEquals(s?.storage_gb, 512)
+  assertEquals(s?.color_en, "Aurora Purple")
+})
+
+Deno.test("xiaomi: au XIG code variant", () => {
+  const s = xiaomi("Xiaomi 13T XIG04 ブラック【au版SIMフリー】")
+  assertEquals(s?.model_name, "Xiaomi 13T")
+  assertEquals(s?.model_number, "XIG04")
+  assertEquals(s?.storage_gb, null) // no storage in bracket
+  assertEquals(s?.color_en, "Black")
+  assertEquals(s?.carrier, "au")
+})
+
+Deno.test("xiaomi: SoftBank A###XM code, REDMI casing -> Redmi, 5G stripped", () => {
+  const s = xiaomi("REDMI15 5G A501XM チタングレー【RAM4GB/ROM128GB SoftBank版SIMフリー】")
+  assertEquals(s?.model_name, "Redmi 15")
+  assertEquals(s?.model_number, "A501XM")
+  assertEquals(s?.storage_gb, 128)
+  assertEquals(s?.color_en, "Titan Gray")
+  assertEquals(s?.carrier, "SoftBank")
+})
+
+Deno.test("xiaomi: Redmi Note10 JE keeps JE, au code", () => {
+  const s = xiaomi("Redmi Note10 JE XIG02 クロームシルバー【au版 SIMフリー】")
+  assertEquals(s?.model_name, "Redmi Note 10 JE")
+  assertEquals(s?.model_number, "XIG02")
+  assertEquals(s?.carrier, "au")
+})
+
+Deno.test("xiaomi: leading unlock bracket + carrier word + Mi10 code", () => {
+  const s = xiaomi("【SIMロック解除済】au Xiaomi Mi10 Lite 5G XIG01 ドリームホワイト")
+  assertEquals(s?.model_name, "Mi 10 Lite")
+  assertEquals(s?.model_number, "XIG01")
+  assertEquals(s?.carrier, "au")
+  assertEquals(s?.is_unlocked, true)
+})
+
+Deno.test("xiaomi: POCO F4 GT 8-digit global code path", () => {
+  const s = xiaomi("XIAOMI POCO F4 GT 5G Dual-SIM 21121210G Cyber Yellow【8GB/128GB 国内版SIMフリー】")
+  assertEquals(s?.model_name, "POCO F4 GT")
+  assertEquals(s?.model_number, "21121210G")
+  assertEquals(s?.storage_gb, 128)
+  assertEquals(s?.color_en, "Cyber Yellow")
+})
+
+Deno.test("xiaomi: nav thumbnail / non-Xiaomi -> null", () => {
+  assertEquals(xiaomi("Redmi 12シリーズ の画像"), null) // nav thumb (no bracket)
+  assertEquals(xiaomi("Galaxy S24 SM-S921Q ブラック"), null) // not Xiaomi
+})
+
+Deno.test("xiaomi: page extraction pulls code-less + coded SKU cards", () => {
+  const html = Deno.readTextFileSync(
+    new URL("./__fixtures__/iosys-xiaomi-p1.html", import.meta.url),
+  )
+  const titles = extractAndroidCardTitles(html, XIAOMI_CONFIG)
+  assertEquals(titles.length > 10, true)
+  // nav thumbnails must be excluded
+  assertEquals(titles.every((t) => !/シリーズ|の画像/.test(t)), true)
+  const skus = parseAndroidListingPage(html, XIAOMI_CONFIG)
+  assertEquals(skus.length > 10, true)
+  assertEquals(skus.every((s) => s.brand === "Xiaomi"), true)
+  assertEquals(skus.every((s) => s.color_en != null || s.color_ja != null), true)
+  // dedupe key uniqueness within a page
+  const keys = new Set(
+    skus.map((s) => `${s.model_name}|${s.storage_gb}|${s.color_en ?? s.color_ja}|${s.carrier}`),
+  )
   assertEquals(keys.size, skus.length)
 })

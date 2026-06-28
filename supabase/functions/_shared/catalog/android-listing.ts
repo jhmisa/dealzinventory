@@ -35,6 +35,11 @@ export interface AndroidBrandConfig {
   modelCodeRe: RegExp // finds + extracts the model code (splits name | tail). Must be /g-free.
   canonicalModelName: (seg: string) => string // clean the name segment
   colorJaToEn: (ja: string | null) => string | null
+  // OPTIONAL: brands whose SIM-free cards carry NO model code (Xiaomi: only au XIG##/SoftBank
+  // A###XM carry codes; SIM-free has none). When `modelCodeRe` fails to match, the engine falls
+  // back to this anchored (^) regex to CONSUME the model-name prefix; the match is the name, the
+  // remainder is the color/storage tail, and model_number is null. Must be anchored and /g-free.
+  nameConsumeRe?: RegExp
 }
 
 const LEADING_BRACKET = /^【([^】]*)】\s*/
@@ -122,14 +127,31 @@ export function parseAndroidListingTitle(
     }
   }
 
-  // 4. Find the model code — it splits the model name from the color/storage tail.
+  // 4. Find the model code — it splits the model name from the color/storage tail. Some brands
+  //    (Xiaomi) only carry a code on carrier variants; SIM-free cards have none, so when the code
+  //    fails to match we fall back to `nameConsumeRe` (anchored) to consume the model-name prefix.
+  let nameSeg: string
+  let model_number: string | null
+  let tail: string
   const codeM = rest.match(config.modelCodeRe)
-  if (!codeM || codeM.index == null) return null
-  const nameSeg = rest.slice(0, codeM.index).trim()
-  const model_number = codeM[0]
-  let tail = rest.slice(codeM.index + codeM[0].length).trim()
-  // Drop a dual/single-SIM marker glued to the code, e.g. "SM-S948Q/DS 256GB ...".
-  tail = tail.replace(/^\/(DS|SS)\b/i, "").trim()
+  if (codeM && codeM.index != null) {
+    nameSeg = rest.slice(0, codeM.index).trim()
+    model_number = codeM[0]
+    tail = rest.slice(codeM.index + codeM[0].length).trim()
+    // Drop a dual/single-SIM marker glued to the code, e.g. "SM-S948Q/DS 256GB ...".
+    tail = tail.replace(/^\/(DS|SS)\b/i, "").trim()
+  } else if (config.nameConsumeRe) {
+    const nameM = rest.match(config.nameConsumeRe)
+    if (!nameM || nameM.index !== 0) return null
+    nameSeg = nameM[0].trim()
+    model_number = null
+    tail = rest.slice(nameM[0].length).trim()
+    // A dual/single-SIM marker can sit between the name and the color (no code to glue to),
+    // e.g. "POCO F6 Pro 5G Dual-SIM White" — drop a leading one left on the tail.
+    tail = tail.replace(/^(Single|Dual)[- ]?SIM\b/i, "").trim()
+  } else {
+    return null
+  }
 
   // 5. Validate the name segment actually names this brand's device.
   if (!config.modelNameRe.test(nameSeg)) return null
@@ -146,6 +168,10 @@ export function parseAndroidListingTitle(
     region_note = tb[1].trim()
     tail = tail.slice(0, tb.index).trim()
   }
+
+  // A code-less parse with no spec bracket is nav noise ("Redmi 12シリーズ の画像"), not a SKU —
+  // every real code-less Xiaomi card carries a 【RAM../ROM../版】 bracket. (Coded cards may omit it.)
+  if (model_number == null && region_note == null) return null
 
   // 7. Inline storage immediately after the code (e.g. "SC-52D 256GB クリーム").
   let storage_gb: number | null = null
@@ -197,6 +223,9 @@ export function parseAndroidListingTitle(
   //    Else recover the color from inside the note bracket (the "everything in bracket" 楽天版 grammar).
   let colorText = tail
     .replace(/\s*法人モデル\s*$/, "")
+    // Drop an accessory-bundle suffix joined by "+", e.g. "ブラック + Photography Kit" (Xiaomi 14
+    // Ultra Photography Kit). A "+" never appears inside a real color, so this is safe brand-wide.
+    .replace(/\s*\+\s*\S.*$/, "")
     .replace(/(\s+[A-Za-z][A-Za-z0-9/]*\d[A-Za-z0-9/]*)+$/, "")
     .trim()
   if (!colorText && region_note) colorText = colorFromNote(region_note)
@@ -252,8 +281,20 @@ export function extractAndroidCardTitles(html: string, config: AndroidBrandConfi
   const out: string[] = []
   for (const m of html.matchAll(/<img[^>]*\salt="([^"]*)"/g)) {
     const t = decodeEntities(m[1] ?? "").trim()
-    // Cheap filter: only alts that carry a model code are SKU cards (nav thumbs are "…の画像").
-    if (t && config.modelCodeRe.test(t)) out.push(t)
+    if (!t) continue
+    // Cheap filter: alts that carry a model code are SKU cards (nav thumbs are "…の画像").
+    if (config.modelCodeRe.test(t)) {
+      out.push(t)
+      continue
+    }
+    // Code-less brands (Xiaomi SIM-free): keep alts whose name prefix matches and that carry a
+    // spec bracket, excluding the bracket-less nav thumbnails ("Redmi 12シリーズ の画像").
+    if (
+      config.nameConsumeRe && config.nameConsumeRe.test(t) && /【/.test(t) &&
+      !/シリーズ|の画像/.test(t)
+    ) {
+      out.push(t)
+    }
   }
   return out
 }
@@ -550,6 +591,105 @@ export const PIXEL_COLORS_JA_EN: Record<string, string> = {
 export function pixelColorJaToEn(ja: string | null): string | null {
   if (!ja) return null
   return PIXEL_COLORS_JA_EN[ja] ?? null
+}
+
+// ---------------------------------------------------------------------------
+// Xiaomi config (Xiaomi flagship / Redmi / POCO / Mi)
+// ---------------------------------------------------------------------------
+
+// Xiaomi is the first brand whose SIM-free cards carry NO model code — only au (XIG##) and
+// SoftBank (A###XM) variants do (plus a few older POCO globals with an 8-digit number). So the
+// config supplies `nameConsumeRe` for the code-less path. Colors come in katakana OR English;
+// ASCII colors flow straight through. Verified research pass 2026-06-28; unmapped JA colors stay
+// null (flagged, never guessed) and promote as the JA token via coalesce in the fill-gaps.
+export const XIAOMI_COLORS_JA_EN: Record<string, string> = {
+  // Generic / basic (verified-direct transliterations)
+  "ブラック": "Black",
+  "ホワイト": "White",
+  "シルバー": "Silver",
+  "グレー": "Gray",
+  "グレイ": "Gray",
+  "ブルー": "Blue",
+  "グリーン": "Green",
+  "イエロー": "Yellow",
+  "レッド": "Red",
+  "ピンク": "Pink",
+  "パープル": "Purple",
+  "ゴールド": "Gold",
+  // T-series "Titan" finish — Xiaomi's official EN word is "Titan", NOT "Titanium" (verified).
+  "チタングレー": "Titan Gray",
+  "チタンブルー": "Titan Blue",
+  "チタンブラック": "Titan Black",
+  // Verified official Xiaomi/Redmi/POCO colorways (research pass 2026-06-28, cross-checked to
+  // specific JP SKU pages).
+  "ミッドナイトブラック": "Midnight Black",
+  "スターリーブルー": "Starry Blue", // Redmi 14C
+  "レモングリーン": "Lemon Green", // Xiaomi 14T
+  "アルパインブルー": "Alpine Blue", // Xiaomi 13T
+  "メドウグリーン": "Meadow Green", // Xiaomi 13T
+  "シルバークローム": "Silver Chrome", // Xiaomi 15 Ultra
+  "ナイトフォールブラック": "Nightfall Black", // Redmi Note 9T (JP)
+  "デイブレイクパープル": "Daybreak Purple", // Redmi Note 9T (JP)
+  "オーロラパープル": "Aurora Purple", // Redmi Note 13 Pro+
+  "ムーンライトホワイト": "Moonlight White", // Redmi Note 13 Pro+
+  "セージグリーン": "Sage Green", // Redmi 14C
+  "モカゴールド": "Mocha Gold", // Xiaomi 15T Pro
+  "リキッドシルバー": "Liquid Silver", // Xiaomi 15
+  "サイバーシルバー": "Cyber Silver", // POCO F7
+  "フォレストグリーン": "Forest Green", // Redmi Note 13 Pro
+  "ラベンダーパープル": "Lavender Purple", // Redmi Note 13 Pro
+  // Transliteration-confident standard Xiaomi color words (same basis as the Galaxy/Xperia maps).
+  "グラファイトグレー": "Graphite Gray",
+  "グレイシャーブルー": "Glacier Blue",
+  "コズミックグレー": "Cosmic Gray",
+  "クロームシルバー": "Chrome Silver", // NB: distinct katakana ordering from シルバークローム — kept separate
+  "ドリームホワイト": "Dream White",
+  // NOTE: deliberately UNMAPPED (research flagged UNVERIFIED — promote as the JA token via coalesce,
+  // never guessed): レイクブルー, ディープブルー, スターリットグリーン, リップルグリーン.
+}
+
+export function xiaomiColorJaToEn(ja: string | null): string | null {
+  if (!ja) return null
+  return XIAOMI_COLORS_JA_EN[ja] ?? null
+}
+
+export const XIAOMI_CONFIG: AndroidBrandConfig = {
+  brand: "Xiaomi",
+  brandPrefixes: [], // "Xiaomi" is NOT a blanket prefix — it's the flagship model line; sub-brand
+  // peeling (Xiaomi POCO/Redmi/Mi → POCO/Redmi/Mi) is handled in canonicalModelName.
+  modelNameRe: /xiaomi|redmi|poco|\bmi/i,
+  // Xiaomi JP codes: au XIG##; SoftBank A###XM; older POCO globals an 8-digit number (+letter).
+  // SIM-free cards have NO code — handled by nameConsumeRe below.
+  modelCodeRe: /\b(XIG\d+|A\d{3}XM|\d{8}[A-Z]?)\b/,
+  // Code-less SIM-free fallback: consume the model-name prefix. Starts with an optional leading
+  // "Xiaomi " brand word, then a sub-brand/flagship line word, then model tokens (anything with a
+  // digit, or a tier word, or a "+"). Stops at the first color token (katakana, or an ASCII word
+  // with no digit that isn't a tier word).
+  nameConsumeRe:
+    /^(?:Xiaomi\s+)?(?:POCO|Redmi|Mi|Xiaomi)(?:\s*(?:[A-Za-z]*\d[A-Za-z0-9]*\+?|Note|Pro|Ultra|Max|Lite|Plus|GT|JE|Dual-SIM|Single-SIM|[45]G|\+))+/i,
+  canonicalModelName: (seg) => {
+    let s = seg.replace(/\s+/g, " ").trim()
+    // 1. Peel a leading "Xiaomi " brand prefix ONLY when it precedes a sub-brand (POCO/Redmi/Mi);
+    //    for the flagship line ("Xiaomi 15T Pro", "Xiaomi11T") the "Xiaomi" IS the model name.
+    // (no \b after Mi/Redmi — names glue the number on, e.g. "Mi11", "Redmi12C")
+    s = s.replace(/^Xiaomi\s+(?=POCO|Redmi|Mi)/i, "")
+    // 2. Normalize the leading brand-line word's casing (iosys writes XIAOMI / REDMI / POCO).
+    s = s.replace(/^xiaomi/i, "Xiaomi").replace(/^redmi/i, "Redmi").replace(/^poco/i, "POCO")
+      .replace(/^mi/i, "Mi")
+    // 3. Insert a space between the brand-line word and a glued number (Xiaomi11T→Xiaomi 11T,
+    //    Redmi12C→Redmi 12C, Mi10→Mi 10, Redmi15→Redmi 15).
+    s = s.replace(/^(Xiaomi|Redmi|POCO|Mi)(?=\d)/, "$1 ")
+    // 4. Space after "Note" before a number (Note11→Note 11, Note9S→Note 9S).
+    s = s.replace(/\bNote(?=\d)/g, "Note ")
+    // 4b. Title-case tier words (iosys writes "Mi11 lite" with a lowercase l) so they match the
+    //     spec-table keys ("Mi 11 Lite", "POCO F7 Ultra").
+    s = s.replace(/\b(pro|ultra|max|lite|plus)\b/gi, (m) => m[0].toUpperCase() + m.slice(1).toLowerCase())
+    // 5. Strip network-generation + SIM markers (JP Xiaomi: 5G is not a model distinguisher,
+    //    unlike Pixel — every JP variant is the 5G one, so collapsing avoids spurious dupes).
+    s = s.replace(/\b[45]G\b/gi, "").replace(/\b(Single|Dual)[- ]?SIM\b/gi, "")
+    return s.replace(/\s+/g, " ").trim()
+  },
+  colorJaToEn: xiaomiColorJaToEn,
 }
 
 export const PIXEL_CONFIG: AndroidBrandConfig = {

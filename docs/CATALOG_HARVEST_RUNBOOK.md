@@ -175,6 +175,7 @@ Re-harvest for new Apple models follows the same shape as §2 (add specs → re-
 | Xperia | Sony | `items/smartphone/xperia` | `XQ-[A-Z]{2}\d{2} \| SO-\d{2}[A-Za-z]+ \| SOG\d+ \| SOV\d+ \| A?\d{3}SO \| J\d{4}` | `xperia-specs.ts` / `XPERIA_COLORS_JA_EN` | `2026-06-28-xperia-fill-gaps.sql` | `iosys-xperia-p1.html` | ✅ legacy reconciled inline (3 rows) |
 | AQUOS | Sharp | `items/smartphone/aquos` | `SH-RM\d+ \| SH-M\d+ \| SH-\d{2}[A-Z] \| SHG\d+ \| SHV\d+ \| A\d{3}SH` | `aquos-specs.ts` / `AQUOS_COLORS_JA_EN` | `2026-06-28-aquos-fill-gaps.sql` | `iosys-aquos-p1.html` | ✅ legacy reconciled inline (4 rows, Black dup merged) |
 | Pixel | Google | `items/smartphone/pixel` | `G[A-Z0-9]{4}` (case-sensitive) | `pixel-specs.ts` / `PIXEL_COLORS_JA_EN` | `2026-06-28-pixel-fill-gaps.sql` | `iosys-pixel-p1.html` | ✅ legacy reconciled inline (4 phone rows; 2 Google speakers left COMPUTER) |
+| Xiaomi | Xiaomi | `items/smartphone/xiaomi` | au `XIG\d+` · SoftBank `A\d{3}XM` · POCO global `\d{8}[A-Z]?` — **+ code-less SIM-free via `nameConsumeRe`** | `xiaomi-specs.ts` / `XIAOMI_COLORS_JA_EN` | `2026-06-28-xiaomi-fill-gaps.sql` | `iosys-xiaomi-p1.html` | ✅ + **legacy reconcile OPEN** (~33 COMPUTER rows / ~125 items) |
 | iPhone | Apple | `items/smartphone/iphone` | part# (`MXVH3J/A`) | `iphone-specs.ts` / `apple-colors.ts` | phase2/3/5 data-ops | `iosys-iphone-simfree-p1.html` | ✅ |
 | iPad | Apple | `items/tablet/ios/ipad` | part# | `ipad-specs.ts` / `apple-colors.ts` | phase4-ipad data-ops | `iosys-ipad-*-p1.html` | ✅ |
 
@@ -222,6 +223,26 @@ Re-harvest for new Apple models follows the same shape as §2 (add specs → re-
 - **Watch-outs:** new `a`-models appear fast (Pixel 10a `GV0BP` shipped 2026-04 — caught as an
   `unknownModels` entry, added to specs). Two `Google` rows are smart speakers (Nest Mini / Home Mini),
   NOT phones — left as COMPUTER, out of scope.
+
+### Xiaomi (Xiaomi-flagship / Redmi / POCO / Mi)
+- **Codes:** au `XIG##` (XIG01=Mi 10 Lite … XIG07=14T base, XIG06=14T Pro) · SoftBank `A###XM`
+  (A001XM=Note 9T … A402XM=14T Pro, A501XM=Redmi 15) · older POCO globals an 8-digit number
+  (`21121210G`). **The defining quirk: SIM-free cards have NO code at all.**
+- **First brand needing the engine extension — `nameConsumeRe` (optional code).** When `modelCodeRe`
+  fails to match, the generic engine falls back to the config's anchored `nameConsumeRe` to consume
+  the model-name prefix (model_number stays null); a guard (`model_number==null && region_note==null
+  → null`) drops "…シリーズ の画像" nav thumbnails. This capability is now reusable for any future
+  code-less brand. Also added a brand-agnostic "+ accessory bundle" color strip.
+- **Canonicalizer:** the flagship numbered line KEEPS "Xiaomi" in the model name ("Xiaomi 15T Pro");
+  `Xiaomi POCO/Redmi/Mi` → drop the leading Xiaomi (sub-brand is the name). Inserts spaces on glued
+  names (`Xiaomi11T`/`Redmi12C`/`Mi11`/`Note11`), title-cases tier words (`Mi11 lite`→`Mi 11 Lite`),
+  strips `5G`/SIM markers.
+- **Specs/colors note:** Xiaomi's official EN finish word is **"Titan"**, not "Titanium" (チタングレー
+  = Titan Gray). シルバークローム (Silver Chrome) ≠ クロームシルバー (Chrome Silver) — kept separate.
+  4 models omitted from specs as UNVERIFIED (harvest `spec_known=false`).
+- **Legacy reconcile:** ~33 COMPUTER phone rows / ~125 items DEFERRED as open debt (size ≈ the
+  Samsung pass) — not done inline. Out-of-scope rows left as-is: Redmi Buds (earbuds), Redmi Pad
+  (tablet→Phase C), Smart Band, Sound Pocket speaker.
 
 ---
 
