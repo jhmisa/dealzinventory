@@ -19,6 +19,7 @@ export const backorderSchema = z
     storage_gb: z.coerce.number().int().nonnegative().optional(),
     ram_gb: z.coerce.number().int().nonnegative().optional(),
     cpu: z.string().trim().optional(),
+    included_accessories: z.string().trim().optional(),
     screen_size: z.coerce.number().nonnegative().optional(),
     supplier_price: z.coerce.number().nonnegative().optional(),
     // Markup (¥) added on top of supplier_price to derive selling_price. Default ¥4000;

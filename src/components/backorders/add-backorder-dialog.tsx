@@ -36,9 +36,14 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { ProductPicker } from '@/components/intake/product-picker'
-import { useProductModelsWithHeroImage } from '@/hooks/use-product-models'
+import { useCreateProductModel } from '@/hooks/use-product-models'
 import { useSuppliers } from '@/hooks/use-suppliers'
-import { findMatchingProductModel, cleanModelName } from '@/services/product-models'
+import {
+  findMatchingProductModel,
+  cleanModelName,
+  enrichProductModelSpecs,
+  searchProductModels,
+} from '@/services/product-models'
 import {
   fetchSupplierProduct,
   searchProductImages,
@@ -48,7 +53,8 @@ import {
 } from '@/services/backorders'
 import { backorderSchema, type BackorderFormValues } from '@/validators/backorder'
 import { cn, normalizeStorageGb } from '@/lib/utils'
-import type { ProductModelWithHeroImage } from '@/lib/types'
+import type { ProductModel, ProductModelInsert, ProductModelWithHeroImage } from '@/lib/types'
+import type { ProductModelFormValues } from '@/validators/product-model'
 
 const GRADES = ['S', 'A', 'B', 'C', 'D', 'J'] as const
 
@@ -61,6 +67,14 @@ interface ParsedSupplierSpecs {
   ramGb: number | null
   brandText: string | null
   modelText: string | null
+  modelNumber: string | null
+  // Absolute catalog specs parsed from the iosys spec table (for NULL-field enrichment).
+  cpu: string | null
+  screenSize: number | null
+  camera: string | null
+  ports: string | null
+  osFamily: string | null
+  year: number | null
 }
 
 interface AddBackorderDialogProps {
@@ -109,6 +123,7 @@ const defaultValues: BackorderFormValues = {
   storage_gb: undefined,
   ram_gb: undefined,
   cpu: '',
+  included_accessories: '',
   screen_size: undefined,
   supplier_price: undefined,
   markup_jpy: 4000,
@@ -123,8 +138,12 @@ const defaultValues: BackorderFormValues = {
 
 export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogProps) {
   const queryClient = useQueryClient()
-  const { data: products } = useProductModelsWithHeroImage()
+  // Do NOT load the whole table (1000-row cap bug). The picker searches the server itself; here we
+  // only keep the auto-matched row so it stays visible/selectable when off the default list. The
+  // base list is a stable empty array so the productList memo doesn't churn each render.
+  const products = useMemo<ProductModelWithHeroImage[]>(() => [], [])
   const { data: suppliers } = useSuppliers()
+  const createProductModel = useCreateProductModel()
 
   const [url, setUrl] = useState('')
   const [fetching, setFetching] = useState(false)
@@ -221,6 +240,7 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
       form.setValue('supplier_stock', product.stock ?? undefined)
       form.setValue('supplier_product_code', product.supplierProductCode ?? '')
       form.setValue('supplier_url', url.trim())
+      form.setValue('included_accessories', product.includedAccessories ?? '')
 
       // Selling price = supplier cost + markup (staff can still edit either). Recompute on
       // fetch so a freshly pasted listing immediately shows supplier + ¥markup.
@@ -248,6 +268,13 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
         ramGb: product.ramGb ?? null,
         brandText: product.brandText ?? null,
         modelText: product.modelText ?? null,
+        modelNumber: product.modelNumber ?? null,
+        cpu: product.specs?.cpu ?? null,
+        screenSize: product.specs?.screenSize ?? null,
+        camera: product.specs?.camera ?? null,
+        ports: product.specs?.ports ?? null,
+        osFamily: product.specs?.os ?? null,
+        year: product.specs?.year ?? null,
       })
 
       // Auto-select the exact product model. Match on part-number (SKU-precise) first, then a
@@ -255,15 +282,55 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
       // displays even when it falls beyond the >1000-row fetch cap. The select-watch effect then
       // auto-fills RAM/chip/screen. Non-fatal: a miss just leaves the picker for manual selection.
       try {
+        const isApplePart = /\b[A-Z0-9]{4,7}\/[A-Z]{1,2}\b/.test(product.modelText ?? '')
         const match = await findMatchingProductModel({
           brand: product.brandText,
           modelText: product.modelText,
+          modelNumber: product.modelNumber,
           storageGb: product.storageGb,
           color: product.color,
+          colorJa: product.colorJa,
         })
         if (match) {
           setMatchedModel(match)
           form.setValue('product_id', match.id)
+          // Confident match = Apple part# exact OR Android model_number exact. Enrich NULL specs
+          // silently; fuzzy/manual selections defer enrichment (handled by staff confirming).
+          const confident = isApplePart || Boolean(product.modelNumber && match.model_number)
+          if (confident && product.specs) {
+            try {
+              const written = await enrichProductModelSpecs(
+                match.id,
+                {
+                  cpu: match.cpu,
+                  chipset: match.chipset,
+                  ram_gb: match.ram_gb,
+                  storage_gb: match.storage_gb,
+                  screen_size: match.screen_size,
+                  camera: match.camera,
+                  ports: match.ports,
+                  os_family: match.os_family,
+                  year: match.year,
+                },
+                {
+                  cpu: product.specs.cpu,
+                  ramGb: product.specs.ramGb,
+                  storageGb: product.specs.storageGb,
+                  screenSize: product.specs.screenSize,
+                  camera: product.specs.camera,
+                  ports: product.specs.ports,
+                  osFamily: product.specs.os,
+                  year: product.specs.year,
+                },
+              )
+              if (written > 0) {
+                await queryClient.invalidateQueries({ queryKey: ['product-models'] })
+                toast.success(`Filled ${written} missing spec field(s) on the model`)
+              }
+            } catch {
+              // enrichment is best-effort; never block the flow
+            }
+          }
         }
       } catch {
         // ignore — manual picker selection remains available
@@ -430,6 +497,46 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
     }
   }
 
+  // Guided "Create Product" with a dedup preview. Before inserting, re-run the search RPC on
+  // brand + model name + model number; if near-matches exist, require an explicit confirm so a
+  // model that merely failed to surface isn't duplicated.
+  async function handleCreateProduct(values: ProductModelFormValues): Promise<string> {
+    const probe = [values.brand, values.model_name, values.model_number]
+      .filter(Boolean)
+      .join(' ')
+      .trim()
+    if (probe) {
+      try {
+        const near = await searchProductModels(probe, undefined, 5)
+        if (near.length > 0) {
+          const list = near
+            .map((m) => `• ${m.brand} ${m.model_name}${m.model_number ? ` (${m.model_number})` : ''} — ${m.color}`)
+            .join('\n')
+          const proceed = window.confirm(
+            `Possible existing matches found:\n\n${list}\n\nCreate a NEW product model anyway?`,
+          )
+          if (!proceed) {
+            // Adopt the closest existing row instead of creating a duplicate.
+            setMatchedModel(near[0])
+            form.setValue('product_id', near[0].id)
+            throw new Error('cancelled-create-adopted-existing')
+          }
+        }
+      } catch (err) {
+        if (err instanceof Error && err.message === 'cancelled-create-adopted-existing') throw err
+        // search failure is non-fatal; fall through to create
+      }
+    }
+    const created = await createProductModel.mutateAsync(values as unknown as ProductModelInsert)
+    setMatchedModel({
+      ...(created as ProductModel),
+      hero_image_url: null,
+      media_count: 0,
+      categories: null,
+    } as ProductModelWithHeroImage)
+    return created.id
+  }
+
   async function handleSubmit(values: BackorderFormValues) {
     setSaving(true)
     try {
@@ -459,6 +566,7 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
         storage_gb: values.storage_gb ?? null,
         ram_gb: values.ram_gb ?? null,
         cpu: values.cpu?.trim() || null,
+        included_accessories: values.included_accessories?.trim() || null,
         screen_size: values.screen_size ?? null,
         supplier_price: values.supplier_price ?? null,
         markup_jpy: values.markup_jpy,
@@ -552,6 +660,8 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
                       onSelect={field.onChange}
                       products={productList}
                       initialSearch={pickerSearch || parsedHint || undefined}
+                      categoryId={matchedModel?.category_id ?? undefined}
+                      onCreate={handleCreateProduct}
                     />
                   </FormControl>
                   <FormMessage />
@@ -712,6 +822,22 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
                     <FormLabel>CPU</FormLabel>
                     <FormControl>
                       <Input {...field} value={field.value ?? ''} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Included accessories — prefilled from the iosys 付属品 list, editable; carried
+                  onto the item when the backorder is received. */}
+              <FormField
+                control={form.control}
+                name="included_accessories"
+                render={({ field }) => (
+                  <FormItem className="col-span-2">
+                    <FormLabel>Included Accessories</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value ?? ''} placeholder="e.g. 箱 / マニュアル" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
