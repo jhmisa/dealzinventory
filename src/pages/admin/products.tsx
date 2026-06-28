@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usePersistedFilters } from '@/hooks/use-persisted-filters'
 import { type ColumnDef } from '@tanstack/react-table'
@@ -27,73 +27,105 @@ import { cn } from '@/lib/utils'
 import type { ProductColorGroup } from '@/services/product-models'
 import type { ProductModelFormValues } from '@/validators/product-model'
 
-function formatStorages(storages: string[] | null): string {
-  if (!storages || storages.length === 0) return '—'
-  const toGb = (s: string) => parseInt(s.replace(/[^0-9]/g, ''), 10) || 0
-  return [...storages]
-    .sort((a, b) => toGb(a) - toGb(b))
-    .map((s) => {
-      const n = toGb(s)
-      return n >= 1024 ? `${n / 1024}TB` : `${n}GB`
-    })
-    .join(' / ')
+function formatStorage(storage: string | null): string {
+  const n = parseInt((storage ?? '').replace(/[^0-9]/g, ''), 10) || 0
+  if (!n) return '—'
+  return n >= 1024 ? `${n / 1024}TB` : `${n}GB`
 }
 
-const columns: ColumnDef<ProductColorGroup>[] = [
-  {
-    id: 'category',
-    header: 'Category',
-    cell: ({ row }) =>
-      row.original.category_name ? (
-        <span className="text-xs bg-muted px-2 py-0.5 rounded">{row.original.category_name}</span>
-      ) : (
-        <span className="text-xs text-muted-foreground">—</span>
+// Split the search box into lowercased tokens (multi-token AND mirrors the RPC).
+function searchTokens(search: string): string[] {
+  return search.trim().toLowerCase().split(/\s+/).filter(Boolean)
+}
+
+function buildColumns(search: string): ColumnDef<ProductColorGroup>[] {
+  const tokens = searchTokens(search)
+  return [
+    {
+      id: 'category',
+      header: 'Category',
+      cell: ({ row }) =>
+        row.original.category_name ? (
+          <span className="text-xs bg-muted px-2 py-0.5 rounded">{row.original.category_name}</span>
+        ) : (
+          <span className="text-xs text-muted-foreground">—</span>
+        ),
+    },
+    {
+      id: 'product_model',
+      header: 'Product Model',
+      cell: ({ row }) => {
+        const g = row.original
+        // Does a SKU line match the search? (storage or part# contains a token.)
+        const lineMatches = (sku: { storage_gb: string | null; part_number: string | null }) => {
+          if (tokens.length === 0) return false
+          const hay = `${formatStorage(sku.storage_gb)} ${sku.part_number ?? ''}`.toLowerCase()
+          return tokens.some((t) => hay.includes(t))
+        }
+        const anyLineMatches = g.skus.some(lineMatches)
+        return (
+          <div className="space-y-0.5">
+            <div className="font-medium">
+              {g.brand} {g.model_name}
+              {g.model_number && (
+                <span className="text-muted-foreground font-normal"> · {g.model_number}</span>
+              )}
+              {' · '}
+              <span>{g.color}</span>
+            </div>
+            {g.skus.length > 0 ? (
+              g.skus.map((sku, i) => {
+                // Dim non-matching lines only when the search points at a specific SKU line.
+                const dim = anyLineMatches && !lineMatches(sku)
+                const hit = anyLineMatches && lineMatches(sku)
+                return (
+                  <div
+                    key={`${sku.storage_gb}-${sku.part_number}-${i}`}
+                    className={cn(
+                      'flex items-center gap-2 text-xs pl-3 tabular-nums',
+                      dim && 'opacity-40',
+                      hit && 'font-medium',
+                    )}
+                  >
+                    <span className="w-12 text-muted-foreground">{formatStorage(sku.storage_gb)}</span>
+                    <span className="font-mono text-muted-foreground">{sku.part_number || '—'}</span>
+                  </div>
+                )
+              })
+            ) : (
+              <div className="text-xs text-muted-foreground pl-3">—</div>
+            )}
+          </div>
+        )
+      },
+    },
+    {
+      id: 'short_description',
+      header: 'Description',
+      cell: ({ row }) => (
+        <span className="text-muted-foreground text-xs line-clamp-2 max-w-[16rem] inline-block align-top">
+          {row.original.short_description || '—'}
+        </span>
       ),
-  },
-  {
-    accessorKey: 'brand',
-    header: 'Brand',
-    cell: ({ row }) => <span className="font-medium">{row.original.brand}</span>,
-  },
-  { accessorKey: 'model_name', header: 'Model' },
-  {
-    accessorKey: 'color',
-    header: 'Color',
-    cell: ({ row }) => <span className="font-medium">{row.original.color}</span>,
-  },
-  {
-    id: 'storages',
-    header: 'Storage',
-    cell: ({ row }) => (
-      <span className="text-muted-foreground text-xs">{formatStorages(row.original.storages)}</span>
-    ),
-  },
-  {
-    id: 'short_description',
-    header: 'Description',
-    cell: ({ row }) => (
-      <span className="text-muted-foreground text-xs line-clamp-1">
-        {row.original.short_description || '—'}
-      </span>
-    ),
-  },
-  {
-    id: 'photos',
-    header: 'Photos',
-    cell: ({ row }) => {
-      const count = row.original.photo_count
-      return <span className={cn('text-sm', count === 0 && 'text-red-500 font-medium')}>{count}</span>
     },
-  },
-  {
-    id: 'videos',
-    header: 'Videos',
-    cell: ({ row }) => {
-      const count = row.original.video_count
-      return <span className={cn('text-sm', count === 0 && 'text-red-500 font-medium')}>{count}</span>
+    {
+      id: 'photos',
+      header: 'Photos',
+      cell: ({ row }) => {
+        const count = row.original.photo_count
+        return <span className={cn('text-sm align-top', count === 0 && 'text-red-500 font-medium')}>{count}</span>
+      },
     },
-  },
-]
+    {
+      id: 'videos',
+      header: 'Videos',
+      cell: ({ row }) => {
+        const count = row.original.video_count
+        return <span className={cn('text-sm align-top', count === 0 && 'text-red-500 font-medium')}>{count}</span>
+      },
+    },
+  ]
+}
 
 export default function ProductListPage() {
   const navigate = useNavigate()
@@ -114,6 +146,7 @@ export default function ProductListPage() {
     media: mediaFilter !== 'all' ? (mediaFilter as 'no-photo' | 'no-video') : undefined,
   })
   const createMutation = useCreateProductModel()
+  const columns = useMemo(() => buildColumns(debouncedSearch || ''), [debouncedSearch])
 
   function handleCreate(values: ProductModelFormValues) {
     createMutation.mutate(values, {
@@ -144,7 +177,7 @@ export default function ProductListPage() {
         <SearchBar
           value={search}
           onChange={setSearch}
-          placeholder="Search by brand, model, or description..."
+          placeholder="Search model, A-number, part#, storage… (e.g. iPhone 15 256, A3089, MTMN3J/A)"
           className="flex-1 min-w-[280px]"
         />
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
@@ -175,7 +208,7 @@ export default function ProductListPage() {
       </div>
 
       {isLoading ? (
-        <TableSkeleton rows={5} columns={8} />
+        <TableSkeleton rows={5} columns={5} />
       ) : (
         <DataTable
           columns={columns}

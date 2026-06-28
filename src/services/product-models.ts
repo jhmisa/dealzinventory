@@ -149,16 +149,25 @@ export async function getProductModels(filters: ProductModelFilters = {}) {
   })
 }
 
+export interface ProductColorGroupSku {
+  storage_gb: string | null
+  part_number: string | null
+}
+
 export interface ProductColorGroup {
   representative_id: string
   color_key: string
   brand: string
   model_name: string
   color: string
+  model_number: string | null
   category_id: string | null
   category_name: string | null
   short_description: string | null
   storages: string[] | null
+  // One entry per storage SKU, ordered by storage size. part# is unique per storage;
+  // model_number is shared across the group (shown once at the header line).
+  skus: ProductColorGroupSku[]
   sku_count: number
   photo_count: number
   video_count: number

@@ -3,8 +3,8 @@
 > Status: GOAL captured 2026-06-28 (awaiting work). Owner: Joey. Builds directly on the shipped
 > color-grouped list + color-fanout media (v1.63.0, see [[project_product_color_fanout_media]] and
 > spec `2026-06-28-product-models-color-media-and-category.md`).
-> **NEXT ACTION after /clear: propose 3 UI options (with a recommendation), get Joey's pick, THEN implement.**
-> Joey explicitly asked for 3 UI proposals BEFORE implementation, and invited pushback.
+> **STATUS 2026-06-28: Joey picked Option A (multi-line cell, one row per color). IMPLEMENTED — RPC `20260628190000` + `products.tsx`. Awaiting visual sign-off + ship.**
+> (History: 3 UI options were proposed; A = honors spec, media counts clean, part# always visible, no new interaction.)
 
 ## What Joey wants
 
