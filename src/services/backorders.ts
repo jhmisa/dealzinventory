@@ -22,7 +22,7 @@ export async function listBackorderLines(filters: BackorderLineFilters = {}) {
     .from('backorder_lines')
     .select(`
       *,
-      product_models(*, categories(name, description_fields)),
+      product_models(*, categories(name, description_fields), product_media(file_url, role, sort_order)),
       suppliers(id, supplier_name)
     `)
     .order('created_at', { ascending: false })

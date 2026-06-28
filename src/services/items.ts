@@ -440,7 +440,7 @@ export async function deleteItemMedia(mediaId: string) {
 // --- Available Inventory Search (for messaging) ---
 
 export interface AvailableInventoryResult {
-  type: 'item' | 'accessory' | 'sell_group'
+  type: 'item' | 'accessory' | 'sell_group' | 'backorder'
   id: string
   code: string
   description: string
@@ -452,6 +452,10 @@ export interface AvailableInventoryResult {
   condition_notes: string | null
   product_model_id: string | null
   accessory_id: string | null
+  // Backorder-only: working-day lead-time range (lead_time_days = upper/max bound,
+  // lead_time_min_days = lower bound). Undefined for the other inventory types.
+  lead_time_days?: number | null
+  lead_time_min_days?: number | null
 }
 
 export interface InventorySearchFilters {
@@ -684,6 +688,75 @@ export async function searchAvailableSellGroups(query: string, filters: Inventor
       condition_notes: null,
       product_model_id: null,
       accessory_id: null,
+    }
+  })
+}
+
+// Backorder (pre-order) lines surface alongside in-stock inventory in the messaging
+// Search Inventory dialog. Mirrors searchAvailableItems: same RPC param shape, same
+// description builder (flat spec fields + category_description_fields), but typed
+// `backorder` and carrying the working-day lead-time range. The RPC already filters to
+// status='ACTIVE' AND available>0.
+export async function searchAvailableBackorderLines(query: string, filters: InventorySearchFilters = {}): Promise<AvailableInventoryResult[]> {
+  const hasQuery = query.trim().length >= 2
+  const hasFilters = filters.brand || filters.categoryId || filters.priceMin != null || filters.priceMax != null
+  if (!hasQuery && !hasFilters) return []
+
+  const params: Record<string, unknown> = {
+    search_query: hasQuery ? query.trim() : '',
+    result_limit: 20,
+  }
+  if (filters.brand) params.filter_brand = filters.brand
+  if (filters.categoryId) params.filter_category_id = filters.categoryId
+  if (filters.priceMin != null) params.price_min = filters.priceMin
+  if (filters.priceMax != null) params.price_max = filters.priceMax
+
+  const { data, error } = await supabase.rpc('search_available_backorder_lines', params)
+  if (error) throw error
+
+  const rows = (data ?? []) as Array<{
+    id: string
+    backorder_code: string
+    condition_grade: string | null
+    selling_price: number | null
+    available: number | null
+    lead_time_days: number | null
+    lead_time_min_days: number | null
+    brand: string | null
+    model_name: string | null
+    hero_media_url: string | null
+    model_number: string | null
+    storage_gb: string | null
+    ram_gb: string | null
+    cpu: string | null
+    gpu: string | null
+    screen_size: number | null
+    color: string | null
+    os_family: string | null
+    year: number | null
+    category_description_fields: string[] | null
+  }>
+
+  return rows.map((row) => {
+    const description = getItemDescription(
+      row as unknown as Record<string, unknown>,
+      null,
+      row.category_description_fields,
+    ) || '—'
+    return {
+      type: 'backorder' as const,
+      id: row.id,
+      code: row.backorder_code,
+      description,
+      grade: row.condition_grade,
+      price: row.selling_price,
+      thumbnail_url: row.hero_media_url,
+      display_url: row.hero_media_url,
+      condition_notes: null,
+      product_model_id: null,
+      accessory_id: null,
+      lead_time_days: row.lead_time_days,
+      lead_time_min_days: row.lead_time_min_days,
     }
   })
 }

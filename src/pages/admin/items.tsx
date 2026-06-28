@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { type ColumnDef } from '@tanstack/react-table'
+import { useQuery } from '@tanstack/react-query'
 import { Plus, Printer, QrCode, Pencil, Copy, AlertTriangle, Image, Play, Star, X, Link2, Radio, Eye, MessageSquare } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -40,6 +41,7 @@ import { printItemLabel } from '@/components/items/label-print'
 import { resolveSoldTo, resolveReservedBy, reservedByMessageLink, type ReservedByInfo } from '@/lib/item-sale'
 import type { Accessory, AccessoryMedia, ConditionGrade } from '@/lib/types'
 import type { LiveSellingSellGroup } from '@/services/sell-groups'
+import { listBackorderLines, type BackorderLineListItem } from '@/services/backorders'
 
 type ItemRow = {
   id: string
@@ -111,12 +113,18 @@ type SellGroupRow = LiveSellingSellGroup & {
   _sg_items: SellGroupItemInfo[]
 }
 
+// Backorder (pre-order, B-code) lines shown as inventory rows. They carry their own joined
+// product_models + supplier and the generated `available` count; not physical items so they're
+// excluded from physical-inventory tabs and the monthly snapshot.
+type BackorderRow = BackorderLineListItem & { _kind: 'backorder' }
+
 type InventoryRow =
   | (ItemRow & { _kind: 'item' })
   | (AccessoryRow & { _kind: 'accessory' })
   | (SellGroupRow & { _kind: 'sell-group' })
+  | BackorderRow
 
-type InventoryTypeFilter = 'all' | 'products' | 'accessories' | 'sell-groups'
+type InventoryTypeFilter = 'all' | 'products' | 'accessories' | 'sell-groups' | 'backorder'
 
 // Shown in the Sold To / Customer Details column when an item is reserved by a
 // PENDING order or offer — gives staff a name to follow up with before confirmation.
@@ -186,7 +194,19 @@ const INVENTORY_TYPE_OPTIONS = [
   { value: 'products', label: 'Products' },
   { value: 'accessories', label: 'Accessories' },
   { value: 'sell-groups', label: 'Group Codes' },
+  { value: 'backorder', label: 'Backorder' },
 ] as const
+
+// Build the spec line for a backorder line the same way items do, so a given model reads
+// identically across Admin Items / Backorders / messaging. Mirrors getItemDesc().
+function getBackorderDesc(line: BackorderLineListItem): string {
+  const pm = line.product_models
+  return getItemDescription(
+    line as unknown as Record<string, unknown>,
+    pm as unknown as Record<string, unknown> | null,
+    pm?.categories?.description_fields,
+  )
+}
 
 const INVENTORY_TABS = [
   { value: 'items', label: 'Items' },
@@ -558,8 +578,22 @@ export default function ItemListPage() {
 
   // Should we show unified view? On All/AVAILABLE/LIVE_SELLING tabs within Items tab
   const showUnified = inventoryTab === 'items' && (statusTab === 'all' || statusTab === 'AVAILABLE' || statusTab === 'LIVE_SELLING')
-  const skipItemsFetch = showUnified && (inventoryType === 'accessories' || inventoryType === 'sell-groups')
-  const skipAccFetch = !showUnified || inventoryType === 'products' || inventoryType === 'sell-groups'
+  const skipItemsFetch = showUnified && (inventoryType === 'accessories' || inventoryType === 'sell-groups' || inventoryType === 'backorder')
+  const skipAccFetch = !showUnified || inventoryType === 'products' || inventoryType === 'sell-groups' || inventoryType === 'backorder'
+
+  // Backorder (pre-order) lines appear as inventory rows on the All / Available status tabs,
+  // either mixed into the "All" type view or alone under the "Backorder" chip. Only sellable
+  // pre-orders (status ACTIVE, available > 0) surface here; PAUSED/CLOSED stay on the
+  // Backorders page. Never shown on LIVE_SELLING and never counted in the inventory snapshot.
+  const showBackorders =
+    showUnified &&
+    (statusTab === 'all' || statusTab === 'AVAILABLE') &&
+    (inventoryType === 'all' || inventoryType === 'backorder')
+  const { data: backorderLinesData, isLoading: backorderLoading } = useQuery({
+    queryKey: ['backorder-lines', { status: 'ACTIVE' }],
+    queryFn: () => listBackorderLines({ status: 'ACTIVE' }),
+    enabled: showBackorders,
+  })
 
   // Fetch items filtered by active status tab
   const { data: allItems, isLoading } = useItems({
@@ -646,14 +680,20 @@ export default function ItemListPage() {
     sorted.sort((a, b) => {
       switch (sortBy) {
         case 'code': {
-          const codeA = a._kind === 'item' ? a.item_code : a._kind === 'accessory' ? a.accessory_code : a.sell_group_code
-          const codeB = b._kind === 'item' ? b.item_code : b._kind === 'accessory' ? b.accessory_code : b.sell_group_code
-          return dir * codeA.localeCompare(codeB)
+          const code = (r: InventoryRow) =>
+            r._kind === 'item' ? r.item_code
+              : r._kind === 'accessory' ? r.accessory_code
+              : r._kind === 'backorder' ? r.backorder_code
+              : r.sell_group_code
+          return dir * code(a).localeCompare(code(b))
         }
         case 'description': {
-          const descA = a._kind === 'item' ? getItemDesc(a) : a._kind === 'accessory' ? [a.brand, a.name].filter(Boolean).join(' ') : a._sg_description
-          const descB = b._kind === 'item' ? getItemDesc(b) : b._kind === 'accessory' ? [b.brand, b.name].filter(Boolean).join(' ') : b._sg_description
-          return dir * descA.localeCompare(descB)
+          const desc = (r: InventoryRow) =>
+            r._kind === 'item' ? getItemDesc(r)
+              : r._kind === 'accessory' ? [r.brand, r.name].filter(Boolean).join(' ')
+              : r._kind === 'backorder' ? getBackorderDesc(r)
+              : r._sg_description
+          return dir * desc(a).localeCompare(desc(b))
         }
         case 'buy_price': {
           const priceA = a._kind === 'item' ? getItemTotalCost(a) : 0
@@ -720,9 +760,40 @@ export default function ItemListPage() {
     })
   }, [])
 
+  // Convert ACTIVE backorder lines to tagged InventoryRow[], applying the same client-side
+  // filters as items (P-code search → backorder_code; description search → spec line; plus
+  // condition/category/brand/price). Only sellable pre-orders (available > 0) are kept.
+  const tagBackorders = useCallback((lines: BackorderLineListItem[] | undefined): InventoryRow[] => {
+    return (lines ?? [])
+      .filter((line) => {
+        if ((line.available ?? 0) <= 0) return false
+        if (debouncedSearch && !line.backorder_code.toLowerCase().includes(debouncedSearch.toLowerCase())) return false
+        if (debouncedDescSearch) {
+          const desc = getBackorderDesc(line)
+          if (!desc.toLowerCase().includes(debouncedDescSearch.toLowerCase())) return false
+        }
+        if (debouncedConditionSearch) {
+          if (!line.condition_notes?.toLowerCase().includes(debouncedConditionSearch.toLowerCase())) return false
+        }
+        const pmBrand = line.product_models?.brand
+        const pmCategory = line.product_models?.categories?.name
+        if (categoryFilter && categoryFilter !== 'all' && pmCategory !== categoryFilter) return false
+        if (brandFilter && brandFilter !== 'all' && pmBrand !== brandFilter) return false
+        const pf = priceFrom ? Number(priceFrom) : null
+        const pt = priceTo ? Number(priceTo) : null
+        if (pf !== null && (line.selling_price == null || Number(line.selling_price) < pf)) return false
+        if (pt !== null && (line.selling_price == null || Number(line.selling_price) > pt)) return false
+        return true
+      })
+      .map((line) => ({ ...line, _kind: 'backorder' as const }))
+  }, [debouncedSearch, debouncedDescSearch, debouncedConditionSearch, categoryFilter, brandFilter, priceFrom, priceTo])
+
   // Build merged unified data when in unified mode
   const unifiedData: InventoryRow[] = useMemo(() => {
     if (!showUnified || inventoryType === 'products') return []
+    if (inventoryType === 'backorder') {
+      return sortInventoryRows(tagBackorders(backorderLinesData))
+    }
     if (inventoryType === 'sell-groups') {
       return sortInventoryRows(tagSellGroups(sellGroupsList))
     }
@@ -769,13 +840,15 @@ export default function ItemListPage() {
       .map((a) => ({ ...a, _kind: 'accessory' as const }))
     // Add sell groups on LIVE_SELLING tab (from live-selling query)
     const taggedSellGroups = statusTab === 'LIVE_SELLING' ? tagSellGroups(liveSellingSellGroups) : []
+    // Add ACTIVE pre-order backorder rows (gated by showBackorders: All/Available tabs only)
+    const taggedBackorders = showBackorders ? tagBackorders(backorderLinesData) : []
 
-    return sortInventoryRows([...taggedItems, ...taggedAcc, ...taggedSellGroups])
-  }, [showUnified, inventoryType, sortedItems, unifiedAccessories, sellGroupsList, liveSellingSellGroups, statusTab, categoryFilter, brandFilter, priceFrom, priceTo, debouncedDescSearch, debouncedConditionSearch, sortInventoryRows, tagSellGroups])
+    return sortInventoryRows([...taggedItems, ...taggedAcc, ...taggedSellGroups, ...taggedBackorders])
+  }, [showUnified, inventoryType, sortedItems, unifiedAccessories, sellGroupsList, liveSellingSellGroups, statusTab, categoryFilter, brandFilter, priceFrom, priceTo, debouncedDescSearch, debouncedConditionSearch, sortInventoryRows, tagSellGroups, tagBackorders, backorderLinesData, showBackorders])
 
   // Unified loading state
   const unifiedIsLoading = showUnified
-    ? (inventoryType === 'sell-groups' ? sgListLoading : inventoryType === 'accessories' ? unifiedAccLoading : inventoryType === 'products' ? isLoading : isLoading || unifiedAccLoading)
+    ? (inventoryType === 'backorder' ? backorderLoading : inventoryType === 'sell-groups' ? sgListLoading : inventoryType === 'accessories' ? unifiedAccLoading : inventoryType === 'products' ? isLoading : isLoading || unifiedAccLoading)
     : isLoading
 
   // Helper to open showcase window for a code
@@ -803,6 +876,7 @@ export default function ItemListPage() {
       size: 40,
       cell: ({ row }: { row: { original: InventoryRow } }) => {
         const r = row.original
+        if (r._kind === 'backorder') return null
         if (r._kind === 'accessory') {
           return (
             <div onClick={(e) => e.stopPropagation()}>
@@ -856,6 +930,45 @@ export default function ItemListPage() {
       maxSize: 900,
       cell: ({ row }) => {
         const r = row.original
+        if (r._kind === 'backorder') {
+          const pm = r.product_models
+          const media = ((pm?.product_media ?? []) as { file_url: string; role: string; sort_order: number }[])
+            .sort((a, b) => a.sort_order - b.sort_order)
+          const thumbUrl = (media.find((m) => m.role === 'hero') ?? media[0])?.file_url
+          const desc = getBackorderDesc(r) || '—'
+          return (
+            <div className="flex items-center gap-3">
+              {thumbUrl ? (
+                <img src={thumbUrl} alt="" className="h-10 w-10 rounded border bg-muted flex-shrink-0 object-cover" />
+              ) : (
+                <div className="h-10 w-10 rounded border bg-muted flex-shrink-0 flex items-center justify-center text-muted-foreground text-xs">—</div>
+              )}
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <CodeDisplay code={r.backorder_code} />
+                  <GradeBadge grade={r.condition_grade as ConditionGrade} />
+                  <span className="rounded bg-amber-100 px-1.5 py-px text-[10px] font-medium text-amber-700 whitespace-nowrap">
+                    ⏳ Pre-order
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    title="Copy Mine link"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      navigator.clipboard.writeText(`${window.location.origin}/mine/${r.backorder_code}`)
+                      toast.success('Mine link copied')
+                    }}
+                  >
+                    <Link2 className="h-3 w-3" />
+                  </Button>
+                </div>
+                <div className="text-sm text-muted-foreground truncate">{desc}</div>
+              </div>
+            </div>
+          )
+        }
         if (r._kind === 'accessory') {
           const brandName = [r.brand, r.name].filter(Boolean).join(' ')
           return (
@@ -1091,6 +1204,9 @@ export default function ItemListPage() {
         if (r._kind === 'sell-group') {
           return r.active ? <Badge variant="outline" className="text-green-700 border-green-400">Active</Badge> : <Badge variant="outline">Inactive</Badge>
         }
+        if (r._kind === 'backorder') {
+          return <Badge variant="outline" className="text-amber-700 border-amber-400 bg-amber-50 whitespace-nowrap">Pre-order ({r.available ?? 0})</Badge>
+        }
         const config = ITEM_STATUSES.find((s) => s.value === r.item_status)
         return config ? <StatusBadge label={config.label} color={config.color} /> : r.item_status
       },
@@ -1101,6 +1217,7 @@ export default function ItemListPage() {
       size: 90,
       cell: ({ row }) => {
         const r = row.original
+        if (r._kind === 'backorder') return r.suppliers?.supplier_name ?? '—'
         if (r._kind !== 'item') return <span className="text-muted-foreground">—</span>
         return r.suppliers?.supplier_name ?? '—'
       },
@@ -1112,6 +1229,7 @@ export default function ItemListPage() {
       cell: ({ row }) => {
         const r = row.original
         if (r._kind !== 'item') {
+          if (r._kind === 'backorder') return <PriceDisplay amount={Number(r.selling_price ?? 0)} />
           if (r._kind === 'accessory') return <PriceDisplay amount={Number(r.selling_price)} />
           if (r._kind === 'sell-group') {
             const repSp = Number((r._sg_items?.[0] as { selling_price?: number | null } | undefined)?.selling_price ?? 0)
@@ -1743,7 +1861,7 @@ export default function ItemListPage() {
             <SearchBar
               value={search}
               onChange={setSearch}
-              placeholder={inventoryType === 'sell-groups' ? 'Search G-code...' : showUnified && inventoryType !== 'products' ? 'Search P-code, A-code, name...' : 'Search P-code...'}
+              placeholder={inventoryType === 'sell-groups' ? 'Search G-code...' : inventoryType === 'backorder' ? 'Search B-code...' : showUnified && inventoryType !== 'products' ? 'Search P-code, A-code, name...' : 'Search P-code...'}
               className="w-[140px]"
             />
             <Select value={gradeFilter} onValueChange={setGradeFilter}>
@@ -1860,12 +1978,20 @@ export default function ItemListPage() {
               onRowClick={(row) => {
                 if (row._kind === 'accessory') navigate(`/admin/accessories/${row.id}`)
                 else if (row._kind === 'sell-group') { /* no-op for sell groups */ }
+                else if (row._kind === 'backorder') navigate('/admin/backorders')
                 else navigate(`/admin/items/${row.id}`)
               }}
               getRowClassName={(row) => {
                 if (row._kind === 'item' && recentlyOrderedItemIds.has(row.id)) return 'animate-[highlight-green_3s_ease-out]'
                 return ''
               }}
+            />
+          ) : showUnified && inventoryType === 'backorder' ? (
+            <DataTable
+              columns={unifiedColumns}
+              data={unifiedData}
+              enableColumnResizing
+              onRowClick={() => navigate('/admin/backorders')}
             />
           ) : showUnified && inventoryType === 'sell-groups' ? (
             <DataTable

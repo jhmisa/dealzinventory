@@ -212,12 +212,14 @@ export function useAvailableInventorySearch(query: string, filters: InventorySea
         itemsService.searchAvailableItems(query, filters),
         (hasQuery || hasFilters) ? searchAvailableAccessories(query, filters) : Promise.resolve([]),
         (hasQuery || hasFilters) ? itemsService.searchAvailableSellGroups(query, filters) : Promise.resolve([]),
+        (hasQuery || hasFilters) ? itemsService.searchAvailableBackorderLines(query, filters) : Promise.resolve([]),
       ])
       const items = results[0].status === 'fulfilled' ? results[0].value : []
       const accessories = results[1].status === 'fulfilled' ? results[1].value : []
       const sellGroups = results[2].status === 'fulfilled' ? results[2].value : []
+      const backorders = results[3].status === 'fulfilled' ? results[3].value : []
       // Sort: exact code matches first, then alphabetically
-      const all = [...items, ...accessories as unknown as AvailableInventoryResult[], ...sellGroups]
+      const all = [...items, ...accessories as unknown as AvailableInventoryResult[], ...sellGroups, ...backorders]
       const q = query.toLowerCase()
       return all.sort((a, b) => {
         const aExact = a.code.toLowerCase() === q ? 0 : 1

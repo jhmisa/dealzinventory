@@ -30,6 +30,17 @@ interface InventorySearchModalProps {
   onInsertItem: (text: string, attachment?: MessageAttachment, thumbnailUrl?: string) => void
 }
 
+// Render a backorder lead time as a working-day range. Mirrors offer-reply.ts formatLeadTime
+// so manually-inserted pre-order offers read identically to the AI-generated ones.
+function formatLeadTime(min: number | null | undefined, max: number | null | undefined): string | null {
+  const lo = typeof min === 'number' && min > 0 ? min : null
+  const hi = typeof max === 'number' && max > 0 ? max : null
+  if (lo && hi) return lo === hi ? `${hi} working days` : `${lo}–${hi} working days`
+  if (hi) return `${hi} working days`
+  if (lo) return `${lo} working days`
+  return null
+}
+
 export const InventorySearchModal = memo(function InventorySearchModal({
   open,
   onClose,
@@ -144,6 +155,15 @@ export const InventorySearchModal = memo(function InventorySearchModal({
           if (item.grade) lines.push(`🏅 Rank ${item.grade}`)
           if (priceText) lines.push(priceText)
           lines.push(`📸 View & Order: ${baseUrl}/mine/${item.code}`)
+        } else if (item.type === 'backorder') {
+          // Pre-order block — mirrors offer-reply.ts formatOfferBlock for backorders.
+          lines.push(`🏷 ${item.code}`)
+          lines.push(`📝 ${item.description}`)
+          if (item.grade) lines.push(`🏅 Rank ${item.grade}`)
+          if (priceText) lines.push(priceText)
+          const lead = formatLeadTime(item.lead_time_min_days, item.lead_time_days)
+          lines.push(lead ? `⏳ Pre-order · ${lead}` : `⏳ Pre-order`)
+          lines.push(`📸 Buy Now & View Photos: ${baseUrl}/mine/${item.code}`)
         } else {
           lines.push(`🏷 ${item.code}`)
           lines.push(`📝 ${item.description}`)
@@ -268,6 +288,11 @@ export const InventorySearchModal = memo(function InventorySearchModal({
                     </td>
                     <td className="py-2 pr-3">
                       <span className="font-mono text-xs">{item.code}</span>
+                      {item.type === 'backorder' && (
+                        <span className="mt-0.5 block w-fit rounded bg-amber-100 px-1 py-px text-[10px] font-medium text-amber-700">
+                          ⏳ Pre-order
+                        </span>
+                      )}
                     </td>
                     <td className="py-2">
                       {item.grade ? (
@@ -281,6 +306,12 @@ export const InventorySearchModal = memo(function InventorySearchModal({
                       {item.condition_notes && (
                         <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">{item.condition_notes}</p>
                       )}
+                      {item.type === 'backorder' && (() => {
+                        const lead = formatLeadTime(item.lead_time_min_days, item.lead_time_days)
+                        return lead ? (
+                          <p className="text-[11px] text-amber-700 mt-0.5">~{lead}</p>
+                        ) : null
+                      })()}
                     </td>
                     <td className="py-2 pr-3 text-right">
                       <span className="text-xs font-medium">{formatPrice(item.price)}</span>
