@@ -22,6 +22,23 @@ Deno.test('getItemDescription: no description_fields falls back to slash concat'
   assertEquals(getItemDescription(item, null, null), 'Oppo A5 5G / 4GB / 128GB / 6.56"');
 });
 
+Deno.test('getItemDescription: fallback includes color after the model (color is a universal spec)', () => {
+  const item = {
+    brand: 'Apple', model_name: 'iPhone 16 Pro Max', color: 'Desert Titanium',
+    cpu: 'A18 Pro', ram_gb: 8, storage_gb: 256, screen_size: 6.9,
+  };
+  assertEquals(
+    getItemDescription(item, null, null),
+    'Apple iPhone 16 Pro Max / Desert Titanium / A18 Pro / 8 / 256 / 6.9"',
+  );
+});
+
+Deno.test('getItemDescription: fallback color falls back to productModel.color', () => {
+  const item = { brand: 'Apple', model_name: 'iPhone 15', storage_gb: 128 };
+  const pm = { color: 'Black' };
+  assertEquals(getItemDescription(item, pm, null), 'Apple iPhone 15 / Black / 128');
+});
+
 Deno.test('getItemDescription: pulls missing fields from productModel', () => {
   const item = { ram_gb: '16GB' };
   const pm = { brand: 'Dell', model_name: 'XPS 13', storage_gb: '512GB' };

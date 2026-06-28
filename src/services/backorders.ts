@@ -85,6 +85,48 @@ export async function createBackorderLine(
   return data as BackorderLine
 }
 
+// Find an existing ACTIVE backorder line that would duplicate a new one — either the
+// same supplier listing URL, or the same SKU identity (product + grade + storage + color).
+// Used by the Add-Backorder dialog to block accidental duplicates before insert.
+// Returns the existing B-code if a match exists, else null.
+export async function findExistingBackorderLine(params: {
+  product_id: string
+  condition_grade: ConditionGrade
+  storage_gb: number | null
+  color: string | null
+  supplier_url: string | null
+}): Promise<string | null> {
+  // 1) Same supplier listing URL — strongest duplicate signal.
+  const url = params.supplier_url?.trim()
+  if (url) {
+    const { data, error } = await supabase
+      .from('backorder_lines')
+      .select('backorder_code')
+      .eq('status', 'ACTIVE')
+      .eq('supplier_url', url)
+      .limit(1)
+    if (error) throw error
+    if (data && data.length > 0) return data[0].backorder_code
+  }
+
+  // 2) Same SKU identity: product + grade + storage (normalized) + color (case-insensitive).
+  let query = supabase
+    .from('backorder_lines')
+    .select('backorder_code, storage_gb, color')
+    .eq('status', 'ACTIVE')
+    .eq('product_id', params.product_id)
+    .eq('condition_grade', params.condition_grade)
+  const color = params.color?.trim()
+  query = color ? query.ilike('color', color) : query.is('color', null)
+
+  const { data, error } = await query
+  if (error) throw error
+
+  const target = normalizeStorageGb(params.storage_gb)
+  const match = (data ?? []).find((r) => normalizeStorageGb(r.storage_gb) === target)
+  return match ? match.backorder_code : null
+}
+
 export async function updateBackorderLine(
   id: string,
   updates: BackorderLineUpdate,

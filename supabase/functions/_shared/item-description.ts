@@ -55,8 +55,12 @@ export function getItemDescription(
   const modelName = item.model_name ?? productModel?.model_name;
   const fullModel = brand && modelName ? `${brand} ${modelName}` : null;
   const screenSize = item.screen_size ?? productModel?.screen_size;
+  // color is a universal core spec (customers want it too), so it belongs in the
+  // generic fallback — not just the category description_fields path.
+  const color = item.color ?? productModel?.color;
   const parts = [
     fullModel,
+    color,
     item.cpu,
     item.ram_gb,
     item.storage_gb,

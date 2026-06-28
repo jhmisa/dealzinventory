@@ -43,6 +43,7 @@ import {
   fetchSupplierProduct,
   searchProductImages,
   createBackorderLine,
+  findExistingBackorderLine,
   saveBackorderPhotos,
 } from '@/services/backorders'
 import { backorderSchema, type BackorderFormValues } from '@/validators/backorder'
@@ -432,6 +433,22 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
   async function handleSubmit(values: BackorderFormValues) {
     setSaving(true)
     try {
+      // Block accidental duplicates: same supplier URL or same SKU identity.
+      const existing = await findExistingBackorderLine({
+        product_id: values.product_id,
+        condition_grade: values.condition_grade,
+        storage_gb: values.storage_gb ?? null,
+        color: values.color?.trim() || null,
+        supplier_url: values.supplier_url?.trim() || null,
+      })
+      if (existing) {
+        toast.error(
+          `A pre-order for this exact item already exists (${existing}). Edit that line — e.g. increase its quantity — instead of adding a duplicate.`,
+        )
+        setSaving(false)
+        return
+      }
+
       const line = await createBackorderLine({
         product_id: values.product_id,
         supplier_id: values.supplier_id,

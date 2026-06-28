@@ -726,6 +726,7 @@ export async function searchAvailableBackorderLines(query: string, filters: Inve
     model_name: string | null
     hero_media_url: string | null
     model_number: string | null
+    part_number: string | null
     storage_gb: string | null
     ram_gb: string | null
     cpu: string | null
@@ -738,11 +739,20 @@ export async function searchAvailableBackorderLines(query: string, filters: Inve
   }>
 
   return rows.map((row) => {
-    const description = getItemDescription(
+    const base = getItemDescription(
       row as unknown as Record<string, unknown>,
       null,
       row.category_description_fields,
-    ) || '—'
+    )
+    // Append the staff-only model identifier `A3295 (MYWJ3J/A)` AFTER the shared
+    // description, matching Admin Items getBackorderDesc() so the two staff surfaces
+    // stay identical. Kept out of getItemDescription (and thus customer offers).
+    const ident = row.model_number
+      ? row.part_number
+        ? `${row.model_number} (${row.part_number})`
+        : row.model_number
+      : null
+    const description = (ident ? `${base} · ${ident}` : base) || '—'
     return {
       type: 'backorder' as const,
       id: row.id,
