@@ -17,12 +17,14 @@ import { ipadSpec } from "./ipad-specs.ts"
 import {
   type AndroidBrandConfig,
   type AndroidListingSku,
+  AQUOS_CONFIG,
   GALAXY_CONFIG,
   parseAndroidListingPage,
   XPERIA_CONFIG,
 } from "./android-listing.ts"
 import { galaxySpec } from "./galaxy-specs.ts"
 import { xperiaSpec } from "./xperia-specs.ts"
+import { aquosSpec } from "./aquos-specs.ts"
 
 export interface CarrierSection {
   path: string // url segment, e.g. "simfree" / "wifi"
@@ -231,6 +233,12 @@ export const XPERIA_CATEGORY: HarvestCategory = androidCategory(
   "items/smartphone/xperia",
   XPERIA_CONFIG,
   xperiaSpec,
+)
+
+export const AQUOS_CATEGORY: HarvestCategory = androidCategory(
+  "items/smartphone/aquos",
+  AQUOS_CONFIG,
+  aquosSpec,
 )
 
 export interface HarvestOptions {

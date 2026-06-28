@@ -8,6 +8,7 @@
 // core for the reusable "new phones came in -> re-run" path.
 
 import {
+  AQUOS_CATEGORY,
   GALAXY_CATEGORY,
   harvestCatalog,
   IPAD_CATEGORY,
@@ -25,6 +26,8 @@ const category = which === "ipad"
   ? GALAXY_CATEGORY
   : which === "xperia"
   ? XPERIA_CATEGORY
+  : which === "aquos"
+  ? AQUOS_CATEGORY
   : IPHONE_CATEGORY
 console.error(`=== harvesting category: ${which} ===`)
 

@@ -134,7 +134,10 @@ export function parseAndroidListingTitle(
   const model_name = config.canonicalModelName(nameSeg)
   if (!model_name) return null
 
-  // 6. Trailing 【...】 note (carrier / RAM / ROM / region).
+  // 6. Trailing 【...】 note (carrier / RAM / ROM / region). First discard any trailing pure-noise
+  //    bracket like 【法人モデル】 (corporate-channel marker) that can follow the real note bracket,
+  //    e.g. "...ブラック【SoftBank版 SIMフリー】【法人モデル】" — so the carrier bracket is read, not this.
+  tail = tail.replace(/(?:\s*【\s*法人モデル\s*】\s*)+$/, "").trim()
   let region_note: string | null = null
   const tb = tail.match(TRAILING_BRACKET)
   if (tb) {
@@ -172,9 +175,13 @@ export function parseAndroidListingTitle(
   }
 
   // 9. Color: prefer the text after the code; strip any trailing full-SKU / code-like token
-  //    (ASCII alnum with a digit, e.g. "ブラック SCV46SKV"). Else recover the color from inside
-  //    the note bracket (the "everything in bracket" 楽天版 grammar).
-  let colorText = tail.replace(/(\s+[A-Za-z][A-Za-z0-9/]*\d[A-Za-z0-9/]*)+$/, "").trim()
+  //    (ASCII alnum with a digit, e.g. "ブラック SCV46SKV") and the corporate-channel marketing
+  //    marker 法人モデル (business SKU; brand-agnostic JP retail noise, e.g. "ブラック 法人モデル").
+  //    Else recover the color from inside the note bracket (the "everything in bracket" 楽天版 grammar).
+  let colorText = tail
+    .replace(/\s*法人モデル\s*$/, "")
+    .replace(/(\s+[A-Za-z][A-Za-z0-9/]*\d[A-Za-z0-9/]*)+$/, "")
+    .trim()
   if (!colorText && region_note) colorText = colorFromNote(region_note)
   let color_ja: string | null = null
   let color_en: string | null = null
@@ -420,4 +427,75 @@ export const XPERIA_CONFIG: AndroidBrandConfig = {
       .replace(/\s+/g, " ")
       .trim(),
   colorJaToEn: xperiaColorJaToEn,
+}
+
+// ---------------------------------------------------------------------------
+// Sharp AQUOS config
+// ---------------------------------------------------------------------------
+
+// Seed color map (observed on iosys + Sharp official EN names; verified research pass 2026-06-28).
+// Unmapped JA colors stay null (flagged, never guessed) — they still promote as the JA token via
+// coalesce in the fill-gaps. ASCII colors (e.g. "Charcoal", "Olive Green") flow straight through.
+// Deliberately NOT mapped (no verified Sharp EN spelling, ambiguous marketing name): クラッシィブルー,
+// サクラ, アッシュイエロー, and the sense2-gen pastel cluster (ラベンダーブルー/ペールピンク/ミントグリーン/
+// アクアブルー/コーラルマゼンタ/アイスグリーン/ブルーミングレッド/ボタニカルグリーン).
+export const AQUOS_COLORS_JA_EN: Record<string, string> = {
+  // Generic / basic (verified-direct)
+  "ブラック": "Black",
+  "ホワイト": "White",
+  "シルバー": "Silver",
+  "ブルー": "Blue",
+  "グリーン": "Green",
+  "ピンク": "Pink",
+  "レッド": "Red",
+  "ゴールド": "Gold",
+  "ネイビー": "Navy",
+  "パープル": "Purple",
+  "コーラル": "Coral",
+  // AQUOS signature colors (Sharp official EN — verified)
+  "カシミヤホワイト": "Cashmere White", // R10 / R9
+  "シルバーホワイト": "Silver White", // sense3 series
+  "ライトカッパー": "Light Copper", // sense4/5G/6/7/8/9
+  "ディープカッパー": "Deep Copper", // sense7 plus
+  "チャコール": "Charcoal", // wish / wish2
+  "オリーブグリーン": "Olive Green", // wish / wish2
+  "ニュアンスブラック": "Nuance Black", // sense5G / sense2
+  "アースブルー": "Earth Blue", // R5G
+  "ミスティックホワイト": "Mystic White", // zero2
+  "アストロブラック": "Astro Black", // zero2
+  "チャコールブラック": "Charcoal Black", // R10 trio (Cashmere White / Charcoal Black / Trench Beige)
+  "ペールグリーン": "Pale Green", // sense8 (verified)
+  // Standard compound colors — direct katakana transliterations of generic color words (same basis
+  // as the Galaxy/Xperia maps: Sky Blue, Coral Red, Cream, etc.). Not marketing-specific names.
+  "ライトシルバー": "Light Silver",
+  "ライラック": "Lilac",
+  "ソフトピンク": "Soft Pink",
+  "アイボリー": "Ivory",
+  "スカイブルー": "Sky Blue",
+  "コーラルレッド": "Coral Red",
+  "イエローゴールド": "Yellow Gold",
+  "オリーブシルバー": "Olive Silver",
+  "クリーム": "Cream",
+}
+
+export function aquosColorJaToEn(ja: string | null): string | null {
+  if (!ja) return null
+  return AQUOS_COLORS_JA_EN[ja] ?? null
+}
+
+export const AQUOS_CONFIG: AndroidBrandConfig = {
+  brand: "Sharp",
+  brandPrefixes: ["SHARP", "Sharp"],
+  modelNameRe: /aquos/i, // lenient (contains): leading carrier junk handled in canonical
+  // Sharp JP codes: SIM-free SH-M##; Rakuten SH-RM##; docomo SH-##L (2 digits + letter);
+  // au SHG##/SHV##; SoftBank A###SH. SH-RM listed before SH-M so it wins. First match wins.
+  modelCodeRe: /\b(SH-RM\d+|SH-M\d+|SH-\d{2}[A-Z]|SHG\d+|SHV\d+|A\d{3}SH)\b/,
+  canonicalModelName: (seg) =>
+    seg
+      .replace(/^.*?AQUOS/i, "AQUOS") // drop leaked carrier/brand prefix; normalise "AQUOS" casing
+      .replace(/\b5G\b/gi, "") // safe: integral "sense5G"/"R5G"/"zero5G" have no word boundary before 5
+      .replace(/\b(Single|Dual)[- ]?SIM\b/gi, "")
+      .replace(/\s+/g, " ")
+      .trim(),
+  colorJaToEn: aquosColorJaToEn,
 }

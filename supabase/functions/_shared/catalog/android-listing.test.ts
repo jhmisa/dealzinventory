@@ -1,5 +1,6 @@
 import { assertEquals } from "https://deno.land/std/assert/mod.ts"
 import {
+  AQUOS_CONFIG,
   extractAndroidCardTitles,
   GALAXY_CONFIG,
   parseAndroidListingPage,
@@ -9,6 +10,7 @@ import {
 
 const galaxy = (t: string) => parseAndroidListingTitle(t, GALAXY_CONFIG)
 const xperia = (t: string) => parseAndroidListingTitle(t, XPERIA_CONFIG)
+const aquos = (t: string) => parseAndroidListingTitle(t, AQUOS_CONFIG)
 
 Deno.test("galaxy: SM-..Q simfree, ROM in bracket, JA color", () => {
   const s = galaxy("Galaxy A57 5G SM-A576Q オーサムネイビー 【RAM8GB/ROM128GB/国内版 SIMフリー】")
@@ -265,6 +267,152 @@ Deno.test("xperia: page extraction pulls only coded SKU cards", () => {
   const skus = parseAndroidListingPage(html, XPERIA_CONFIG)
   assertEquals(skus.length > 5, true)
   assertEquals(skus.every((s) => s.brand === "Sony" && /^Xperia/.test(s.model_name)), true)
+  assertEquals(skus.every((s) => s.model_number != null), true)
+  const keys = new Set(skus.map((s) => `${s.model_name}|${s.storage_gb}|${s.color_en ?? s.color_ja}|${s.carrier}`))
+  assertEquals(keys.size, skus.length)
+})
+
+// ---------------------------------------------------------------------------
+// Sharp AQUOS
+// ---------------------------------------------------------------------------
+
+Deno.test("aquos: simfree SH-M code, labelled RAM/ROM, JA color", () => {
+  const s = aquos("AQUOS R10 SH-M31 カシミヤホワイト【RAM12GB/ROM256GB 国内版SIMフリー】")
+  assertEquals(s?.brand, "Sharp")
+  assertEquals(s?.model_name, "AQUOS R10")
+  assertEquals(s?.model_number, "SH-M31")
+  assertEquals(s?.storage_gb, 256)
+  assertEquals(s?.ram_gb, 12)
+  assertEquals(s?.color_ja, "カシミヤホワイト")
+  assertEquals(s?.color_en, "Cashmere White")
+  assertEquals(s?.carrier, "SIM-Free") // 国内版
+  assertEquals(s?.is_unlocked, true)
+})
+
+Deno.test("aquos: SH-M code, no storage in title", () => {
+  const s = aquos("AQUOS R9 SH-M28 ホワイト【国内版SIMフリー】")
+  assertEquals(s?.model_name, "AQUOS R9")
+  assertEquals(s?.model_number, "SH-M28")
+  assertEquals(s?.storage_gb, null)
+  assertEquals(s?.color_en, "White")
+  assertEquals(s?.carrier, "SIM-Free")
+})
+
+Deno.test("aquos: bare {ram}GB/{rom}GB bracket (no labels)", () => {
+  const s = aquos("AQUOS sense9 SH-M29 ホワイト【6GB/128GB 国内版SIMフリー】")
+  assertEquals(s?.model_name, "AQUOS sense9")
+  assertEquals(s?.storage_gb, 128) // larger bare GB = storage
+  assertEquals(s?.ram_gb, 6) // smaller bare GB = RAM
+  assertEquals(s?.color_en, "White")
+})
+
+Deno.test("aquos: Rakuten SH-RM code wins over SH-M, ASCII color", () => {
+  const s = aquos("AQUOS sense3 lite SH-RM12 Light Copper【楽天版 SIMフリー】")
+  assertEquals(s?.model_name, "AQUOS sense3 lite")
+  assertEquals(s?.model_number, "SH-RM12") // not mis-split as SH-M
+  assertEquals(s?.color_en, "Light Copper")
+  assertEquals(s?.color_ja, null)
+  assertEquals(s?.carrier, "Rakuten")
+})
+
+Deno.test("aquos: sense5G integral 5G NOT stripped from name", () => {
+  const s = aquos("AQUOS sense5G SHG03 ライトカッパー【au版 SIMフリー】")
+  assertEquals(s?.model_name, "AQUOS sense5G") // 5G preserved (no word boundary before 5)
+  assertEquals(s?.color_en, "Light Copper")
+  assertEquals(s?.carrier, "au")
+})
+
+Deno.test("aquos: au SHG code, JA color, spaced bracket", () => {
+  const s = aquos("AQUOS sense6 SHG05 シルバー 【au版 SIMフリー】")
+  assertEquals(s?.model_name, "AQUOS sense6")
+  assertEquals(s?.model_number, "SHG05")
+  assertEquals(s?.color_en, "Silver")
+  assertEquals(s?.carrier, "au")
+})
+
+Deno.test("aquos: au SHV code + かんたん variant + carrier-word prefix + leading unlock", () => {
+  const s = aquos("【SIMロック解除済】au AQUOS sense2 かんたん SHV43 Bright Silver")
+  assertEquals(s?.model_name, "AQUOS sense2 かんたん") // sub-variant kept
+  assertEquals(s?.model_number, "SHV43")
+  assertEquals(s?.carrier, "au") // prefix word
+  assertEquals(s?.is_unlocked, true)
+  assertEquals(s?.color_en, "Bright Silver")
+})
+
+Deno.test("aquos: サウンド variant kept in name", () => {
+  const s = aquos("【SIMロック解除済】au AQUOS sense3 plus サウンド SHV46 クラッシィブルー")
+  assertEquals(s?.model_name, "AQUOS sense3 plus サウンド")
+  assertEquals(s?.model_number, "SHV46")
+  assertEquals(s?.color_ja, "クラッシィブルー")
+  assertEquals(s?.color_en, null) // unverified EN, never guessed
+})
+
+Deno.test("aquos: SoftBank A###SH code", () => {
+  const s = aquos("AQUOS sense7 plus A208SH ディープカッパー【SoftBank版 SIMフリー】")
+  assertEquals(s?.model_name, "AQUOS sense7 plus")
+  assertEquals(s?.model_number, "A208SH")
+  assertEquals(s?.color_en, "Deep Copper")
+  assertEquals(s?.carrier, "SoftBank")
+})
+
+Deno.test("aquos: 法人モデル corporate marker stripped from color", () => {
+  const s = aquos("AQUOS wish3 A303SH ブラック 法人モデル【SoftBank版 SIMフリー】")
+  assertEquals(s?.model_name, "AQUOS wish3")
+  assertEquals(s?.model_number, "A303SH")
+  assertEquals(s?.color_ja, "ブラック") // 法人モデル stripped
+  assertEquals(s?.color_en, "Black")
+  assertEquals(s?.carrier, "SoftBank")
+})
+
+Deno.test("aquos: 法人モデル as its own trailing bracket after carrier bracket", () => {
+  const s = aquos("AQUOS wish3 A303SH ブラック【SoftBank版 SIMフリー】【法人モデル】")
+  assertEquals(s?.model_name, "AQUOS wish3")
+  assertEquals(s?.model_number, "A303SH")
+  assertEquals(s?.color_ja, "ブラック") // trailing 【法人モデル】 discarded, carrier bracket read
+  assertEquals(s?.color_en, "Black")
+  assertEquals(s?.carrier, "SoftBank")
+})
+
+Deno.test("aquos: docomo SH-##L code, leading network-restriction bracket", () => {
+  const s = aquos("【ネットワーク利用制限－】AQUOS sense7 SH-53C ライトカッパー【docomo版 SIMフリー】")
+  assertEquals(s?.model_name, "AQUOS sense7")
+  assertEquals(s?.model_number, "SH-53C")
+  assertEquals(s?.color_en, "Light Copper")
+  assertEquals(s?.carrier, "docomo")
+})
+
+Deno.test("aquos: docomo SH-02M, ASCII color, carrier-word + unlock", () => {
+  const s = aquos("【SIMロック解除済】docomo AQUOS sense3 SH-02M Black")
+  assertEquals(s?.model_name, "AQUOS sense3")
+  assertEquals(s?.model_number, "SH-02M")
+  assertEquals(s?.color_en, "Black")
+  assertEquals(s?.carrier, "docomo")
+  assertEquals(s?.is_unlocked, true)
+})
+
+Deno.test("aquos: MVNO 版 (J:COM) maps to no carrier-word, slash-RAM bracket", () => {
+  const s = aquos("AQUOS wish SH-M20 Olive Green【RAM4GB/ROM64GB/国内版 SIMフリー】")
+  assertEquals(s?.model_name, "AQUOS wish")
+  assertEquals(s?.storage_gb, 64)
+  assertEquals(s?.ram_gb, 4)
+  assertEquals(s?.color_en, "Olive Green")
+  assertEquals(s?.carrier, "SIM-Free") // 国内版
+})
+
+Deno.test("aquos: non-AQUOS / no code -> null", () => {
+  assertEquals(aquos("AQUOS"), null) // nav thumb, no code
+  assertEquals(aquos("Galaxy S24 SM-S921Q ブラック"), null) // not AQUOS
+})
+
+Deno.test("aquos: page extraction pulls only coded SKU cards", () => {
+  const html = Deno.readTextFileSync(
+    new URL("./__fixtures__/iosys-aquos-p1.html", import.meta.url),
+  )
+  const titles = extractAndroidCardTitles(html, AQUOS_CONFIG)
+  assertEquals(titles.length > 5, true)
+  const skus = parseAndroidListingPage(html, AQUOS_CONFIG)
+  assertEquals(skus.length > 5, true)
+  assertEquals(skus.every((s) => s.brand === "Sharp" && /^AQUOS/.test(s.model_name)), true)
   assertEquals(skus.every((s) => s.model_number != null), true)
   const keys = new Set(skus.map((s) => `${s.model_name}|${s.storage_gb}|${s.color_en ?? s.color_ja}|${s.carrier}`))
   assertEquals(keys.size, skus.length)

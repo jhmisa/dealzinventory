@@ -65,6 +65,10 @@ dedupes on `sku_key`, runs from a local runner (`run-harvest-local.ts <category>
 - **Sony Xperia phones** — 106 ANDROID product_models / 31 models (v1.66.0); `XPERIA_CONFIG` + `xperia-specs.ts`
   (34 models, research-verified) + Sony color map. Inline legacy reconcile of 3 COMPUTER-miscategorized Sony
   rows done. Recipe proven a 2nd time with zero engine changes.
+- **Sharp AQUOS phones** — 80 ANDROID product_models / 32 models (v1.67.0); `AQUOS_CONFIG` + `aquos-specs.ts`
+  (34 models, research-verified) + Sharp color map. Inline legacy reconcile of 4 COMPUTER-miscategorized
+  `Aquos Sense3` rows (incl. a Black dup merged via `superseded_by`). One small GENERIC engine fix: discard a
+  trailing pure-noise `【法人モデル】` corporate bracket so the carrier bracket is read. Recipe proven a 3rd time.
 - **Identifier-display list** — `/admin/products` shows Brand·Model·model#·color + per-storage part# with
   dynamic multi-token search (v1.64.0).
 
@@ -97,7 +101,7 @@ dedupes on `sku_key`, runs from a local runner (`run-harvest-local.ts <category>
 
 ## Phased roadmap (priority = kaitori value × pipeline readiness)
 **Phase A — Android phones (pipeline ready, highest volume).** Brand-by-brand, each its own session-sized
-unit. Suggested order (volume/ease): **~~Xperia~~ ✓ → AQUOS (next) → Pixel → Xiaomi → OPPO → arrows → Huawei →
+unit. Suggested order (volume/ease): **~~Xperia~~ ✓ → ~~AQUOS~~ ✓ → Pixel (next) → Xiaomi → OPPO → arrows → Huawei →
 Zenfone/ROG → Motorola razr.** Recipe below. Also fold in the **deferred legacy-Samsung reconcile**
 (42 COMPUTER-miscategorized `Samsung` rows, 37 referenced by 117 live items → recategorize→ANDROID, dedup
 vs the clean Galaxy rows, re-point items, archive stubs; mirrors iPhone Phase 2).
