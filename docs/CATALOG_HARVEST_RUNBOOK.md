@@ -178,6 +178,7 @@ Re-harvest for new Apple models follows the same shape as §2 (add specs → re-
 | Xiaomi | Xiaomi | `items/smartphone/xiaomi` | au `XIG\d+` · SoftBank `A\d{3}XM` · POCO global `\d{8}[A-Z]?` — **+ code-less SIM-free via `nameConsumeRe`** | `xiaomi-specs.ts` / `XIAOMI_COLORS_JA_EN` | `2026-06-28-xiaomi-fill-gaps.sql` | `iosys-xiaomi-p1.html` | ✅ + **legacy reconcile OPEN** (~33 COMPUTER rows / ~125 items) |
 | OPPO | OPPO→`Oppo` | `items/smartphone/oppo` | global `CPH\d+` · au `OPG\d+` · SoftBank/Y!mobile `A\d{3}OP` — **+ code-less old via `nameConsumeRe`** | `oppo-specs.ts` / `OPPO_COLORS_JA_EN` | `2026-06-28-oppo-fill-gaps.sql` | `iosys-oppo-p1.html` | ✅ + **legacy reconcile OPEN** (~25 COMPUTER rows / ~110 items) |
 | arrows | Fujitsu/FCNT | `items/smartphone/arrows` | docomo `F-\d{2}[A-Z]` · au `FCG\d+` · SoftBank `A\d{3}FC` · SIM-free `M\d{2}` | `arrows-specs.ts` / `ARROWS_COLORS_JA_EN` | `2026-06-28-arrows-fill-gaps.sql` | `iosys-arrows-p1.html` | ✅ + **small legacy reconcile OPEN** (~9 arrows rows; ⚠️ LifeBooks are real laptops) |
+| HUAWEI | Huawei | `items/smartphone/huawei` | global `[A-Z]{3}-[A-Z]{1,2}\d{1,2}[A-Z]?` (J=Japan) · au `HWV\d+` · docomo `HW-\d{2}[A-Z]` | `huawei-specs.ts` / `HUAWEI_COLORS_JA_EN` | `2026-06-28-huawei-fill-gaps.sql` | `iosys-huawei-p1.html` | ✅ + **small legacy reconcile OPEN** (~8 rows); honor = separate brand (excluded) |
 | iPhone | Apple | `items/smartphone/iphone` | part# (`MXVH3J/A`) | `iphone-specs.ts` / `apple-colors.ts` | phase2/3/5 data-ops | `iosys-iphone-simfree-p1.html` | ✅ |
 | iPad | Apple | `items/tablet/ios/ipad` | part# | `ipad-specs.ts` / `apple-colors.ts` | phase4-ipad data-ops | `iosys-ipad-*-p1.html` | ✅ |
 
@@ -225,6 +226,18 @@ Re-harvest for new Apple models follows the same shape as §2 (add specs → re-
 - **Watch-outs:** new `a`-models appear fast (Pixel 10a `GV0BP` shipped 2026-04 — caught as an
   `unknownModels` entry, added to specs). Two `Google` rows are smart speakers (Nest Mini / Home Mini),
   NOT phones — left as COMPUTER, out of scope.
+
+### HUAWEI (P-series / Mate / nova)
+- **Codes:** global model code = 3 uppercase letters + `-` + alnum (`ANE-LX2J`, `ELS-NX9`; trailing
+  `J` = Japan SIM-free) · au `HWV##` · docomo `HW-##[A-Z]`. The simfree crawl captures unlocked
+  ex-carrier cards too (HWV/HW- coded), so all models land even though /au /docomo sections read empty.
+- **Engine capability added with HUAWEI (generic):** strip a parenthesized secondary carrier code right
+  after the model code — `ANE-LX2J (HWU34) Klein Blue`. Canonicalizer also peels MVNO prefixes the
+  engine's carrier-word list (docomo/au/softbank/rakuten) misses: **Y!mobile / UQ / mineo**. Inserts the
+  nova space (`nova3`→`nova 3`). KEEPS `5G` (P40 Pro 5G).
+- **⚠️ honor is a SEPARATE brand** in iosys — `modelNameRe` excludes it so "HUAWEI honor6" never lands
+  under "Huawei". Color note: クラインブルー = **Klein Blue**, NOT クラッシュブルー = Crush Blue (distinct).
+  Most HUAWEI colors are English on iosys and pass straight through.
 
 ### arrows (Fujitsu / FCNT)
 - **Codes:** docomo `F-##[A-Z]` (F = Fujitsu/FCNT prefix) · au `FCG##` (FCNT-era; older Fujitsu au = `FJ##`)

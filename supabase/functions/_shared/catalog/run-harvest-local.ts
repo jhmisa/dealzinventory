@@ -13,6 +13,7 @@ import {
   harvestCatalog,
   IPAD_CATEGORY,
   ARROWS_CATEGORY,
+  HUAWEI_CATEGORY,
   IPHONE_CATEGORY,
   OPPO_CATEGORY,
   PIXEL_CATEGORY,
@@ -40,6 +41,8 @@ const category = which === "ipad"
   ? OPPO_CATEGORY
   : which === "arrows"
   ? ARROWS_CATEGORY
+  : which === "huawei"
+  ? HUAWEI_CATEGORY
   : IPHONE_CATEGORY
 console.error(`=== harvesting category: ${which} ===`)
 

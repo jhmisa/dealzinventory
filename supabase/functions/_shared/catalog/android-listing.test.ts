@@ -4,6 +4,7 @@ import {
   ARROWS_CONFIG,
   extractAndroidCardTitles,
   GALAXY_CONFIG,
+  HUAWEI_CONFIG,
   parseAndroidListingPage,
   parseAndroidListingTitle,
   OPPO_CONFIG,
@@ -13,6 +14,7 @@ import {
 } from "./android-listing.ts"
 
 const arrows = (t: string) => parseAndroidListingTitle(t, ARROWS_CONFIG)
+const huawei = (t: string) => parseAndroidListingTitle(t, HUAWEI_CONFIG)
 
 const galaxy = (t: string) => parseAndroidListingTitle(t, GALAXY_CONFIG)
 const xperia = (t: string) => parseAndroidListingTitle(t, XPERIA_CONFIG)
@@ -906,5 +908,97 @@ Deno.test("arrows: page extraction pulls coded SKU cards", () => {
   const skus = parseAndroidListingPage(html, ARROWS_CONFIG)
   assertEquals(skus.length > 3, true)
   assertEquals(skus.every((s) => s.brand === "Fujitsu" && /arrows/i.test(s.model_name)), true)
+  assertEquals(skus.every((s) => s.color_en != null || s.color_ja != null), true)
+})
+
+// ---------------------------------------------------------------------------
+// HUAWEI (P-series / Mate / nova) — coded brand, global 3-letter codes
+// ---------------------------------------------------------------------------
+
+Deno.test("huawei: global 3-letter code, ASCII color, HUAWEI prefix peeled", () => {
+  const s = huawei("HUAWEI P30 lite MAR-LX2J Pearl White【国内版 SIMFREE】")
+  assertEquals(s?.brand, "Huawei")
+  assertEquals(s?.model_name, "P30 lite")
+  assertEquals(s?.model_number, "MAR-LX2J")
+  assertEquals(s?.color_en, "Pearl White")
+  assertEquals(s?.carrier, "SIM-Free")
+})
+
+Deno.test("huawei: P40 Pro 5G kept, ELS code", () => {
+  const s = huawei("HUAWEI P40 Pro 5G ELS-NX9 Silver Frost【国内版 SIMフリー】")
+  assertEquals(s?.model_name, "P40 Pro 5G") // 5G kept
+  assertEquals(s?.model_number, "ELS-NX9")
+  assertEquals(s?.color_en, "Silver Frost")
+})
+
+Deno.test("huawei: inline storage after code (P10 Plus 64GB)", () => {
+  const s = huawei("Huawei P10 Plus VKY-L29 64GB Dazzling Gold【国内版SIMフリー】")
+  assertEquals(s?.model_name, "P10 Plus")
+  assertEquals(s?.model_number, "VKY-L29")
+  assertEquals(s?.storage_gb, 64)
+  assertEquals(s?.color_en, "Dazzling Gold")
+})
+
+Deno.test("huawei: parenthesized secondary code stripped, JA color (Klein Blue)", () => {
+  const s = huawei("Huawei P20 lite ANE-LX2J (HWSDA2) クラインブルー【Y!mobile版 SIMフリー】")
+  assertEquals(s?.model_name, "P20 lite")
+  assertEquals(s?.model_number, "ANE-LX2J") // first code; (HWSDA2) dropped
+  assertEquals(s?.color_ja, "クラインブルー")
+  assertEquals(s?.color_en, "Klein Blue")
+})
+
+Deno.test("huawei: Y!mobile prefix before HUAWEI peeled", () => {
+  const s = huawei("Y!mobile HUAWEI P30 lite MAR-LX2J Peacock Blue")
+  assertEquals(s?.model_name, "P30 lite")
+  assertEquals(s?.model_number, "MAR-LX2J")
+  assertEquals(s?.color_en, "Peacock Blue")
+})
+
+Deno.test("huawei: au HWV code, leading unlock + carrier word", () => {
+  const s = huawei("【SIMロック解除済】au Huawei P20 lite HWV32 Midnight Black")
+  assertEquals(s?.model_name, "P20 lite")
+  assertEquals(s?.model_number, "HWV32")
+  assertEquals(s?.carrier, "au")
+  assertEquals(s?.is_unlocked, true)
+  assertEquals(s?.color_en, "Midnight Black")
+})
+
+Deno.test("huawei: docomo HW-##L code", () => {
+  const s = huawei("【SIMロック解除済】docomo HUAWEI P30 Pro HW-02L Breathing Crystal")
+  assertEquals(s?.model_name, "P30 Pro")
+  assertEquals(s?.model_number, "HW-02L")
+  assertEquals(s?.carrier, "docomo")
+  assertEquals(s?.color_en, "Breathing Crystal")
+})
+
+Deno.test("huawei: Mate 20 Pro LYA code, JA color (Midnight Blue)", () => {
+  const s = huawei("【SIMロック解除済】Softbank Huawei Mate 20 Pro LYA-L09 ミッドナイトブルー")
+  assertEquals(s?.model_name, "Mate 20 Pro")
+  assertEquals(s?.model_number, "LYA-L09")
+  assertEquals(s?.color_ja, "ミッドナイトブルー")
+  assertEquals(s?.color_en, "Midnight Blue")
+})
+
+Deno.test("huawei: nova lite 3 POT code", () => {
+  const s = huawei("HUAWEI nova lite 3 POT-LX2J Aurora Blue【国内版 SIMフリー】")
+  assertEquals(s?.model_name, "nova lite 3")
+  assertEquals(s?.model_number, "POT-LX2J")
+  assertEquals(s?.color_en, "Aurora Blue")
+})
+
+Deno.test("huawei: non-Huawei / nav -> null", () => {
+  assertEquals(huawei("Galaxy S24 SM-S921Q ブラック"), null)
+  assertEquals(huawei("HUAWEI"), null) // bare nav, no code
+})
+
+Deno.test("huawei: page extraction pulls coded SKU cards", () => {
+  const html = Deno.readTextFileSync(
+    new URL("./__fixtures__/iosys-huawei-p1.html", import.meta.url),
+  )
+  const titles = extractAndroidCardTitles(html, HUAWEI_CONFIG)
+  assertEquals(titles.length > 3, true)
+  const skus = parseAndroidListingPage(html, HUAWEI_CONFIG)
+  assertEquals(skus.length > 3, true)
+  assertEquals(skus.every((s) => s.brand === "Huawei"), true)
   assertEquals(skus.every((s) => s.color_en != null || s.color_ja != null), true)
 })

@@ -20,6 +20,7 @@ import {
   AQUOS_CONFIG,
   ARROWS_CONFIG,
   GALAXY_CONFIG,
+  HUAWEI_CONFIG,
   OPPO_CONFIG,
   parseAndroidListingPage,
   PIXEL_CONFIG,
@@ -33,6 +34,7 @@ import { pixelSpec } from "./pixel-specs.ts"
 import { xiaomiSpec } from "./xiaomi-specs.ts"
 import { oppoSpec } from "./oppo-specs.ts"
 import { arrowsSpec } from "./arrows-specs.ts"
+import { huaweiSpec } from "./huawei-specs.ts"
 
 export interface CarrierSection {
   path: string // url segment, e.g. "simfree" / "wifi"
@@ -271,6 +273,12 @@ export const ARROWS_CATEGORY: HarvestCategory = androidCategory(
   "items/smartphone/arrows",
   ARROWS_CONFIG,
   arrowsSpec,
+)
+
+export const HUAWEI_CATEGORY: HarvestCategory = androidCategory(
+  "items/smartphone/huawei",
+  HUAWEI_CONFIG,
+  huaweiSpec,
 )
 
 export interface HarvestOptions {

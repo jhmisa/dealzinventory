@@ -140,6 +140,8 @@ export function parseAndroidListingTitle(
     tail = rest.slice(codeM.index + codeM[0].length).trim()
     // Drop a dual/single-SIM marker glued to the code, e.g. "SM-S948Q/DS 256GB ...".
     tail = tail.replace(/^\/(DS|SS)\b/i, "").trim()
+    // Drop a parenthesized secondary carrier code, e.g. HUAWEI "ANE-LX2J (HWU34) Klein Blue".
+    tail = tail.replace(/^\(\s*[A-Za-z0-9]+\s*\)\s*/, "").trim()
   } else if (config.nameConsumeRe) {
     const nameM = rest.match(config.nameConsumeRe)
     if (!nameM || nameM.index !== 0) return null
@@ -862,4 +864,64 @@ export const ARROWS_CONFIG: AndroidBrandConfig = {
       .replace(/\s+/g, " ")
       .trim(),
   colorJaToEn: arrowsColorJaToEn,
+}
+
+// ---------------------------------------------------------------------------
+// HUAWEI config (P-series / Mate / nova)
+// ---------------------------------------------------------------------------
+
+// HUAWEI is a coded brand: global model code = 3 uppercase letters + "-" + alnum (ANE-LX2J, ELS-NX9,
+// LYA-L09); au HWV##; docomo HW-##[A-Z]. Most colors are already English (flow through); a few JP
+// katakana ones are mapped. MVNO/carrier prefixes (Y!mobile / UQ / mineo) and a parenthesized
+// secondary code "(HWU34)" are peeled. Verified research pass 2026-06-28.
+export const HUAWEI_COLORS_JA_EN: Record<string, string> = {
+  // Generic / basic
+  "ブラック": "Black",
+  "ホワイト": "White",
+  "ブルー": "Blue",
+  // Verified HUAWEI JP colorways (research pass 2026-06-28). Most colors print in English on iosys
+  // already (flow through as color_en); these are the katakana spellings.
+  "クラインブルー": "Klein Blue", // nova lite 3 / P20 lite (NOT Crush Blue — distinct color)
+  "ミッドナイトブルー": "Midnight Blue", // P20 Pro (docomo)
+  "ミッドナイトブラック": "Midnight Black",
+  "オーロラブルー": "Aurora Blue", // nova lite 3
+  "オーロラ": "Aurora", // P30 / P30 Pro gradient
+  "パールホワイト": "Pearl White", // P30 lite
+  "ピーコックブルー": "Peacock Blue", // P30 lite
+  "サクラピンク": "Sakura Pink", // nova line
+  "コーラルレッド": "Coral Red", // nova lite 3
+  "クラッシュブルー": "Crush Blue", // nova 5T
+  "クラッシュグリーン": "Crush Green", // nova 5T
+  "ミッドサマーパープル": "Midsummer Purple", // nova 5T
+  "グラファイトブラック": "Graphite Black", // P10 Plus / Mate line
+  "シルバーフロスト": "Silver Frost", // P40 Pro 5G
+  "ブリージングクリスタル": "Breathing Crystal", // P30 Pro
+}
+
+export function huaweiColorJaToEn(ja: string | null): string | null {
+  if (!ja) return null
+  return HUAWEI_COLORS_JA_EN[ja] ?? null
+}
+
+export const HUAWEI_CONFIG: AndroidBrandConfig = {
+  brand: "Huawei",
+  brandPrefixes: ["HUAWEI", "Huawei"],
+  // Lenient (contains) — a leading MVNO word (Y!mobile/UQ) may still sit on the name segment before
+  // canonicalization strips it; the model token is P##/Mate/nova. (honor is a SEPARATE brand in iosys
+  // — deliberately excluded so "HUAWEI honor6" never lands under the Huawei brand column.)
+  modelNameRe: /\b(P\d|Mate|nova)/i,
+  // HUAWEI codes: global 3-letter "ABC-XYn[J]"; au HWV##; docomo HW-##[A-Z]. First match wins.
+  modelCodeRe: /\b([A-Z]{3}-[A-Z]{1,2}\d{1,2}[A-Z]?|HWV\d+|HW-\d{2}[A-Z])\b/,
+  canonicalModelName: (seg) =>
+    seg
+      // Strip a leading MVNO/carrier word the engine's CARRIER_WORD (docomo/au/softbank/rakuten only)
+      // doesn't cover — "Y!mobile HUAWEI P30 lite", "UQ ...", "mineo ...".
+      .replace(/^(Y!?mobile|UQ\s?mobile|UQ|mineo)\s+/i, "")
+      .replace(/^(HUAWEI|Huawei)\s+/i, "") // brand prefix left when an MVNO word preceded it
+      .replace(/\bnova(?=\d)/gi, "nova ") // "nova3"->"nova 3", "nova2"->"nova 2" (nova 5T already spaced)
+      // KEEP 5G — Huawei uses it as a model marker ("P40 Pro 5G"); JP lineup rarely has a 4G twin.
+      .replace(/\b(Single|Dual)[- ]?SIM\b/gi, "")
+      .replace(/\s+/g, " ")
+      .trim(),
+  colorJaToEn: huaweiColorJaToEn,
 }
