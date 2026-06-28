@@ -1,6 +1,6 @@
--- Phase B-Apple (MacBook) — fill-gaps promotion.
--- Promote clean MacBook SKUs harvested from iosys (iosys_catalog.brand='Apple', device_category=
--- 'COMPUTER', model_name LIKE 'MacBook%') into product_models. Unlike Android, the Mac config
+-- Phase B-Apple (desktop Mac: iMac / Mac mini) — fill-gaps promotion.
+-- Promote clean desktop Mac (iMac / Mac mini) SKUs harvested from iosys (iosys_catalog.brand='Apple', device_category=
+-- 'COMPUTER', model_name IN ('Mac mini','iMac','Mac Studio','Mac Pro')) into product_models. Unlike Android, the Mac config
 -- (chip/RAM/SSD/GPU) is read straight from the title bracket — spec_known is always true.
 --
 -- IDENTITY collapses on CONFIG (model_name, screen_size, chipset, ram, storage, color) — several
@@ -14,17 +14,16 @@
 -- (the legacy dirty rows would block it); promote the global UNIQUE once COMPUTER is clean (Phase D).
 
 WITH src AS (
-  SELECT DISTINCT ON (model_name, specs->>'screen_size', specs->>'chipset', specs->>'ram_gb', storage_gb, coalesce(color_en, color_ja))
-    brand, model_name, storage_gb, coalesce(color_en, color_ja) AS color, color_ja,
+  SELECT DISTINCT ON (model_name, specs->>'screen_size', specs->>'chipset', specs->>'ram_gb', storage_gb, coalesce(color_en, color_ja, '—'))
+    brand, model_name, storage_gb, coalesce(color_en, color_ja, '—') AS color, color_ja,
     model_number, source_url, specs,
     CASE WHEN storage_gb IS NULL THEN NULL
          WHEN storage_gb >= 1024 AND storage_gb % 1024 = 0 THEN (storage_gb/1024)::text || 'TB'
          ELSE storage_gb::text || 'GB' END AS storage_text
   FROM public.iosys_catalog
-  WHERE device_category = 'COMPUTER' AND brand = 'Apple' AND model_name LIKE 'MacBook%'
-    AND coalesce(color_en, color_ja) IS NOT NULL
+  WHERE device_category = 'COMPUTER' AND brand = 'Apple' AND model_name IN ('Mac mini','iMac','Mac Studio','Mac Pro')
   ORDER BY model_name, specs->>'screen_size', specs->>'chipset', specs->>'ram_gb', storage_gb,
-           coalesce(color_en, color_ja),
+           coalesce(color_en, color_ja, '—'),
            (specs->>'region_code' = 'J') DESC NULLS LAST, model_number
 )
 INSERT INTO public.product_models

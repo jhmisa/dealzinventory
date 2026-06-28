@@ -202,6 +202,8 @@ function macRow(sku: MacListingSku, section: CarrierSection, sourceUrl: string):
       is_intel: sku.is_intel,
       cpu_cores: sku.cpu_cores,
       gpu_cores: sku.gpu_cores,
+      storage_type: sku.storage_type,
+      imac_variant: sku.imac_variant,
       period: sku.period,
       region_code: sku.region_code,
       is_domestic: sku.is_domestic,
@@ -213,6 +215,14 @@ function macRow(sku: MacListingSku, section: CarrierSection, sourceUrl: string):
 export const MACBOOK_CATEGORY: HarvestCategory = {
   pathPrefix: "items/pc/notepc",
   sections: [{ path: "macbook", carrier: null }],
+  pageToRows: (html, section, src) =>
+    parseMacListingPage(html).map((sku) => macRow(sku, section, src)),
+}
+
+// Desktop Macs (iMac / Mac mini / Mac Studio / Mac Pro) — same parser + part# pipeline.
+export const DESKMAC_CATEGORY: HarvestCategory = {
+  pathPrefix: "items/pc/deskpc",
+  sections: [{ path: "mac", carrier: null }],
   pageToRows: (html, section, src) =>
     parseMacListingPage(html).map((sku) => macRow(sku, section, src)),
 }

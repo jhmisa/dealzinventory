@@ -13,6 +13,7 @@ import {
   harvestCatalog,
   IPAD_CATEGORY,
   MACBOOK_CATEGORY,
+  DESKMAC_CATEGORY,
   ARROWS_CATEGORY,
   HUAWEI_CATEGORY,
   MOTOROLA_CATEGORY,
@@ -33,6 +34,8 @@ const category = which === "ipad"
   ? IPAD_CATEGORY
   : which === "macbook"
   ? MACBOOK_CATEGORY
+  : which === "deskmac"
+  ? DESKMAC_CATEGORY
   : which === "galaxy"
   ? GALAXY_CATEGORY
   : which === "xperia"

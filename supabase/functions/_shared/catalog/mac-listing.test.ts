@@ -107,3 +107,72 @@ Deno.test("mac: page extraction + dedupe by part#", () => {
   const parts = new Set(skus.map((s) => s.part_number))
   assertEquals(parts.size, skus.length)
 })
+
+// ---------------------------------------------------------------------------
+// Desktop Macs — Mac mini (no size/color), iMac (size + storage-type in bracket)
+// ---------------------------------------------------------------------------
+
+Deno.test("mac: Mac mini M1, no size, no color", () => {
+  const s = mac("Mac mini MGNR3J/A Late 2020【Apple M1/8GB/256GB SSD】")
+  assertEquals(s?.model_name, "Mac mini")
+  assertEquals(s?.size_inch, null)
+  assertEquals(s?.color_ja, null)
+  assertEquals(s?.chip, "Apple M1")
+  assertEquals(s?.ram_gb, 8)
+  assertEquals(s?.ssd_gb, 256)
+  assertEquals(s?.storage_type, "SSD")
+  assertEquals(s?.year, 2020)
+})
+
+Deno.test("mac: Mac mini Intel Core i3", () => {
+  const s = mac("Mac mini MRTR2J/A Late 2018【Core i3(3.6GHz)/8GB/128GB SSD】")
+  assertEquals(s?.model_name, "Mac mini")
+  assertEquals(s?.chip, "Core i3")
+  assertEquals(s?.is_intel, true)
+  assertEquals(s?.ram_gb, 8)
+  assertEquals(s?.ssd_gb, 128)
+})
+
+Deno.test("mac: iMac M4 with color, size in bracket (24inch)", () => {
+  const s = mac("iMac Retina 4.5K MWUF3J/A Late 2024 ブルー【Apple M4/24inch/16GB/256GB SSD】")
+  assertEquals(s?.model_name, "iMac")
+  assertEquals(s?.imac_variant, "4.5K")
+  assertEquals(s?.size_inch, 24) // from the bracket
+  assertEquals(s?.chip, "Apple M4")
+  assertEquals(s?.ram_gb, 16)
+  assertEquals(s?.ssd_gb, 256)
+  assertEquals(s?.color_ja, "ブルー")
+  assertEquals(s?.color_en, "Blue")
+})
+
+Deno.test("mac: iMac Intel 5K, no color, Fusion Drive", () => {
+  const s = mac("iMac Retina 5K MRQY2J/A Early 2019 【Core i5(3.0GHz)/27inch/16GB/1TB Fusion Drive】")
+  assertEquals(s?.model_name, "iMac")
+  assertEquals(s?.imac_variant, "5K")
+  assertEquals(s?.size_inch, 27)
+  assertEquals(s?.chip, "Core i5")
+  assertEquals(s?.ram_gb, 16)
+  assertEquals(s?.ssd_gb, 1024) // 1TB
+  assertEquals(s?.storage_type, "Fusion Drive")
+  assertEquals(s?.color_ja, null)
+})
+
+Deno.test("mac: iMac 4K, 21.5inch, HDD, Mid2020 no-space period", () => {
+  const s = mac("iMac Retina 4K MRT32J/A Late 2019【Core i3(3.6GHz)/21.5inch/8GB/1TB HDD】")
+  assertEquals(s?.model_name, "iMac")
+  assertEquals(s?.size_inch, 21.5)
+  assertEquals(s?.ssd_gb, 1024)
+  assertEquals(s?.storage_type, "HDD")
+})
+
+Deno.test("mac: desktop page extraction", () => {
+  const html = Deno.readTextFileSync(
+    new URL("./__fixtures__/iosys-deskmac-p1.html", import.meta.url),
+  )
+  const skus = parseMacListingPage(html)
+  assertEquals(skus.length > 3, true)
+  // the deskpc/mac page mixes MacBooks + desktops; confirm desktop Macs are parsed (mini + iMac)
+  assertEquals(skus.some((s) => s.model_name === "Mac mini"), true)
+  assertEquals(skus.some((s) => s.model_name === "iMac"), true)
+  assertEquals(skus.every((s) => /\/A$/.test(s.part_number)), true)
+})
