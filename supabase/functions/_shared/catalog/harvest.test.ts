@@ -24,7 +24,8 @@ Deno.test("harvest: single section, dedupes + enriches + stops at empty page", a
 
   // every row has the absolute key + brand/category
   for (const r of res.rows) {
-    assertEquals(r.part_number.endsWith("/A"), true)
+    assertEquals(r.part_number?.endsWith("/A"), true)
+    assertEquals(r.sku_key, r.part_number) // Apple dedupe key == part_number
     assertEquals(r.brand, "Apple")
     assertEquals(r.device_category, "IPHONE")
     assertEquals(r.model_name.startsWith("iPhone"), true)

@@ -7,13 +7,17 @@
 // The deployed edge function (harvest-iosys-catalog) uses the SAME harvestCatalog()
 // core for the reusable "new phones came in -> re-run" path.
 
-import { harvestCatalog, IPAD_CATEGORY, IPHONE_CATEGORY } from "./harvest.ts"
+import { GALAXY_CATEGORY, harvestCatalog, IPAD_CATEGORY, IPHONE_CATEGORY } from "./harvest.ts"
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 
 const which = (Deno.args[0] ?? "iphone").toLowerCase()
-const category = which === "ipad" ? IPAD_CATEGORY : IPHONE_CATEGORY
+const category = which === "ipad"
+  ? IPAD_CATEGORY
+  : which === "galaxy"
+  ? GALAXY_CATEGORY
+  : IPHONE_CATEGORY
 console.error(`=== harvesting category: ${which} ===`)
 
 const res = await harvestCatalog({
@@ -42,16 +46,17 @@ const json = JSON.stringify(res.rows)
 // Dollar-quoted literal avoids all escaping of Japanese / apostrophes.
 const sql = `-- iosys_catalog harvest (${res.rows.length} SKUs, ${res.stats.pagesFetched} pages)
 INSERT INTO public.iosys_catalog
-  (part_number, model_number, brand, model_name, storage_gb, color_ja, color_en,
+  (sku_key, part_number, model_number, brand, model_name, storage_gb, color_ja, color_en,
    carrier, connectivity, device_category, source_url, carrier_path, raw_title, listing_count, specs)
-SELECT x.part_number, x.model_number, x.brand, x.model_name, x.storage_gb, x.color_ja,
+SELECT x.sku_key, x.part_number, x.model_number, x.brand, x.model_name, x.storage_gb, x.color_ja,
        x.color_en, NULLIF(x.carrier,'')::jp_carrier, x.connectivity, x.device_category, x.source_url,
        x.carrier_path, x.raw_title, x.listing_count, x.specs
 FROM jsonb_to_recordset($json$${json}$json$::jsonb) AS x(
-  part_number text, model_number text, brand text, model_name text, storage_gb int,
+  sku_key text, part_number text, model_number text, brand text, model_name text, storage_gb int,
   color_ja text, color_en text, carrier text, connectivity text, device_category text, source_url text,
   carrier_path text, raw_title text, listing_count int, specs jsonb)
-ON CONFLICT (part_number) DO UPDATE SET
+ON CONFLICT (sku_key) DO UPDATE SET
+  part_number = EXCLUDED.part_number,
   model_number = EXCLUDED.model_number,
   brand = EXCLUDED.brand,
   model_name = EXCLUDED.model_name,
