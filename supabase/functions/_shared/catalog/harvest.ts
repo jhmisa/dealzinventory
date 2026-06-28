@@ -19,6 +19,7 @@ import {
   type AndroidListingSku,
   AQUOS_CONFIG,
   ARROWS_CONFIG,
+  ASUS_CONFIG,
   GALAXY_CONFIG,
   HUAWEI_CONFIG,
   OPPO_CONFIG,
@@ -35,6 +36,7 @@ import { xiaomiSpec } from "./xiaomi-specs.ts"
 import { oppoSpec } from "./oppo-specs.ts"
 import { arrowsSpec } from "./arrows-specs.ts"
 import { huaweiSpec } from "./huawei-specs.ts"
+import { asusSpec } from "./asus-specs.ts"
 
 export interface CarrierSection {
   path: string // url segment, e.g. "simfree" / "wifi"
@@ -279,6 +281,19 @@ export const HUAWEI_CATEGORY: HarvestCategory = androidCategory(
   "items/smartphone/huawei",
   HUAWEI_CONFIG,
   huaweiSpec,
+)
+
+// ASUS has two iosys paths (Zenfone + ROG Phone) under one brand/config.
+export const ZENFONE_CATEGORY: HarvestCategory = androidCategory(
+  "items/smartphone/zenfone",
+  ASUS_CONFIG,
+  asusSpec,
+)
+
+export const ROG_CATEGORY: HarvestCategory = androidCategory(
+  "items/smartphone/rog",
+  ASUS_CONFIG,
+  asusSpec,
 )
 
 export interface HarvestOptions {

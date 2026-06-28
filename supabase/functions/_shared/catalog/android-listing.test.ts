@@ -2,6 +2,7 @@ import { assertEquals } from "https://deno.land/std/assert/mod.ts"
 import {
   AQUOS_CONFIG,
   ARROWS_CONFIG,
+  ASUS_CONFIG,
   extractAndroidCardTitles,
   GALAXY_CONFIG,
   HUAWEI_CONFIG,
@@ -15,6 +16,7 @@ import {
 
 const arrows = (t: string) => parseAndroidListingTitle(t, ARROWS_CONFIG)
 const huawei = (t: string) => parseAndroidListingTitle(t, HUAWEI_CONFIG)
+const asus = (t: string) => parseAndroidListingTitle(t, ASUS_CONFIG)
 
 const galaxy = (t: string) => parseAndroidListingTitle(t, GALAXY_CONFIG)
 const xperia = (t: string) => parseAndroidListingTitle(t, XPERIA_CONFIG)
@@ -1000,5 +1002,86 @@ Deno.test("huawei: page extraction pulls coded SKU cards", () => {
   const skus = parseAndroidListingPage(html, HUAWEI_CONFIG)
   assertEquals(skus.length > 3, true)
   assertEquals(skus.every((s) => s.brand === "Huawei"), true)
+  assertEquals(skus.every((s) => s.color_en != null || s.color_ja != null), true)
+})
+
+// ---------------------------------------------------------------------------
+// ASUS (Zenfone / ROG Phone) — two lines, AI#### + older ZS### codes
+// ---------------------------------------------------------------------------
+
+Deno.test("asus: modern AI#### code, Zenfone9 -> 'Zenfone 9', bare RAM/ROM, JA color", () => {
+  const s = asus("ASUS ZenFone9 AI2202 サンセットレッド【8GB/128GB 国内版 SIMフリー】")
+  assertEquals(s?.brand, "ASUS")
+  assertEquals(s?.model_name, "Zenfone 9")
+  assertEquals(s?.model_number, "AI2202")
+  assertEquals(s?.storage_gb, 128)
+  assertEquals(s?.ram_gb, 8)
+  assertEquals(s?.color_ja, "サンセットレッド")
+  assertEquals(s?.color_en, "Sunset Red")
+  assertEquals(s?.carrier, "SIM-Free")
+})
+
+Deno.test("asus: ROG Phone8 -> 'ROG Phone 8', Rebel Grey, overseas", () => {
+  const s = asus("ASUS ROG Phone8 AI2401 レベルグレー【RAM16GB/ROM256GB 海外版 SIMフリー】")
+  assertEquals(s?.model_name, "ROG Phone 8")
+  assertEquals(s?.model_number, "AI2401")
+  assertEquals(s?.storage_gb, 256)
+  assertEquals(s?.ram_gb, 16)
+  assertEquals(s?.color_en, "Rebel Grey")
+  assertEquals(s?.is_domestic, false) // 海外版
+})
+
+Deno.test("asus: ROG Phone8 Pro keeps Pro", () => {
+  const s = asus("ASUS ROG Phone8 Pro AI2401 ファントムブラック【RAM16GB/ROM512GB 国内版 SIMフリー】")
+  assertEquals(s?.model_name, "ROG Phone 8 Pro")
+  assertEquals(s?.storage_gb, 512)
+  assertEquals(s?.color_en, "Phantom Black")
+})
+
+Deno.test("asus: older ZS code with SKU suffix + Dual-SIM + color in bracket (Zenfone 5Z)", () => {
+  const s = asus("ASUS ZenFone5Z ZS620KL-SL128S6 Dual-SIM 【Silver 128GB 国内版SIMフリー】")
+  assertEquals(s?.model_name, "Zenfone 5Z")
+  assertEquals(s?.model_number, "ZS620KL-SL128S6") // SKU suffix kept as the coarse code
+  assertEquals(s?.storage_gb, 128) // from inside the bracket
+  assertEquals(s?.color_en, "Silver") // Dual-SIM stripped, recovered from bracket
+  assertEquals(s?.carrier, "SIM-Free")
+})
+
+Deno.test("asus: Zenfone8 ZS code, ASCII color + RAM/ROM bracket", () => {
+  const s = asus("ASUS Zenfone8 ZS590KS-SL256S16 Silver【16GB/256GB 国内版 SIMフリー】")
+  assertEquals(s?.model_name, "Zenfone 8")
+  assertEquals(s?.model_number, "ZS590KS-SL256S16")
+  assertEquals(s?.storage_gb, 256)
+  assertEquals(s?.ram_gb, 16)
+  assertEquals(s?.color_en, "Silver")
+})
+
+Deno.test("asus: spaced katakana color (スターリー ブルー) maps", () => {
+  const s = asus("ASUS ZenFone9 AI2202 スターリー ブルー【8GB/128GB 国内版 SIMフリー】")
+  assertEquals(s?.model_name, "Zenfone 9")
+  assertEquals(s?.color_en, "Starry Blue")
+})
+
+Deno.test("asus: mineo MVNO note -> domestic, color recovered", () => {
+  const s = asus("ASUS ZenFone9 AI2202 ミッドナイトブラック【8GB/128GB mineo版 SIMフリー】")
+  assertEquals(s?.model_name, "Zenfone 9")
+  assertEquals(s?.color_en, "Midnight Black")
+  assertEquals(s?.storage_gb, 128)
+})
+
+Deno.test("asus: non-ASUS / nav -> null", () => {
+  assertEquals(asus("Galaxy S24 SM-S921Q ブラック"), null)
+  assertEquals(asus("ASUS"), null) // bare nav, no code
+})
+
+Deno.test("asus: page extraction (zenfone fixture)", () => {
+  const html = Deno.readTextFileSync(
+    new URL("./__fixtures__/iosys-zenfone-p1.html", import.meta.url),
+  )
+  const titles = extractAndroidCardTitles(html, ASUS_CONFIG)
+  assertEquals(titles.length > 3, true)
+  const skus = parseAndroidListingPage(html, ASUS_CONFIG)
+  assertEquals(skus.length > 3, true)
+  assertEquals(skus.every((s) => s.brand === "ASUS"), true)
   assertEquals(skus.every((s) => s.color_en != null || s.color_ja != null), true)
 })

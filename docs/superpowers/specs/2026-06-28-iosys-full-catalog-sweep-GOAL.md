@@ -108,7 +108,7 @@ dedupes on `sku_key`, runs from a local runner (`run-harvest-local.ts <category>
 **Phase A — Android phones (pipeline ready, highest volume).** Brand-by-brand, each its own session-sized
 unit. Suggested order (volume/ease): **~~Xperia~~ ✓ → ~~AQUOS~~ ✓ → ~~Pixel~~ ✓ → ~~Xiaomi~~ ✓ (v1.69.0; first
 optional-code brand via `nameConsumeRe`) → ~~OPPO~~ ✓ (v1.70.0; storage-in-name + 付属 strip + brand-casing
-guard) → ~~arrows~~ ✓ (v1.71.0; clean coded, 0 engine changes) → ~~Huawei~~ ✓ (v1.72.0; paren-code strip + MVNO peel) → Zenfone/ROG (next) → Motorola razr.**
+guard) → ~~arrows~~ ✓ (v1.71.0; clean coded, 0 engine changes) → ~~Huawei~~ ✓ (v1.72.0; paren-code strip + MVNO peel) → ~~Zenfone/ROG~~ ✓ (v1.73.0; 2 paths 1 config) → Motorola razr (next, LAST Phase-A).**
 Recipe below. Also fold in the **deferred legacy-Samsung reconcile** (+ the deferred Xiaomi ~33-row & OPPO ~25-row reconciles)
 (42 COMPUTER-miscategorized `Samsung` rows, 37 referenced by 117 live items → recategorize→ANDROID, dedup
 vs the clean Galaxy rows, re-point items, archive stubs; mirrors iPhone Phase 2).

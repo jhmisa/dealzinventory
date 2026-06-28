@@ -155,6 +155,10 @@ export function parseAndroidListingTitle(
     return null
   }
 
+  // 4a. Drop a standalone Single/Dual-SIM word left at the head of the tail (ASUS
+  //     "ZS620KL-SL128S6 Dual-SIM 【Silver 128GB ...】"). The "/DS"-glued form is handled above.
+  tail = tail.replace(/^(Single|Dual)[- ]?SIM\b\s*/i, "").trim()
+
   // 4b. Storage/RAM can sit in the NAME segment, immediately before the code (OPPO
   //     "Reno3 A 6GB 128GB CPH2013 White"). Pull a trailing "{ram}GB {rom}GB" (or lone "{n}GB") run
   //     out of the name so it doesn't pollute the model name; keep it as a storage/RAM fallback.
@@ -924,4 +928,62 @@ export const HUAWEI_CONFIG: AndroidBrandConfig = {
       .replace(/\s+/g, " ")
       .trim(),
   colorJaToEn: huaweiColorJaToEn,
+}
+
+// ---------------------------------------------------------------------------
+// ASUS config (Zenfone / ROG Phone)
+// ---------------------------------------------------------------------------
+
+// ASUS covers two lines under one brand: Zenfone and ROG Phone. Codes: modern (Zenfone 9+, ROG Phone
+// 8+) = "AI####" project code; older Zenfone = "Z[SE]###[KL/KS]" with an optional "-XX###S##" SKU
+// suffix (color/storage/RAM, e.g. ZS620KL-SL128S6). The canonicalizer normalizes "ZenFone"→"Zenfone"
+// and inserts the space before the number ("Zenfone9"→"Zenfone 9", "ROG Phone8"→"ROG Phone 8") to
+// match ASUS's official naming. Verified research pass 2026-06-28.
+export const ASUS_COLORS_JA_EN: Record<string, string> = {
+  // Generic / basic
+  "ブラック": "Black",
+  "ホワイト": "White",
+  "シルバー": "Silver",
+  "レッド": "Red",
+  "ブルー": "Blue",
+  // ASUS Zenfone / ROG official colorways
+  "ファントムブラック": "Phantom Black", // ROG Phone 8 Pro
+  "ミッドナイトブラック": "Midnight Black", // Zenfone 9
+  "ムーンライトホワイト": "Moonlight White", // Zenfone 8 / 9
+  "サンセットレッド": "Sunset Red", // Zenfone 9
+  "スターリーブルー": "Starry Blue", // Zenfone 9
+  "スターリー ブルー": "Starry Blue", // spaced spelling variant on iosys
+  "レベルグレー": "Rebel Grey", // ROG Phone 8 (ASUS "Rebel Grey" — British spelling, verified)
+  // Additional verified ASUS colorways (research pass 2026-06-28)
+  "ストームホワイト": "Storm White", // ROG Phone 6 / 7
+  "スノーホワイト": "Snow White", // ROG Phone 9
+  "オーロラグリーン": "Aurora Green", // Zenfone 10
+  "コメットホワイト": "Comet White", // Zenfone 10
+  "エクリプスレッド": "Eclipse Red", // Zenfone 10
+  "オブシディアンブラック": "Obsidian Black", // Zenfone 8
+  "ホライゾンシルバー": "Horizon Silver", // Zenfone 8
+  "デザートサンド": "Desert Sand", // Zenfone 11 Ultra
+  "スカイラインブルー": "Skyline Blue", // Zenfone 11 Ultra
+}
+
+export function asusColorJaToEn(ja: string | null): string | null {
+  if (!ja) return null
+  return ASUS_COLORS_JA_EN[ja] ?? null
+}
+
+export const ASUS_CONFIG: AndroidBrandConfig = {
+  brand: "ASUS",
+  brandPrefixes: ["ASUS", "Asus"],
+  modelNameRe: /^(Zenfone|ROG)/i, // after ASUS peel the name starts with Zenfone / ROG Phone
+  // ASUS codes: modern AI####; older Z[SE]###[KL/KS] (+ optional "-XX###S##" SKU suffix). First wins.
+  modelCodeRe: /\b(AI\d{4}|Z[A-Z]\d{3}[A-Z]{2}(?:-[A-Za-z0-9]+)?)\b/,
+  canonicalModelName: (seg) =>
+    seg
+      .replace(/zenfone/i, "Zenfone") // normalize ASUS's inconsistent "ZenFone"/"Zenfone" casing
+      .replace(/Zenfone(?=\d)/i, "Zenfone ") // "Zenfone9"->"Zenfone 9", "Zenfone5Z"->"Zenfone 5Z"
+      .replace(/ROG\s*Phone(?=\d)/i, "ROG Phone ") // "ROG Phone8"->"ROG Phone 8"
+      .replace(/\b(Single|Dual)[- ]?SIM\b/gi, "")
+      .replace(/\s+/g, " ")
+      .trim(),
+  colorJaToEn: asusColorJaToEn,
 }

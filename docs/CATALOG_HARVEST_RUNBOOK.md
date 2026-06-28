@@ -179,6 +179,7 @@ Re-harvest for new Apple models follows the same shape as §2 (add specs → re-
 | OPPO | OPPO→`Oppo` | `items/smartphone/oppo` | global `CPH\d+` · au `OPG\d+` · SoftBank/Y!mobile `A\d{3}OP` — **+ code-less old via `nameConsumeRe`** | `oppo-specs.ts` / `OPPO_COLORS_JA_EN` | `2026-06-28-oppo-fill-gaps.sql` | `iosys-oppo-p1.html` | ✅ + **legacy reconcile OPEN** (~25 COMPUTER rows / ~110 items) |
 | arrows | Fujitsu/FCNT | `items/smartphone/arrows` | docomo `F-\d{2}[A-Z]` · au `FCG\d+` · SoftBank `A\d{3}FC` · SIM-free `M\d{2}` | `arrows-specs.ts` / `ARROWS_COLORS_JA_EN` | `2026-06-28-arrows-fill-gaps.sql` | `iosys-arrows-p1.html` | ✅ + **small legacy reconcile OPEN** (~9 arrows rows; ⚠️ LifeBooks are real laptops) |
 | HUAWEI | Huawei | `items/smartphone/huawei` | global `[A-Z]{3}-[A-Z]{1,2}\d{1,2}[A-Z]?` (J=Japan) · au `HWV\d+` · docomo `HW-\d{2}[A-Z]` | `huawei-specs.ts` / `HUAWEI_COLORS_JA_EN` | `2026-06-28-huawei-fill-gaps.sql` | `iosys-huawei-p1.html` | ✅ + **small legacy reconcile OPEN** (~8 rows); honor = separate brand (excluded) |
+| ASUS | ASUS | `items/smartphone/zenfone` + `/rog` | modern `AI\d{4}` · older `Z[A-Z]\d{3}[A-Z]{2}(-…)?` | `asus-specs.ts` / `ASUS_COLORS_JA_EN` | `2026-06-28-asus-fill-gaps.sql` | `iosys-{zenfone,rog}-p1.html` | ✅ + **small legacy reconcile OPEN** (~4 rows); 2 paths, 1 config |
 | iPhone | Apple | `items/smartphone/iphone` | part# (`MXVH3J/A`) | `iphone-specs.ts` / `apple-colors.ts` | phase2/3/5 data-ops | `iosys-iphone-simfree-p1.html` | ✅ |
 | iPad | Apple | `items/tablet/ios/ipad` | part# | `ipad-specs.ts` / `apple-colors.ts` | phase4-ipad data-ops | `iosys-ipad-*-p1.html` | ✅ |
 
@@ -226,6 +227,20 @@ Re-harvest for new Apple models follows the same shape as §2 (add specs → re-
 - **Watch-outs:** new `a`-models appear fast (Pixel 10a `GV0BP` shipped 2026-04 — caught as an
   `unknownModels` entry, added to specs). Two `Google` rows are smart speakers (Nest Mini / Home Mini),
   NOT phones — left as COMPUTER, out of scope.
+
+### ASUS (Zenfone / ROG Phone)
+- **Two iosys paths, one config:** `items/smartphone/zenfone` + `items/smartphone/rog` both use
+  `ASUS_CONFIG` via separate `ZENFONE_CATEGORY` / `ROG_CATEGORY`. Harvest each (`run-harvest-local.ts
+  zenfone` then `rog`), load both, one fill-gaps (`brand='ASUS'`) promotes them together.
+- **Codes:** modern `AI####` project code (Zenfone 9+, ROG Phone 6+); older `Z[SE]###[KL/KS]` with an
+  optional `-XX###S##` SKU suffix (color/storage/RAM, e.g. `ZS620KL-SL128S6`) — kept whole as the code.
+- **Naming:** canonicalizer normalizes `ZenFone`→`Zenfone` (ASUS changed styling at the 8-gen) and
+  inserts the space before the number (`Zenfone9`→`Zenfone 9`, `ROG Phone8`→`ROG Phone 8`). **No "ROG
+  Phone 4"** (ASUS skipped it). ROG Phone II uses a Roman numeral.
+- **Engine capability added with ASUS (generic):** strip a standalone `Single/Dual-SIM` word at the head
+  of the tail (`ZS620KL-SL128S6 Dual-SIM 【Silver 128GB…】`).
+- **Brand casing:** legacy stores "ASUS" all-caps → fill-gaps guard uses `lower(brand)` (same precaution
+  as OPPO). Color: レベルグレー = **Rebel Grey** (British "Grey").
 
 ### HUAWEI (P-series / Mate / nova)
 - **Codes:** global model code = 3 uppercase letters + `-` + alnum (`ANE-LX2J`, `ELS-NX9`; trailing
