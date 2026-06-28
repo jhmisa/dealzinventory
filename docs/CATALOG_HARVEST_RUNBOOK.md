@@ -177,6 +177,7 @@ Re-harvest for new Apple models follows the same shape as §2 (add specs → re-
 | Pixel | Google | `items/smartphone/pixel` | `G[A-Z0-9]{4}` (case-sensitive) | `pixel-specs.ts` / `PIXEL_COLORS_JA_EN` | `2026-06-28-pixel-fill-gaps.sql` | `iosys-pixel-p1.html` | ✅ legacy reconciled inline (4 phone rows; 2 Google speakers left COMPUTER) |
 | Xiaomi | Xiaomi | `items/smartphone/xiaomi` | au `XIG\d+` · SoftBank `A\d{3}XM` · POCO global `\d{8}[A-Z]?` — **+ code-less SIM-free via `nameConsumeRe`** | `xiaomi-specs.ts` / `XIAOMI_COLORS_JA_EN` | `2026-06-28-xiaomi-fill-gaps.sql` | `iosys-xiaomi-p1.html` | ✅ + **legacy reconcile OPEN** (~33 COMPUTER rows / ~125 items) |
 | OPPO | OPPO→`Oppo` | `items/smartphone/oppo` | global `CPH\d+` · au `OPG\d+` · SoftBank/Y!mobile `A\d{3}OP` — **+ code-less old via `nameConsumeRe`** | `oppo-specs.ts` / `OPPO_COLORS_JA_EN` | `2026-06-28-oppo-fill-gaps.sql` | `iosys-oppo-p1.html` | ✅ + **legacy reconcile OPEN** (~25 COMPUTER rows / ~110 items) |
+| arrows | Fujitsu/FCNT | `items/smartphone/arrows` | docomo `F-\d{2}[A-Z]` · au `FCG\d+` · SoftBank `A\d{3}FC` · SIM-free `M\d{2}` | `arrows-specs.ts` / `ARROWS_COLORS_JA_EN` | `2026-06-28-arrows-fill-gaps.sql` | `iosys-arrows-p1.html` | ✅ + **small legacy reconcile OPEN** (~9 arrows rows; ⚠️ LifeBooks are real laptops) |
 | iPhone | Apple | `items/smartphone/iphone` | part# (`MXVH3J/A`) | `iphone-specs.ts` / `apple-colors.ts` | phase2/3/5 data-ops | `iosys-iphone-simfree-p1.html` | ✅ |
 | iPad | Apple | `items/tablet/ios/ipad` | part# | `ipad-specs.ts` / `apple-colors.ts` | phase4-ipad data-ops | `iosys-ipad-*-p1.html` | ✅ |
 
@@ -224,6 +225,18 @@ Re-harvest for new Apple models follows the same shape as §2 (add specs → re-
 - **Watch-outs:** new `a`-models appear fast (Pixel 10a `GV0BP` shipped 2026-04 — caught as an
   `unknownModels` entry, added to specs). Two `Google` rows are smart speakers (Nest Mini / Home Mini),
   NOT phones — left as COMPUTER, out of scope.
+
+### arrows (Fujitsu / FCNT)
+- **Codes:** docomo `F-##[A-Z]` (F = Fujitsu/FCNT prefix) · au `FCG##` (FCNT-era; older Fujitsu au = `FJ##`)
+  · SoftBank `A###FC` (FC = FCNT tag; older Fujitsu SB = `###F`) · SIM-free `M##` (M06/M07/M08).
+- **"arrows" kept lowercase** in the model name (official FCNT styling), brand = "Fujitsu". KEEPS `5G`
+  ("arrows 5G" = F-51A is a model name). Clean coded brand — **zero engine changes**, pure config reuse.
+- **Spec gotchas:** arrows Alpha (M08 / docomo twin F-51F) = MediaTek Dimensity 8350 Extreme, **2025**
+  (a stale source showing Snapdragon 450 is wrong). We2 base = Dimensity 7025 but We2 Plus = Snapdragon
+  7s Gen 2 — don't assume one SoC across a family. Color: ブラッシュ = **Blush** (not Brush).
+- **⚠️ LifeBook trap:** brand "Fujitsu" also covers genuine **LifeBook Windows laptops** (correctly
+  COMPUTER, OUT of scope). The legacy reconcile MUST scope to `model_name ILIKE '%arrows%'`, never
+  brand='Fujitsu' alone. Rugged business arrows (BZ01/BZ02) carry no F-code → not harvested (out of scope).
 
 ### OPPO (A-series / Reno / Find / older R)
 - **Codes:** global/SIM-free/Rakuten `CPH####` · au `OPG##` · SoftBank/Y!mobile `A###OP`. A coded

@@ -811,3 +811,55 @@ export const OPPO_CONFIG: AndroidBrandConfig = {
       .trim(),
   colorJaToEn: oppoColorJaToEn,
 }
+
+// ---------------------------------------------------------------------------
+// Fujitsu / FCNT arrows config (arrows N / We / Be / Alpha / 5G / NX)
+// ---------------------------------------------------------------------------
+
+// arrows is a clean CODED brand: docomo F-##[A-Z], au FCG##, SoftBank A###FC, SIM-free M## (arrows
+// Alpha = M08). "arrows" is the model line (kept in the name, lowercase per FCNT styling), like
+// "Galaxy"/"Pixel"; brand column = "Fujitsu" (matches legacy + the brand-normalize trigger). KEEPS
+// "5G" — "arrows 5G" (F-51A) is a model name, not noise. Verified research pass 2026-06-28.
+export const ARROWS_COLORS_JA_EN: Record<string, string> = {
+  // Generic / basic
+  "ブラック": "Black",
+  "ホワイト": "White",
+  "ネイビー": "Navy", // arrows We (docomo F-51B)
+  "ゴールド": "Gold",
+  "レッド": "Red", // arrows We (docomo online-shop exclusive)
+  "ピンク": "Pink",
+  "パープル": "Purple", // arrows We (docomo exclusive)
+  "ローズゴールド": "Rose Gold", // arrows We au FCG01 (direct transliteration of the iosys color token)
+  // arrows N (F-51C) official colors (research-verified)
+  "フォグホワイト": "Fog White",
+  "フォレストブラック": "Forest Black",
+  "ブラッシュネイビー": "Blush Navy", // ブラッシュ = Blush, NOT Brush
+  // arrows We2 / We2 Plus official colors (research-verified)
+  "ミストホワイト": "Mist White", // We2 (SoftBank)
+  "ネイビーグリーン": "Navy Green", // We2
+  "ライトオレンジ": "Light Orange", // We2
+  "ライトブルー": "Light Blue", // We2 (Rakuten/au)
+  "スレートグレイ": "Slate Gray", // We2 Plus (F-51E)
+  "シャンパンシルバー": "Champagne Silver", // We2 Plus (F-51E)
+}
+
+export function arrowsColorJaToEn(ja: string | null): string | null {
+  if (!ja) return null
+  return ARROWS_COLORS_JA_EN[ja] ?? null
+}
+
+export const ARROWS_CONFIG: AndroidBrandConfig = {
+  brand: "Fujitsu",
+  brandPrefixes: [], // "arrows" is the model line, kept in the name (not a peelable prefix)
+  modelNameRe: /arrows/i, // lenient (contains): leading carrier junk handled by the engine
+  // arrows JP codes: docomo F-##[A-Z]; au FCG##; SoftBank A###FC; SIM-free M## (arrows Alpha M08).
+  modelCodeRe: /\b(F-\d{2}[A-Z]|FCG\d+|A\d{3}FC|M\d{2})\b/,
+  canonicalModelName: (seg) =>
+    seg
+      .replace(/^.*?arrows/i, "arrows") // drop any leaked carrier prefix; force lowercase "arrows"
+      // KEEP 5G — "arrows 5G" (F-51A) is a model name, not spurious noise.
+      .replace(/\b(Single|Dual)[- ]?SIM\b/gi, "")
+      .replace(/\s+/g, " ")
+      .trim(),
+  colorJaToEn: arrowsColorJaToEn,
+}

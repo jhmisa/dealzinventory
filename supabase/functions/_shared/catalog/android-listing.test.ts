@@ -1,6 +1,7 @@
 import { assertEquals } from "https://deno.land/std/assert/mod.ts"
 import {
   AQUOS_CONFIG,
+  ARROWS_CONFIG,
   extractAndroidCardTitles,
   GALAXY_CONFIG,
   parseAndroidListingPage,
@@ -10,6 +11,8 @@ import {
   XIAOMI_CONFIG,
   XPERIA_CONFIG,
 } from "./android-listing.ts"
+
+const arrows = (t: string) => parseAndroidListingTitle(t, ARROWS_CONFIG)
 
 const galaxy = (t: string) => parseAndroidListingTitle(t, GALAXY_CONFIG)
 const xperia = (t: string) => parseAndroidListingTitle(t, XPERIA_CONFIG)
@@ -826,4 +829,82 @@ Deno.test("oppo: page extraction pulls coded + code-less SKU cards", () => {
     skus.map((s) => `${s.model_name}|${s.storage_gb}|${s.color_en ?? s.color_ja}|${s.carrier}`),
   )
   assertEquals(keys.size, skus.length)
+})
+
+// ---------------------------------------------------------------------------
+// Fujitsu / FCNT arrows (arrows N / We / Be / Alpha / 5G) — clean coded brand
+// ---------------------------------------------------------------------------
+
+Deno.test("arrows: docomo F-##C code, JA color, model keeps lowercase 'arrows'", () => {
+  const s = arrows("arrows N F-51C フォレストブラック【docomo版 SIMフリー】")
+  assertEquals(s?.brand, "Fujitsu")
+  assertEquals(s?.model_name, "arrows N")
+  assertEquals(s?.model_number, "F-51C")
+  assertEquals(s?.color_ja, "フォレストブラック")
+  assertEquals(s?.carrier, "docomo")
+})
+
+Deno.test("arrows: au FCG code, Rose Gold", () => {
+  const s = arrows("arrows We FCG01 ローズゴールド【au版SIMフリー】")
+  assertEquals(s?.model_name, "arrows We")
+  assertEquals(s?.model_number, "FCG01")
+  assertEquals(s?.color_en, "Rose Gold")
+  assertEquals(s?.carrier, "au")
+})
+
+Deno.test("arrows: docomo F-##B code, ASCII color", () => {
+  const s = arrows("arrows We F-51B Navy【docomo版SIMフリー】")
+  assertEquals(s?.model_name, "arrows We")
+  assertEquals(s?.model_number, "F-51B")
+  assertEquals(s?.color_en, "Navy")
+  assertEquals(s?.color_ja, null)
+})
+
+Deno.test("arrows: SoftBank A###FC code + leading network-restriction bracket", () => {
+  const s = arrows("【ネットワーク利用制限－】arrows We A101FC ブラック【SoftBank版 SIMフリー】")
+  assertEquals(s?.model_name, "arrows We")
+  assertEquals(s?.model_number, "A101FC")
+  assertEquals(s?.carrier, "SoftBank")
+  assertEquals(s?.color_en, "Black")
+})
+
+Deno.test("arrows: SIM-free M## code (arrows Alpha M08)", () => {
+  const s = arrows("arrows Alpha M08 ブラック【国内版SIMフリー】")
+  assertEquals(s?.model_name, "arrows Alpha")
+  assertEquals(s?.model_number, "M08")
+  assertEquals(s?.color_en, "Black")
+  assertEquals(s?.carrier, "SIM-Free")
+})
+
+Deno.test("arrows: Be4 Plus keeps the Plus tier, leading unlock + carrier word", () => {
+  const s = arrows("【SIMロック解除済】docomo arrows Be4 Plus F-41B Red")
+  assertEquals(s?.model_name, "arrows Be4 Plus")
+  assertEquals(s?.model_number, "F-41B")
+  assertEquals(s?.carrier, "docomo")
+  assertEquals(s?.is_unlocked, true)
+  assertEquals(s?.color_en, "Red")
+})
+
+Deno.test("arrows: Be3 F-02L", () => {
+  const s = arrows("【SIMロック解除済】docomo arrows Be3 F-02L Pink")
+  assertEquals(s?.model_name, "arrows Be3")
+  assertEquals(s?.model_number, "F-02L")
+  assertEquals(s?.color_en, "Pink")
+})
+
+Deno.test("arrows: non-arrows / nav -> null", () => {
+  assertEquals(arrows("Galaxy S24 SM-S921Q ブラック"), null)
+  assertEquals(arrows("arrows"), null) // bare nav, no code
+})
+
+Deno.test("arrows: page extraction pulls coded SKU cards", () => {
+  const html = Deno.readTextFileSync(
+    new URL("./__fixtures__/iosys-arrows-p1.html", import.meta.url),
+  )
+  const titles = extractAndroidCardTitles(html, ARROWS_CONFIG)
+  assertEquals(titles.length > 3, true)
+  const skus = parseAndroidListingPage(html, ARROWS_CONFIG)
+  assertEquals(skus.length > 3, true)
+  assertEquals(skus.every((s) => s.brand === "Fujitsu" && /arrows/i.test(s.model_name)), true)
+  assertEquals(skus.every((s) => s.color_en != null || s.color_ja != null), true)
 })
