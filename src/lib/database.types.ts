@@ -3952,6 +3952,7 @@ export type Database = {
     Functions: {
       _backorder_norm_storage_gb: { Args: { p_raw: string }; Returns: number }
       _hash_pin: { Args: { pin_text: string }; Returns: string }
+      _spm_normalize: { Args: { p: string }; Returns: string }
       _verify_pin: {
         Args: { pin_hash: string; pin_text: string }
         Returns: boolean
@@ -4231,6 +4232,29 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      search_product_models: {
+        Args: { p_category_id?: string; p_limit?: number; p_search?: string }
+        Returns: {
+          brand: string
+          category_id: string
+          category_name: string
+          chipset: string
+          color: string
+          color_ja: string
+          cpu: string
+          hero_image_url: string
+          id: string
+          media_count: number
+          model_name: string
+          model_number: string
+          part_number: string
+          ram_gb: string
+          screen_size: number
+          short_description: string
+          status: Database["public"]["Enums"]["product_status"]
+          storage_gb: string
+        }[]
       }
       towns_in_city: {
         Args: { p_city_ja: string; p_prefecture_ja: string }
