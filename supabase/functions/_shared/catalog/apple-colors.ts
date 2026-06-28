@@ -18,6 +18,8 @@ export const JA_TO_EN_COLOR: Record<string, string> = {
   "スペースグレイ": "Space Gray",
   "スペースグレー": "Space Gray",
   "スペースブラック": "Space Black",
+  "スレート": "Slate", // Apple Watch titanium (Series 10/11)
+  "ナチュラル": "Natural", // Apple Watch natural titanium (Ultra / Series 10/11)
   "ジェットブラック": "Jet Black",
   "マットブラック": "Matte Black",
   "グラファイト": "Graphite",

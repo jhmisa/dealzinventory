@@ -14,6 +14,7 @@ import {
   IPAD_CATEGORY,
   MACBOOK_CATEGORY,
   DESKMAC_CATEGORY,
+  APPLEWATCH_CATEGORY,
   ARROWS_CATEGORY,
   HUAWEI_CATEGORY,
   MOTOROLA_CATEGORY,
@@ -36,6 +37,8 @@ const category = which === "ipad"
   ? MACBOOK_CATEGORY
   : which === "deskmac"
   ? DESKMAC_CATEGORY
+  : which === "applewatch" || which === "watch"
+  ? APPLEWATCH_CATEGORY
   : which === "galaxy"
   ? GALAXY_CATEGORY
   : which === "xperia"

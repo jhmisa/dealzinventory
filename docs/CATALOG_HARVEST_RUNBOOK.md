@@ -163,8 +163,20 @@ because the title grammar differs.
   Intel, CPU/GPU cores, region suffix, period→year. **Identity collapses on config** (model/size/chip/
   RAM/SSD/color), part# is coarse. fill-gaps formats storage GB/TB, os_family='macOS'. No COMPUTER
   unique index yet (legacy dirty rows). NEXT: iMac/mini/Studio (`items/pc/deskpc/mac` — desktop grammar).
-- **Not yet built (Phase B):** iMac/Mac mini/Mac Studio (desktop config grammar), Apple Watch (case
-  size/material/GPS-vs-Cellular), AirPods (simple name+part#+year). Reuse part#-as-key + `apple-colors`.
+- **Desktop Macs (iMac/Mac mini/Studio/Pro, SHIPPED v1.76.0):** same `mac-listing.ts` parser, path
+  `items/pc/deskpc/mac` (split-on-part#; iMac size+storage-type inside the bracket; colorless desktops → `—`).
+- **Apple Watch (`apple-watch-listing.ts` + `apple-watch-specs.ts`, SHIPPED v1.77.0):** path
+  `items/wearable/apple`, `device_category='OTHER'` (wearable). Grammar `[【バンド無し】][【第N世代】]
+  Apple Watch [Nike|Hermes|Edition] {Series N|SE|SE3|Ultra2…} {40–49}mm {GPS|GPS+Cellular}モデル
+  {part#}[+{bandPart#}] {A####} 【{caseColor}{material}ケース[/{band}]】`. **Identity = CASE config**
+  (model + size + material + case color + has_cellular); the **band is dropped** (swappable). SiP is NOT
+  in the title → enriched from the verified spec ref (**Series 11/SE 3/Ultra 3 all reuse S10, no "S11"**;
+  collection keys on base series). `form_factor='{size}mm {material}'`, `has_cellular` boolean,
+  `os_family='watchOS'`, `model_name` omits the "Apple" prefix ("Watch Series 7"). Bare titanium case →
+  "Natural", bare stainless → "Silver". Partial UNIQUE on `(brand,model_name,form_factor,color,has_cellular)
+  WHERE device_category='OTHER'`.
+- **Not yet built (Phase B):** AirPods (simple name+part#+year) — the last Apple shape. Reuse part#-as-key
+  + `apple-colors`; likely also `device_category='OTHER'`.
 
 Re-harvest for new Apple models follows the same shape as §2 (add specs → re-run → idempotent upsert).
 
@@ -189,6 +201,8 @@ Re-harvest for new Apple models follows the same shape as §2 (add specs → re-
 | Motorola | Motorola | `items/smartphone/motorola` | global `XT\d{4}-\d` · SoftBank `A\d{3}MO` · docomo `M-\d{2}[A-Z]` | `motorola-specs.ts` / `MOTOROLA_COLORS_JA_EN` | `2026-06-28-motorola-fill-gaps.sql` | `iosys-motorola-p1.html` | ✅ (18 core spec'd; 7 carrier/recent flagged) + tiny legacy OPEN (~3) |
 | iPhone | Apple | `items/smartphone/iphone` | part# (`MXVH3J/A`) | `iphone-specs.ts` / `apple-colors.ts` | phase2/3/5 data-ops | `iosys-iphone-simfree-p1.html` | ✅ |
 | iPad | Apple | `items/tablet/ios/ipad` | part# | `ipad-specs.ts` / `apple-colors.ts` | phase4-ipad data-ops | `iosys-ipad-*-p1.html` | ✅ |
+| Mac | Apple | `items/pc/notepc/macbook` + `items/pc/deskpc/mac` | part# (config in title bracket) | (none — config in title) / `apple-colors.ts` | `2026-06-29-{macbook,deskmac}-fill-gaps.sql` | `iosys-{macbook,deskmac}-p1.html` | ✅ MacBook+desktop; legacy reconcile DEFERRED |
+| Apple Watch | Apple | `items/wearable/apple` | part# (band dropped from identity) | `apple-watch-specs.ts` / `apple-colors.ts` | `2026-06-29-applewatch-{fill-gaps,reconcile}.sql` | `iosys-applewatch-p1.html` | ✅ legacy reconciled inline (7 merged, 8 cleaned) |
 
 ### Galaxy (Samsung)
 - **Codes:** SIM-free `SM-…Q/C` · au `SCG##`/`SCV##` · docomo `SC-##L`.

@@ -15,6 +15,8 @@ import { iphoneSpec } from "./iphone-specs.ts"
 import { type IpadListingSku, parseIpadListingPage } from "./ipad-listing.ts"
 import { ipadSpec } from "./ipad-specs.ts"
 import { type MacListingSku, parseMacListingPage } from "./mac-listing.ts"
+import { type AppleWatchListingSku, parseAppleWatchListingPage } from "./apple-watch-listing.ts"
+import { appleWatchSpec } from "./apple-watch-specs.ts"
 import {
   type AndroidBrandConfig,
   type AndroidListingSku,
@@ -225,6 +227,54 @@ export const DESKMAC_CATEGORY: HarvestCategory = {
   sections: [{ path: "mac", carrier: null }],
   pageToRows: (html, section, src) =>
     parseMacListingPage(html).map((sku) => macRow(sku, section, src)),
+}
+
+// Apple Watch — Apple part#-keyed, device_category=OTHER (wearable). The SiP/year are NOT in the
+// title, so we enrich from the verified apple-watch-specs reference. Identity collapses on the CASE
+// config (model + size + material + case color + has_cellular); the band is dropped (swappable).
+function watchRow(sku: AppleWatchListingSku, section: CarrierSection, sourceUrl: string): CatalogRow {
+  const spec = appleWatchSpec(sku.model_name)
+  return {
+    sku_key: sku.part_number,
+    part_number: sku.part_number,
+    model_number: sku.model_number, // A-number
+    brand: "Apple",
+    model_name: sku.model_name,
+    storage_gb: null, // watches have storage but iosys doesn't list it; not an identity attribute
+    color_ja: sku.color_ja,
+    color_en: sku.color_en,
+    carrier: null,
+    connectivity: sku.connectivity, // "GPS" / "GPS + Cellular"
+    device_category: "OTHER",
+    source_url: sourceUrl,
+    carrier_path: section.path,
+    raw_title: sku.raw_title,
+    listing_count: 1,
+    specs: {
+      chipset: spec?.chipset ?? null,
+      year: spec?.year ?? null,
+      case_size_mm: sku.case_size_mm,
+      case_material: sku.case_material,
+      case_material_ja: sku.case_material_ja,
+      form_factor: sku.form_factor,
+      collection: sku.collection,
+      generation: sku.generation,
+      has_cellular: sku.has_cellular,
+      connectivity: sku.connectivity,
+      band_less: sku.band_less,
+      band_part_number: sku.band_part_number,
+      region_code: sku.region_code,
+      is_domestic: sku.is_domestic,
+      spec_known: spec != null,
+    },
+  }
+}
+
+export const APPLEWATCH_CATEGORY: HarvestCategory = {
+  pathPrefix: "items/wearable",
+  sections: [{ path: "apple", carrier: null }],
+  pageToRows: (html, section, src) =>
+    parseAppleWatchListingPage(html).map((sku) => watchRow(sku, section, src)),
 }
 
 // Android brands have no part_number → dedupe identity is (brand, model, storage, color, carrier).
