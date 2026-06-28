@@ -1,3 +1,4 @@
+Initialising login role...
 export type Json =
   | string
   | number
@@ -11,31 +12,6 @@ export type Database = {
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.1"
-  }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
   }
   public: {
     Tables: {
@@ -528,6 +504,7 @@ export type Database = {
           created_by: string | null
           discount_amount: number
           id: string
+          included_accessories: string | null
           lead_time_days: number
           lead_time_min_days: number
           markup_jpy: number
@@ -559,6 +536,7 @@ export type Database = {
           created_by?: string | null
           discount_amount?: number
           id?: string
+          included_accessories?: string | null
           lead_time_days?: number
           lead_time_min_days?: number
           markup_jpy?: number
@@ -590,6 +568,7 @@ export type Database = {
           created_by?: string | null
           discount_amount?: number
           id?: string
+          included_accessories?: string | null
           lead_time_days?: number
           lead_time_min_days?: number
           markup_jpy?: number
@@ -1404,6 +1383,7 @@ export type Database = {
           model_number: string | null
           part_number: string | null
           raw_title: string | null
+          sku_key: string
           source_url: string | null
           specs: Json
           storage_gb: number | null
@@ -1426,6 +1406,7 @@ export type Database = {
           model_number?: string | null
           part_number?: string | null
           raw_title?: string | null
+          sku_key: string
           source_url?: string | null
           specs?: Json
           storage_gb?: number | null
@@ -1448,6 +1429,7 @@ export type Database = {
           model_number?: string | null
           part_number?: string | null
           raw_title?: string | null
+          sku_key?: string
           source_url?: string | null
           specs?: Json
           storage_gb?: number | null
@@ -1661,6 +1643,7 @@ export type Database = {
           id: string
           imei: string | null
           imei2: string | null
+          included_accessories: string | null
           inspected_at: string | null
           inspected_by: string | null
           inspection_checklist: Json | null
@@ -1723,6 +1706,7 @@ export type Database = {
           id?: string
           imei?: string | null
           imei2?: string | null
+          included_accessories?: string | null
           inspected_at?: string | null
           inspected_by?: string | null
           inspection_checklist?: Json | null
@@ -1785,6 +1769,7 @@ export type Database = {
           id?: string
           imei?: string | null
           imei2?: string | null
+          included_accessories?: string | null
           inspected_at?: string | null
           inspected_by?: string | null
           inspection_checklist?: Json | null
@@ -4067,10 +4052,12 @@ export type Database = {
           color: string
           color_key: string
           model_name: string
+          model_number: string
           photo_count: number
           representative_id: string
           short_description: string
           sku_count: number
+          skus: Json
           storages: string[]
           video_count: number
         }[]
@@ -4487,9 +4474,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       ac_adapter_status: ["CORRECT", "INCORRECT", "MISSING"],
@@ -4601,3 +4585,5 @@ export const Constants = {
     },
   },
 } as const
+A new version of Supabase CLI is available: v2.108.0 (currently installed v2.90.0)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
