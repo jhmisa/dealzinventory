@@ -64,3 +64,21 @@ Deno.test("iosys: SO-52C Android — modelNumber, JP color, grade, spec table, a
   assertEquals((p.includedAccessories ?? "").includes("箱"), true)
   assertEquals((p.includedAccessories ?? "").includes("マニュアル"), true)
 })
+
+// --- Apple iPad — color must NOT drag the trailing part#/model-code tokens -------------
+// iPad titles place the color BEFORE the part number ("128GB ブルー MH314J/A A3459"), unlike
+// iPhone titles ("A3093 (MU093VC/A) 128GB ピンク"). The storage-anchored color capture used to
+// return "ブルー MH314J/A A3459"; stripTrailingCodes() now trims it back to the bare color.
+const ipadHtml = await Deno.readTextFile(
+  new URL("./__fixtures__/iosys-ipad-400178.html", import.meta.url),
+)
+const ipadUrl =
+  "https://iosys.co.jp/items/tablet/ios/ipad/wifi/ipad_air_11インチ_wi-fi/400178"
+
+Deno.test("iosys: iPad color strips trailing part# / model code", () => {
+  const p = iosysAdapter.parse(ipadHtml, ipadUrl)
+  assertEquals(p.colorJa, "ブルー")
+  assertEquals(p.color, "Blue")
+  assertEquals(p.storageGb, 128)
+  assertEquals(p.conditionGrade, "S")
+})

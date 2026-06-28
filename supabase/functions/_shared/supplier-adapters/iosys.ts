@@ -155,6 +155,21 @@ function parseScreenInches(str: string | null): number | null {
   return Number.isFinite(n) ? n : null
 }
 
+/**
+ * Strip trailing Apple part-number / model-code tokens from a captured color segment.
+ * iPad titles place the color BEFORE the part number ("128GB ブルー MH314J/A A3459"), so the
+ * storage-anchored capture otherwise drags those codes into the color. iPhone titles put the
+ * part number BEFORE the storage, so this is a no-op there. Examples removed:
+ *   MH314J/A (xxxxx/A part numbers), A3459 (Annnn model codes), MU093VC/A.
+ */
+function stripTrailingCodes(s: string): string {
+  return s
+    .replace(/\s+[A-Z0-9]{3,}\/[A-Z](?=\s|$)/g, "") // part numbers like MH314J/A, MU093VC/A
+    .replace(/\s+A\d{3,}(?=\s|$)/g, "") // Apple model codes like A3459, A3093
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
 /** "2022年6月" / "2022/06" / "2022" -> 2022. Null if no 4-digit year. */
 function parseYear(str: string | null): number | null {
   if (!str) return null
@@ -228,12 +243,12 @@ function parse(html: string, input: string): NormalizedSupplierProduct {
   if (title) {
     const storageAnchored = title.match(/\d+\s*(?:GB|TB)\s+([^【|]+)/i)
     if (storageAnchored) {
-      colorJa = decodeEntities(storageAnchored[1].trim())
+      colorJa = stripTrailingCodes(decodeEntities(storageAnchored[1].trim())) || null
     } else if (modelNumber) {
       // text after the model number up to the first 【 / | / end
       const afterCode = title.split(modelNumber)[1] ?? ""
       const codeAnchored = afterCode.match(/^\s*([^【|]+)/)
-      if (codeAnchored) colorJa = decodeEntities(codeAnchored[1].trim()) || null
+      if (codeAnchored) colorJa = stripTrailingCodes(decodeEntities(codeAnchored[1].trim())) || null
     }
   }
   const color = colorJaToEn(colorJa) ?? colorJa
