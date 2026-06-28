@@ -20,40 +20,53 @@ import {
 } from '@/components/ui/select'
 import { PageHeader, SearchBar, DataTable, TableSkeleton } from '@/components/shared'
 import { ProductForm } from '@/components/items/product-form'
-import { useProductModels, useCreateProductModel } from '@/hooks/use-product-models'
+import { useProductColorGroups, useCreateProductModel } from '@/hooks/use-product-models'
 import { useCategories } from '@/hooks/use-categories'
 import { useDebounce } from '@/hooks/use-debounce'
 import { cn } from '@/lib/utils'
-import type { ProductModelWithCounts } from '@/lib/types'
+import type { ProductColorGroup } from '@/services/product-models'
 import type { ProductModelFormValues } from '@/validators/product-model'
 
-type ProductRow = ProductModelWithCounts & {
-  photo_count: number
-  video_count: number
-  categories?: { name: string } | null
+function formatStorages(storages: string[] | null): string {
+  if (!storages || storages.length === 0) return '—'
+  const toGb = (s: string) => parseInt(s.replace(/[^0-9]/g, ''), 10) || 0
+  return [...storages]
+    .sort((a, b) => toGb(a) - toGb(b))
+    .map((s) => {
+      const n = toGb(s)
+      return n >= 1024 ? `${n / 1024}TB` : `${n}GB`
+    })
+    .join(' / ')
 }
 
-const columns: ColumnDef<ProductRow>[] = [
+const columns: ColumnDef<ProductColorGroup>[] = [
   {
     id: 'category',
     header: 'Category',
-    cell: ({ row }) => {
-      const cat = row.original.categories
-      return cat?.name ? (
-        <span className="text-xs bg-muted px-2 py-0.5 rounded">{cat.name}</span>
+    cell: ({ row }) =>
+      row.original.category_name ? (
+        <span className="text-xs bg-muted px-2 py-0.5 rounded">{row.original.category_name}</span>
       ) : (
         <span className="text-xs text-muted-foreground">—</span>
-      )
-    },
+      ),
   },
   {
     accessorKey: 'brand',
     header: 'Brand',
     cell: ({ row }) => <span className="font-medium">{row.original.brand}</span>,
   },
+  { accessorKey: 'model_name', header: 'Model' },
   {
-    accessorKey: 'model_name',
-    header: 'Model',
+    accessorKey: 'color',
+    header: 'Color',
+    cell: ({ row }) => <span className="font-medium">{row.original.color}</span>,
+  },
+  {
+    id: 'storages',
+    header: 'Storage',
+    cell: ({ row }) => (
+      <span className="text-muted-foreground text-xs">{formatStorages(row.original.storages)}</span>
+    ),
   },
   {
     id: 'short_description',
@@ -69,11 +82,7 @@ const columns: ColumnDef<ProductRow>[] = [
     header: 'Photos',
     cell: ({ row }) => {
       const count = row.original.photo_count
-      return (
-        <span className={cn('text-sm', count === 0 && 'text-red-500 font-medium')}>
-          {count}
-        </span>
-      )
+      return <span className={cn('text-sm', count === 0 && 'text-red-500 font-medium')}>{count}</span>
     },
   },
   {
@@ -81,11 +90,7 @@ const columns: ColumnDef<ProductRow>[] = [
     header: 'Videos',
     cell: ({ row }) => {
       const count = row.original.video_count
-      return (
-        <span className={cn('text-sm', count === 0 && 'text-red-500 font-medium')}>
-          {count}
-        </span>
-      )
+      return <span className={cn('text-sm', count === 0 && 'text-red-500 font-medium')}>{count}</span>
     },
   },
 ]
@@ -103,19 +108,12 @@ export default function ProductListPage() {
   const [formOpen, setFormOpen] = useState(false)
 
   const { data: categories } = useCategories()
-  const { data: products, isLoading } = useProductModels({
+  const { data: groups, isLoading } = useProductColorGroups({
     search: debouncedSearch || undefined,
     categoryId: categoryFilter !== 'all' ? categoryFilter : undefined,
+    media: mediaFilter !== 'all' ? (mediaFilter as 'no-photo' | 'no-video') : undefined,
   })
   const createMutation = useCreateProductModel()
-
-  // Client-side media filter
-  const filteredProducts = (products ?? []).filter((pm) => {
-    const row = pm as ProductRow
-    if (mediaFilter === 'no-photo' && row.photo_count > 0) return false
-    if (mediaFilter === 'no-video' && row.video_count > 0) return false
-    return true
-  }) as ProductRow[]
 
   function handleCreate(values: ProductModelFormValues) {
     createMutation.mutate(values, {
@@ -177,12 +175,12 @@ export default function ProductListPage() {
       </div>
 
       {isLoading ? (
-        <TableSkeleton rows={5} columns={6} />
+        <TableSkeleton rows={5} columns={8} />
       ) : (
         <DataTable
           columns={columns}
-          data={filteredProducts}
-          onRowClick={(row) => navigate(`/admin/products/${row.id}`)}
+          data={groups ?? []}
+          onRowClick={(row) => navigate(`/admin/products/${row.representative_id}`)}
         />
       )}
 
