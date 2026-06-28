@@ -1,9 +1,119 @@
 import { supabase } from '@/lib/supabase'
+import { normalizeStorageGb } from '@/lib/utils'
 import type { ProductModel, ProductModelInsert, ProductModelUpdate, ProductModelWithHeroImage } from '@/lib/types'
 
 export interface ProductModelFilters {
   search?: string
   categoryId?: string
+}
+
+// Inputs from a parsed supplier listing (NormalizedSupplierProduct) used to resolve the exact
+// ACTIVE product_model. `modelText` is the raw model string (may embed an A-number + part-number,
+// e.g. "iPhone16 Pro Max A3295 (MYWJ3J/A) 256GB ...").
+export interface ProductModelMatchInput {
+  brand?: string | null
+  modelText?: string | null
+  storageGb?: number | null
+  color?: string | null
+}
+
+// Extract an Apple part-number like "MYWJ3J/A" from the model text. These are the canonical,
+// SKU-precise identifier stored on product_models.part_number.
+function extractPartNumber(modelText: string): string | null {
+  const m = modelText.match(/\b([A-Z0-9]{4,7}\/[A-Z]{1,2})\b/)
+  return m ? m[1] : null
+}
+
+// Derive a clean `model_name`-style search term from the raw supplier model text:
+//   "iPhone16 Pro Max A3295 (MYWJ3J/A) 256GB ..." -> "iPhone 16 Pro Max"
+// Strips everything from the A-number (or the storage token) onward, then space-normalizes the
+// glued "iPhone16" -> "iPhone 16" form to match our clean product_models.model_name.
+export function cleanModelName(modelText: string): string {
+  let name = modelText.trim()
+  // Cut at the first A-number (e.g. " A3295 ...") if present...
+  const aSplit = name.split(/\s+A\d{4,5}/)[0]
+  if (aSplit !== name) {
+    name = aSplit
+  } else {
+    // ...otherwise cut at the storage token (e.g. " 256GB").
+    name = name.split(/\s+\d+\s*(?:GB|TB)/i)[0]
+  }
+  // Normalize "iPhone16" -> "iPhone 16" (catalog stores the spaced form).
+  name = name.replace(/\b(iPhone|iPad)(\d)/i, '$1 $2')
+  return name.trim()
+}
+
+/**
+ * Resolve the exact ACTIVE product_model for a parsed supplier listing.
+ *
+ * Two-stage match (no client-side scan over the >1000-row table — both stages query the server):
+ *   (a) part-number exact: the listing's part-number == product_models.part_number (SKU-precise).
+ *   (b) fallback: clean the model name and query that single model's SKUs (~30 rows, cap-safe),
+ *       then pick the row whose storage + color match the listing (storage-only fallback).
+ *
+ * Returns the full ProductModelWithHeroImage-shaped row (so the caller can merge it into the
+ * picker's product list for off-list display), or null when nothing matches.
+ */
+export async function findMatchingProductModel(
+  input: ProductModelMatchInput,
+): Promise<ProductModelWithHeroImage | null> {
+  const modelText = (input.modelText ?? '').trim()
+  if (!modelText) return null
+
+  const select = '*, product_media(id, file_url, role, sort_order), categories(name)'
+
+  const toHero = (pm: Record<string, unknown>): ProductModelWithHeroImage => {
+    const media =
+      (pm.product_media as Array<{ id: string; file_url: string; role: string; sort_order: number }>) ?? []
+    const hero = media.find((m) => m.role === 'hero') ?? media[0] ?? null
+    return {
+      ...(pm as object),
+      product_media: undefined,
+      hero_image_url: hero?.file_url ?? null,
+      media_count: media.length,
+      categories: pm.categories as { name: string } | null,
+    } as ProductModelWithHeroImage
+  }
+
+  // (a) Exact part-number match — the happy path.
+  const partNo = extractPartNumber(modelText)
+  if (partNo) {
+    const { data, error } = await supabase
+      .from('product_models')
+      .select(select)
+      .eq('part_number', partNo)
+      .eq('status', 'ACTIVE')
+      .limit(1)
+    if (error) throw error
+    if (data && data.length > 0) return toHero(data[0])
+  }
+
+  // (b) Fallback: query just this model's SKUs, then disambiguate by storage + color in JS.
+  const cleanName = cleanModelName(modelText)
+  if (!cleanName) return null
+
+  const { data, error } = await supabase
+    .from('product_models')
+    .select(select)
+    .ilike('model_name', cleanName)
+    .eq('status', 'ACTIVE')
+  if (error) throw error
+  const rows = data ?? []
+  if (rows.length === 0) return null
+
+  const wantStorage = normalizeStorageGb(input.storageGb)
+  const wantColor = (input.color ?? '').trim().toLowerCase()
+
+  const storageMatches = wantStorage == null
+    ? rows
+    : rows.filter((r) => normalizeStorageGb((r as { storage_gb: unknown }).storage_gb) === wantStorage)
+
+  // Prefer an exact storage + color hit; fall back to storage-only.
+  const exact = wantColor
+    ? storageMatches.find((r) => ((r as { color: string | null }).color ?? '').trim().toLowerCase() === wantColor)
+    : undefined
+  const chosen = exact ?? storageMatches[0] ?? null
+  return chosen ? toHero(chosen as Record<string, unknown>) : null
 }
 
 export async function getProductModels(filters: ProductModelFilters = {}) {

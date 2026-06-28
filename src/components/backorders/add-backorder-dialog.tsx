@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
@@ -38,6 +38,7 @@ import {
 import { ProductPicker } from '@/components/intake/product-picker'
 import { useProductModelsWithHeroImage } from '@/hooks/use-product-models'
 import { useSuppliers } from '@/hooks/use-suppliers'
+import { findMatchingProductModel, cleanModelName } from '@/services/product-models'
 import {
   fetchSupplierProduct,
   searchProductImages,
@@ -46,6 +47,7 @@ import {
 } from '@/services/backorders'
 import { backorderSchema, type BackorderFormValues } from '@/validators/backorder'
 import { cn, normalizeStorageGb } from '@/lib/utils'
+import type { ProductModelWithHeroImage } from '@/lib/types'
 
 const GRADES = ['S', 'A', 'B', 'C', 'D', 'J'] as const
 
@@ -126,8 +128,14 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
   const [fetching, setFetching] = useState(false)
   const [saving, setSaving] = useState(false)
   const [parsedHint, setParsedHint] = useState('')
+  // Clean term seeded into the ProductPicker search (decoupled from `parsedHint`, which keeps
+  // the full identifier-laden string for the human-readable "Parsed: …" line).
+  const [pickerSearch, setPickerSearch] = useState('')
   // Link-parsed specs (source of truth for this unit) kept for model-match validation.
   const [parsed, setParsed] = useState<ParsedSupplierSpecs | null>(null)
+  // The auto-matched product model. Merged into the picker list so an off-list selection (beyond
+  // the >1000-row fetch cap) still displays + drives the spec auto-fill and mismatch checks.
+  const [matchedModel, setMatchedModel] = useState<ProductModelWithHeroImage | null>(null)
 
   // Photo curation. Candidates are seeded from the fetched listing (after the
   // dedupe-by-index/prefer-_L normalization). `kept` tracks which survive.
@@ -144,7 +152,14 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
   })
 
   const supplierList = suppliers ?? []
-  const productList = products ?? []
+  // Merge the auto-matched model in so it displays even if it falls beyond the >1000-row fetch cap.
+  const productList = useMemo(() => {
+    const base = products ?? []
+    if (matchedModel && !base.some((p) => p.id === matchedModel.id)) {
+      return [matchedModel, ...base]
+    }
+    return base
+  }, [products, matchedModel])
 
   // Keep selling price = supplier price + markup as either changes. Selling remains directly
   // editable; a manual edit holds until supplier price or markup changes again.
@@ -164,7 +179,9 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
     form.reset(defaultValues)
     setUrl('')
     setParsedHint('')
+    setPickerSearch('')
     setParsed(null)
+    setMatchedModel(null)
     setPhotos([])
     setKept(new Set())
     setFetching(false)
@@ -210,9 +227,15 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
         form.setValue('selling_price', product.supplierPrice + markup)
       }
 
-      // Hint for model selection (brand + model text).
+      // Hint for the human-readable "Parsed: …" line (full identifier-laden string).
       const hint = [product.brandText, product.modelText].filter(Boolean).join(' ').trim()
       setParsedHint(hint)
+
+      // Seed the picker's manual-search with a CLEAN term (brand + clean model name, no A-number
+      // / part-number / storage) so the fallback search actually returns rows. e.g.
+      // "Apple iPhone16 Pro Max A3295 (MYWJ3J/A) 256GB …" -> "Apple iPhone 16 Pro Max".
+      const cleanName = cleanModelName(product.modelText ?? '')
+      setPickerSearch([product.brandText, cleanName].filter(Boolean).join(' ').trim())
 
       // Remember the link specs so we can (a) keep them authoritative and (b) warn if the
       // chosen product model contradicts the listing.
@@ -224,6 +247,25 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
         brandText: product.brandText ?? null,
         modelText: product.modelText ?? null,
       })
+
+      // Auto-select the exact product model. Match on part-number (SKU-precise) first, then a
+      // clean-name + storage/color fallback. Merge the full row into the picker list so it
+      // displays even when it falls beyond the >1000-row fetch cap. The select-watch effect then
+      // auto-fills RAM/chip/screen. Non-fatal: a miss just leaves the picker for manual selection.
+      try {
+        const match = await findMatchingProductModel({
+          brand: product.brandText,
+          modelText: product.modelText,
+          storageGb: product.storageGb,
+          color: product.color,
+        })
+        if (match) {
+          setMatchedModel(match)
+          form.setValue('product_id', match.id)
+        }
+      } catch {
+        // ignore — manual picker selection remains available
+      }
 
       // Auto-match the iosys SOURCING supplier. Prefer the reference-only listing
       // (e.g. "Iosys Tsushin Haiban-ka (Online)") since backorders are sourced from it,
@@ -486,7 +528,7 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
                       value={field.value}
                       onSelect={field.onChange}
                       products={productList}
-                      initialSearch={parsedHint || undefined}
+                      initialSearch={pickerSearch || parsedHint || undefined}
                     />
                   </FormControl>
                   <FormMessage />

@@ -137,7 +137,7 @@ export function ProductPicker({ value, onSelect, products, initialSearch, onCrea
               {products.map((product) => (
                 <CommandItem
                   key={product.id}
-                  value={`${product.brand} ${product.model_name} ${product.short_description ?? ''} ${product.color} ${product.cpu ?? ''} ${product.ram_gb ?? ''} ${product.storage_gb ?? ''}`}
+                  value={`${product.brand} ${product.model_name} ${product.short_description ?? ''} ${product.color} ${product.cpu ?? ''} ${product.ram_gb ?? ''} ${product.storage_gb ?? ''} ${product.model_number ?? ''} ${product.part_number ?? ''}`}
                   onSelect={() => {
                     onSelect(product.id)
                     setOpen(false)
@@ -165,6 +165,16 @@ export function ProductPicker({ value, onSelect, products, initialSearch, onCrea
                       <div className="text-xs font-medium">
                         {product.brand} {product.model_name}
                       </div>
+                      {(product.model_number || product.part_number) && (
+                        <div className="text-[11px] font-mono text-muted-foreground/80">
+                          {[
+                            product.model_number,
+                            product.part_number ? `(${product.part_number})` : null,
+                          ]
+                            .filter(Boolean)
+                            .join(' ')}
+                        </div>
+                      )}
                       <div className="text-xs text-muted-foreground">
                         {product.short_description || product.color}
                       </div>
