@@ -13,6 +13,7 @@ import {
   harvestCatalog,
   IPAD_CATEGORY,
   IPHONE_CATEGORY,
+  PIXEL_CATEGORY,
   XPERIA_CATEGORY,
 } from "./harvest.ts"
 
@@ -28,6 +29,8 @@ const category = which === "ipad"
   ? XPERIA_CATEGORY
   : which === "aquos"
   ? AQUOS_CATEGORY
+  : which === "pixel"
+  ? PIXEL_CATEGORY
   : IPHONE_CATEGORY
 console.error(`=== harvesting category: ${which} ===`)
 

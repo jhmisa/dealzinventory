@@ -174,6 +174,7 @@ Re-harvest for new Apple models follows the same shape as §2 (add specs → re-
 | Galaxy | Samsung | `items/smartphone/galaxy` | `SM-[A-Z0-9]+ \| SCG\d+ \| SCV\d+ \| SC-\d+[A-Z]` | `galaxy-specs.ts` / `GALAXY_COLORS_JA_EN` | `2026-06-28-galaxy-fill-gaps.sql` | `iosys-galaxy-p1.html` | ✅ + **legacy reconcile OPEN** (42 COMPUTER rows) |
 | Xperia | Sony | `items/smartphone/xperia` | `XQ-[A-Z]{2}\d{2} \| SO-\d{2}[A-Za-z]+ \| SOG\d+ \| SOV\d+ \| A?\d{3}SO \| J\d{4}` | `xperia-specs.ts` / `XPERIA_COLORS_JA_EN` | `2026-06-28-xperia-fill-gaps.sql` | `iosys-xperia-p1.html` | ✅ legacy reconciled inline (3 rows) |
 | AQUOS | Sharp | `items/smartphone/aquos` | `SH-RM\d+ \| SH-M\d+ \| SH-\d{2}[A-Z] \| SHG\d+ \| SHV\d+ \| A\d{3}SH` | `aquos-specs.ts` / `AQUOS_COLORS_JA_EN` | `2026-06-28-aquos-fill-gaps.sql` | `iosys-aquos-p1.html` | ✅ legacy reconciled inline (4 rows, Black dup merged) |
+| Pixel | Google | `items/smartphone/pixel` | `G[A-Z0-9]{4}` (case-sensitive) | `pixel-specs.ts` / `PIXEL_COLORS_JA_EN` | `2026-06-28-pixel-fill-gaps.sql` | `iosys-pixel-p1.html` | ✅ legacy reconciled inline (4 phone rows; 2 Google speakers left COMPUTER) |
 | iPhone | Apple | `items/smartphone/iphone` | part# (`MXVH3J/A`) | `iphone-specs.ts` / `apple-colors.ts` | phase2/3/5 data-ops | `iosys-iphone-simfree-p1.html` | ✅ |
 | iPad | Apple | `items/tablet/ios/ipad` | part# | `ipad-specs.ts` / `apple-colors.ts` | phase4-ipad data-ops | `iosys-ipad-*-p1.html` | ✅ |
 
@@ -204,6 +205,23 @@ Re-harvest for new Apple models follows the same shape as §2 (add specs → re-
   channel) bracket so the real carrier bracket is read; also strips an inline `法人モデル` from color.
 - **Legacy reconcile:** 4 `Aquos Sense3`/`Aquos Sense 3` COMPUTER rows → ANDROID canonical `AQUOS sense3`;
   a duplicate Black DRAFT row merged into the 21-item row via `superseded_by`.
+
+### Pixel (Google)
+- **Codes:** one shape — Google's `G` + 4 uppercase-alnum (`GL066`/`GM66V`/`GN4F5`/`G020D`/`GV0BP`);
+  carrier-agnostic. Regex is **case-sensitive** so `Google`/`Green` (lowercase tail) never match, and
+  storage (`128GB`) has no boundary before its `G`.
+- **Canonicalizer:** lenient (contains `pixel`); strips leaked carrier/`Google` prefix; inserts space
+  `Pixel10`→`Pixel 10`, `Pixel7a`→`Pixel 7a`. **Does NOT strip `5G`** — for Pixel it's a model
+  distinguisher (`Pixel 4a 5G` ≠ `Pixel 4a`, `Pixel 5a 5G`), never spurious noise.
+- **Storage:** inline after the code on ~99% of cards → near-complete storage coverage (only the
+  original Pixel Fold omitted it). Colors are ASCII English (Obsidian/Porcelain/Bay/Frost…) and flow
+  straight through; the color map only covers older katakana spellings.
+- **Generic engine fix shipped with Pixel:** Pixel-3-era titles wrap color+storage in ASCII/mixed
+  brackets `[Just Black 64GB]` / `【Purple-ish 64GB]` *before* the carrier bracket. The engine now
+  normalizes `[`/`]` → `【`/`】` and unwraps a leftover bracket still wrapping the tail (step 8b).
+- **Watch-outs:** new `a`-models appear fast (Pixel 10a `GV0BP` shipped 2026-04 — caught as an
+  `unknownModels` entry, added to specs). Two `Google` rows are smart speakers (Nest Mini / Home Mini),
+  NOT phones — left as COMPUTER, out of scope.
 
 ---
 

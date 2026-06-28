@@ -5,12 +5,14 @@ import {
   GALAXY_CONFIG,
   parseAndroidListingPage,
   parseAndroidListingTitle,
+  PIXEL_CONFIG,
   XPERIA_CONFIG,
 } from "./android-listing.ts"
 
 const galaxy = (t: string) => parseAndroidListingTitle(t, GALAXY_CONFIG)
 const xperia = (t: string) => parseAndroidListingTitle(t, XPERIA_CONFIG)
 const aquos = (t: string) => parseAndroidListingTitle(t, AQUOS_CONFIG)
+const pixel = (t: string) => parseAndroidListingTitle(t, PIXEL_CONFIG)
 
 Deno.test("galaxy: SM-..Q simfree, ROM in bracket, JA color", () => {
   const s = galaxy("Galaxy A57 5G SM-A576Q オーサムネイビー 【RAM8GB/ROM128GB/国内版 SIMフリー】")
@@ -413,6 +415,115 @@ Deno.test("aquos: page extraction pulls only coded SKU cards", () => {
   const skus = parseAndroidListingPage(html, AQUOS_CONFIG)
   assertEquals(skus.length > 5, true)
   assertEquals(skus.every((s) => s.brand === "Sharp" && /^AQUOS/.test(s.model_name)), true)
+  assertEquals(skus.every((s) => s.model_number != null), true)
+  const keys = new Set(skus.map((s) => `${s.model_name}|${s.storage_gb}|${s.color_en ?? s.color_ja}|${s.carrier}`))
+  assertEquals(keys.size, skus.length)
+})
+
+// ---------------------------------------------------------------------------
+// Google Pixel
+// ---------------------------------------------------------------------------
+
+Deno.test("pixel: Google prefix, G-code, inline storage, ASCII color, Pixel10->Pixel 10", () => {
+  const s = pixel("Google Pixel10 GL066 128GB Indigo【国内版SIMフリー】")
+  assertEquals(s?.brand, "Google")
+  assertEquals(s?.model_name, "Pixel 10") // space inserted
+  assertEquals(s?.model_number, "GL066")
+  assertEquals(s?.storage_gb, 128) // inline
+  assertEquals(s?.color_en, "Indigo")
+  assertEquals(s?.color_ja, null)
+  assertEquals(s?.carrier, "SIM-Free") // 国内版
+})
+
+Deno.test("pixel: Pro XL multi-word suffix kept, 512GB", () => {
+  const s = pixel("Google Pixel10 Pro XL GYPW4 512GB Obsidian【国内版SIMフリー】")
+  assertEquals(s?.model_name, "Pixel 10 Pro XL")
+  assertEquals(s?.model_number, "GYPW4")
+  assertEquals(s?.storage_gb, 512)
+  assertEquals(s?.color_en, "Obsidian")
+})
+
+Deno.test("pixel: Pro Fold suffix kept", () => {
+  const s = pixel("Google Pixel9 Pro Fold GC15S 256GB Porcelain【国内版SIMフリー】")
+  assertEquals(s?.model_name, "Pixel 9 Pro Fold")
+  assertEquals(s?.model_number, "GC15S")
+  assertEquals(s?.storage_gb, 256)
+  assertEquals(s?.color_en, "Porcelain")
+})
+
+Deno.test("pixel: 'a' suffix variant (Pixel7a)", () => {
+  const s = pixel("Google Pixel7a G82U8 128GB Coral【国内版SIMフリー】")
+  assertEquals(s?.model_name, "Pixel 7a")
+  assertEquals(s?.model_number, "G82U8")
+  assertEquals(s?.color_en, "Coral")
+})
+
+Deno.test("pixel: 5G is a model distinguisher, NOT stripped (4a 5G ≠ 4a)", () => {
+  const s = pixel("Google Pixel4a 5G G025H 128GB Just Black【国内版SIMフリー】")
+  assertEquals(s?.model_name, "Pixel 4a 5G") // 5G preserved
+  assertEquals(s?.color_en, "Just Black")
+})
+
+Deno.test("pixel: SoftBank carrier-word + leading unlock + inline storage", () => {
+  const s = pixel("【SIMロック解除済】Softbank Google Pixel4 G020N 64GB Clearly White")
+  assertEquals(s?.model_name, "Pixel 4")
+  assertEquals(s?.model_number, "G020N")
+  assertEquals(s?.storage_gb, 64)
+  assertEquals(s?.color_en, "Clearly White")
+  assertEquals(s?.carrier, "SoftBank")
+  assertEquals(s?.is_unlocked, true)
+})
+
+Deno.test("pixel: 'G'+4 code never matches 'Google' or a storage token", () => {
+  // "Google" is lowercase after the G; "128GB" has no boundary before G and only 1 char after.
+  const s = pixel("Google Pixel8 GZPFO 128GB Obsidian【国内版SIMフリー】")
+  assertEquals(s?.model_number, "GZPFO")
+  assertEquals(s?.model_name, "Pixel 8")
+  assertEquals(s?.storage_gb, 128)
+})
+
+Deno.test("pixel: 10a current model parses (GV0BP)", () => {
+  const s = pixel("Google Pixel10a GV0BP 128GB Lavender【docomo版SIMフリー】")
+  assertEquals(s?.model_name, "Pixel 10a")
+  assertEquals(s?.model_number, "GV0BP")
+  assertEquals(s?.storage_gb, 128)
+  assertEquals(s?.color_en, "Lavender")
+  assertEquals(s?.carrier, "docomo")
+})
+
+Deno.test("pixel: Pixel 3-era ASCII [Color Storage] bracket before carrier bracket", () => {
+  const s = pixel("Google Pixel3 XL G013D [Just Black 64GB]【国内版SIMフリー】")
+  assertEquals(s?.model_name, "Pixel 3 XL")
+  assertEquals(s?.model_number, "G013D")
+  assertEquals(s?.storage_gb, 64) // unwrapped from the [...] group
+  assertEquals(s?.color_en, "Just Black")
+  assertEquals(s?.carrier, "SIM-Free")
+})
+
+Deno.test("pixel: Pixel 3-era mixed 【Color Storage] bracket (no carrier bracket)", () => {
+  const s = pixel("【SIMロック解除済】SoftBank Google Pixel3a XL G020D【Purple-ish 64GB]")
+  assertEquals(s?.model_name, "Pixel 3a XL")
+  assertEquals(s?.model_number, "G020D")
+  assertEquals(s?.storage_gb, 64)
+  assertEquals(s?.color_en, "Purple-ish")
+  assertEquals(s?.carrier, "SoftBank")
+  assertEquals(s?.is_unlocked, true)
+})
+
+Deno.test("pixel: non-Pixel / no code -> null", () => {
+  assertEquals(pixel("Pixel"), null) // nav thumb, no code
+  assertEquals(pixel("Galaxy S24 SM-S921Q ブラック"), null) // not Pixel
+})
+
+Deno.test("pixel: page extraction pulls only coded SKU cards", () => {
+  const html = Deno.readTextFileSync(
+    new URL("./__fixtures__/iosys-pixel-p1.html", import.meta.url),
+  )
+  const titles = extractAndroidCardTitles(html, PIXEL_CONFIG)
+  assertEquals(titles.length > 5, true)
+  const skus = parseAndroidListingPage(html, PIXEL_CONFIG)
+  assertEquals(skus.length > 5, true)
+  assertEquals(skus.every((s) => s.brand === "Google" && /^Pixel/.test(s.model_name)), true)
   assertEquals(skus.every((s) => s.model_number != null), true)
   const keys = new Set(skus.map((s) => `${s.model_name}|${s.storage_gb}|${s.color_en ?? s.color_ja}|${s.carrier}`))
   assertEquals(keys.size, skus.length)

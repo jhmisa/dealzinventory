@@ -95,8 +95,10 @@ export function parseAndroidListingTitle(
   if (!rawTitle) return null
   const raw = decodeEntities(rawTitle).replace(/[\s　]+/g, " ").trim()
 
-  // 1. Peel leading 【...】 brackets (condition / lock / network-restriction).
-  let rest = raw
+  // 1. Peel leading 【...】 brackets (condition / lock / network-restriction). Normalize ASCII/mixed
+  //    square brackets to 【】 first — Pixel 3-era titles wrap color+storage in "[Just Black 64GB]" or
+  //    the mixed "【Purple-ish 64GB]"; treating them as 【...】 lets the note machinery handle them.
+  let rest = raw.replace(/\[/g, "【").replace(/\]/g, "】")
   let leadingUnlock = false
   for (let m = rest.match(LEADING_BRACKET); m; m = rest.match(LEADING_BRACKET)) {
     if (/SIMロック解除済|SIMフリー/i.test(m[1])) leadingUnlock = true
@@ -172,6 +174,21 @@ export function parseAndroidListingTitle(
         if (ram_gb == null && bare.length >= 2) ram_gb = Math.min(...bare)
       }
     }
+  }
+
+  // 8b. A leftover bracketed group still wrapping the tail (Pixel 3-era "[Just Black 64GB]【国内版…】"
+  //     after square-bracket normalization, where the carrier bracket was already peeled in step 6)
+  //     carries color+storage — unwrap it and treat like a note.
+  const wrappedTail = tail.match(/^【\s*(.+?)\s*】$/)
+  if (wrappedTail) {
+    const inner = wrappedTail[1]
+    if (storage_gb == null) {
+      const bare = [...inner.matchAll(/(\d+)\s*(GB|TB)/gi)]
+        .map((m) => toStorageGb(m[1], m[2]))
+        .filter((n): n is number => n != null)
+      if (bare.length) storage_gb = Math.max(...bare)
+    }
+    tail = colorFromNote(inner)
   }
 
   // 9. Color: prefer the text after the code; strip any trailing full-SKU / code-like token
@@ -498,4 +515,58 @@ export const AQUOS_CONFIG: AndroidBrandConfig = {
       .replace(/\s+/g, " ")
       .trim(),
   colorJaToEn: aquosColorJaToEn,
+}
+
+// ---------------------------------------------------------------------------
+// Google Pixel config
+// ---------------------------------------------------------------------------
+
+// Pixel listings are almost always in English (Obsidian / Porcelain / Bay / Jade / Indigo / Coral /
+// Moonstone / Lemongrass…) — ASCII colors flow straight through as color_en, so this map only covers
+// the katakana spellings that appear for older Pixels. Quirky official Google names ("Clearly White",
+// "Just Black", "Purple-ish", "Sorta Sage"…) are already ASCII and need no mapping. Verified Sharp-style
+// research pass 2026-06-28; アイス/ソルベ deliberately NOT mapped (unverified as official Pixel colors).
+export const PIXEL_COLORS_JA_EN: Record<string, string> = {
+  "オブシディアン": "Obsidian",
+  "ポーセリン": "Porcelain",
+  "ヘーゼル": "Hazel",
+  "ヘイゼル": "Hazel",
+  "ベイ": "Bay",
+  "ローズ": "Rose",
+  "スノー": "Snow",
+  "チャコール": "Charcoal",
+  "セージ": "Sage",
+  "コーラル": "Coral",
+  "クラウディーホワイト": "Cloudy White",
+  "ジャストブラック": "Just Black",
+  "クリアーホワイト": "Clearly White",
+  "バーリーブルー": "Barely Blue",
+  "レモングラス": "Lemongrass",
+  // Generic / basic fallbacks
+  "ブラック": "Black",
+  "ホワイト": "White",
+}
+
+export function pixelColorJaToEn(ja: string | null): string | null {
+  if (!ja) return null
+  return PIXEL_COLORS_JA_EN[ja] ?? null
+}
+
+export const PIXEL_CONFIG: AndroidBrandConfig = {
+  brand: "Google",
+  brandPrefixes: ["Google"],
+  modelNameRe: /pixel/i, // lenient (contains): leading carrier/Google junk handled in canonical
+  // Google model code: "G" + 4 uppercase-alnum (GL066 / GM66V / GN4F5 / G020D). Carrier-agnostic;
+  // storage/color never encoded. Case-sensitive G + [A-Z0-9] so "Google"/"Green" never match.
+  modelCodeRe: /\bG[A-Z0-9]{4}\b/,
+  canonicalModelName: (seg) =>
+    seg
+      .replace(/^.*?Pixel/i, "Pixel") // drop leaked carrier/Google prefix; normalise "Pixel" casing
+      // NB: do NOT strip 5G — for Pixel it's a model distinguisher ("Pixel 4a 5G" ≠ "Pixel 4a"),
+      // never spurious noise (unlike Galaxy/Xperia/AQUOS).
+      .replace(/\b(Single|Dual)[- ]?SIM\b/gi, "")
+      .replace(/^Pixel(?=\d)/i, "Pixel ") // "Pixel10"->"Pixel 10", "Pixel7a"->"Pixel 7a"
+      .replace(/\s+/g, " ")
+      .trim(),
+  colorJaToEn: pixelColorJaToEn,
 }
