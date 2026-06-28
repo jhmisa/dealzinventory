@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       accessories: {
@@ -1359,6 +1384,75 @@ export type Database = {
           total_inventory_value?: number
           total_items?: number
           total_purchase_cost?: number
+        }
+        Relationships: []
+      }
+      iosys_catalog: {
+        Row: {
+          brand: string | null
+          carrier: Database["public"]["Enums"]["jp_carrier"] | null
+          carrier_path: string | null
+          color_en: string | null
+          color_ja: string | null
+          connectivity: string | null
+          created_at: string
+          device_category: string | null
+          harvested_at: string
+          id: string
+          listing_count: number | null
+          model_name: string
+          model_number: string | null
+          part_number: string | null
+          raw_title: string | null
+          source_url: string | null
+          specs: Json
+          storage_gb: number | null
+          supplier_product_code: string | null
+          updated_at: string
+        }
+        Insert: {
+          brand?: string | null
+          carrier?: Database["public"]["Enums"]["jp_carrier"] | null
+          carrier_path?: string | null
+          color_en?: string | null
+          color_ja?: string | null
+          connectivity?: string | null
+          created_at?: string
+          device_category?: string | null
+          harvested_at?: string
+          id?: string
+          listing_count?: number | null
+          model_name: string
+          model_number?: string | null
+          part_number?: string | null
+          raw_title?: string | null
+          source_url?: string | null
+          specs?: Json
+          storage_gb?: number | null
+          supplier_product_code?: string | null
+          updated_at?: string
+        }
+        Update: {
+          brand?: string | null
+          carrier?: Database["public"]["Enums"]["jp_carrier"] | null
+          carrier_path?: string | null
+          color_en?: string | null
+          color_ja?: string | null
+          connectivity?: string | null
+          created_at?: string
+          device_category?: string | null
+          harvested_at?: string
+          id?: string
+          listing_count?: number | null
+          model_name?: string
+          model_number?: string | null
+          part_number?: string | null
+          raw_title?: string | null
+          source_url?: string | null
+          specs?: Json
+          storage_gb?: number | null
+          supplier_product_code?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -2846,6 +2940,8 @@ export type Database = {
           category_id: string | null
           chipset: string | null
           color: string
+          color_ja: string | null
+          color_key: string | null
           cpu: string | null
           created_at: string
           device_category: Database["public"]["Enums"]["device_category"]
@@ -2872,8 +2968,10 @@ export type Database = {
           ram_gb: string | null
           screen_size: number | null
           short_description: string | null
+          source_url: string | null
           status: Database["public"]["Enums"]["product_status"]
           storage_gb: string | null
+          superseded_by: string | null
           supports_stylus: boolean | null
           updated_at: string
           verified_at: string | null
@@ -2887,6 +2985,8 @@ export type Database = {
           category_id?: string | null
           chipset?: string | null
           color: string
+          color_ja?: string | null
+          color_key?: string | null
           cpu?: string | null
           created_at?: string
           device_category?: Database["public"]["Enums"]["device_category"]
@@ -2913,8 +3013,10 @@ export type Database = {
           ram_gb?: string | null
           screen_size?: number | null
           short_description?: string | null
+          source_url?: string | null
           status?: Database["public"]["Enums"]["product_status"]
           storage_gb?: string | null
+          superseded_by?: string | null
           supports_stylus?: boolean | null
           updated_at?: string
           verified_at?: string | null
@@ -2928,6 +3030,8 @@ export type Database = {
           category_id?: string | null
           chipset?: string | null
           color?: string
+          color_ja?: string | null
+          color_key?: string | null
           cpu?: string | null
           created_at?: string
           device_category?: Database["public"]["Enums"]["device_category"]
@@ -2954,8 +3058,10 @@ export type Database = {
           ram_gb?: string | null
           screen_size?: number | null
           short_description?: string | null
+          source_url?: string | null
           status?: Database["public"]["Enums"]["product_status"]
           storage_gb?: string | null
+          superseded_by?: string | null
           supports_stylus?: boolean | null
           updated_at?: string
           verified_at?: string | null
@@ -2968,6 +3074,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_models_superseded_by_fkey"
+            columns: ["superseded_by"]
+            isOneToOne: false
+            referencedRelation: "product_models"
             referencedColumns: ["id"]
           },
         ]
@@ -3945,6 +4058,23 @@ export type Database = {
         Args: { p_accessory_id: string; p_quantity: number }
         Returns: number
       }
+      list_product_color_groups: {
+        Args: { p_category_id?: string; p_media?: string; p_search?: string }
+        Returns: {
+          brand: string
+          category_id: string
+          category_name: string
+          color: string
+          color_key: string
+          model_name: string
+          photo_count: number
+          representative_id: string
+          short_description: string
+          sku_count: number
+          storages: string[]
+          video_count: number
+        }[]
+      }
       mark_backorder_ordered: {
         Args: { p_order_item_id: string }
         Returns: undefined
@@ -3966,9 +4096,7 @@ export type Database = {
       process_message_queue: { Args: never; Returns: undefined }
       queue_review_requests: { Args: never; Returns: undefined }
       release_backorder_unit: {
-        Args: {
-          p_order_item_id: string
-        }
+        Args: { p_order_item_id: string }
         Returns: undefined
       }
       reserve_backorder_unit: {
@@ -4006,6 +4134,7 @@ export type Database = {
           model_name: string
           model_number: string
           os_family: string
+          part_number: string
           ram_gb: string
           screen_size: number
           selling_price: number
@@ -4166,6 +4295,7 @@ export type Database = {
         | "SOLD"
         | "SUPPLIER_RETURN"
         | "REMOVED"
+      jp_carrier: "SIM-Free" | "docomo" | "au" | "SoftBank" | "Rakuten"
       kaitori_delivery_method: "SHIP" | "WALK_IN"
       kaitori_media_role:
         | "front"
@@ -4202,7 +4332,7 @@ export type Database = {
         | "SHIPPED"
         | "DELIVERED"
         | "CANCELLED"
-      product_status: "DRAFT" | "ACTIVE"
+      product_status: "DRAFT" | "ACTIVE" | "ARCHIVED"
       queue_status: "PENDING" | "PROCESSING" | "SENT" | "FAILED"
       refund_payment_method: "BANK_TRANSFER" | "CASH"
       screen_condition: "GOOD" | "FAIR" | "POOR" | "CRACKED"
@@ -4357,6 +4487,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       ac_adapter_status: ["CORRECT", "INCORRECT", "MISSING"],
@@ -4398,6 +4531,7 @@ export const Constants = {
         "SUPPLIER_RETURN",
         "REMOVED",
       ],
+      jp_carrier: ["SIM-Free", "docomo", "au", "SoftBank", "Rakuten"],
       kaitori_delivery_method: ["SHIP", "WALK_IN"],
       kaitori_media_role: [
         "front",
@@ -4437,7 +4571,7 @@ export const Constants = {
         "DELIVERED",
         "CANCELLED",
       ],
-      product_status: ["DRAFT", "ACTIVE"],
+      product_status: ["DRAFT", "ACTIVE", "ARCHIVED"],
       queue_status: ["PENDING", "PROCESSING", "SENT", "FAILED"],
       refund_payment_method: ["BANK_TRANSFER", "CASH"],
       screen_condition: ["GOOD", "FAIR", "POOR", "CRACKED"],
