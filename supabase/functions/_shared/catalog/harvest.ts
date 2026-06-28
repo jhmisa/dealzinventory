@@ -22,6 +22,7 @@ import {
   ASUS_CONFIG,
   GALAXY_CONFIG,
   HUAWEI_CONFIG,
+  MOTOROLA_CONFIG,
   OPPO_CONFIG,
   parseAndroidListingPage,
   PIXEL_CONFIG,
@@ -37,6 +38,7 @@ import { oppoSpec } from "./oppo-specs.ts"
 import { arrowsSpec } from "./arrows-specs.ts"
 import { huaweiSpec } from "./huawei-specs.ts"
 import { asusSpec } from "./asus-specs.ts"
+import { motorolaSpec } from "./motorola-specs.ts"
 
 export interface CarrierSection {
   path: string // url segment, e.g. "simfree" / "wifi"
@@ -294,6 +296,12 @@ export const ROG_CATEGORY: HarvestCategory = androidCategory(
   "items/smartphone/rog",
   ASUS_CONFIG,
   asusSpec,
+)
+
+export const MOTOROLA_CATEGORY: HarvestCategory = androidCategory(
+  "items/smartphone/motorola",
+  MOTOROLA_CONFIG,
+  motorolaSpec,
 )
 
 export interface HarvestOptions {

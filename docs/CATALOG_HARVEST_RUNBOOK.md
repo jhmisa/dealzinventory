@@ -180,6 +180,7 @@ Re-harvest for new Apple models follows the same shape as §2 (add specs → re-
 | arrows | Fujitsu/FCNT | `items/smartphone/arrows` | docomo `F-\d{2}[A-Z]` · au `FCG\d+` · SoftBank `A\d{3}FC` · SIM-free `M\d{2}` | `arrows-specs.ts` / `ARROWS_COLORS_JA_EN` | `2026-06-28-arrows-fill-gaps.sql` | `iosys-arrows-p1.html` | ✅ + **small legacy reconcile OPEN** (~9 arrows rows; ⚠️ LifeBooks are real laptops) |
 | HUAWEI | Huawei | `items/smartphone/huawei` | global `[A-Z]{3}-[A-Z]{1,2}\d{1,2}[A-Z]?` (J=Japan) · au `HWV\d+` · docomo `HW-\d{2}[A-Z]` | `huawei-specs.ts` / `HUAWEI_COLORS_JA_EN` | `2026-06-28-huawei-fill-gaps.sql` | `iosys-huawei-p1.html` | ✅ + **small legacy reconcile OPEN** (~8 rows); honor = separate brand (excluded) |
 | ASUS | ASUS | `items/smartphone/zenfone` + `/rog` | modern `AI\d{4}` · older `Z[A-Z]\d{3}[A-Z]{2}(-…)?` | `asus-specs.ts` / `ASUS_COLORS_JA_EN` | `2026-06-28-asus-fill-gaps.sql` | `iosys-{zenfone,rog}-p1.html` | ✅ + **small legacy reconcile OPEN** (~4 rows); 2 paths, 1 config |
+| Motorola | Motorola | `items/smartphone/motorola` | global `XT\d{4}-\d` · SoftBank `A\d{3}MO` · docomo `M-\d{2}[A-Z]` | `motorola-specs.ts` / `MOTOROLA_COLORS_JA_EN` | `2026-06-28-motorola-fill-gaps.sql` | `iosys-motorola-p1.html` | ✅ (18 core spec'd; 7 carrier/recent flagged) + tiny legacy OPEN (~3) |
 | iPhone | Apple | `items/smartphone/iphone` | part# (`MXVH3J/A`) | `iphone-specs.ts` / `apple-colors.ts` | phase2/3/5 data-ops | `iosys-iphone-simfree-p1.html` | ✅ |
 | iPad | Apple | `items/tablet/ios/ipad` | part# | `ipad-specs.ts` / `apple-colors.ts` | phase4-ipad data-ops | `iosys-ipad-*-p1.html` | ✅ |
 
@@ -227,6 +228,19 @@ Re-harvest for new Apple models follows the same shape as §2 (add specs → re-
 - **Watch-outs:** new `a`-models appear fast (Pixel 10a `GV0BP` shipped 2026-04 — caught as an
   `unknownModels` entry, added to specs). Two `Google` rows are smart speakers (Nest Mini / Home Mini),
   NOT phones — left as COMPUTER, out of scope.
+
+### Motorola (moto g / edge / razr)
+- **Codes:** global `XT####-#` (suffix = region/carrier SKU); SoftBank `A###MO` (MO = Motorola);
+  docomo `M-##[A-Z]`. Carrier variants map to a global twin (razr 40s/A303MO = razr 40 rebadge;
+  razr 50d/M-51E = base razr 50, NOT the Ultra). model_number + carrier are coarse.
+- **Names lowercase** (`moto g52j 5G`, `edge 20`, `razr 40`); canonicalizer spaces razr/edge before
+  the number (`razr40`→`razr 40`, `edge30`→`edge 30`), lowercases a leaked `Moto`→`moto`, KEEPS `5G`.
+  Storage often sits in the name (`moto g30 128GB XT2129-2`) — pulled by the generic step 4b.
+- **JP-exclusive models:** moto g52j 5G (SD695, FeliCa) + its II/SPECIAL refreshes (same XT2219-1
+  code, RAM/storage-only difference), moto g53j 5G (SD480+, NOT a 695 despite the higher number).
+  Many razr colors are **Pantone-collab** names (Scarab Green, Parfait Pink, Spritz Orange, Sand
+  Cream, Gibraltar Sea Navy). **技適 cert ≠ JP sale** — several models cleared cert but never sold
+  (excluded). edge 60 (Dimensity 7400) ≠ edge 60 pro (Dimensity 8350) — distinct.
 
 ### ASUS (Zenfone / ROG Phone)
 - **Two iosys paths, one config:** `items/smartphone/zenfone` + `items/smartphone/rog` both use

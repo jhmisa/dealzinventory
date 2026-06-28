@@ -14,6 +14,7 @@ import {
   IPAD_CATEGORY,
   ARROWS_CATEGORY,
   HUAWEI_CATEGORY,
+  MOTOROLA_CATEGORY,
   ROG_CATEGORY,
   ZENFONE_CATEGORY,
   IPHONE_CATEGORY,
@@ -49,6 +50,8 @@ const category = which === "ipad"
   ? ZENFONE_CATEGORY
   : which === "rog"
   ? ROG_CATEGORY
+  : which === "motorola"
+  ? MOTOROLA_CATEGORY
   : IPHONE_CATEGORY
 console.error(`=== harvesting category: ${which} ===`)
 

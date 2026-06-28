@@ -987,3 +987,80 @@ export const ASUS_CONFIG: AndroidBrandConfig = {
       .trim(),
   colorJaToEn: asusColorJaToEn,
 }
+
+// ---------------------------------------------------------------------------
+// Motorola config (moto g / edge / razr)
+// ---------------------------------------------------------------------------
+
+// Motorola covers three lines under one brand: moto g, edge, razr. Codes: global "XT####-#";
+// SoftBank "A###MO"; docomo "M-##[A-Z]". Names are lowercase ("moto g52j 5G", "edge 20", "razr 40").
+// The canonicalizer inserts the space razr40->razr 40; storage often sits in the name ("moto g30
+// 128GB XT2129-2") and is pulled by the generic step 4b. Verified research pass 2026-06-28.
+export const MOTOROLA_COLORS_JA_EN: Record<string, string> = {
+  // Generic / basic
+  "ブラック": "Black",
+  "ホワイト": "White",
+  "シルバー": "Silver",
+  "グレイ": "Gray",
+  "グレー": "Gray",
+  "ブルー": "Blue",
+  "ミッドナイトブルー": "Midnight Blue",
+  "シルバーブルー": "Silver Blue",
+  "ブラックビューティー": "Black Beauty", // edge 40 neo (long-vowel ー spelling variant)
+  // Verified Motorola colorways (research pass 2026-06-28 — all cross-checked to specific JP models).
+  "インクブラック": "Ink Black", // moto g53j 5G
+  "パールホワイト": "Pearl White", // moto g52j 5G (+ II / SPECIAL)
+  "ミネラルグレイ": "Mineral Gray", // moto g31 / g32
+  "バニラクリーム": "Vanilla Cream", // razr 40 / 40s
+  "インフィニットブラック": "Infinite Black", // razr 40 Ultra
+  "イリディセントスカイ": "Iridescent Sky", // moto g100 (JP-exclusive launch color)
+  "パステルスカイ": "Pastel Sky", // moto g30
+  "アークティックシルバー": "Arctic Silver", // moto g53j 5G
+  "フレッシュラベンダー": "Fresh Lavender", // moto g05
+  "フロストオニキス": "Frost Onyx", // edge 20
+  "エレキグラファイト": "Electric Graphite", // edge 20 fusion
+  "ホワイトマーブル": "White Marble", // razr 50d (docomo)
+  // Pantone-collaboration razr/edge colors (curated names, verified)
+  "スカラベグリーン": "Scarab Green", // razr 60 Ultra
+  "パルフェピンク": "Parfait Pink", // razr 60
+  "サンドクリーム": "Sand Cream", // razr 50 / 50s
+  "スプリッツオレンジ": "Spritz Orange", // razr 50 / 50s (NOT "Split Orange")
+  "ジブラルタルシーネイビー": "Gibraltar Sea Navy", // edge 60 / razr 60
+  "コアラグレイ": "Koala Grey", // razr 50 / 50s
+  "サマーライラック": "Summer Lilac", // razr 40s
+  "セージグリーン": "Sage Green", // razr 40 / 40s
+  // edge / moto-g additional verified colors
+  "イクリプスブラック": "Eclipse Black", // edge 40
+  "ルナブルー": "Luna Blue", // edge 40
+  "カリビアンブルー": "Caribbean Blue", // edge 40 neo
+  "ブラックビューティ": "Black Beauty", // edge 40 neo
+  "アイスグリーン": "Ice Green", // moto g24
+  "ミスティブルー": "Misty Blue", // moto g05
+  "ブラックオイスター": "Black Oyster", // moto g66j 5G (Pantone)
+  "ディルグリーン": "Dill Green", // moto g66j 5G (Pantone)
+  "グレーミスト": "Grey Mist", // moto g66j 5G (Pantone)
+}
+
+export function motorolaColorJaToEn(ja: string | null): string | null {
+  if (!ja) return null
+  return MOTOROLA_COLORS_JA_EN[ja] ?? null
+}
+
+export const MOTOROLA_CONFIG: AndroidBrandConfig = {
+  brand: "Motorola",
+  brandPrefixes: ["Motorola", "motorola"],
+  modelNameRe: /^(moto|edge|razr)/i, // after Motorola peel the name starts with moto/edge/razr
+  // Motorola codes: global XT####-#; SoftBank A###MO; docomo M-##[A-Z]. First match wins.
+  modelCodeRe: /\b(XT\d{4}-\d|A\d{3}MO|M-\d{2}[A-Z])\b/,
+  canonicalModelName: (seg) =>
+    seg
+      .replace(/^motorola\s+/i, "") // belt-and-suspenders if the prefix peel missed it
+      .replace(/^moto\b/i, "moto") // normalize the line casing ("Moto g64"->"moto g64")
+      .replace(/\brazr(?=\d)/gi, "razr ") // "razr40"->"razr 40", "razr60 Ultra"->"razr 60 Ultra"
+      .replace(/\bedge(?=\d)/gi, "edge ") // "edge30 Pro"->"edge 30 Pro"
+      // KEEP 5G — Motorola uses it as a model marker ("moto g52j 5G", and the II/SPECIAL variants).
+      .replace(/\b(Single|Dual)[- ]?SIM\b/gi, "")
+      .replace(/\s+/g, " ")
+      .trim(),
+  colorJaToEn: motorolaColorJaToEn,
+}

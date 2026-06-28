@@ -6,6 +6,7 @@ import {
   extractAndroidCardTitles,
   GALAXY_CONFIG,
   HUAWEI_CONFIG,
+  MOTOROLA_CONFIG,
   parseAndroidListingPage,
   parseAndroidListingTitle,
   OPPO_CONFIG,
@@ -17,6 +18,7 @@ import {
 const arrows = (t: string) => parseAndroidListingTitle(t, ARROWS_CONFIG)
 const huawei = (t: string) => parseAndroidListingTitle(t, HUAWEI_CONFIG)
 const asus = (t: string) => parseAndroidListingTitle(t, ASUS_CONFIG)
+const moto = (t: string) => parseAndroidListingTitle(t, MOTOROLA_CONFIG)
 
 const galaxy = (t: string) => parseAndroidListingTitle(t, GALAXY_CONFIG)
 const xperia = (t: string) => parseAndroidListingTitle(t, XPERIA_CONFIG)
@@ -1083,5 +1085,95 @@ Deno.test("asus: page extraction (zenfone fixture)", () => {
   const skus = parseAndroidListingPage(html, ASUS_CONFIG)
   assertEquals(skus.length > 3, true)
   assertEquals(skus.every((s) => s.brand === "ASUS"), true)
+  assertEquals(skus.every((s) => s.color_en != null || s.color_ja != null), true)
+})
+
+// ---------------------------------------------------------------------------
+// Motorola (moto g / edge / razr) — XT####-# + carrier codes
+// ---------------------------------------------------------------------------
+
+Deno.test("moto: global XT code, storage in name, Motorola prefix peeled", () => {
+  const s = moto("Motorola moto g30 128GB XT2129-2 パステルスカイ【国内版 SIMフリー】")
+  assertEquals(s?.brand, "Motorola")
+  assertEquals(s?.model_name, "moto g30")
+  assertEquals(s?.model_number, "XT2129-2")
+  assertEquals(s?.storage_gb, 128) // from the name segment
+  assertEquals(s?.color_ja, "パステルスカイ")
+  assertEquals(s?.carrier, "SIM-Free")
+})
+
+Deno.test("moto: g52j 5G kept, inline storage, Ink Black", () => {
+  const s = moto("Motorola moto g52j 5G 128GB XT2219-1 インクブラック【国内版 SIMフリー】")
+  assertEquals(s?.model_name, "moto g52j 5G")
+  assertEquals(s?.model_number, "XT2219-1")
+  assertEquals(s?.storage_gb, 128)
+  assertEquals(s?.color_en, "Ink Black")
+})
+
+Deno.test("moto: g52j 5G II variant distinct", () => {
+  const s = moto("Motorola moto g52j 5G II 128GB XT2219-1 パールホワイト【国内版 SIMフリー】")
+  assertEquals(s?.model_name, "moto g52j 5G II")
+  assertEquals(s?.color_en, "Pearl White")
+})
+
+Deno.test("moto: razr40 -> 'razr 40', bracket RAM/ROM, Vanilla Cream", () => {
+  const s = moto("motorola razr40 XT2323-4 バニラクリーム【RAM8GB/ROM256GB 国内版SIMフリー】")
+  assertEquals(s?.model_name, "razr 40")
+  assertEquals(s?.model_number, "XT2323-4")
+  assertEquals(s?.storage_gb, 256)
+  assertEquals(s?.ram_gb, 8)
+  assertEquals(s?.color_en, "Vanilla Cream")
+})
+
+Deno.test("moto: razr40 Ultra -> 'razr 40 Ultra', bare RAM/ROM, Infinite Black", () => {
+  const s = moto("motorola razr40 Ultra XT2321-1 インフィニットブラック【8GB/256GB 国内版SIMフリー】")
+  assertEquals(s?.model_name, "razr 40 Ultra")
+  assertEquals(s?.storage_gb, 256)
+  assertEquals(s?.ram_gb, 8)
+  assertEquals(s?.color_en, "Infinite Black")
+})
+
+Deno.test("moto: razr60 Ultra -> 'razr 60 Ultra'", () => {
+  const s = moto("Motorola razr60 Ultra XT2551-7 スカラベグリーン【RAM16GB/ROM512GB 国内版SIMフリー】")
+  assertEquals(s?.model_name, "razr 60 Ultra")
+  assertEquals(s?.storage_gb, 512)
+  assertEquals(s?.ram_gb, 16)
+})
+
+Deno.test("moto: SoftBank A###MO code (razr 40s)", () => {
+  const s = moto("motorola razr 40s A303MO バニラクリーム【RAM8GB/ROM256GB SoftBank版SIMフリー】")
+  assertEquals(s?.model_name, "razr 40s")
+  assertEquals(s?.model_number, "A303MO")
+  assertEquals(s?.carrier, "SoftBank")
+  assertEquals(s?.color_en, "Vanilla Cream")
+})
+
+Deno.test("moto: docomo M-##E code (razr 50d)", () => {
+  const s = moto("motorola razr 50d M-51E ホワイトマーブル【docomo版 SIMフリー】")
+  assertEquals(s?.model_name, "razr 50d")
+  assertEquals(s?.model_number, "M-51E")
+  assertEquals(s?.carrier, "docomo")
+})
+
+Deno.test("moto: edge line (edge 20 fusion)", () => {
+  const s = moto("motorola edge 20 fusion XT2139-2 エレキグラファイト【国内版 SIMフリー】")
+  assertEquals(s?.model_name, "edge 20 fusion")
+  assertEquals(s?.model_number, "XT2139-2")
+})
+
+Deno.test("moto: non-Motorola / nav -> null", () => {
+  assertEquals(moto("Galaxy S24 SM-S921Q ブラック"), null)
+  assertEquals(moto("motorola"), null) // bare nav, no code
+})
+
+Deno.test("moto: page extraction (motorola fixture)", () => {
+  const html = Deno.readTextFileSync(
+    new URL("./__fixtures__/iosys-motorola-p1.html", import.meta.url),
+  )
+  const titles = extractAndroidCardTitles(html, MOTOROLA_CONFIG)
+  assertEquals(titles.length > 5, true)
+  const skus = parseAndroidListingPage(html, MOTOROLA_CONFIG)
+  assertEquals(skus.length > 5, true)
+  assertEquals(skus.every((s) => s.brand === "Motorola"), true)
   assertEquals(skus.every((s) => s.color_en != null || s.color_ja != null), true)
 })
