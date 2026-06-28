@@ -370,6 +370,10 @@ function ProductDetailContent({
         </div>
         <h1 className="text-2xl font-bold text-zinc-900">{product.brand} {product.model_name}</h1>
         {subtitle && <p className="text-[13px] text-zinc-500">{subtitle}</p>}
+        <p className="text-xs text-muted-foreground mt-1">
+          Photos and videos here are shared across every storage and carrier variant of this color —
+          upload once.
+        </p>
         {product.short_description && (
           <p className="text-[13px] text-zinc-500 pt-1">{product.short_description}</p>
         )}
