@@ -149,6 +149,41 @@ export async function getProductModels(filters: ProductModelFilters = {}) {
   })
 }
 
+export interface ProductColorGroup {
+  representative_id: string
+  color_key: string
+  brand: string
+  model_name: string
+  color: string
+  category_id: string | null
+  category_name: string | null
+  short_description: string | null
+  storages: string[] | null
+  sku_count: number
+  photo_count: number
+  video_count: number
+}
+
+export interface ProductColorGroupFilters {
+  search?: string
+  categoryId?: string
+  media?: 'no-photo' | 'no-video'
+}
+
+// One row per (brand, model_name, color). Backed by the list_product_color_groups
+// RPC (server-side grouping + filtering; also avoids the 1000-row PostgREST cap).
+export async function getProductColorGroups(
+  filters: ProductColorGroupFilters = {},
+): Promise<ProductColorGroup[]> {
+  const { data, error } = await supabase.rpc('list_product_color_groups', {
+    p_search: filters.search ?? undefined,
+    p_category_id: filters.categoryId ?? undefined,
+    p_media: filters.media ?? undefined,
+  })
+  if (error) throw error
+  return (data ?? []) as ProductColorGroup[]
+}
+
 export async function getProductModelsWithHeroImage(search?: string, categoryId?: string): Promise<ProductModelWithHeroImage[]> {
   let query = supabase
     .from('product_models')

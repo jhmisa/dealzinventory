@@ -10,6 +10,15 @@ export function useProductModels(filters: productModelsService.ProductModelFilte
   })
 }
 
+export function useProductColorGroups(
+  filters: productModelsService.ProductColorGroupFilters = {},
+) {
+  return useQuery({
+    queryKey: queryKeys.productModels.list({ ...filters, grouped: true }),
+    queryFn: () => productModelsService.getProductColorGroups(filters),
+  })
+}
+
 export function useProductModelsWithHeroImage(search?: string, categoryId?: string) {
   return useQuery({
     queryKey: queryKeys.productModels.list({ search, categoryId, withHero: true }),
