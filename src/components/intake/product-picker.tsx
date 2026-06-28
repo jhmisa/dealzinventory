@@ -8,7 +8,6 @@ import {
 } from '@/components/ui/popover'
 import {
   Command,
-  CommandEmpty,
   CommandGroup,
   CommandInput,
   CommandItem,
@@ -141,27 +140,19 @@ export function ProductPicker({
                 <Loader2 className="h-3.5 w-3.5 animate-spin" /> Searching…
               </div>
             )}
-            <CommandEmpty>
-              <div className="py-2 text-center">
-                <p className="text-sm text-muted-foreground">
-                  {debounced.length === 0 ? 'Type to search products.' : 'No products found.'}
-                </p>
-                {onCreate && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-2"
-                    onClick={() => {
-                      setOpen(false)
-                      setCreateDialogOpen(true)
-                    }}
-                  >
-                    <Plus className="h-3.5 w-3.5 mr-1" />
-                    Create Product
-                  </Button>
-                )}
-              </div>
-            </CommandEmpty>
+            {/* Explicit empty/hint text. We do NOT use cmdk's <CommandEmpty> here: with
+                shouldFilter={false} and the always-present "None" item, cmdk's item count is
+                never zero, so <CommandEmpty> would never mount. Drive the empty state ourselves. */}
+            {!isFetching && debounced.length === 0 && rows.length === 0 && (
+              <p className="py-3 text-center text-sm text-muted-foreground">
+                Type to search products.
+              </p>
+            )}
+            {!isFetching && debounced.length > 0 && (serverResults?.length ?? 0) === 0 && (
+              <p className="py-3 text-center text-sm text-muted-foreground">
+                No products found.
+              </p>
+            )}
             <CommandGroup>
               <CommandItem
                 value="__none__"
@@ -241,6 +232,25 @@ export function ProductPicker({
                 </CommandItem>
               ))}
             </CommandGroup>
+            {/* Create affordance — reachable whenever the staff has typed a query (results or not).
+                handleCreateProduct re-searches and warns on near-duplicates, so showing this even
+                when results exist is safe and lets staff add a genuinely-missing variant. */}
+            {onCreate && debounced.length > 0 && (
+              <div className="border-t p-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => {
+                    setOpen(false)
+                    setCreateDialogOpen(true)
+                  }}
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" />
+                  Create New Product
+                </Button>
+              </div>
+            )}
           </CommandList>
         </Command>
       </PopoverContent>
