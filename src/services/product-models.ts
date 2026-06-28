@@ -351,6 +351,48 @@ export async function updateProductModel(id: string, updates: ProductModelUpdate
   return data as ProductModel
 }
 
+// Absolute (catalog) specs parsed from a supplier listing's spec table. Only the fields that
+// belong canonically on product_models. ram/storage are stored as text on product_models.
+export interface ParsedModelSpecs {
+  cpu?: string | null
+  chipset?: string | null
+  ramGb?: number | null
+  storageGb?: number | null
+  screenSize?: number | null
+  camera?: string | null
+  ports?: string | null
+  osFamily?: string | null
+  year?: number | null
+}
+
+// Fill ONLY the NULL/empty absolute-spec fields of a product model from parsed specs. Never
+// overwrites a value the model already has. Returns the number of fields written (0 = nothing to do).
+// Caller gates this to CONFIDENT matches (Apple part# exact / Android model_number exact).
+export async function enrichProductModelSpecs(
+  modelId: string,
+  current: Pick<ProductModel, 'cpu' | 'chipset' | 'ram_gb' | 'storage_gb' | 'screen_size' | 'camera' | 'ports' | 'os_family' | 'year'>,
+  parsed: ParsedModelSpecs,
+): Promise<number> {
+  const updates: ProductModelUpdate = {}
+  const isEmpty = (v: unknown) => v == null || v === ''
+  if (isEmpty(current.cpu) && parsed.cpu) updates.cpu = parsed.cpu
+  if (isEmpty(current.chipset) && parsed.chipset) updates.chipset = parsed.chipset
+  if (isEmpty(current.ram_gb) && parsed.ramGb != null) updates.ram_gb = String(parsed.ramGb)
+  if (isEmpty(current.storage_gb) && parsed.storageGb != null) updates.storage_gb = String(parsed.storageGb)
+  if (isEmpty(current.screen_size) && parsed.screenSize != null) updates.screen_size = parsed.screenSize
+  if (isEmpty(current.camera) && parsed.camera) updates.camera = parsed.camera
+  if (isEmpty(current.ports) && parsed.ports) updates.ports = parsed.ports
+  if (isEmpty(current.os_family) && parsed.osFamily) updates.os_family = parsed.osFamily
+  if (isEmpty(current.year) && parsed.year != null) updates.year = parsed.year
+
+  const keys = Object.keys(updates)
+  if (keys.length === 0) return 0
+
+  const { error } = await supabase.from('product_models').update(updates).eq('id', modelId)
+  if (error) throw error
+  return keys.length
+}
+
 export async function deleteProductModel(id: string) {
   const { error } = await supabase
     .from('product_models')
