@@ -119,6 +119,9 @@ to accurate matching. Carrier lives per-unit on `items`, NOT product_models. Pro
 partial UNIQUE to a global one once all categories are clean. (Schema prep can start anytime.)
 
 ## The proven per-brand recipe (Android; copy Galaxy)
+> **Canonical operational copy now lives in [`docs/CATALOG_HARVEST_RUNBOOK.md`](../../CATALOG_HARVEST_RUNBOOK.md)**
+> — use that for re-harvesting an existing brand (new models) AND for adding a new brand; it carries a
+> per-brand "formula" registry (code regex, canonicalizer quirks, files, gotchas). Short version kept here:
 1. `curl` the live iosys brand page → save fixture in `__fixtures__/iosys-<brand>-p1.html`; eyeball title grammar.
 2. TDD: write `<brand>` cases in a test, add an `AndroidBrandConfig` (brand keyword, model-code regex,
    `canonicalModelName`, color map) — reuse `android-listing.ts` generic engine.

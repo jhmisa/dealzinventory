@@ -24,6 +24,13 @@
 - Edge fns: (kaitori quote logic — see kaitori.ts / price list)
 - Tables: kaitori_requests, kaitori_request_media, kaitori_price_list
 
+## Catalog harvest (iosys → product_models)
+- Runbook: **docs/CATALOG_HARVEST_RUNBOOK.md** (how to re-harvest existing brands / add new ones; per-brand formula registry)
+- Code: supabase/functions/_shared/catalog/ — android-listing.ts (generic engine + per-brand configs), iosys-listing.ts + ipad-listing.ts (Apple part#), harvest.ts, run-harvest-local.ts, <brand>-specs.ts, apple-colors.ts
+- Edge fn: harvest-iosys-catalog (deployed re-harvest path) · Data-ops: supabase/data-ops/<date>-<brand>-fill-gaps.sql
+- Tables: iosys_catalog (staging, dedupe on sku_key), product_models (promoted target)
+- Theory: docs/investigations/android-identifier-conventions.md · Goal: docs/superpowers/specs/2026-06-28-iosys-full-catalog-sweep-GOAL.md
+
 ## Items / Inventory
 - Services: items.ts, item-audit-logs.ts, item-defects.ts, intake-receipts.ts, inventory-removals.ts, inventory-snapshots.ts, inventory-report-pdf.ts, suppliers.ts
 - Edge fns: parse-invoice

@@ -1,0 +1,261 @@
+# Catalog Harvest Runbook
+
+> **The canonical operational guide for populating `product_models` from iosys.co.jp.**
+> Read this when you need to (a) **re-harvest a brand we've already done** because new models came
+> out, or (b) **add a brand we've never done**. It is a *living* doc — every brand added appends a
+> row to the [Per-brand registry](#5-per-brand-registry-the-formulas).
+>
+> Theory/background: [`docs/investigations/android-identifier-conventions.md`](investigations/android-identifier-conventions.md).
+> Master goal + scope: [`docs/superpowers/specs/2026-06-28-iosys-full-catalog-sweep-GOAL.md`](superpowers/specs/2026-06-28-iosys-full-catalog-sweep-GOAL.md).
+> Current status of each brand: [`PROJECT_STATE.md`](PROJECT_STATE.md).
+
+---
+
+## 0. Pick your path (decision tree)
+
+| Situation | Go to |
+|---|---|
+| New models came out for a brand we **already did** (e.g. AQUOS R11, Pixel 11) | [§2 Re-harvest an existing brand](#2-re-harvest-an-existing-brand-the-common-case) |
+| A brand we've **never done** (next in the Phase-A queue) | [§3 Add a new brand](#3-add-a-new-brand-full-recipe) |
+| Apple (iPhone / iPad / Mac / Watch / AirPods) | [§4 Apple part# pipeline](#4-apple-part-pipeline) |
+| "What was the formula for brand X?" | [§5 Per-brand registry](#5-per-brand-registry-the-formulas) |
+| Commands / file locations | [§6 Cheat-sheet](#6-files--commands-cheat-sheet) |
+
+---
+
+## 1. The mental model (why it's not one-size-fits-all)
+
+There is **one shared parser engine**, but **each brand needs its own small "formula."** This is the
+key thing to understand: the engine is generic; the brand-specific knowledge is isolated into a config
+object you write once per brand.
+
+**Two pipelines:**
+
+- **Apple part#-keyed** — Apple's part number (`MXVH3J/A`) encodes model+storage+color+region in one
+  code, so identity = `part_number`. Used for iPhone, iPad (and later Mac/Watch/AirPods).
+- **Android (brand, model_name, storage, color)-keyed** — **no Android code encodes storage or color**
+  (the displayed model number is a coarse "model + carrier/region" tag, like Apple's A-number). So
+  identity = `(brand, model_name, storage, color)`; `model_number` + `carrier` are *coarse attributes*,
+  not the key. Storage and color are parsed from the **title text**, not the code.
+
+**The generic Android engine** (`supabase/functions/_shared/catalog/android-listing.ts`,
+`parseAndroidListingTitle`) knows the *universal* iosys title grammar that every Android brand shares:
+
+```
+[Brand] ModelName ModelCode Color(JP|EN) 【RAM.. / ROM.. / 版(carrier)】
+```
+
+It handles leading condition brackets, carrier-word prefixes, inline vs bracketed storage, the
+"everything in one bracket" 楽天版 grammar, trailing full-SKU codes, etc. — **once, for all brands.**
+
+**What each brand supplies (the "formula" = `AndroidBrandConfig`):**
+
+| Part | What it is | Why it's per-brand |
+|---|---|---|
+| **1. `modelCodeRe`** | regex that finds the model code & splits "name \| tail" | Each maker encodes model+carrier differently (Samsung `SM-/SCG/SC-`, Sony `XQ-/SO-/SOG`, Sharp `SH-M/SH-RM/SHG/A###SH`). **This is the "identifier formula" you intuited.** |
+| **2. `canonicalModelName`** | cleans the name segment | Brand quirks: leaked brand/sub-brand prefixes, `Xperia1`→`Xperia 1`, `AceII`→`Ace II`, casing, which suffixes to keep (`sense2 かんたん`) vs strip (`5G`/`Dual-SIM`). |
+| **3. color map** (`<BRAND>_COLORS_JA_EN`) | Japanese color → official English | Every maker names colors differently; only *verified* names are mapped, the rest stay null (flagged, never guessed). |
+| **4. spec table** (`<brand>-specs.ts`) | model → chipset/screen/year/RAM | iosys doesn't surface specs; we enrich from a research-verified reference. |
+
+So: **shared engine + 4-part per-brand formula.** Adding a brand = writing that formula (config +
+specs + colors) and wiring one category path. No engine changes in the normal case (AQUOS needed one
+tiny *generic* fix — discard a `【法人モデル】` noise bracket — which now benefits all brands).
+
+---
+
+## 2. Re-harvest an existing brand (the common case)
+
+**Use when:** a brand is already shipped (has a config + specs + colors + a fill-gaps data-op) and you
+just need to pull **newly released models / colors** (e.g. AQUOS R11 launched). This is fast and safe —
+everything is idempotent.
+
+> ⚠️ Verify these against the [registry](#5-per-brand-registry-the-formulas), but for an existing brand
+> you usually only need to (a) add the new model to its `*-specs.ts`, (b) add any new colors to its
+> color map, then (c) re-run the harvest + the same fill-gaps data-op.
+
+1. **Add the new model's specs.** Open `supabase/functions/_shared/catalog/<brand>-specs.ts` and add the
+   new model(s) with research-verified chipset/screen/year/RAM (use a research subagent — see §3 step 3).
+   Use the *exact canonical model name* the parser will produce (check the registry's canonicalizer notes).
+2. **Add new colors.** If the new model ships colors not in `<BRAND>_COLORS_JA_EN` (in
+   `android-listing.ts`), add the *verified* English names; leave uncertain ones unmapped (they promote
+   as the Japanese token via coalesce — never guess).
+3. **Re-harvest** (idempotent upsert into `iosys_catalog` ON CONFLICT(sku_key)):
+   ```bash
+   cd supabase/functions/_shared/catalog
+   deno run --allow-net --allow-write run-harvest-local.ts <brand> > /tmp/<brand>.sql 2>/tmp/<brand>.log
+   grep -A40 "HARVEST STATS" /tmp/<brand>.log    # check unknownModels=[] and unmappedColors
+   ```
+   - `unknownModels` should be empty — anything there means step 1 missed a model (or the canonical name
+     doesn't match your specs key). Fix and re-run.
+   - `unmappedColors` is fine *if* they're genuinely-uncertain marketing names; map the easy/verified ones.
+4. **Load** the harvest into staging, then **re-run the same fill-gaps data-op** (its NOT-EXISTS guards
+   make it additive — only *new* SKUs insert; existing rows untouched):
+   ```bash
+   cd /Users/joeymisa/Documents/Projects/inventory-claude
+   supabase db query --linked -f /tmp/<brand>.sql
+   supabase db query --linked -f supabase/data-ops/<date>-<brand>-fill-gaps.sql
+   ```
+5. **Verify** (dev login + Playwright screenshot of `/admin/products?q=<brand>`) the new models render
+   with model#/storage/color. Bump version, commit, push.
+
+**If a new model has a code format the existing `modelCodeRe` doesn't match** (a genuinely new carrier
+code shape), that's the one case you touch the config: extend the brand's `modelCodeRe` and add a test.
+The registry records each brand's current code coverage so you know what's already handled.
+
+---
+
+## 3. Add a new brand (full recipe)
+
+**Use when:** the brand has never been harvested. ~1 session per brand. (This is the canonical copy of
+the recipe; the GOAL doc keeps a short pointer here.)
+
+1. **Fetch a fixture & eyeball the grammar.** `curl` the live brand page, save it, extract the card
+   titles to see the real code shapes and quirks (don't trust remembered formats):
+   ```bash
+   cd supabase/functions/_shared/catalog
+   curl -s -A "Mozilla/5.0 ... Chrome/124.0 Safari/537.36" -H "Accept-Language: ja,en;q=0.8" \
+     "https://iosys.co.jp/items/smartphone/<brand>/simfree" -o __fixtures__/iosys-<brand>-p1.html
+   grep -oE '<img[^>]*alt="[^"]*<Brand>[^"]*"' __fixtures__/iosys-<brand>-p1.html \
+     | sed -E 's/.*alt="([^"]*)".*/\1/' | sort -u
+   ```
+   Catalogue: SIM-free / docomo / au / SoftBank / Rakuten code shapes, any sub-variant suffixes, and any
+   trailing-noise tokens.
+2. **TDD the config.** Add `<BRAND>_CONFIG: AndroidBrandConfig` in `android-listing.ts` (brand, prefixes,
+   `modelNameRe`, `modelCodeRe`, `canonicalModelName`, color map) and write tests in
+   `android-listing.test.ts` covering *every* observed grammar variant. Reuse the generic engine.
+3. **Research-verified spec table.** Create `<brand>-specs.ts` (model → chipset/screen/year/RAM,
+   `os_family: "Android"`). **Spawn a research subagent** for specs + the JA→EN color map (worked well
+   for Galaxy/Xperia/AQUOS) — be rigorous: flag anything unverified, never guess.
+4. **Wire the category.** Add `<BRAND>_CATEGORY = androidCategory("items/smartphone/<brand>", <CONFIG>,
+   <brandSpec>)` in `harvest.ts`, and a `which === '<brand>'` arm in `run-harvest-local.ts`. Run the full
+   deno suite green: `deno test --allow-read`.
+5. **Harvest & inspect.** `deno run --allow-net --allow-write run-harvest-local.ts <brand> > /tmp/h.sql`.
+   Check `HARVEST STATS` for `unknownModels` (extend specs) and `unmappedColors` (map verified ones).
+   **Inspect for broken parses** — extract the JSON rows and look for colors absorbing brackets/noise,
+   colorless rows, or weird model names. Iterate the config until clean, then load:
+   `supabase db query --linked -f /tmp/h.sql`.
+6. **Fill-gaps data-op.** Write `supabase/data-ops/<date>-<brand>-fill-gaps.sql` (copy the most recent
+   brand's): additive + idempotent NOT-EXISTS guard, `DISTINCT ON (brand,model,storage,color)`
+   collapsing carriers, `device_category='ANDROID'`, specs from `iosys_catalog.specs`, storage as
+   `'<n>GB'` text, the storage-NULL-skip guard, and the shared partial UNIQUE index. **Check for legacy
+   rows** miscategorized as COMPUTER for this brand (see §7) and reconcile them inline if few. Apply via
+   CLI.
+7. **Verify & ship.** Dev login + Playwright screenshot `/admin/products?q=<brand>`. Bump version, commit
+   **only the relevant files** (never `git add -A` — repo root has ~50 stray PNGs), push. Update
+   PROJECT_STATE, the GOAL roadmap, and **append this brand's row to [§5](#5-per-brand-registry-the-formulas)**.
+
+---
+
+## 4. Apple part# pipeline
+
+Apple is the *other* pipeline — identity = `part_number` (encodes everything), so no per-brand color/code
+formula is needed; instead each *device shape* (iPhone vs iPad vs Mac vs Watch) gets its own parser
+because the title grammar differs.
+
+- **iPhone:** `iosys-listing.ts` + `iphone-specs.ts`, path `items/smartphone/iphone`.
+- **iPad:** `ipad-listing.ts` + `ipad-specs.ts`, path `items/tablet/ios/ipad` (leading `【第N世代】` gen,
+  part#/A# at END, Wi-Fi vs Wi-Fi+Cellular + size as SKU attributes, glass token).
+- **Colors:** `apple-colors.ts` (JA→EN) with model-aware fixes (iPhone 8/X `Black→Space Gray`,
+  `White→Silver`; `Red→(PRODUCT)RED`; `Midnight Black→Midnight`).
+- **Not yet built (Phase B):** Mac (config-rich: chip/RAM/SSD brackets), Apple Watch (case size/material/
+  GPS-vs-Cellular), AirPods (simple name+part#+year). Reuse part#-as-key + `apple-colors`.
+
+Re-harvest for new Apple models follows the same shape as §2 (add specs → re-run → idempotent upsert).
+
+---
+
+## 5. Per-brand registry (the "formulas")
+
+> **Append a row + a subsection here every time you finish a brand.** This is the lookup that makes
+> re-harvesting and debugging fast. Status & SKU counts live in PROJECT_STATE; this is the *formula*.
+
+| Brand | Maker | Path | Code regex (the formula) | Spec / color files | Data-op | Fixture | Status |
+|---|---|---|---|---|---|---|---|
+| Galaxy | Samsung | `items/smartphone/galaxy` | `SM-[A-Z0-9]+ \| SCG\d+ \| SCV\d+ \| SC-\d+[A-Z]` | `galaxy-specs.ts` / `GALAXY_COLORS_JA_EN` | `2026-06-28-galaxy-fill-gaps.sql` | `iosys-galaxy-p1.html` | ✅ + **legacy reconcile OPEN** (42 COMPUTER rows) |
+| Xperia | Sony | `items/smartphone/xperia` | `XQ-[A-Z]{2}\d{2} \| SO-\d{2}[A-Za-z]+ \| SOG\d+ \| SOV\d+ \| A?\d{3}SO \| J\d{4}` | `xperia-specs.ts` / `XPERIA_COLORS_JA_EN` | `2026-06-28-xperia-fill-gaps.sql` | `iosys-xperia-p1.html` | ✅ legacy reconciled inline (3 rows) |
+| AQUOS | Sharp | `items/smartphone/aquos` | `SH-RM\d+ \| SH-M\d+ \| SH-\d{2}[A-Z] \| SHG\d+ \| SHV\d+ \| A\d{3}SH` | `aquos-specs.ts` / `AQUOS_COLORS_JA_EN` | `2026-06-28-aquos-fill-gaps.sql` | `iosys-aquos-p1.html` | ✅ legacy reconciled inline (4 rows, Black dup merged) |
+| iPhone | Apple | `items/smartphone/iphone` | part# (`MXVH3J/A`) | `iphone-specs.ts` / `apple-colors.ts` | phase2/3/5 data-ops | `iosys-iphone-simfree-p1.html` | ✅ |
+| iPad | Apple | `items/tablet/ios/ipad` | part# | `ipad-specs.ts` / `apple-colors.ts` | phase4-ipad data-ops | `iosys-ipad-*-p1.html` | ✅ |
+
+### Galaxy (Samsung)
+- **Codes:** SIM-free `SM-…Q/C` · au `SCG##`/`SCV##` · docomo `SC-##L`.
+- **Canonicalizer:** keeps `Galaxy` in the name; strips `5G`, `Single/Dual-SIM`; collapses iosys's
+  `S9+ (Plus)` → `S9+`.
+- **Quirks handled:** `SM-…/DS` dual-SIM suffix, inline storage (`SC-52D 256GB クリーム`), trailing
+  full-SKU code (`ブラック SCV46SKV`), all-in-bracket 楽天版 (`【8GB 128GB Prism White 楽天版…】`).
+- **Open debt:** 42 legacy `Samsung` rows miscategorized COMPUTER (37 referenced by 117 items) — a
+  careful reconcile pass (mirrors iPhone Phase 2); not yet done.
+
+### Xperia (Sony)
+- **Codes:** SIM-free `XQ-AA##` · docomo `SO-##L` (+ optional lowercase, `SO-51Aa`) · au `SOV##`/`SOG##`
+  · SoftBank `(A)###SO` (the optional `A`-prefix is the gotcha) · old global `J####`.
+- **Canonicalizer:** lenient `modelNameRe` (contains `xperia`); strips leaked `Sony/SONY/ahamo` (docomo
+  sub-brand) prefixes; inserts the space `Xperia1`→`Xperia 1`; `AceII`→`Ace II`; `Pro-I`/`ProI`→`Pro I`.
+- **Specs note:** every JP Xperia flagship = Snapdragon (Sony never used Exynos); JP variants differ only
+  on RAM/storage tier — a parsed `【RAM..GB】` overrides the spec fallback.
+
+### AQUOS (Sharp)
+- **Codes:** SIM-free `SH-M##` · Rakuten `SH-RM##` (**listed before `SH-M` in the alternation so it
+  wins**) · docomo `SH-##L` · au `SHG##`/`SHV##` · SoftBank `A###SH`.
+- **Canonicalizer:** lenient (contains `aquos`); strips any leaked prefix before `AQUOS` & normalizes its
+  casing; keeps sub-variant suffixes (`sense2 かんたん`, `sense3 plus サウンド`); the `\b5G\b` strip is
+  **safe for integral names** (`sense5G`/`R5G`/`zero5G` — no word boundary before the `5`).
+- **Generic engine fix shipped with AQUOS:** discard a trailing pure-noise `【法人モデル】` (corporate
+  channel) bracket so the real carrier bracket is read; also strips an inline `法人モデル` from color.
+- **Legacy reconcile:** 4 `Aquos Sense3`/`Aquos Sense 3` COMPUTER rows → ANDROID canonical `AQUOS sense3`;
+  a duplicate Black DRAFT row merged into the 21-item row via `superseded_by`.
+
+---
+
+## 6. Files & commands cheat-sheet
+
+**Code (`supabase/functions/_shared/catalog/`):**
+- `android-listing.ts` — generic Android engine + every `<BRAND>_CONFIG` + `<BRAND>_COLORS_JA_EN`.
+- `<brand>-specs.ts` — per-brand verified spec reference.
+- `harvest.ts` — crawl/dedupe/enrich engine + `<BRAND>_CATEGORY` definitions + `androidCategory()` factory.
+- `run-harvest-local.ts` — local runner (`<brand>` arg) → emits SQL to stdout, stats to stderr.
+- `*.test.ts` — `deno test --allow-read` (run from the catalog dir).
+
+**Data-ops (`supabase/data-ops/`):** `<date>-<brand>-fill-gaps.sql` — promotes `iosys_catalog` →
+`product_models` (additive, idempotent, re-runnable).
+
+**Staging table:** `iosys_catalog` — dedupes on `sku_key` (Apple=part#, Android=
+`brand|model|storage|color|carrier`); harvest upserts ON CONFLICT(sku_key).
+
+**Commands:**
+```bash
+# from supabase/functions/_shared/catalog
+deno test --allow-read
+deno run --allow-net --allow-write run-harvest-local.ts <brand|iphone|ipad> > /tmp/h.sql 2>/tmp/h.log
+# from repo root (Supabase = CLI only, never MCP)
+supabase db query --linked -f /tmp/h.sql
+supabase db query --linked -f supabase/data-ops/<date>-<brand>-fill-gaps.sql
+supabase db query --linked "SELECT ... FROM public.product_models WHERE brand='<Maker>' ..."
+```
+Deployed re-harvest path (from edge IP, for scheduled re-runs): edge fn `harvest-iosys-catalog`
+(uses the same `harvestCatalog()` core).
+
+---
+
+## 7. Carried-over gotchas (reuse, don't rediscover)
+
+- **Android identity = (brand, model_name, storage, color).** Model code + carrier are coarse attributes
+  that collapse to one product_model; carrier lives per-unit on `items`, not on product_models.
+- **Storage** stored as `"<n>GB"` **text**; `ram_gb`/`year`… `ram_gb` is TEXT, `screen_size` is NUMERIC,
+  `year` is INT. Most JP carrier titles **omit storage** → those rows land storage NULL (flagged, never
+  guessed). `color` is NOT NULL in product_models → skip color-less parses.
+- **Never guess specs/colors.** Unverified colors stay null and promote as the Japanese token via
+  `coalesce(color_en, color_ja)`; unknown specs leave `spec_known=false`.
+- **Legacy COMPUTER miscategorization:** older brands often have a few `product_models` rows wrongly
+  set `device_category='COMPUTER'` with dirty names and no specs. Before/with the fill-gaps, check:
+  ```sql
+  SELECT status, count(*) FROM public.product_models
+  WHERE model_name ILIKE '%<brand>%' AND device_category='COMPUTER' GROUP BY status;
+  ```
+  Reconcile inline if few (recategorize→ANDROID, canonicalize name, enrich, normalize storage, merge
+  dups via `superseded_by`, repoint items). `items` link to product_models via `items.product_id`.
+- **Idempotency:** harvest upserts ON CONFLICT(sku_key); fill-gaps uses NOT-EXISTS guards → both safe to
+  re-run. The harvest converges (stops a section after 2 dry pages).
+- **Integrity guard:** partial `UNIQUE (brand, model_name, storage_gb, color) WHERE
+  device_category='ANDROID' AND status='ACTIVE'` (created by the Galaxy op; `IF NOT EXISTS` in each
+  later op makes it a no-op).
