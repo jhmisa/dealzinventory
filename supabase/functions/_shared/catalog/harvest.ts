@@ -19,8 +19,10 @@ import {
   type AndroidListingSku,
   GALAXY_CONFIG,
   parseAndroidListingPage,
+  XPERIA_CONFIG,
 } from "./android-listing.ts"
 import { galaxySpec } from "./galaxy-specs.ts"
+import { xperiaSpec } from "./xperia-specs.ts"
 
 export interface CarrierSection {
   path: string // url segment, e.g. "simfree" / "wifi"
@@ -223,6 +225,12 @@ export const GALAXY_CATEGORY: HarvestCategory = androidCategory(
   "items/smartphone/galaxy",
   GALAXY_CONFIG,
   galaxySpec,
+)
+
+export const XPERIA_CATEGORY: HarvestCategory = androidCategory(
+  "items/smartphone/xperia",
+  XPERIA_CONFIG,
+  xperiaSpec,
 )
 
 export interface HarvestOptions {

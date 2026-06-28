@@ -62,6 +62,9 @@ dedupes on `sku_key`, runs from a local runner (`run-harvest-local.ts <category>
 - **iPhone** — SKU-accurate, 442 ACTIVE SKUs (Phases 0–5, see PROJECT_STATE).
 - **iPad** — SKU-accurate, 226 ACTIVE SKUs.
 - **Samsung Galaxy phones** — 144 ANDROID SKUs / 50 models (v1.65.0); generic Android pipeline + Galaxy config.
+- **Sony Xperia phones** — 106 ANDROID product_models / 31 models (v1.66.0); `XPERIA_CONFIG` + `xperia-specs.ts`
+  (34 models, research-verified) + Sony color map. Inline legacy reconcile of 3 COMPUTER-miscategorized Sony
+  rows done. Recipe proven a 2nd time with zero engine changes.
 - **Identifier-display list** — `/admin/products` shows Brand·Model·model#·color + per-storage part# with
   dynamic multi-token search (v1.64.0).
 
@@ -94,7 +97,7 @@ dedupes on `sku_key`, runs from a local runner (`run-harvest-local.ts <category>
 
 ## Phased roadmap (priority = kaitori value × pipeline readiness)
 **Phase A — Android phones (pipeline ready, highest volume).** Brand-by-brand, each its own session-sized
-unit. Suggested order (volume/ease): **Xperia → AQUOS → Pixel → Xiaomi → OPPO → arrows → Huawei →
+unit. Suggested order (volume/ease): **~~Xperia~~ ✓ → AQUOS (next) → Pixel → Xiaomi → OPPO → arrows → Huawei →
 Zenfone/ROG → Motorola razr.** Recipe below. Also fold in the **deferred legacy-Samsung reconcile**
 (42 COMPUTER-miscategorized `Samsung` rows, 37 referenced by 117 live items → recategorize→ANDROID, dedup
 vs the clean Galaxy rows, re-point items, archive stubs; mirrors iPhone Phase 2).

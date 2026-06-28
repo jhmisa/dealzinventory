@@ -351,3 +351,73 @@ export const GALAXY_CONFIG: AndroidBrandConfig = {
       .trim(),
   colorJaToEn: galaxyColorJaToEn,
 }
+
+// ---------------------------------------------------------------------------
+// Sony Xperia config
+// ---------------------------------------------------------------------------
+
+// Seed color map (observed on iosys + Sony official EN names). Extended by the verified
+// research pass; unmapped JA colors stay null (flagged, never guessed). ASCII colors
+// (e.g. "Frosted Black", "Liquid Silver", "Venus Pink") flow straight through as color_en.
+export const XPERIA_COLORS_JA_EN: Record<string, string> = {
+  // Generic / basic
+  "ブラック": "Black",
+  "ホワイト": "White",
+  "ブルー": "Blue",
+  "グレー": "Grey", // Sony uses British "Grey"
+  "グレイ": "Grey",
+  "シルバー": "Silver",
+  "ゴールド": "Gold",
+  "グリーン": "Green",
+  "パープル": "Purple",
+  "レッド": "Red",
+  "ピンク": "Pink",
+  "ラベンダー": "Lavender",
+  // Xperia signature colors (Sony official EN — verified)
+  "フロストブラック": "Frosted Black",
+  "フロストシルバー": "Frosted Silver",
+  "フロストパープル": "Frosted Purple",
+  "スレートブラック": "Slate Black",
+  "プラチナシルバー": "Platinum Silver",
+  "セージグリーン": "Sage Green",
+  "オーキッドパープル": "Orchid Purple",
+  "エクリュホワイト": "Ecru White",
+  "ネイティブゴールド": "Native Gold",
+  "ガーネットレッド": "Garnet Red",
+  "カーキグリーン": "Khaki Green",
+  "モスグリーン": "Moss Green",
+  "スカーレット": "Scarlet",
+  "グラファイトブラック": "Graphite Black",
+  "アイオライトシルバー": "Iolite Silver",
+  "ミント": "Mint",
+  "ターコイズ": "Turquoise",
+  "ブリックオレンジ": "Brick Orange",
+  // NOTE: deliberately NOT mapped (no official Sony EN name verified — flagged null, never
+  // guessed; still promote as the JA token via coalesce in the fill-gaps): チャコールブラック,
+  // アイスホワイト, ミストグレー, フロストグレー, フロストグリーン
+}
+
+export function xperiaColorJaToEn(ja: string | null): string | null {
+  if (!ja) return null
+  return XPERIA_COLORS_JA_EN[ja] ?? null
+}
+
+export const XPERIA_CONFIG: AndroidBrandConfig = {
+  brand: "Sony",
+  brandPrefixes: ["SONY", "Sony"],
+  modelNameRe: /xperia/i, // lenient (contains): leading carrier/sub-brand junk handled in canonical
+  // Sony JP codes: SIM-free XQ-..; docomo SO-..(K/L/M/A/B/C/D + optional lowercase, e.g. SO-51Aa);
+  // au SOV##/SOG##; SoftBank (A)###SO; old global J####. First match wins.
+  modelCodeRe: /\b(XQ-[A-Z]{2}\d{2}|SO-\d{2}[A-Za-z]+|SOG\d+|SOV\d+|A?\d{3}SO|J\d{4})\b/,
+  canonicalModelName: (seg) =>
+    seg
+      .replace(/^((SONY|Sony|ahamo)\s+)+/i, "") // strip leaked brand / docomo sub-brand prefixes
+      .replace(/\b5G\b/gi, "")
+      .replace(/\b(Single|Dual)[- ]?SIM\b/gi, "")
+      .replace(/^Xperia(?=\d)/i, "Xperia ") // "Xperia1" -> "Xperia 1"
+      .replace(/\bAce(?=[IVX])/g, "Ace ") // "AceII" -> "Ace II"
+      .replace(/\bPro[- ]?I\b/gi, "Pro I") // "Pro-I" / "ProI" -> "Pro I"
+      .replace(/\s+/g, " ")
+      .trim(),
+  colorJaToEn: xperiaColorJaToEn,
+}

@@ -7,7 +7,13 @@
 // The deployed edge function (harvest-iosys-catalog) uses the SAME harvestCatalog()
 // core for the reusable "new phones came in -> re-run" path.
 
-import { GALAXY_CATEGORY, harvestCatalog, IPAD_CATEGORY, IPHONE_CATEGORY } from "./harvest.ts"
+import {
+  GALAXY_CATEGORY,
+  harvestCatalog,
+  IPAD_CATEGORY,
+  IPHONE_CATEGORY,
+  XPERIA_CATEGORY,
+} from "./harvest.ts"
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
@@ -17,6 +23,8 @@ const category = which === "ipad"
   ? IPAD_CATEGORY
   : which === "galaxy"
   ? GALAXY_CATEGORY
+  : which === "xperia"
+  ? XPERIA_CATEGORY
   : IPHONE_CATEGORY
 console.error(`=== harvesting category: ${which} ===`)
 
