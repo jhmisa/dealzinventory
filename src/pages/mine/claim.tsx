@@ -29,6 +29,18 @@ import type { Customer } from '@/lib/types'
 import type { GalleryImage } from '@/components/shared/image-gallery'
 import { PhoneInput } from '@/components/shared/phone-input'
 
+// Working-day lead-time range as customer-facing text. "4–7 working days", or a single value
+// when min/max coincide, or null when neither bound is set.
+function formatLeadTime(min: number | null | undefined, max: number | null | undefined): string | null {
+  const lo = min ?? null
+  const hi = max ?? null
+  if (lo == null && hi == null) return null
+  if (lo != null && hi != null) {
+    return lo === hi ? `${hi} working days` : `${lo}–${hi} working days`
+  }
+  return `${hi ?? lo} working days`
+}
+
 // --- Product Media Gallery ---
 
 type MediaTab = 'photos' | 'videos'
@@ -691,10 +703,25 @@ function MineClaimInner() {
                     {product.stockCount} in stock
                   </span>
                 )}
+                {product.type === 'backorder' && (
+                  <Badge variant="outline" className="text-xs py-0 border-amber-300 bg-amber-50 text-amber-800">
+                    ⏳ Pre-order
+                  </Badge>
+                )}
               </div>
 
               {product.subtitle && (
                 <p className="text-sm text-muted-foreground">{product.subtitle}</p>
+              )}
+
+              {/* Pre-order lead-time note */}
+              {product.type === 'backorder' && (
+                <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  This is a pre-order — we source it from our supplier after you order.
+                  {formatLeadTime(product.leadTimeMinDays, product.leadTimeMaxDays) && (
+                    <> Estimated arrival: <span className="font-medium">{formatLeadTime(product.leadTimeMinDays, product.leadTimeMaxDays)}</span>.</>
+                  )}
+                </p>
               )}
             </div>
 

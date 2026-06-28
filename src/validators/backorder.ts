@@ -24,6 +24,9 @@ export const backorderSchema = z
     // Markup (¥) added on top of supplier_price to derive selling_price. Default ¥4000;
     // editable up or down per line.
     markup_jpy: z.coerce.number().nonnegative('Markup cannot be negative').default(4000),
+    // Optional customer discount (¥) off the selling price — a pre-order can still be discounted.
+    // Profit = selling_price − discount_amount − supplier_price.
+    discount_amount: z.coerce.number().nonnegative('Discount cannot be negative').default(0),
     supplier_url: z.string().url('Must be a valid URL').optional().or(z.literal('')),
     supplier_product_code: z.string().trim().optional(),
     supplier_stock: z.coerce.number().int().nonnegative().optional(),

@@ -501,6 +501,7 @@ export type Database = {
           cpu: string | null
           created_at: string
           created_by: string | null
+          discount_amount: number
           id: string
           lead_time_days: number
           lead_time_min_days: number
@@ -531,6 +532,7 @@ export type Database = {
           cpu?: string | null
           created_at?: string
           created_by?: string | null
+          discount_amount?: number
           id?: string
           lead_time_days?: number
           lead_time_min_days?: number
@@ -561,6 +563,7 @@ export type Database = {
           cpu?: string | null
           created_at?: string
           created_by?: string | null
+          discount_amount?: number
           id?: string
           lead_time_days?: number
           lead_time_min_days?: number
@@ -3962,6 +3965,12 @@ export type Database = {
       }
       process_message_queue: { Args: never; Returns: undefined }
       queue_review_requests: { Args: never; Returns: undefined }
+      release_backorder_unit: {
+        Args: {
+          p_order_item_id: string
+        }
+        Returns: undefined
+      }
       reserve_backorder_unit: {
         Args: {
           p_backorder_line_id: string

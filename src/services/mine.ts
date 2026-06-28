@@ -2,11 +2,12 @@ import { supabase } from '@/lib/supabase'
 import { getItemByCode, getItem } from '@/services/items'
 import { getSellGroupByCode } from '@/services/sell-groups'
 import { getAccessoryByCode } from '@/services/accessories'
-import { getSellGroupDescription, filterHiddenProductMedia } from '@/lib/utils'
+import { getBackorderLine } from '@/services/backorders'
+import { getSellGroupDescription, getItemDescription, filterHiddenProductMedia } from '@/lib/utils'
 import type { GalleryImage } from '@/components/shared/image-gallery'
 
 export interface ClaimableProduct {
-  type: 'item' | 'sell_group' | 'accessory'
+  type: 'item' | 'sell_group' | 'accessory' | 'backorder'
   code: string
   id: string
   title: string
@@ -18,18 +19,22 @@ export interface ClaimableProduct {
   available: boolean
   stockCount?: number
   conditionNotes?: string | null
+  // Backorder (pre-order) only: estimated working-day lead-time range shown on the product page.
+  leadTimeMinDays?: number | null
+  leadTimeMaxDays?: number | null
   raw: {
     itemId?: string
     accessoryId?: string
     sellGroupId?: string
+    backorderLineId?: string
     productId?: string
   }
 }
 
-export function parseCode(code: string): { prefix: 'P' | 'G' | 'A'; digits: string } | null {
-  const match = code.match(/^(P|G|A)(\d{6})$/i)
+export function parseCode(code: string): { prefix: 'P' | 'G' | 'A' | 'B'; digits: string } | null {
+  const match = code.match(/^(P|G|A|B)(\d{6})$/i)
   if (!match) return null
-  return { prefix: match[1].toUpperCase() as 'P' | 'G' | 'A', digits: match[2] }
+  return { prefix: match[1].toUpperCase() as 'P' | 'G' | 'A' | 'B', digits: match[2] }
 }
 
 export async function getClaimableByCode(code: string): Promise<ClaimableProduct | null> {
@@ -45,6 +50,8 @@ export async function getClaimableByCode(code: string): Promise<ClaimableProduct
       return getClaimableSellGroup(normalized)
     case 'A':
       return getClaimableAccessory(normalized)
+    case 'B':
+      return getClaimableBackorder(normalized)
     default:
       return null
   }
@@ -207,6 +214,70 @@ async function getClaimableAccessory(code: string): Promise<ClaimableProduct | n
       available,
       stockCount: acc.stock_quantity,
       raw: { accessoryId: acc.id },
+    }
+  } catch {
+    return null
+  }
+}
+
+async function getClaimableBackorder(code: string): Promise<ClaimableProduct | null> {
+  try {
+    // Resolve the B-code -> id, then reuse the joined fetch (product_models + categories +
+    // product_media + curated backorder_line_media).
+    const { data: ref } = await supabase
+      .from('backorder_lines')
+      .select('id')
+      .eq('backorder_code', code)
+      .maybeSingle()
+    if (!ref) return null
+
+    const line = await getBackorderLine(ref.id)
+    if (!line) return null
+
+    const pm = line.product_models as {
+      brand: string; model_name: string; categories: { description_fields: string[] | null } | null
+      product_media: { id: string; file_url: string; media_type: string; role: string; sort_order: number }[]
+    } | null
+
+    const title = pm ? `${pm.brand} ${pm.model_name}` : code
+    const subtitle = getItemDescription(
+      line as unknown as Record<string, unknown>,
+      pm as unknown as Record<string, unknown> | null,
+      pm?.categories?.description_fields,
+    )
+
+    // Media: curated backorder photos first (these are the real-unit / chosen shots), then the
+    // product model's catalog photos as a fallback so the page is never image-less.
+    const media: GalleryImage[] = []
+    const curated = (line.backorder_line_media ?? []) as { id: string; file_url: string; sort_order: number }[]
+    for (const m of [...curated].sort((a, b) => a.sort_order - b.sort_order)) {
+      media.push({ id: m.id, url: m.file_url, mediaType: 'image' })
+    }
+    const productMedia = (pm?.product_media ?? []).slice().sort((a, b) => a.sort_order - b.sort_order)
+    for (const m of productMedia) {
+      media.push({ id: m.id, url: m.file_url, mediaType: m.media_type === 'video' ? 'video' : 'image' })
+    }
+
+    const sellingPrice = Number(line.selling_price ?? 0)
+    const discount = Number(line.discount_amount ?? 0)
+    const effectivePrice = Math.max(0, sellingPrice - discount)
+    const available = line.status === 'ACTIVE' && (line.available ?? 0) > 0
+
+    return {
+      type: 'backorder',
+      code,
+      id: line.id,
+      title,
+      subtitle,
+      grade: line.condition_grade,
+      price: effectivePrice,
+      originalPrice: discount > 0 ? sellingPrice : undefined,
+      media,
+      available,
+      stockCount: line.available ?? 0,
+      leadTimeMinDays: line.lead_time_min_days ?? null,
+      leadTimeMaxDays: line.lead_time_days ?? null,
+      raw: { backorderLineId: line.id, productId: line.product_id ?? undefined },
     }
   } catch {
     return null

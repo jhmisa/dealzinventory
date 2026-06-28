@@ -412,6 +412,36 @@ function ItemAmountCell({ row, updateItem }: { row: ItemRow; updateItem: ReturnT
   )
 }
 
+// Read-only Cost / Sell / Disc / Profit breakdown for a backorder (pre-order) row, mirroring
+// ItemAmountCell's layout. Cost = supplier_price, Sell = selling_price, Disc = discount_amount,
+// Profit = Sell − Disc − Cost (= markup − discount), green when ≥ 0.
+function BackorderAmountCell({ row }: { row: BackorderRow }) {
+  const cost = Number(row.supplier_price ?? 0)
+  const sell = Number(row.selling_price ?? 0)
+  const disc = Number(row.discount_amount ?? 0)
+  const profit = sell - disc - cost
+  return (
+    <div className="flex flex-col gap-0 text-xs leading-tight" onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-center justify-between gap-1">
+        <span className="text-muted-foreground">Cost</span>
+        <PriceDisplay amount={cost} className="text-xs" />
+      </div>
+      <div className="flex items-center justify-between gap-1">
+        <span className="text-muted-foreground">Sell</span>
+        <PriceDisplay amount={sell} className="text-xs" />
+      </div>
+      <div className="flex items-center justify-between gap-1">
+        <span className="text-muted-foreground">Disc</span>
+        <PriceDisplay amount={disc} className="text-xs" />
+      </div>
+      <div className={cn('flex items-center justify-between gap-1 font-medium', profit >= 0 ? 'text-green-600' : 'text-red-500')}>
+        <span>Profit</span>
+        <PriceDisplay amount={profit} className="text-xs" />
+      </div>
+    </div>
+  )
+}
+
 export default function ItemListPage() {
   const navigate = useNavigate()
   useItemsRealtimeSync()
@@ -1229,7 +1259,7 @@ export default function ItemListPage() {
       cell: ({ row }) => {
         const r = row.original
         if (r._kind !== 'item') {
-          if (r._kind === 'backorder') return <PriceDisplay amount={Number(r.selling_price ?? 0)} />
+          if (r._kind === 'backorder') return <BackorderAmountCell row={r} />
           if (r._kind === 'accessory') return <PriceDisplay amount={Number(r.selling_price)} />
           if (r._kind === 'sell-group') {
             const repSp = Number((r._sg_items?.[0] as { selling_price?: number | null } | undefined)?.selling_price ?? 0)

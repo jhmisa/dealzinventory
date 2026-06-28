@@ -60,16 +60,17 @@ Deno.serve(async (req) => {
     if (!customer) return jsonResponse({ error: 'Customer not found' });
 
     // Parse code prefix
-    const match = code.match(/^([PGA])(\d{6})$/i);
+    const match = code.match(/^([PGAB])(\d{6})$/i);
     if (!match) return jsonResponse({ error: 'Invalid code format' });
 
     const prefix = match[1].toUpperCase();
     let itemId: string | null = null;
     let accessoryId: string | null = null;
+    let backorderLineId: string | null = null;
     let description = '';
     let unitPrice = 0;
     let itemDiscount = 0;
-    let quantity = 1;
+    const quantity = 1;
 
     if (prefix === 'P') {
       // Fetch item by P-code
@@ -146,6 +147,24 @@ Deno.serve(async (req) => {
       accessoryId = acc.id;
       description = [acc.brand, acc.name].filter(Boolean).join(' ');
       unitPrice = acc.selling_price;
+
+    } else if (prefix === 'B') {
+      // Fetch backorder (pre-order) line. unit_price = selling_price (full); discount = discount_amount.
+      const { data: line, error: lineError } = await supabase
+        .from('backorder_lines')
+        .select('id, backorder_code, status, available, selling_price, discount_amount, product_models(brand, model_name)')
+        .eq('backorder_code', code.toUpperCase())
+        .maybeSingle();
+
+      if (lineError || !line) return jsonResponse({ error: 'Pre-order not found' });
+      if (line.status !== 'ACTIVE') return jsonResponse({ error: 'This pre-order is not available' });
+      if ((line.available ?? 0) <= 0) return jsonResponse({ error: 'This pre-order is sold out' });
+
+      backorderLineId = line.id;
+      const pm = line.product_models as { brand: string; model_name: string } | null;
+      description = pm ? `${pm.brand} ${pm.model_name}` : line.backorder_code;
+      unitPrice = Number(line.selling_price ?? 0);
+      itemDiscount = Number(line.discount_amount ?? 0);
     }
 
     const DEFAULT_SHIPPING_COST = 1000;
@@ -207,29 +226,50 @@ Deno.serve(async (req) => {
       isNewOrder = true;
     }
 
-    // Create order item
-    const { error: oiError } = await supabase
-      .from('order_items')
-      .insert({
-        order_id: orderId,
-        item_id: itemId,
-        accessory_id: accessoryId,
-        description,
-        quantity,
-        unit_price: unitPrice,
-        discount: itemDiscount,
+    // Create order item. Backorder (pre-order) lines go through reserve_backorder_unit, which
+    // locks the line, re-checks availability, increments quantity_reserved, and inserts the
+    // order_item (backorder_status=AWAITING_ORDER, item_id NULL) atomically — preventing oversell.
+    if (backorderLineId) {
+      const { data: oiId, error: reserveErr } = await supabase.rpc('reserve_backorder_unit', {
+        p_order_id: orderId,
+        p_backorder_line_id: backorderLineId,
+        p_unit_price: unitPrice,
       });
+      if (reserveErr || !oiId) {
+        if (isNewOrder) {
+          await supabase.from('orders').delete().eq('id', orderId);
+        }
+        return jsonResponse({ error: 'This pre-order is no longer available' });
+      }
+      // Backfill the fields reserve_backorder_unit doesn't set (description, discount, quantity).
+      await supabase
+        .from('order_items')
+        .update({ description, discount: itemDiscount, quantity })
+        .eq('id', oiId as string);
+    } else {
+      const { error: oiError } = await supabase
+        .from('order_items')
+        .insert({
+          order_id: orderId,
+          item_id: itemId,
+          accessory_id: accessoryId,
+          description,
+          quantity,
+          unit_price: unitPrice,
+          discount: itemDiscount,
+        });
 
-    if (oiError) {
-      // Rollback if new order
-      if (isNewOrder) {
-        await supabase.from('orders').delete().eq('id', orderId);
+      if (oiError) {
+        // Rollback if new order
+        if (isNewOrder) {
+          await supabase.from('orders').delete().eq('id', orderId);
+        }
+        // Check for unique constraint (double-claim)
+        if (oiError.code === '23505') {
+          return jsonResponse({ error: 'This item has already been claimed by another customer' });
+        }
+        return jsonResponse({ error: `Failed to create order item: ${oiError.message}` });
       }
-      // Check for unique constraint (double-claim)
-      if (oiError.code === '23505') {
-        return jsonResponse({ error: 'This item has already been claimed by another customer' });
-      }
-      return jsonResponse({ error: `Failed to create order item: ${oiError.message}` });
     }
 
     // Recalculate order totals (for existing orders with new items)

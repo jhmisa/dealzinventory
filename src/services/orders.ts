@@ -159,7 +159,7 @@ export async function cancelOrder(
   // Get all line items in this order
   const { data: orderItems } = await supabase
     .from('order_items')
-    .select('item_id, accessory_id, quantity')
+    .select('id, item_id, accessory_id, quantity, backorder_line_id')
     .eq('order_id', orderId)
 
   // Update order status to CANCELLED with reason
@@ -167,6 +167,13 @@ export async function cancelOrder(
   if (cancellationCategory) updates.cancellation_category = cancellationCategory
   if (cancellationNotes) updates.cancellation_notes = cancellationNotes
   const order = await updateOrder(orderId, updates)
+
+  // Release any pre-order (backorder) reservations so the unit becomes mineable again. The RPC
+  // decrements quantity_reserved (→ available rises) and unlinks the order_item (idempotent).
+  const backorderItems = (orderItems ?? []).filter((oi) => oi.backorder_line_id != null)
+  for (const oi of backorderItems) {
+    await supabase.rpc('release_backorder_unit', { p_order_item_id: oi.id })
+  }
 
   // Revert all inventory items to AVAILABLE
   const itemIds = (orderItems ?? [])
@@ -601,9 +608,14 @@ export async function removeOrderLineItem(orderItemId: string) {
   // Fetch the order_item to get item_id / accessory_id before deleting
   const { data: orderItem } = await supabase
     .from('order_items')
-    .select('item_id, accessory_id, quantity')
+    .select('item_id, accessory_id, quantity, backorder_line_id')
     .eq('id', orderItemId)
     .single()
+
+  // Release the pre-order reservation (decrements quantity_reserved) before deleting the row.
+  if (orderItem?.backorder_line_id) {
+    await supabase.rpc('release_backorder_unit', { p_order_item_id: orderItemId })
+  }
 
   const { error } = await supabase
     .from('order_items')

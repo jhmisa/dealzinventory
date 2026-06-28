@@ -111,6 +111,7 @@ const defaultValues: BackorderFormValues = {
   screen_size: undefined,
   supplier_price: undefined,
   markup_jpy: 4000,
+  discount_amount: 0,
   supplier_url: '',
   supplier_product_code: '',
   supplier_stock: undefined,
@@ -382,10 +383,14 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
   // render from RHF's watch(). `overridden` flags when the (editable) selling price no longer
   // equals supplier + markup, so the panel can show the auto value for reference.
   const watchedSelling = form.watch('selling_price')
+  const watchedDiscount = form.watch('discount_amount')
   const pricingSupplier = Number(watchedSupplierPrice) || 0
   const pricingMarkup = Number(watchedMarkup) || 0
   const pricingComputed = pricingSupplier + pricingMarkup
   const pricingSelling = Number(watchedSelling) || 0
+  const pricingDiscount = Number(watchedDiscount) || 0
+  const pricingEffective = Math.max(0, pricingSelling - pricingDiscount)
+  const pricingProfit = pricingEffective - pricingSupplier
   const pricingOverridden = pricingSelling !== pricingComputed
   const yen = (n: number) => `¥${n.toLocaleString('en-US')}`
 
@@ -440,6 +445,7 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
         screen_size: values.screen_size ?? null,
         supplier_price: values.supplier_price ?? null,
         markup_jpy: values.markup_jpy,
+        discount_amount: values.discount_amount,
         supplier_url: values.supplier_url?.trim() || null,
         supplier_product_code: values.supplier_product_code?.trim() || null,
         supplier_stock: values.supplier_stock ?? null,
@@ -735,7 +741,28 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
                 )}
               />
 
-              {/* Pricing summary — visualizes Selling = Supplier + Markup with live values */}
+              {/* Discount — optional customer discount off the selling price (pre-orders can be discounted) */}
+              <FormField
+                control={form.control}
+                name="discount_amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Discount (JPY)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={0}
+                        {...field}
+                        value={field.value ?? ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Pricing summary — visualizes Selling = Supplier + Markup, then the effective price
+                  after any discount and the resulting profit (Sell − Disc − Cost). */}
               <div className="col-span-2 rounded-lg border bg-muted/40 p-4">
                 <div className="flex flex-wrap items-end justify-between gap-4">
                   <div className="flex items-end gap-3 text-sm tabular-nums">
@@ -750,12 +777,29 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
                     </div>
                     <span className="pb-0.5 text-muted-foreground">=</span>
                   </div>
-                  <div className="flex flex-col">
-                    <span className="text-xs font-medium text-muted-foreground">Selling Price</span>
+                  <div className="flex flex-col text-right">
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {pricingDiscount > 0 ? 'Customer Pays' : 'Selling Price'}
+                    </span>
                     <span className="text-2xl font-bold leading-none tabular-nums">
-                      {yen(pricingSelling)}
+                      {pricingDiscount > 0 && (
+                        <span className="mr-1 align-middle text-base font-normal text-muted-foreground line-through">
+                          {yen(pricingSelling)}
+                        </span>
+                      )}
+                      {yen(pricingEffective)}
                     </span>
                   </div>
+                </div>
+                <div className="mt-2 flex items-center justify-between text-xs tabular-nums">
+                  {pricingDiscount > 0 ? (
+                    <span className="text-muted-foreground">Discount −{yen(pricingDiscount)}</span>
+                  ) : (
+                    <span />
+                  )}
+                  <span className={cn('font-medium', pricingProfit >= 0 ? 'text-green-600' : 'text-red-500')}>
+                    Profit {yen(pricingProfit)}
+                  </span>
                 </div>
                 {pricingOverridden && (
                   <p className="mt-2 text-xs text-amber-600">
