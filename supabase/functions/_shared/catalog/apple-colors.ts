@@ -5,6 +5,19 @@
 // Scope: iPhone colors first (per spec, iPhone is harvested first). iPad/Android
 // colors can be appended as Phase 4 expands coverage.
 
+import {
+  GALAXY_COLORS_JA_EN,
+  XPERIA_COLORS_JA_EN,
+  AQUOS_COLORS_JA_EN,
+  PIXEL_COLORS_JA_EN,
+  XIAOMI_COLORS_JA_EN,
+  OPPO_COLORS_JA_EN,
+  ARROWS_COLORS_JA_EN,
+  HUAWEI_COLORS_JA_EN,
+  ASUS_COLORS_JA_EN,
+  MOTOROLA_COLORS_JA_EN,
+} from "./android-listing.ts"
+
 /** Japanese color token -> canonical English color name. */
 export const JA_TO_EN_COLOR: Record<string, string> = {
   // --- neutrals / classics ---
@@ -72,13 +85,31 @@ export const JA_TO_EN_COLOR: Record<string, string> = {
   "ソフトピンク": "Soft Pink",
 }
 
-/** Resolve a Japanese color token to canonical English, or null if unmapped. */
+// All Android brand color maps, consulted after the Apple map. Order is arbitrary — keys
+// rarely collide, and where they do (e.g. ミント -> Mint) every map agrees.
+const ANDROID_COLOR_MAPS: Record<string, string>[] = [
+  GALAXY_COLORS_JA_EN,
+  XPERIA_COLORS_JA_EN,
+  AQUOS_COLORS_JA_EN,
+  PIXEL_COLORS_JA_EN,
+  XIAOMI_COLORS_JA_EN,
+  OPPO_COLORS_JA_EN,
+  ARROWS_COLORS_JA_EN,
+  HUAWEI_COLORS_JA_EN,
+  ASUS_COLORS_JA_EN,
+  MOTOROLA_COLORS_JA_EN,
+]
+
+/** Resolve a Japanese color token to canonical English (Apple + all Android maps), or null. */
 export function colorJaToEn(colorJa: string | null | undefined): string | null {
   if (!colorJa) return null
   const key = colorJa.trim()
   if (key in JA_TO_EN_COLOR) return JA_TO_EN_COLOR[key]
-  // tolerate a trailing/leading whitespace or full-width spaces already trimmed above;
-  // try a normalized lookup (strip spaces) as a last resort.
   const compact = key.replace(/[\s　]+/g, "")
-  return JA_TO_EN_COLOR[compact] ?? null
+  if (compact in JA_TO_EN_COLOR) return JA_TO_EN_COLOR[compact]
+  for (const m of ANDROID_COLOR_MAPS) {
+    if (key in m) return m[key]
+    if (compact in m) return m[compact]
+  }
+  return null
 }

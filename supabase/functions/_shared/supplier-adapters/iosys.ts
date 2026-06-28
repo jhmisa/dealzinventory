@@ -8,6 +8,7 @@ const RANK_TO_GRADE: Record<string, NormalizedSupplierProduct["conditionGrade"]>
   "未使用": "S",
   "未使用品": "S",
   "new": "S",
+  "s": "S",
   "a": "A",
   "aランク": "A",
   "b": "B",
@@ -16,6 +17,8 @@ const RANK_TO_GRADE: Record<string, NormalizedSupplierProduct["conditionGrade"]>
   "cランク": "C",
   "d": "D",
   "dランク": "D",
+  "j": "J",
+  "jランク": "J",
 }
 
 // ---- small local helpers ---------------------------------------------------
@@ -87,8 +90,13 @@ function parseStorage(str: string | null): number | null {
 
 function mapRank(rankText: string | null): NormalizedSupplierProduct["conditionGrade"] {
   if (!rankText) return null
-  const key = rankText.trim().toLowerCase()
-  return RANK_TO_GRADE[key] ?? RANK_TO_GRADE[rankText.trim()] ?? null
+  const trimmed = rankText.trim()
+  const key = trimmed.toLowerCase()
+  const direct = RANK_TO_GRADE[key] ?? RANK_TO_GRADE[trimmed]
+  if (direct) return direct
+  // Tolerate "中古Cランク" / "Cランク" forms reaching this path.
+  const m = trimmed.match(/中古\s*([SABCDJ])\s*ランク/i) ?? trimmed.match(/^([SABCDJ])\s*ランク$/i)
+  return m ? RANK_TO_GRADE[m[1].toLowerCase()] ?? null : null
 }
 
 function decodeEntities(s: string): string {
@@ -106,6 +114,52 @@ function pickSpec(description: string | null, label: string): string | null {
   const re = new RegExp(label + "\\s*[:：]\\s*([^\\s]+)")
   const m = description.match(re)
   return m ? m[1].trim() : null
+}
+
+/** Strip inline tags, decode entities, collapse whitespace. */
+function cleanCell(s: string): string {
+  return decodeEntities(s.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim())
+}
+
+/** Parse the <div id="spec"> ... <table> ... </table> into a label->value map. */
+function parseSpecTable(html: string): Record<string, string> {
+  const out: Record<string, string> = {}
+  const block = html.match(/<div[^>]*id="spec"[\s\S]*?<table[\s\S]*?<\/table>/i)
+  const scope = block ? block[0] : html
+  for (const row of scope.matchAll(/<tr[^>]*>\s*<th[^>]*>([\s\S]*?)<\/th>\s*<td[^>]*>([\s\S]*?)<\/td>/gi)) {
+    const label = decodeEntities(row[1].replace(/<[^>]+>/g, "").trim())
+    const value = cleanCell(row[2])
+    if (label) out[label] = value
+  }
+  return out
+}
+
+/** Extract a Japanese carrier model code (SO-52C, SC-54D, A301SH, XQ-CT44, SCG14...) from text. */
+function extractModelNumber(...candidates: (string | null)[]): string | null {
+  const re =
+    /\b(SO-\d{2}[A-Za-z]+|SOG\d+|SOV\d+|XQ-[A-Z]{2}\d{2}|SC-\d{2}[A-Z]|SCG\d+|SCV\d+|SM-[A-Z0-9]+|SH-(?:RM)?\d+[A-Z]?|SHG\d+|SHV\d+|F-\d{2}[A-Z]|FCG\d+|CPH\d+|OPG\d+|XIG\d+|G[A-Z0-9]{4}|A\d{3}(?:SH|SO|OP|XM|MO|FC)|XT\d{4}-\d|HWV\d+|HW-\d{2}[A-Z])\b/
+  for (const c of candidates) {
+    if (!c) continue
+    const m = c.match(re)
+    if (m) return m[1]
+  }
+  return null
+}
+
+/** "5.0インチ" / "6.1 inch" -> 6.1 (numeric). Null if not parseable. */
+function parseScreenInches(str: string | null): number | null {
+  if (!str) return null
+  const m = str.match(/(\d+(?:\.\d+)?)\s*(?:インチ|inch|"|型)/i)
+  if (!m) return null
+  const n = parseFloat(m[1])
+  return Number.isFinite(n) ? n : null
+}
+
+/** "2022年6月" / "2022/06" / "2022" -> 2022. Null if no 4-digit year. */
+function parseYear(str: string | null): number | null {
+  if (!str) return null
+  const m = str.match(/(20\d{2})/)
+  return m ? Number(m[1]) : null
 }
 
 // ---- adapter ---------------------------------------------------------------
@@ -163,29 +217,88 @@ function parse(html: string, input: string): NormalizedSupplierProduct {
 
   const brandText = ldBrand ? decodeEntities(ldBrand) : null
 
-  // Color: from the title (storage token followed by a color word before any 【...】 bracket).
-  // iosys lists the JAPANESE color token; keep it as colorJa and derive canonical English for
-  // inventory + customer-facing use (the Kaitori side shows the Japanese). Unknown tokens fall
-  // back to the raw Japanese so the field is never empty (staff can correct it).
+  // Model number (carrier/region code) — from the URL slug and the title. Anchors the color.
+  const modelNumber = extractModelNumber(modelText, title, input)
+
+  // Color: iosys lists the Japanese token. For Apple titles it follows the storage
+  // ("128GB ホワイト"); for Android titles there is NO storage token, so fall back to the
+  // token after the model number (and before any 【...】 bracket). Keep colorJa raw and derive
+  // canonical English (now consulting the Android color maps too). Unknown tokens stay raw.
   let colorJa: string | null = null
   if (title) {
-    const cm = title.match(/\d+\s*(?:GB|TB)\s+([^【|]+)/i)
-    if (cm) colorJa = decodeEntities(cm[1].trim())
+    const storageAnchored = title.match(/\d+\s*(?:GB|TB)\s+([^【|]+)/i)
+    if (storageAnchored) {
+      colorJa = decodeEntities(storageAnchored[1].trim())
+    } else if (modelNumber) {
+      // text after the model number up to the first 【 / | / end
+      const afterCode = title.split(modelNumber)[1] ?? ""
+      const codeAnchored = afterCode.match(/^\s*([^【|]+)/)
+      if (codeAnchored) colorJa = decodeEntities(codeAnchored[1].trim()) || null
+    }
   }
   const color = colorJaToEn(colorJa) ?? colorJa
 
-  // Storage: from JSON-LD spec description ("ストレージ:128GB"), fall back to title.
+  // Spec table (<div id="spec"><table>): authoritative for OS/CPU/RAM/ROM/screen/camera/etc.
+  const spec = parseSpecTable(html)
+  const specRamGb = parseStorage(spec["RAM"] ?? null)
+  const specStorageGb = parseStorage(spec["ROM"] ?? spec["容量"] ?? null)
+
+  // Storage: spec table ROM > JSON-LD ストレージ > title token.
   const storageGb =
-    parseStorage(pickSpec(ldDescription, "ストレージ")) ?? parseStorage(title)
+    specStorageGb ??
+    parseStorage(pickSpec(ldDescription, "ストレージ")) ??
+    parseStorage(title)
 
-  // RAM: not surfaced on iOS device pages; attempt spec, else null.
-  const ramGb = parseStorage(pickSpec(ldDescription, "メモリ"))
+  // RAM: spec table > JSON-LD メモリ.
+  const ramGb = specRamGb ?? parseStorage(pickSpec(ldDescription, "メモリ"))
 
-  // Rank / condition: the main item header carries <p class="condition">新品</p>.
+  const specs: NormalizedSupplierProduct["specs"] = {
+    os: spec["OS"] ?? null,
+    cpu: spec["CPU"] ?? null,
+    ramGb: specRamGb,
+    storageGb: specStorageGb,
+    screenSize: parseScreenInches(spec["ディスプレイ"] ?? null),
+    camera: spec["カメラ"] ?? null,
+    comms: spec["通信"] ?? null,
+    bands: spec["電波帯"] ?? null,
+    externalMemory: spec["外部メモリ"] ?? null,
+    year: parseYear(spec["発売日"] ?? null),
+    ports: spec["接続端子"] ?? null,
+  }
+
+  // Rank / condition. The <h1> / meta carry the authoritative listing grade as a 中古Xランク
+  // token (the SO-52C page expresses grade ONLY this way; <p class="condition"> blocks lower on
+  // the page belong to related products and must not win). Prefer the <h1> token, then the spec
+  // table 状態 / JSON-LD 状態, then the legacy <p class="condition"> header, then any body token.
+  const h1 = pick(html, /<h1[^>]*>([\s\S]*?)<\/h1>/)
+  const gradeToken = (s: string | null): string | null => {
+    if (!s) return null
+    const m = s.match(/中古\s*([SABCDJ])\s*ランク/i)
+    return m ? m[1] : null
+  }
   const rankText =
+    gradeToken(h1) ??
+    (spec["状態"] ?? null) ??
+    pickSpec(ldDescription, "状態") ??
     pick(html, /<p class="condition">\s*([^<]+?)\s*<\/p>/) ??
-    pickSpec(ldDescription, "状態")
+    gradeToken(html)
   const conditionGrade = mapRank(rankText)
+
+  // Included accessories (付属品): verbatim text. Spec table first, then the labelled
+  // subtitle/content block (the SO-52C page lists it as a <p class="subtitle">付属品</p>
+  // followed by a <div class="content"><p>箱/マニュアル</p></div>), then a <td> fallback.
+  const includedAccessories =
+    (spec["付属品"] ?? null) ??
+    (() => {
+      const m = html.match(
+        /付属品\s*<\/p>\s*<div[^>]*class="content[^"]*"[^>]*>\s*<p>([\s\S]*?)<\/p>/i,
+      )
+      return m ? cleanCell(m[1]) || null : null
+    })() ??
+    (() => {
+      const m = html.match(/付属品[\s\S]{0,40}?<td[^>]*>([\s\S]*?)<\/td>/i)
+      return m ? cleanCell(m[1]) || null : null
+    })()
 
   // Price: prefer JSON-LD, fall back to the visible price block.
   const supplierPrice =
@@ -233,6 +346,7 @@ function parse(html: string, input: string): NormalizedSupplierProduct {
     sourceUrl,
     brandText,
     modelText,
+    modelNumber,
     color,
     colorJa,
     storageGb,
@@ -242,6 +356,8 @@ function parse(html: string, input: string): NormalizedSupplierProduct {
     supplierPrice,
     stock,
     imageUrls,
+    specs,
+    includedAccessories,
   }
 }
 

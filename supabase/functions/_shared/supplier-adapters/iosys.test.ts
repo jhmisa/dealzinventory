@@ -44,3 +44,23 @@ Deno.test("iosys: parses model, price, stock, rank->grade, gallery", () => {
     true,
   )
 })
+
+// --- Sony SO-52C (Android, no storage token in title, JP color, spec table) ----------
+const so52cHtml = await Deno.readTextFile(
+  new URL("./__fixtures__/iosys-so-52c.html", import.meta.url),
+)
+const so52cUrl =
+  "https://iosys.co.jp/items/smartphone/xperia10/docomo/xperia10_iv_so-52c/278266"
+
+Deno.test("iosys: SO-52C Android — modelNumber, JP color, grade, spec table, accessories", () => {
+  const p = iosysAdapter.parse(so52cHtml, so52cUrl)
+  assertEquals(p.modelNumber, "SO-52C")
+  assertEquals(p.colorJa, "ミント")
+  assertEquals(p.color, "Mint")
+  assertEquals(p.conditionGrade, "C")
+  assertEquals(p.storageGb, 128)
+  assertEquals(p.specs.ramGb, 6)
+  assertEquals((p.specs.cpu ?? "").includes("Snapdragon 695") || (p.specs.cpu ?? "").includes("Snapdragon695"), true)
+  assertEquals((p.includedAccessories ?? "").includes("箱"), true)
+  assertEquals((p.includedAccessories ?? "").includes("マニュアル"), true)
+})
