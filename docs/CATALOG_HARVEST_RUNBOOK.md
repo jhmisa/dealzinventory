@@ -157,8 +157,14 @@ because the title grammar differs.
   part#/A# at END, Wi-Fi vs Wi-Fi+Cellular + size as SKU attributes, glass token).
 - **Colors:** `apple-colors.ts` (JA→EN) with model-aware fixes (iPhone 8/X `Black→Space Gray`,
   `White→Silver`; `Red→(PRODUCT)RED`; `Midnight Black→Midnight`).
-- **Not yet built (Phase B):** Mac (config-rich: chip/RAM/SSD brackets), Apple Watch (case size/material/
-  GPS-vs-Cellular), AirPods (simple name+part#+year). Reuse part#-as-key + `apple-colors`.
+- **Mac (`mac-listing.ts`, SHIPPED v1.75.0):** path `items/pc/notepc/macbook`. Grammar `MacBook
+  [Air|Pro] {size}インチ {part#/A} {Early|Mid|Late} {year} {color} 【chip/RAM/SSD[/GPU]】`. **The config
+  is IN the title bracket → no spec file needed** (spec_known always true). Parses M1–M5 (Pro/Max) +
+  Intel, CPU/GPU cores, region suffix, period→year. **Identity collapses on config** (model/size/chip/
+  RAM/SSD/color), part# is coarse. fill-gaps formats storage GB/TB, os_family='macOS'. No COMPUTER
+  unique index yet (legacy dirty rows). NEXT: iMac/mini/Studio (`items/pc/deskpc/mac` — desktop grammar).
+- **Not yet built (Phase B):** iMac/Mac mini/Mac Studio (desktop config grammar), Apple Watch (case
+  size/material/GPS-vs-Cellular), AirPods (simple name+part#+year). Reuse part#-as-key + `apple-colors`.
 
 Re-harvest for new Apple models follows the same shape as §2 (add specs → re-run → idempotent upsert).
 

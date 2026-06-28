@@ -14,6 +14,7 @@ import { type Carrier, type ListingSku, parseListingPage } from "./iosys-listing
 import { iphoneSpec } from "./iphone-specs.ts"
 import { type IpadListingSku, parseIpadListingPage } from "./ipad-listing.ts"
 import { ipadSpec } from "./ipad-specs.ts"
+import { type MacListingSku, parseMacListingPage } from "./mac-listing.ts"
 import {
   type AndroidBrandConfig,
   type AndroidListingSku,
@@ -171,6 +172,49 @@ export const IPAD_CATEGORY: HarvestCategory = {
   sections: IPAD_SECTIONS,
   pageToRows: (html, section, src) =>
     parseIpadListingPage(html, section.carrier).map((sku) => ipadRow(sku, section, src)),
+}
+
+// Mac (MacBook Air/Pro) — Apple part#-keyed, COMPUTER category. The full config (chip/RAM/SSD/GPU)
+// is read from the title bracket, so spec_known is always true. Identity collapses on config in the
+// fill-gaps (several part#s share one config); part# is the coarse representative.
+function macRow(sku: MacListingSku, section: CarrierSection, sourceUrl: string): CatalogRow {
+  return {
+    sku_key: sku.part_number,
+    part_number: sku.part_number,
+    model_number: sku.part_number, // Mac has no separate A-number; the part# IS the identifier
+    brand: "Apple",
+    model_name: sku.model_name,
+    storage_gb: sku.ssd_gb,
+    color_ja: sku.color_ja,
+    color_en: sku.color_en,
+    carrier: null,
+    connectivity: null,
+    device_category: "COMPUTER",
+    source_url: sourceUrl,
+    carrier_path: section.path,
+    raw_title: sku.raw_title,
+    listing_count: 1,
+    specs: {
+      chipset: sku.chip,
+      ram_gb: sku.ram_gb,
+      screen_size: sku.size_inch,
+      year: sku.year,
+      is_intel: sku.is_intel,
+      cpu_cores: sku.cpu_cores,
+      gpu_cores: sku.gpu_cores,
+      period: sku.period,
+      region_code: sku.region_code,
+      is_domestic: sku.is_domestic,
+      spec_known: true, // config is printed in the title bracket — always known
+    },
+  }
+}
+
+export const MACBOOK_CATEGORY: HarvestCategory = {
+  pathPrefix: "items/pc/notepc",
+  sections: [{ path: "macbook", carrier: null }],
+  pageToRows: (html, section, src) =>
+    parseMacListingPage(html).map((sku) => macRow(sku, section, src)),
 }
 
 // Android brands have no part_number → dedupe identity is (brand, model, storage, color, carrier).

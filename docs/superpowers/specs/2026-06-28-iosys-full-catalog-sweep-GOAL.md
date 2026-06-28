@@ -113,7 +113,7 @@ Recipe below. Also fold in the **deferred legacy-Samsung reconcile** (+ the defe
 (42 COMPUTER-miscategorized `Samsung` rows, 37 referenced by 117 live items → recategorize→ANDROID, dedup
 vs the clean Galaxy rows, re-point items, archive stubs; mirrors iPhone Phase 2).
 
-**Phase B — Apple non-phone (part# pattern, high resale value).** **MacBook → iMac/Mac mini/Mac Studio/Mac
+**Phase B — Apple non-phone (part# pattern, high resale value).** ~~MacBook~~ ✓ (v1.75.0, 189 configs) → iMac/Mac mini/Mac Studio/Mac
 Pro → Apple Watch → AirPods.** New parsers (config/size dims) but reuse part#-as-key + apple-colors.
 
 **Phase C — Android tablets + core wearables/audio.** Galaxy Tab + other Android tablets; Galaxy Watch +

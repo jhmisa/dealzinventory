@@ -12,6 +12,7 @@ import {
   GALAXY_CATEGORY,
   harvestCatalog,
   IPAD_CATEGORY,
+  MACBOOK_CATEGORY,
   ARROWS_CATEGORY,
   HUAWEI_CATEGORY,
   MOTOROLA_CATEGORY,
@@ -30,6 +31,8 @@ const UA =
 const which = (Deno.args[0] ?? "iphone").toLowerCase()
 const category = which === "ipad"
   ? IPAD_CATEGORY
+  : which === "macbook"
+  ? MACBOOK_CATEGORY
   : which === "galaxy"
   ? GALAXY_CATEGORY
   : which === "xperia"
@@ -57,7 +60,7 @@ console.error(`=== harvesting category: ${which} ===`)
 
 const res = await harvestCatalog({
   category,
-  maxPagesPerSection: 30,
+  maxPagesPerSection: 60,
   stopAfterDryPages: 2,
   throttleMs: 900,
   onProgress: (m) => console.error(m), // progress to stderr; SQL to stdout
