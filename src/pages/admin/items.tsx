@@ -35,7 +35,7 @@ import { useItemListColumnSettings } from '@/hooks/use-settings'
 import { usePersistedFilters } from '@/hooks/use-persisted-filters'
 import { useDebounce } from '@/hooks/use-debounce'
 import { ITEM_STATUSES, CONDITION_GRADES } from '@/lib/constants'
-import { formatDate, formatPrice, cn, buildShortDescription, formatCustomerName, getItemDescription, getItemTotalCost, type ItemCostRow } from '@/lib/utils'
+import { formatDate, formatPrice, cn, buildShortDescription, formatCustomerName, getItemDescription, withBackorderIdentifier, getItemTotalCost, type ItemCostRow } from '@/lib/utils'
 import { toast } from 'sonner'
 import { printItemLabel } from '@/components/items/label-print'
 import { resolveSoldTo, resolveReservedBy, reservedByMessageLink, type ReservedByInfo } from '@/lib/item-sale'
@@ -199,9 +199,8 @@ const INVENTORY_TYPE_OPTIONS = [
 
 // Build the spec line for a backorder line the same way items do, so a given model reads
 // identically across Admin Items / Backorders / messaging. Mirrors getItemDesc().
-// Appends the staff-only model identifier `A3295 (MYWJ3J/A)` (model_number + part_number)
-// AFTER the shared description, so it stays out of getItemDescription (and thus out of
-// customer-facing offers). Kept in parity with searchAvailableBackorderLines.
+// Inserts the staff-only model identifier `A3295 (MYWJ3J/A)` right after the model name
+// (via withBackorderIdentifier) — kept out of getItemDescription (and thus customer offers).
 function getBackorderDesc(line: BackorderLineListItem): string {
   const pm = line.product_models
   const base = getItemDescription(
@@ -209,12 +208,7 @@ function getBackorderDesc(line: BackorderLineListItem): string {
     pm as unknown as Record<string, unknown> | null,
     pm?.categories?.description_fields,
   )
-  const ident = pm?.model_number
-    ? pm.part_number
-      ? `${pm.model_number} (${pm.part_number})`
-      : pm.model_number
-    : null
-  return ident ? `${base} · ${ident}` : base
+  return withBackorderIdentifier(base, pm?.model_number, pm?.part_number)
 }
 
 const INVENTORY_TABS = [

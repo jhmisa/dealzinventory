@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { fetchAllPages } from '@/lib/fetch-all-pages'
-import { getItemDescription, getSellGroupDescription, filterHiddenProductMedia } from '@/lib/utils'
+import { getItemDescription, getSellGroupDescription, withBackorderIdentifier, filterHiddenProductMedia } from '@/lib/utils'
 import type { Item, ItemInsert, ItemUpdate, ItemCost, ItemMedia } from '@/lib/types'
 
 // Temporary debug function — can be removed later
@@ -744,15 +744,10 @@ export async function searchAvailableBackorderLines(query: string, filters: Inve
       null,
       row.category_description_fields,
     )
-    // Append the staff-only model identifier `A3295 (MYWJ3J/A)` AFTER the shared
-    // description, matching Admin Items getBackorderDesc() so the two staff surfaces
-    // stay identical. Kept out of getItemDescription (and thus customer offers).
-    const ident = row.model_number
-      ? row.part_number
-        ? `${row.model_number} (${row.part_number})`
-        : row.model_number
-      : null
-    const description = (ident ? `${base} · ${ident}` : base) || '—'
+    // Insert the staff-only model identifier `A3295 (MYWJ3J/A)` right after the model
+    // name, matching Admin Items getBackorderDesc() so the staff surfaces stay identical.
+    // Kept out of getItemDescription (and thus customer offers).
+    const description = withBackorderIdentifier(base, row.model_number, row.part_number) || '—'
     return {
       type: 'backorder' as const,
       id: row.id,

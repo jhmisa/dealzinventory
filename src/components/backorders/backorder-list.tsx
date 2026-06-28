@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { listBackorderLines, type BackorderLineListItem } from '@/services/backorders'
 import { GradeBadge, StatusBadge, TableSkeleton, CodeDisplay, EmptyState } from '@/components/shared'
-import { cn, formatPrice, getItemDescription } from '@/lib/utils'
+import { cn, formatPrice, getItemDescription, withBackorderIdentifier } from '@/lib/utils'
 import type { ConditionGrade } from '@/lib/types'
 
 // Status tabs mirror the Items page pattern: an "all" pseudo-tab plus the three
@@ -27,11 +27,13 @@ const BACKORDER_STATUSES = [
 // plus its joined product_models + category description_fields.
 function getBackorderDescription(line: BackorderLineListItem): string {
   const pm = line.product_models
-  return getItemDescription(
+  const base = getItemDescription(
     line as unknown as Record<string, unknown>,
     pm as unknown as Record<string, unknown> | null,
     pm?.categories?.description_fields,
   )
+  // Staff surface → show the model identifier `A3295 (MYWJ3J/A)` after the model name.
+  return withBackorderIdentifier(base, pm?.model_number, pm?.part_number)
 }
 
 // Lead time as a working-day range: "4–7d" (min..max), collapsing an equal/absent bound.

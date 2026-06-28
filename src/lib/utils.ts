@@ -194,6 +194,33 @@ export function getItemDescription(
 }
 
 /**
+ * Insert the STAFF-ONLY model identifier `A3295 (MYWJ3J/A)` (model_number +
+ * part_number) right after the model-name segment of a built description, e.g.
+ *   "Apple iPhone 16 Pro Max / Desert Titanium / …"
+ *   → "Apple iPhone 16 Pro Max A3295 (MYWJ3J/A) / Desert Titanium / …"
+ * Used by the three staff backorder surfaces (Admin Items, Backorders list,
+ * Messages Search Inventory) so they read identically. Deliberately kept OUT of
+ * getItemDescription so the identifier never leaks into customer-facing offers.
+ */
+export function withBackorderIdentifier(
+  base: string,
+  modelNumber: string | null | undefined,
+  partNumber: string | null | undefined,
+): string {
+  const ident = modelNumber
+    ? partNumber
+      ? `${modelNumber} (${partNumber})`
+      : modelNumber
+    : null
+  if (!ident) return base
+  if (!base) return ident
+  const sep = ' / '
+  const idx = base.indexOf(sep)
+  if (idx === -1) return `${base} ${ident}`
+  return `${base.slice(0, idx)} ${ident}${base.slice(idx)}`
+}
+
+/**
  * Build a sell group's description by picking a representative member item and
  * delegating to getItemDescription. Honors per-item field overrides and the
  * model's category description_fields config — so every surface (Admin Sell
