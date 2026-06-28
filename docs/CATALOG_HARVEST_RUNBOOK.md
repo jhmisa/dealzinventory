@@ -176,6 +176,7 @@ Re-harvest for new Apple models follows the same shape as §2 (add specs → re-
 | AQUOS | Sharp | `items/smartphone/aquos` | `SH-RM\d+ \| SH-M\d+ \| SH-\d{2}[A-Z] \| SHG\d+ \| SHV\d+ \| A\d{3}SH` | `aquos-specs.ts` / `AQUOS_COLORS_JA_EN` | `2026-06-28-aquos-fill-gaps.sql` | `iosys-aquos-p1.html` | ✅ legacy reconciled inline (4 rows, Black dup merged) |
 | Pixel | Google | `items/smartphone/pixel` | `G[A-Z0-9]{4}` (case-sensitive) | `pixel-specs.ts` / `PIXEL_COLORS_JA_EN` | `2026-06-28-pixel-fill-gaps.sql` | `iosys-pixel-p1.html` | ✅ legacy reconciled inline (4 phone rows; 2 Google speakers left COMPUTER) |
 | Xiaomi | Xiaomi | `items/smartphone/xiaomi` | au `XIG\d+` · SoftBank `A\d{3}XM` · POCO global `\d{8}[A-Z]?` — **+ code-less SIM-free via `nameConsumeRe`** | `xiaomi-specs.ts` / `XIAOMI_COLORS_JA_EN` | `2026-06-28-xiaomi-fill-gaps.sql` | `iosys-xiaomi-p1.html` | ✅ + **legacy reconcile OPEN** (~33 COMPUTER rows / ~125 items) |
+| OPPO | OPPO→`Oppo` | `items/smartphone/oppo` | global `CPH\d+` · au `OPG\d+` · SoftBank/Y!mobile `A\d{3}OP` — **+ code-less old via `nameConsumeRe`** | `oppo-specs.ts` / `OPPO_COLORS_JA_EN` | `2026-06-28-oppo-fill-gaps.sql` | `iosys-oppo-p1.html` | ✅ + **legacy reconcile OPEN** (~25 COMPUTER rows / ~110 items) |
 | iPhone | Apple | `items/smartphone/iphone` | part# (`MXVH3J/A`) | `iphone-specs.ts` / `apple-colors.ts` | phase2/3/5 data-ops | `iosys-iphone-simfree-p1.html` | ✅ |
 | iPad | Apple | `items/tablet/ios/ipad` | part# | `ipad-specs.ts` / `apple-colors.ts` | phase4-ipad data-ops | `iosys-ipad-*-p1.html` | ✅ |
 
@@ -223,6 +224,23 @@ Re-harvest for new Apple models follows the same shape as §2 (add specs → re-
 - **Watch-outs:** new `a`-models appear fast (Pixel 10a `GV0BP` shipped 2026-04 — caught as an
   `unknownModels` entry, added to specs). Two `Google` rows are smart speakers (Nest Mini / Home Mini),
   NOT phones — left as COMPUTER, out of scope.
+
+### OPPO (A-series / Reno / Find / older R)
+- **Codes:** global/SIM-free/Rakuten `CPH####` · au `OPG##` · SoftBank/Y!mobile `A###OP`. A coded
+  brand (unlike Xiaomi) — only a few old models (AX7) are code-less (handled by `nameConsumeRe`).
+- **Naming is GLUED** ("Reno5 A", "Reno10 Pro" — number stuck to "Reno"), confirmed official OPPO JP.
+  **KEEPS `5G`** as a distinguisher ("A5 5G" ≠ "A5 2020"), like Pixel — does NOT strip it.
+- **Two engine capabilities added with OPPO (now generic/reusable):** (1) storage in the NAME segment
+  before the code — "Reno3 A 6GB 128GB CPH2013 White" (step 4b pulls a trailing `{ram}GB {rom}GB` run
+  off the name); (2) the "…付属" bundled-accessory color strip — "Find N6 … OPPO AI Pen Kit付属".
+- **⚠️ BRAND-CASING GOTCHA (first hit by OPPO):** `trg_normalize_brand_product_models` title-cases the
+  brand on insert (`OPPO`→`Oppo`). All earlier brands were already title-case. So a fill-gaps whose
+  brand is all-caps **MUST** compare `lower(pm.brand)=lower(s.brand)` in the NOT-EXISTS guard — else a
+  re-run inserts a row the trigger normalizes into a `product_models_android_sku_uniq` collision. Any
+  future all-caps brand (ZTE, etc.) needs the same `lower()` guard.
+- **A77 trap:** the JP "OPPO A77" = Helio G35 **4G**, NOT the global "A77 5G"/Dimensity. Spec'd as JP.
+- **Legacy reconcile:** ~25 COMPUTER phone rows / ~110 items DEFERRED (mostly clean names + a few
+  dups). Out-of-scope legacy rows (R15 Pro / R17 Neo / A3 5G / A5x) left as-is.
 
 ### Xiaomi (Xiaomi-flagship / Redmi / POCO / Mi)
 - **Codes:** au `XIG##` (XIG01=Mi 10 Lite … XIG07=14T base, XIG06=14T Pro) · SoftBank `A###XM`

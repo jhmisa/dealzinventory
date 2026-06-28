@@ -5,6 +5,7 @@ import {
   GALAXY_CONFIG,
   parseAndroidListingPage,
   parseAndroidListingTitle,
+  OPPO_CONFIG,
   PIXEL_CONFIG,
   XIAOMI_CONFIG,
   XPERIA_CONFIG,
@@ -15,6 +16,7 @@ const xperia = (t: string) => parseAndroidListingTitle(t, XPERIA_CONFIG)
 const aquos = (t: string) => parseAndroidListingTitle(t, AQUOS_CONFIG)
 const pixel = (t: string) => parseAndroidListingTitle(t, PIXEL_CONFIG)
 const xiaomi = (t: string) => parseAndroidListingTitle(t, XIAOMI_CONFIG)
+const oppo = (t: string) => parseAndroidListingTitle(t, OPPO_CONFIG)
 
 Deno.test("galaxy: SM-..Q simfree, ROM in bracket, JA color", () => {
   const s = galaxy("Galaxy A57 5G SM-A576Q オーサムネイビー 【RAM8GB/ROM128GB/国内版 SIMフリー】")
@@ -700,6 +702,126 @@ Deno.test("xiaomi: page extraction pulls code-less + coded SKU cards", () => {
   assertEquals(skus.every((s) => s.brand === "Xiaomi"), true)
   assertEquals(skus.every((s) => s.color_en != null || s.color_ja != null), true)
   // dedupe key uniqueness within a page
+  const keys = new Set(
+    skus.map((s) => `${s.model_name}|${s.storage_gb}|${s.color_en ?? s.color_ja}|${s.carrier}`),
+  )
+  assertEquals(keys.size, skus.length)
+})
+
+// ---------------------------------------------------------------------------
+// OPPO (A-series / Reno / Find / older R / Reno A) — coded brand, JP grammar quirks
+// ---------------------------------------------------------------------------
+
+Deno.test("oppo: CPH code, simfree JA color", () => {
+  const s = oppo("OPPO A77 CPH2385 ブラック【国内版 SIMフリー】")
+  assertEquals(s?.brand, "OPPO")
+  assertEquals(s?.model_name, "A77")
+  assertEquals(s?.model_number, "CPH2385")
+  assertEquals(s?.color_ja, "ブラック")
+  assertEquals(s?.color_en, "Black")
+  assertEquals(s?.carrier, "SIM-Free")
+})
+
+Deno.test("oppo: au OPG code, 5G kept as distinguisher", () => {
+  const s = oppo("OPPO A5 5G OPG06 グリーン【au版 SIMフリー】")
+  assertEquals(s?.model_name, "A5 5G") // 5G NOT stripped (A5 5G ≠ A5 2020)
+  assertEquals(s?.model_number, "OPG06")
+  assertEquals(s?.color_en, "Green")
+  assertEquals(s?.carrier, "au")
+})
+
+Deno.test("oppo: A5 2020 keeps the year suffix", () => {
+  const s = oppo("OPPO A5 2020 CPH1943 Green【国内版 SIMフリー】")
+  assertEquals(s?.model_name, "A5 2020")
+  assertEquals(s?.model_number, "CPH1943")
+  assertEquals(s?.color_en, "Green")
+})
+
+Deno.test("oppo: A###OP SoftBank code, Reno10 Pro 5G", () => {
+  const s = oppo("OPPO Reno10 Pro 5G A302OP シルバーグレー【SoftBank版SIMフリー】")
+  assertEquals(s?.model_name, "Reno10 Pro 5G")
+  assertEquals(s?.model_number, "A302OP")
+  assertEquals(s?.carrier, "SoftBank")
+  assertEquals(s?.color_ja, "シルバーグレー")
+  assertEquals(s?.color_en, "Silver Gray") // Reno10 Pro verified color
+})
+
+Deno.test("oppo: storage in NAME segment before the code (Reno3 A)", () => {
+  const s = oppo("Oppo Reno3 A 6GB 128GB CPH2013 White【国内版 SIMフリー】")
+  assertEquals(s?.model_name, "Reno3 A")
+  assertEquals(s?.model_number, "CPH2013")
+  assertEquals(s?.storage_gb, 128) // from the name segment
+  assertEquals(s?.ram_gb, 6)
+  assertEquals(s?.color_en, "White")
+  assertEquals(s?.carrier, "SIM-Free")
+})
+
+Deno.test("oppo: storage in trailing bracket (Reno A)", () => {
+  const s = oppo("Oppo Reno A CPH1983 Black【6GB 64GB 国内版SIMフリー】")
+  assertEquals(s?.model_name, "Reno A")
+  assertEquals(s?.storage_gb, 64)
+  assertEquals(s?.ram_gb, 6)
+  assertEquals(s?.color_en, "Black")
+})
+
+Deno.test("oppo: 付属 accessory-bundle suffix stripped from color (Find N6)", () => {
+  const s = oppo("OPPO Find N6 5G Dual-SIM CPH2765 ブロッサムオレンジ OPPO AI Pen Kit付属 【RAM16GB/ROM512GB 国内版SIMフリー】")
+  assertEquals(s?.model_name, "Find N6 5G") // Dual-SIM stripped, 5G kept
+  assertEquals(s?.storage_gb, 512)
+  assertEquals(s?.ram_gb, 16)
+  assertEquals(s?.color_ja, "ブロッサムオレンジ") // bundle "OPPO AI Pen Kit付属" removed
+  assertEquals(s?.color_en, "Blossom Orange") // Find N6 verified color
+})
+
+Deno.test("oppo: ASCII [..] bracket with color+storage inside (R17 Pro)", () => {
+  const s = oppo("Oppo R17 Pro Dual-SIM CPH1877 [エメラルドグリーン 6GB 128GB 国内版　SIMフリー]")
+  assertEquals(s?.model_name, "R17 Pro")
+  assertEquals(s?.storage_gb, 128)
+  assertEquals(s?.ram_gb, 6)
+  assertEquals(s?.color_ja, "エメラルドグリーン")
+  assertEquals(s?.carrier, "SIM-Free")
+})
+
+Deno.test("oppo: code-less old model via nameConsumeRe (AX7)", () => {
+  const s = oppo("OPPO AX7 ブルー【国内版SIMフリー】")
+  assertEquals(s?.model_name, "AX7")
+  assertEquals(s?.model_number, null)
+  assertEquals(s?.color_en, "Blue")
+  assertEquals(s?.carrier, "SIM-Free")
+})
+
+Deno.test("oppo: leading unlock bracket + carrier word + Find X3 Pro, ASCII color", () => {
+  const s = oppo("【SIMロック解除済】au Oppo Find X3 Pro 5G OPG03 Gloss Black")
+  assertEquals(s?.model_name, "Find X3 Pro 5G")
+  assertEquals(s?.model_number, "OPG03")
+  assertEquals(s?.carrier, "au")
+  assertEquals(s?.is_unlocked, true)
+  assertEquals(s?.color_en, "Gloss Black")
+})
+
+Deno.test("oppo: Reno5 A Rakuten, Ice Blue verified color", () => {
+  const s = oppo("OPPO Reno5 A CPH2199 アイスブルー【楽天版 SIMフリー】")
+  assertEquals(s?.model_name, "Reno5 A")
+  assertEquals(s?.carrier, "Rakuten")
+  assertEquals(s?.color_en, "Ice Blue")
+})
+
+Deno.test("oppo: nav thumbnail / non-OPPO -> null", () => {
+  assertEquals(oppo("OPPO reno A画像"), null) // nav thumb (no bracket)
+  assertEquals(oppo("Galaxy S24 SM-S921Q ブラック"), null) // not OPPO
+})
+
+Deno.test("oppo: page extraction pulls coded + code-less SKU cards", () => {
+  const html = Deno.readTextFileSync(
+    new URL("./__fixtures__/iosys-oppo-p1.html", import.meta.url),
+  )
+  const titles = extractAndroidCardTitles(html, OPPO_CONFIG)
+  assertEquals(titles.length > 5, true)
+  assertEquals(titles.every((t) => !/シリーズ|の画像/.test(t)), true)
+  const skus = parseAndroidListingPage(html, OPPO_CONFIG)
+  assertEquals(skus.length > 5, true)
+  assertEquals(skus.every((s) => s.brand === "OPPO"), true)
+  assertEquals(skus.every((s) => s.color_en != null || s.color_ja != null), true)
   const keys = new Set(
     skus.map((s) => `${s.model_name}|${s.storage_gb}|${s.color_en ?? s.color_ja}|${s.carrier}`),
   )

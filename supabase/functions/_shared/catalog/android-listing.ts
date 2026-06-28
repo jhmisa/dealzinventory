@@ -153,6 +153,23 @@ export function parseAndroidListingTitle(
     return null
   }
 
+  // 4b. Storage/RAM can sit in the NAME segment, immediately before the code (OPPO
+  //     "Reno3 A 6GB 128GB CPH2013 White"). Pull a trailing "{ram}GB {rom}GB" (or lone "{n}GB") run
+  //     out of the name so it doesn't pollute the model name; keep it as a storage/RAM fallback.
+  let nameStorage: number | null = null
+  let nameRam: number | null = null
+  const nameSto = nameSeg.match(/\s+((?:\d+\s*GB\s+)*\d+\s*(?:GB|TB))\s*$/i)
+  if (nameSto && nameSto.index != null) {
+    const nums = [...nameSto[1].matchAll(/(\d+)\s*(GB|TB)/gi)]
+      .map((m) => toStorageGb(m[1], m[2]))
+      .filter((n): n is number => n != null)
+    if (nums.length) {
+      nameStorage = Math.max(...nums)
+      if (nums.length >= 2) nameRam = Math.min(...nums)
+      nameSeg = nameSeg.slice(0, nameSto.index).trim()
+    }
+  }
+
   // 5. Validate the name segment actually names this brand's device.
   if (!config.modelNameRe.test(nameSeg)) return null
   const model_name = config.canonicalModelName(nameSeg)
@@ -217,12 +234,19 @@ export function parseAndroidListingTitle(
     tail = colorFromNote(inner)
   }
 
+  // 8c. Fall back to storage/RAM pulled from the name segment (step 4b) if still unresolved.
+  if (storage_gb == null) storage_gb = nameStorage
+  if (ram_gb == null) ram_gb = nameRam
+
   // 9. Color: prefer the text after the code; strip any trailing full-SKU / code-like token
   //    (ASCII alnum with a digit, e.g. "ブラック SCV46SKV") and the corporate-channel marketing
   //    marker 法人モデル (business SKU; brand-agnostic JP retail noise, e.g. "ブラック 法人モデル").
   //    Else recover the color from inside the note bracket (the "everything in bracket" 楽天版 grammar).
   let colorText = tail
     .replace(/\s*法人モデル\s*$/, "")
+    // Drop a Japanese "…付属" bundled-accessory suffix, e.g. "ブロッサムオレンジ OPPO AI Pen Kit付属"
+    // (OPPO Find N6). 付属 = "included"; never part of a color — brand-agnostic JP retail noise.
+    .replace(/\s+\S.*付属\s*$/, "")
     // Drop an accessory-bundle suffix joined by "+", e.g. "ブラック + Photography Kit" (Xiaomi 14
     // Ultra Photography Kit). A "+" never appears inside a real color, so this is safe brand-wide.
     .replace(/\s*\+\s*\S.*$/, "")
@@ -709,4 +733,81 @@ export const PIXEL_CONFIG: AndroidBrandConfig = {
       .replace(/\s+/g, " ")
       .trim(),
   colorJaToEn: pixelColorJaToEn,
+}
+
+// ---------------------------------------------------------------------------
+// OPPO config (OPPO A-series / Reno / Find / older R / Reno A)
+// ---------------------------------------------------------------------------
+
+// OPPO is a CODED brand (unlike Xiaomi): almost every card carries a model code — CPH#### (global
+// SIM-free / Rakuten), OPG## (au), A###OP (SoftBank / Y!mobile). A few old models (AX7) are code-
+// less, handled by nameConsumeRe. JP-specific grammars handled by the generic engine: storage in
+// the name segment before the code ("Reno3 A 6GB 128GB CPH2013 White", step 4b) and the "…付属"
+// accessory-bundle suffix ("Find N6 … OPPO AI Pen Kit付属", step 9). Colors come in katakana OR
+// English; verified research pass 2026-06-28, unmapped JA colors stay null (flagged, never guessed).
+export const OPPO_COLORS_JA_EN: Record<string, string> = {
+  // Generic / basic (verified-direct transliterations)
+  "ブラック": "Black",
+  "ホワイト": "White",
+  "シルバー": "Silver",
+  "グレー": "Gray",
+  "グレイ": "Gray",
+  "ブルー": "Blue",
+  "グリーン": "Green",
+  "レッド": "Red",
+  "ピンク": "Pink",
+  "パープル": "Purple",
+  "ゴールド": "Gold",
+  "オレンジ": "Orange",
+  // OPPO official EN colorways (verified research pass 2026-06-28 vs oppo.com/jp + GSMArena).
+  "アイスブルー": "Ice Blue", // Reno5 A / Reno13 A
+  "シルバーブラック": "Silver Black", // Reno5 A
+  "ナイトブラック": "Night Black", // Reno9 A
+  "ムーンホワイト": "Moon White", // Reno9 A
+  "ドリームブルー": "Dream Blue", // Reno7 A
+  "スターリーブラック": "Starry Black", // Reno7 A
+  "ダークグリーン": "Dark Green", // Reno11 A
+  "コーラルパープル": "Coral Purple", // Reno11 A
+  "グローグリーン": "Glow Green", // A79 5G
+  "ブロッサムオレンジ": "Blossom Orange", // Find N6
+  "スペースブラック": "Space Black", // Find X9
+  "チタニウムグレー": "Titanium Gray", // Find X9 (OPPO uses "Titanium", unlike Xiaomi's "Titan")
+  "グロッシーパープル": "Glossy Purple", // Reno10 Pro
+  "シルバーグレー": "Silver Gray", // Reno10 Pro
+  "ファンタスティックパープル": "Fantastic Purple", // A54 5G
+  "エメラルドグリーン": "Emerald Green", // R17 Pro
+  // Additional common JP OPPO colors (research, high confidence)
+  "ミステリーブラック": "Mystery Black", // A79 5G
+  "ルミナスネイビー": "Luminous Navy", // Reno13 A
+  "チャコールグレー": "Charcoal Gray", // Reno13 A
+  "ステラーチタニウム": "Stellar Titanium", // Find N6 (ー prolonged-mark spelling)
+  "ステラ―チタニウム": "Stellar Titanium", // Find N6 (― horizontal-bar spelling iosys actually uses)
+}
+
+export function oppoColorJaToEn(ja: string | null): string | null {
+  if (!ja) return null
+  return OPPO_COLORS_JA_EN[ja] ?? null
+}
+
+export const OPPO_CONFIG: AndroidBrandConfig = {
+  brand: "OPPO",
+  brandPrefixes: ["OPPO", "Oppo"],
+  // After the OPPO prefix is peeled the name starts with the line token: A##/AX##/Reno/Find/R##.
+  modelNameRe: /^(A\s*\d|AX\d|Reno|Find\b|R\d{2})/i,
+  // OPPO JP codes: global/SIM-free/Rakuten CPH####; au OPG##; SoftBank/Y!mobile A###OP.
+  modelCodeRe: /\b(CPH\d+|OPG\d+|A\d{3}OP)\b/,
+  // A few old code-less models (e.g. "OPPO AX7 ブルー【国内版SIMフリー】"). Consume the line token +
+  // following model tokens (digits / tier words / the JP "A" suffix), stop at the color. The leading
+  // "OPPO " prefix is optional so this also matches the raw title in the card extractor (which tests
+  // before the prefix is peeled).
+  nameConsumeRe:
+    /^(?:OPPO\s+|Oppo\s+)?(?:A\s*\d[A-Za-z0-9]*|AX\d+|Reno[A-Za-z0-9]*|Find\s*[A-Za-z0-9]+|R\d{2}[A-Za-z0-9]*)(?:\s*(?:[A-Za-z]*\d[A-Za-z0-9]*|Pro|Plus|Lite|Neo|[45]G|A|Dual-SIM|Single-SIM|\d{4}))*/i,
+  canonicalModelName: (seg) =>
+    seg
+      .replace(/^(OPPO|Oppo)\s+/i, "") // belt-and-suspenders if the prefix peel missed it
+      // KEEP 5G — for OPPO it's a model distinguisher ("A5 5G" ≠ "A5 2020"), never spurious noise.
+      .replace(/\b(Single|Dual)[- ]?SIM\b/gi, "")
+      .replace(/\s+/g, " ")
+      .trim(),
+  colorJaToEn: oppoColorJaToEn,
 }

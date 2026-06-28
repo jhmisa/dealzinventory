@@ -19,6 +19,7 @@ import {
   type AndroidListingSku,
   AQUOS_CONFIG,
   GALAXY_CONFIG,
+  OPPO_CONFIG,
   parseAndroidListingPage,
   PIXEL_CONFIG,
   XIAOMI_CONFIG,
@@ -29,6 +30,7 @@ import { xperiaSpec } from "./xperia-specs.ts"
 import { aquosSpec } from "./aquos-specs.ts"
 import { pixelSpec } from "./pixel-specs.ts"
 import { xiaomiSpec } from "./xiaomi-specs.ts"
+import { oppoSpec } from "./oppo-specs.ts"
 
 export interface CarrierSection {
   path: string // url segment, e.g. "simfree" / "wifi"
@@ -255,6 +257,12 @@ export const XIAOMI_CATEGORY: HarvestCategory = androidCategory(
   "items/smartphone/xiaomi",
   XIAOMI_CONFIG,
   xiaomiSpec,
+)
+
+export const OPPO_CATEGORY: HarvestCategory = androidCategory(
+  "items/smartphone/oppo",
+  OPPO_CONFIG,
+  oppoSpec,
 )
 
 export interface HarvestOptions {
