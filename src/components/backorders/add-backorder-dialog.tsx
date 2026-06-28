@@ -91,6 +91,7 @@ const defaultValues: BackorderFormValues = {
   condition_grade: 'A',
   selling_price: 0,
   color: '',
+  color_ja: '',
   storage_gb: undefined,
   ram_gb: undefined,
   cpu: '',
@@ -174,8 +175,10 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
         return
       }
 
-      // Prefill the RHF fields from NormalizedSupplierProduct.
+      // Prefill the RHF fields from NormalizedSupplierProduct. color is canonical English
+      // (inventory + customer-facing); color_ja keeps the Japanese token for the Kaitori side.
       form.setValue('color', product.color ?? '')
+      form.setValue('color_ja', product.colorJa ?? '')
       form.setValue('storage_gb', product.storageGb ?? undefined)
       form.setValue('ram_gb', product.ramGb ?? undefined)
       if (product.conditionGrade) {
@@ -265,6 +268,17 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
     .join(' ')
     .trim()
 
+  // Live pricing breakdown for the summary panel: Selling = Supplier + Markup. Computed each
+  // render from RHF's watch(). `overridden` flags when the (editable) selling price no longer
+  // equals supplier + markup, so the panel can show the auto value for reference.
+  const watchedSelling = form.watch('selling_price')
+  const pricingSupplier = Number(watchedSupplierPrice) || 0
+  const pricingMarkup = Number(watchedMarkup) || 0
+  const pricingComputed = pricingSupplier + pricingMarkup
+  const pricingSelling = Number(watchedSelling) || 0
+  const pricingOverridden = pricingSelling !== pricingComputed
+  const yen = (n: number) => `¥${n.toLocaleString('en-US')}`
+
   async function handleSearchWeb() {
     if (!searchQuery) {
       toast.error('Select a product or fetch a listing first')
@@ -309,6 +323,7 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
         condition_grade: values.condition_grade,
         selling_price: values.selling_price,
         color: values.color?.trim() || null,
+        color_ja: values.color_ja?.trim() || null,
         storage_gb: values.storage_gb ?? null,
         ram_gb: values.ram_gb ?? null,
         cpu: values.cpu?.trim() || null,
@@ -479,15 +494,30 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
                 )}
               />
 
-              {/* Color */}
+              {/* Color (English) — shown in inventory + customer-facing surfaces */}
               <FormField
                 control={form.control}
                 name="color"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Color</FormLabel>
+                    <FormLabel>Color (English)</FormLabel>
                     <FormControl>
-                      <Input {...field} value={field.value ?? ''} />
+                      <Input {...field} value={field.value ?? ''} placeholder="e.g. Desert Titanium" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Color (Japanese) — kept for the Kaitori side */}
+              <FormField
+                control={form.control}
+                name="color_ja"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Color (日本語)</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value ?? ''} placeholder="例: デザートチタニウム" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -588,6 +618,35 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
                   </FormItem>
                 )}
               />
+
+              {/* Pricing summary — visualizes Selling = Supplier + Markup with live values */}
+              <div className="col-span-2 rounded-lg border bg-muted/40 p-4">
+                <div className="flex flex-wrap items-end justify-between gap-4">
+                  <div className="flex items-end gap-3 text-sm tabular-nums">
+                    <div className="flex flex-col">
+                      <span className="text-xs font-medium text-muted-foreground">Supplier</span>
+                      <span className="font-semibold">{yen(pricingSupplier)}</span>
+                    </div>
+                    <span className="pb-0.5 text-muted-foreground">+</span>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-medium text-muted-foreground">Markup</span>
+                      <span className="font-semibold">{yen(pricingMarkup)}</span>
+                    </div>
+                    <span className="pb-0.5 text-muted-foreground">=</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-medium text-muted-foreground">Selling Price</span>
+                    <span className="text-2xl font-bold leading-none tabular-nums">
+                      {yen(pricingSelling)}
+                    </span>
+                  </div>
+                </div>
+                {pricingOverridden && (
+                  <p className="mt-2 text-xs text-amber-600">
+                    Manually adjusted — auto = {yen(pricingComputed)} (supplier + markup).
+                  </p>
+                )}
+              </div>
 
               {/* Supplier stock */}
               <FormField

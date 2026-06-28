@@ -4,7 +4,8 @@ export interface NormalizedSupplierProduct {
   sourceUrl: string
   brandText: string | null
   modelText: string | null
-  color: string | null
+  color: string | null // canonical English (for inventory + customer-facing)
+  colorJa: string | null // original Japanese token (for the Kaitori side)
   storageGb: number | null
   ramGb: number | null
   rankText: string | null // supplier-native rank (e.g. "新品", "Aランク")

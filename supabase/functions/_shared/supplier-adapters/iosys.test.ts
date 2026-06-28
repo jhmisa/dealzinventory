@@ -28,7 +28,8 @@ Deno.test("iosys: parses model, price, stock, rank->grade, gallery", () => {
   assertEquals(p.sourceUrl, url)
   assertEquals(p.brandText, "Apple")
   assertEquals(p.modelText, "iPhone15 Plus A3093 (MU093VC/A) 128GB ピンク")
-  assertEquals(p.color, "ピンク")
+  assertEquals(p.color, "Pink") // canonical English derived from the JA token
+  assertEquals(p.colorJa, "ピンク") // original Japanese kept for the Kaitori side
   assertEquals(p.storageGb, 128)
   // iPhone pages do not surface RAM -> null
   assertEquals(p.ramGb, null)

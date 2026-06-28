@@ -495,6 +495,7 @@ export type Database = {
           available: number | null
           backorder_code: string
           color: string | null
+          color_ja: string | null
           condition_grade: Database["public"]["Enums"]["condition_grade"]
           condition_notes: string | null
           cpu: string | null
@@ -524,6 +525,7 @@ export type Database = {
           available?: number | null
           backorder_code: string
           color?: string | null
+          color_ja?: string | null
           condition_grade: Database["public"]["Enums"]["condition_grade"]
           condition_notes?: string | null
           cpu?: string | null
@@ -553,6 +555,7 @@ export type Database = {
           available?: number | null
           backorder_code?: string
           color?: string | null
+          color_ja?: string | null
           condition_grade?: Database["public"]["Enums"]["condition_grade"]
           condition_notes?: string | null
           cpu?: string | null

@@ -13,7 +13,9 @@ export const backorderSchema = z
     selling_price: z.coerce
       .number({ invalid_type_error: 'Selling price is required' })
       .positive('Selling price must be greater than 0'),
+    // color = canonical English (inventory + customer-facing); color_ja = Japanese (Kaitori side).
     color: z.string().trim().optional(),
+    color_ja: z.string().trim().optional(),
     storage_gb: z.coerce.number().int().nonnegative().optional(),
     ram_gb: z.coerce.number().int().nonnegative().optional(),
     cpu: z.string().trim().optional(),

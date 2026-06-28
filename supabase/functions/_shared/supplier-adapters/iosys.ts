@@ -1,4 +1,5 @@
 import type { NormalizedSupplierProduct, SupplierAdapter } from "./types.ts"
+import { colorJaToEn } from "../catalog/apple-colors.ts"
 
 const IMAGE_HOST = "https://d27ea4kkb8flj9.cloudfront.net"
 
@@ -163,11 +164,15 @@ function parse(html: string, input: string): NormalizedSupplierProduct {
   const brandText = ldBrand ? decodeEntities(ldBrand) : null
 
   // Color: from the title (storage token followed by a color word before any 【...】 bracket).
-  let color: string | null = null
+  // iosys lists the JAPANESE color token; keep it as colorJa and derive canonical English for
+  // inventory + customer-facing use (the Kaitori side shows the Japanese). Unknown tokens fall
+  // back to the raw Japanese so the field is never empty (staff can correct it).
+  let colorJa: string | null = null
   if (title) {
     const cm = title.match(/\d+\s*(?:GB|TB)\s+([^【|]+)/i)
-    if (cm) color = decodeEntities(cm[1].trim())
+    if (cm) colorJa = decodeEntities(cm[1].trim())
   }
+  const color = colorJaToEn(colorJa) ?? colorJa
 
   // Storage: from JSON-LD spec description ("ストレージ:128GB"), fall back to title.
   const storageGb =
@@ -229,6 +234,7 @@ function parse(html: string, input: string): NormalizedSupplierProduct {
     brandText,
     modelText,
     color,
+    colorJa,
     storageGb,
     ramGb,
     rankText,
