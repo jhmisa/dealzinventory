@@ -13,8 +13,10 @@ export interface ProductModelFilters {
 export interface ProductModelMatchInput {
   brand?: string | null
   modelText?: string | null
+  modelNumber?: string | null // carrier/region code for Android (SO-52C, SC-54D, ...)
   storageGb?: number | null
   color?: string | null
+  colorJa?: string | null
 }
 
 // Extract an Apple part-number like "MYWJ3J/A" from the model text. These are the canonical,
@@ -88,6 +90,34 @@ export async function findMatchingProductModel(
     if (data && data.length > 0) return toHero(data[0])
   }
 
+  // (a2) Android model_number exact match (SO-52C, SC-54D, ...). Disambiguate by color/storage.
+  const modelNo = (input.modelNumber ?? "").trim()
+  if (modelNo) {
+    const { data, error } = await supabase
+      .from('product_models')
+      .select(select)
+      .eq('model_number', modelNo)
+      .eq('status', 'ACTIVE')
+    if (error) throw error
+    const rows = data ?? []
+    if (rows.length > 0) {
+      const wantStorage = normalizeStorageGb(input.storageGb)
+      const wantColorEn = (input.color ?? '').trim().toLowerCase()
+      const wantColorJa = (input.colorJa ?? '').trim()
+      const storageMatches = wantStorage == null
+        ? rows
+        : rows.filter((r) => normalizeStorageGb((r as { storage_gb: unknown }).storage_gb) === wantStorage)
+      const pool = storageMatches.length > 0 ? storageMatches : rows
+      const byColor = pool.find((r) => {
+        const en = ((r as { color: string | null }).color ?? '').trim().toLowerCase()
+        const ja = ((r as { color_ja: string | null }).color_ja ?? '').trim()
+        return (wantColorEn && en === wantColorEn) || (wantColorJa && ja === wantColorJa)
+      })
+      const chosen = byColor ?? pool[0]
+      if (chosen) return toHero(chosen as Record<string, unknown>)
+    }
+  }
+
   // (b) Fallback: query just this model's SKUs, then disambiguate by storage + color in JS.
   const cleanName = cleanModelName(modelText)
   if (!cleanName) return null
@@ -109,8 +139,13 @@ export async function findMatchingProductModel(
     : rows.filter((r) => normalizeStorageGb((r as { storage_gb: unknown }).storage_gb) === wantStorage)
 
   // Prefer an exact storage + color hit; fall back to storage-only.
-  const exact = wantColor
-    ? storageMatches.find((r) => ((r as { color: string | null }).color ?? '').trim().toLowerCase() === wantColor)
+  const wantColorJa = (input.colorJa ?? '').trim()
+  const exact = (wantColor || wantColorJa)
+    ? storageMatches.find((r) => {
+        const en = ((r as { color: string | null }).color ?? '').trim().toLowerCase()
+        const ja = ((r as { color_ja: string | null }).color_ja ?? '').trim()
+        return (wantColor && en === wantColor) || (wantColorJa && ja === wantColorJa)
+      })
     : undefined
   const chosen = exact ?? storageMatches[0] ?? null
   return chosen ? toHero(chosen as Record<string, unknown>) : null
