@@ -19,6 +19,8 @@ export const queryKeys = {
     details: () => [...queryKeys.productModels.all, 'detail'] as const,
     detail: (id: string) => [...queryKeys.productModels.details(), id] as const,
     media: (id: string) => [...queryKeys.productModels.all, 'media', id] as const,
+    search: (query: string, categoryId?: string) =>
+      [...queryKeys.productModels.all, 'search', query, categoryId ?? null] as const,
   },
   suppliers: {
     all: ['suppliers'] as const,

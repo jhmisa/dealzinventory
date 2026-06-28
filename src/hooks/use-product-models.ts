@@ -26,6 +26,15 @@ export function useProductModelsWithHeroImage(search?: string, categoryId?: stri
   })
 }
 
+export function useProductModelSearch(query: string, categoryId?: string) {
+  return useQuery({
+    queryKey: queryKeys.productModels.search(query, categoryId),
+    queryFn: () => productModelsService.searchProductModels(query, categoryId),
+    enabled: query.trim().length > 0,
+    staleTime: 30_000,
+  })
+}
+
 export function useProductModel(id: string) {
   return useQuery({
     queryKey: queryKeys.productModels.detail(id),

@@ -234,6 +234,30 @@ export async function getProductModelsWithHeroImage(search?: string, categoryId?
   })
 }
 
+// Server-side fuzzy search over product_models via the search_product_models RPC. Returns
+// INDIVIDUAL rows shaped as ProductModelWithHeroImage (the picker renders these directly),
+// bypassing the 1000-row PostgREST cap and tolerating glued/hyphen/JP-color query forms.
+export async function searchProductModels(
+  query: string,
+  categoryId?: string,
+  limit = 50,
+): Promise<ProductModelWithHeroImage[]> {
+  const { data, error } = await supabase.rpc('search_product_models', {
+    p_search: query,
+    p_category_id: categoryId ?? undefined,
+    p_limit: limit,
+  })
+  if (error) throw error
+  return (data ?? []).map((r) => ({
+    ...(r as object),
+    hero_image_url: (r as { hero_image_url: string | null }).hero_image_url ?? null,
+    media_count: Number((r as { media_count: number }).media_count ?? 0),
+    categories: (r as { category_name: string | null }).category_name
+      ? { name: (r as { category_name: string }).category_name }
+      : null,
+  })) as ProductModelWithHeroImage[]
+}
+
 export async function batchMatchProducts(
   descriptions: string[]
 ): Promise<Map<string, string | null>> {
