@@ -35,7 +35,7 @@ import { useItemListColumnSettings } from '@/hooks/use-settings'
 import { usePersistedFilters } from '@/hooks/use-persisted-filters'
 import { useDebounce } from '@/hooks/use-debounce'
 import { ITEM_STATUSES, CONDITION_GRADES } from '@/lib/constants'
-import { formatDate, formatPrice, cn, buildShortDescription, formatCustomerName, getItemDescription, withBackorderIdentifier, getItemTotalCost, type ItemCostRow } from '@/lib/utils'
+import { formatDate, formatPrice, cn, buildShortDescription, formatCustomerName, getItemDescription, withBackorderIdentifier, getItemTotalCost, buildItemSearchHaystack, type ItemCostRow } from '@/lib/utils'
 import { toast } from 'sonner'
 import { printItemLabel } from '@/components/items/label-print'
 import { resolveSoldTo, resolveReservedBy, reservedByMessageLink, type ReservedByInfo } from '@/lib/item-sale'
@@ -629,9 +629,13 @@ export default function ItemListPage() {
     enabled: showBackorders,
   })
 
-  // Fetch items filtered by active status tab
+  // Fetch items filtered by active status tab. Plain-text search is applied CLIENT-side
+  // (fuzzy, over the full spec haystack) in `filteredItems` below, so we only pass the
+  // search server-side for G-code lookups (which resolve to specific item IDs and aren't
+  // in the text haystack). For plain text we load the whole tab and filter in-memory.
   const { data: allItems, isLoading } = useItems({
-    ...baseFilters,
+    search: isGCodeSearch ? debouncedSearch || undefined : undefined,
+    grade: baseFilters.grade,
     status: statusTab !== 'all' && statusTab !== 'LIVE_SELLING' ? statusTab : undefined,
     isLiveSelling: statusTab === 'LIVE_SELLING' ? true : undefined,
   }, { enabled: !skipItemsFetch })
@@ -681,6 +685,9 @@ export default function ItemListPage() {
 
   // Client-side filtering for filters not passed to the server
   const filteredItems = items.filter(item => {
+    // Main search box: separator-insensitive fuzzy over the full spec haystack (@/lib/search).
+    // Skipped for G-code searches, which are already resolved server-side in useItems.
+    if (debouncedSearch && !isGCodeSearch && !searchMatches(buildItemSearchHaystack(item), debouncedSearch)) return false
     if (noSellFilter === 'yes' && item.selling_price != null) return false
     if (categoryFilter && categoryFilter !== 'all' && item.product_models?.categories?.name !== categoryFilter) return false
     if (brandFilter && brandFilter !== 'all' && (item.brand ?? item.product_models?.brand) !== brandFilter) return false

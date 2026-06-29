@@ -4,7 +4,6 @@ import * as ordersService from '@/services/orders'
 import type { OrderInsert } from '@/lib/types'
 
 interface OrderFilters {
-  search?: string
   status?: string
   source?: string
   customerId?: string

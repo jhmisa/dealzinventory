@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Check, ChevronsUpDown, Package, ShoppingBag, Puzzle } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { searchMatches } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
+import { fetchAllPages } from '@/lib/fetch-all-pages'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -39,35 +41,39 @@ interface ItemSearchInputProps {
   onSelect: (result: SearchResult) => void
 }
 
-function useUnifiedSearch(search: string) {
-  return useQuery({
-    queryKey: ['social-media-search', search],
-    queryFn: async () => {
-      const term = search.trim()
-      const results: SearchResult[] = []
+// Fetch the FULL candidate pool ONCE (keyed without the search term) via fetchAllPages —
+// so the client-side separator-insensitive filter (@/lib/search) searches the entire
+// inventory (older units included), not just a recent window. Preserves prior behavior
+// (all item statuses + browse when empty). The displayed result count is capped in the
+// component to keep the list light; the pool itself is complete.
+const DISPLAY_LIMIT = 50
 
-      // Search items — items have brand/model_name directly on the row
+// Internal pool entry carries a pre-built search haystack used for client-side matching.
+type PoolResult = SearchResult & { haystack: string }
+
+function useUnifiedSearch() {
+  return useQuery({
+    queryKey: ['social-media-search-pool'],
+    queryFn: async () => {
+      const results: PoolResult[] = []
+
+      // Items — brand/model can live on the item row OR product_models; include both.
       {
-        let query = supabase
+        const buildItemsQuery = () => supabase
           .from('items')
           .select(`
             id, item_code, product_id, condition_grade, brand, model_name,
-            product_models(short_description, product_media(file_url, sort_order)),
+            product_models(brand, model_name, color, short_description, product_media(file_url, sort_order)),
             item_media(file_url, thumbnail_url, sort_order)
           `)
           .order('item_code', { ascending: false })
-          .limit(10)
-
-        if (term) {
-          query = query.or(
-            `item_code.ilike.%${term}%,brand.ilike.%${term}%,model_name.ilike.%${term}%`
-          )
-        }
-
-        const { data: items } = await query
-        if (items) {
-          for (const item of items) {
+        type ItemRow = NonNullable<Awaited<ReturnType<typeof buildItemsQuery>>['data']>[number]
+        const items = await fetchAllPages<ItemRow>((from, to) => buildItemsQuery().range(from, to))
+        for (const item of items) {
             const pm = item.product_models as unknown as {
+              brand: string | null
+              model_name: string | null
+              color: string | null
               short_description: string | null
               product_media: { file_url: string; sort_order: number }[]
             } | null
@@ -81,7 +87,9 @@ function useUnifiedSearch(search: string) {
               ?? pm?.product_media?.[0]?.file_url
               ?? null
 
-            const label = [item.brand, item.model_name].filter(Boolean).join(' ') || 'Unknown'
+            const brand = item.brand ?? pm?.brand
+            const modelName = item.model_name ?? pm?.model_name
+            const label = [brand, modelName].filter(Boolean).join(' ') || 'Unknown'
 
             results.push({
               id: item.id,
@@ -93,29 +101,21 @@ function useUnifiedSearch(search: string) {
               grade: item.condition_grade,
               product_id: item.product_id,
               accessory_id: null,
+              haystack: [item.item_code, brand, modelName, pm?.color, pm?.short_description].filter(Boolean).join(' '),
             })
-          }
         }
       }
 
-      // Search accessories — accessory_code, name, or brand
+      // Accessories — page the full active set for client-side matching
       {
-        let query = supabase
+        const buildAccQuery = () => supabase
           .from('accessories')
           .select('id, accessory_code, name, brand, accessory_media(file_url, sort_order)')
           .eq('active', true)
           .order('accessory_code', { ascending: false })
-          .limit(10)
-
-        if (term) {
-          query = query.or(
-            `accessory_code.ilike.%${term}%,name.ilike.%${term}%,brand.ilike.%${term}%`
-          )
-        }
-
-        const { data: accessories } = await query
-        if (accessories) {
-          for (const acc of accessories) {
+        type AccRow = NonNullable<Awaited<ReturnType<typeof buildAccQuery>>['data']>[number]
+        const accessories = await fetchAllPages<AccRow>((from, to) => buildAccQuery().range(from, to))
+        for (const acc of accessories) {
             const media = acc.accessory_media as unknown as { file_url: string; sort_order: number }[] | null
             results.push({
               id: acc.id,
@@ -127,25 +127,14 @@ function useUnifiedSearch(search: string) {
               grade: null,
               product_id: null,
               accessory_id: acc.id,
+              haystack: [acc.accessory_code, acc.name, acc.brand].filter(Boolean).join(' '),
             })
-          }
         }
       }
 
-      // Search sell groups — by code or product description
+      // Sell groups — small table, pull the full active set for client-side matching
       {
-        // Find matching product IDs for description search
-        let matchingProductIds: string[] = []
-        if (term && !/^[PGA]/i.test(term)) {
-          const { data: matchingProducts } = await supabase
-            .from('product_models')
-            .select('id')
-            .or(`brand.ilike.%${term}%,model_name.ilike.%${term}%`)
-            .limit(50)
-          matchingProductIds = (matchingProducts ?? []).map((p) => p.id)
-        }
-
-        let query = supabase
+        const query = supabase
           .from('sell_groups')
           .select(`
             id, sell_group_code, product_id, condition_grade, discount_amount,
@@ -154,15 +143,7 @@ function useUnifiedSearch(search: string) {
           `)
           .eq('active', true)
           .order('sell_group_code', { ascending: false })
-          .limit(10)
-
-        if (term) {
-          if (matchingProductIds.length > 0) {
-            query = query.or(`sell_group_code.ilike.%${term}%,product_id.in.(${matchingProductIds.join(',')})`)
-          } else {
-            query = query.ilike('sell_group_code', `%${term}%`)
-          }
-        }
+          .limit(1000)
 
         const { data: sellGroups } = await query
         if (sellGroups) {
@@ -185,6 +166,7 @@ function useUnifiedSearch(search: string) {
               grade: sg.condition_grade,
               product_id: sg.product_id,
               accessory_id: null,
+              haystack: [sg.sell_group_code, pm?.brand, pm?.model_name, pm?.short_description].filter(Boolean).join(' '),
             })
           }
         }
@@ -205,7 +187,17 @@ const typeLabels: Record<SearchResultType, string> = {
 export function ItemSearchInput({ value, selectedLabel, onSelect }: ItemSearchInputProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
-  const { data: results = [] } = useUnifiedSearch(search)
+  const { data: pool = [] } = useUnifiedSearch()
+
+  // Separator-insensitive fuzzy filter over the complete cached pool; cap the displayed
+  // rows PER TYPE so the list stays light and every type stays represented (empty query →
+  // browse the most recent DISPLAY_LIMIT of each).
+  const results = useMemo(() => {
+    const term = search.trim()
+    const matched = term ? pool.filter((r) => searchMatches(r.haystack, term)) : pool
+    const perType: Record<SearchResultType, number> = { item: 0, accessory: 0, sell_group: 0 }
+    return matched.filter((r) => (perType[r.type] < DISPLAY_LIMIT ? (perType[r.type]++, true) : false))
+  }, [pool, search])
 
   const displayLabel = selectedLabel ?? 'Search by code or description...'
 

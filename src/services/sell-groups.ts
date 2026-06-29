@@ -449,31 +449,34 @@ export async function getSellGroupsForList(filters: SellGroupListFilters = {}) {
 
 export type SellGroupListItem = Awaited<ReturnType<typeof getSellGroupsForList>>[number]
 
-// Count sell groups (optionally by status)
+// Count sell groups (optionally by status). Badges must reflect the SAME fuzzy search
+// the list (getSellGroupsForList) uses, so we match client-side over the identical
+// haystack (G-code + product identity) instead of a server-side `sell_group_code ILIKE`.
+// sell_groups is tiny (~30 rows), so paging the full table per search is negligible.
 export async function getSellGroupStatusCounts(filters: { search?: string; grade?: string } = {}) {
-  // Total count
-  let totalQuery = supabase
-    .from('sell_groups')
-    .select('id', { count: 'exact', head: true })
-  if (filters.search) totalQuery = totalQuery.ilike('sell_group_code', `%${filters.search}%`)
-  if (filters.grade) totalQuery = totalQuery.eq('condition_grade', filters.grade)
+  const buildQuery = () => {
+    let query = supabase
+      .from('sell_groups')
+      .select('id, active, sell_group_code, product_models(brand, model_name, color, short_description)')
+      .order('id', { ascending: true })
+    if (filters.grade) query = query.eq('condition_grade', filters.grade)
+    return query
+  }
 
-  // Available (active) count
-  let availableQuery = supabase
-    .from('sell_groups')
-    .select('id', { count: 'exact', head: true })
-    .eq('active', true)
-  if (filters.search) availableQuery = availableQuery.ilike('sell_group_code', `%${filters.search}%`)
-  if (filters.grade) availableQuery = availableQuery.eq('condition_grade', filters.grade)
+  type Row = NonNullable<Awaited<ReturnType<typeof buildQuery>>['data']>[number]
+  const rows = await fetchAllPages<Row>((from, to) => buildQuery().range(from, to))
 
-  const [totalResult, availableResult] = await Promise.all([totalQuery, availableQuery])
-
-  if (totalResult.error) throw totalResult.error
-  if (availableResult.error) throw availableResult.error
+  const matched = filters.search
+    ? rows.filter((sg) => {
+        const pm = sg.product_models as { brand: string | null; model_name: string | null; color: string | null; short_description: string | null } | null
+        const hay = [sg.sell_group_code, pm?.brand, pm?.model_name, pm?.color, pm?.short_description].filter(Boolean).join(' ')
+        return searchMatches(hay, filters.search!)
+      })
+    : rows
 
   return {
-    all: totalResult.count ?? 0,
-    available: availableResult.count ?? 0,
+    all: matched.length,
+    available: matched.filter((sg) => sg.active).length,
   }
 }
 

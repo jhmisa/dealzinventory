@@ -194,6 +194,67 @@ export function getItemDescription(
 }
 
 /**
+ * Canonical, separator-insensitive search haystack for an inventory item.
+ *
+ * Built from RAW spec fields (item-level, falling back to product_models) plus
+ * the supplier/condition free text. This is the SINGLE source of truth shared by
+ * BOTH the admin Items list filter AND the status-tab count computation, so a
+ * tab badge's number always equals the number of rows the same search shows.
+ *
+ * The fuzzy matcher (`searchMatches` in @/lib/search) strips separators and does
+ * token-AND matching, so concatenating raw fields covers the same tokens the
+ * formatted description would — we additionally append `<n>gb` variants so a
+ * query like "128gb" matches the storage/RAM specs.
+ */
+export interface ItemSearchFields {
+  item_code?: string | null
+  brand?: string | null
+  model_name?: string | null
+  color?: string | null
+  cpu?: string | null
+  ram_gb?: number | null
+  storage_gb?: number | null
+  screen_size?: number | null
+  os_family?: string | null
+  supplier_description?: string | null
+  condition_notes?: string | null
+  product_models?: {
+    brand?: string | null
+    model_name?: string | null
+    color?: string | null
+    cpu?: string | null
+    ram_gb?: number | null
+    storage_gb?: number | null
+    screen_size?: number | null
+    os_family?: string | null
+    short_description?: string | null
+  } | null
+}
+
+export function buildItemSearchHaystack(item: ItemSearchFields): string {
+  const pm = item.product_models
+  const storage = item.storage_gb ?? pm?.storage_gb ?? null
+  const ram = item.ram_gb ?? pm?.ram_gb ?? null
+  const parts: (string | number | null | undefined)[] = [
+    item.item_code,
+    item.brand ?? pm?.brand,
+    item.model_name ?? pm?.model_name,
+    item.color ?? pm?.color,
+    item.cpu ?? pm?.cpu,
+    item.os_family ?? pm?.os_family,
+    item.screen_size ?? pm?.screen_size,
+    storage,
+    storage != null ? `${storage}gb` : null,
+    ram,
+    ram != null ? `${ram}gb` : null,
+    pm?.short_description,
+    item.supplier_description,
+    item.condition_notes,
+  ]
+  return parts.filter((p) => p != null && p !== '').join(' ')
+}
+
+/**
  * Insert the STAFF-ONLY model identifier `A3295 (MYWJ3J/A)` (model_number +
  * part_number) right after the model-name segment of a built description, e.g.
  *   "Apple iPhone 16 Pro Max / Desert Titanium / …"

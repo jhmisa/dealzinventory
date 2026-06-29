@@ -30,13 +30,31 @@ export function CustomerLinker({ onLink, isLoading, trigger }: CustomerLinkerPro
     if (!search.trim()) return
     setSearching(true)
     try {
-      const { data, error } = await supabase
-        .from('customers')
-        .select('id, customer_code, last_name, first_name, email, phone, fb_name, orders(count), kaitori_requests(count)')
-        .or(`last_name.ilike.%${search}%,first_name.ilike.%${search}%,customer_code.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%,fb_name.ilike.%${search}%`)
-        .limit(10)
+      // Separator-insensitive fuzzy search (code/name/email/phone/fb_name + receiver names)
+      // via the shared engine, matching the Customers page. RPC returns full customer rows
+      // ordered by recency; take the top 10 and fetch their order/kaitori counts.
+      const { data: matches, error } = await supabase.rpc('search_customers_with_receivers', {
+        query: search,
+      })
       if (error) throw error
-      const mapped = (data ?? []).map((c) => ({
+      const top = (matches ?? []).slice(0, 10)
+      const ids = top.map((c) => c.id)
+
+      const countById = new Map<string, { orders: number; kaitori: number }>()
+      if (ids.length > 0) {
+        const { data: counts } = await supabase
+          .from('customers')
+          .select('id, orders(count), kaitori_requests(count)')
+          .in('id', ids)
+        for (const c of counts ?? []) {
+          countById.set(c.id, {
+            orders: (c.orders as unknown as { count: number }[])?.[0]?.count ?? 0,
+            kaitori: (c.kaitori_requests as unknown as { count: number }[])?.[0]?.count ?? 0,
+          })
+        }
+      }
+
+      const mapped = top.map((c) => ({
         id: c.id,
         customer_code: c.customer_code,
         last_name: c.last_name,
@@ -44,8 +62,8 @@ export function CustomerLinker({ onLink, isLoading, trigger }: CustomerLinkerPro
         email: c.email,
         phone: c.phone,
         fb_name: c.fb_name as string | null,
-        order_count: (c.orders as unknown as { count: number }[])?.[0]?.count ?? 0,
-        kaitori_count: (c.kaitori_requests as unknown as { count: number }[])?.[0]?.count ?? 0,
+        order_count: countById.get(c.id)?.orders ?? 0,
+        kaitori_count: countById.get(c.id)?.kaitori ?? 0,
       }))
       setResults(mapped)
     } catch {

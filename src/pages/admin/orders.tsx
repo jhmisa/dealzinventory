@@ -256,9 +256,9 @@ export default function OrderListPage() {
   const setSourceFilter = (v: string) => setParam('source', v, 'all')
   const setMainTab = (v: 'orders' | 'offers') => setParam('tab', v, 'orders')
 
-  // Fetch all orders (no status filter) so we can compute tab counts
+  // Fetch all orders (no status filter, no server search) so we can compute tab counts
+  // and run the SAME client-side fuzzy search the Offers tab uses (see searchedOrders).
   const { data: allOrders, isLoading } = useOrders({
-    search: mainTab === 'orders' ? search || undefined : undefined,
     source: sourceFilter === 'all' ? undefined : sourceFilter,
   })
 
@@ -328,9 +328,32 @@ export default function OrderListPage() {
 
   const pendingOffersCount = offers.filter(o => o.offer_status === 'PENDING').length
 
-  // Compute counts per status
-  const statusCounts: Record<string, number> = { all: orders.length }
-  for (const order of orders) {
+  // Separator-insensitive fuzzy search across order code, customer (name/code/email/phone),
+  // and receiver name (@/lib/search) — mirrors the Offers tab so spaced/dashed queries hit.
+  const orderSearchQuery = mainTab === 'orders' ? search.trim() : ''
+  const searchedOrders = orderSearchQuery
+    ? orders.filter((o) => {
+        const c = o.customers
+        const haystack = [
+          o.order_code,
+          c?.customer_code,
+          c?.first_name,
+          c?.last_name,
+          c ? formatCustomerName(c) : null,
+          c?.email,
+          c?.phone,
+          o.receiver_first_name,
+          o.receiver_last_name,
+        ]
+          .filter(Boolean)
+          .join(' ')
+        return searchMatches(haystack, orderSearchQuery)
+      })
+    : orders
+
+  // Compute counts per status (reflects current search)
+  const statusCounts: Record<string, number> = { all: searchedOrders.length }
+  for (const order of searchedOrders) {
     statusCounts[order.order_status] = (statusCounts[order.order_status] ?? 0) + 1
   }
 
@@ -363,13 +386,13 @@ export default function OrderListPage() {
     offerStatusCounts[offer.offer_status] = (offerStatusCounts[offer.offer_status] ?? 0) + 1
   }
 
-  // Delivery issue count
-  const deliveryIssueCount = orders.filter((o) => o.delivery_issue_flag && o.order_status === 'SHIPPED').length
+  // Delivery issue count (reflects current search)
+  const deliveryIssueCount = searchedOrders.filter((o) => o.delivery_issue_flag && o.order_status === 'SHIPPED').length
 
   // Filter by active tab
   let filteredOrders = statusTab === 'all'
-    ? orders
-    : orders.filter((o) => o.order_status === statusTab)
+    ? searchedOrders
+    : searchedOrders.filter((o) => o.order_status === statusTab)
 
   if (showDeliveryIssuesOnly) {
     filteredOrders = filteredOrders.filter((o) => o.delivery_issue_flag)

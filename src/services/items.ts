@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import { fetchAllPages } from '@/lib/fetch-all-pages'
-import { getItemDescription, getSellGroupDescription, withBackorderIdentifier, filterHiddenProductMedia } from '@/lib/utils'
+import { getItemDescription, getSellGroupDescription, withBackorderIdentifier, filterHiddenProductMedia, buildItemSearchHaystack } from '@/lib/utils'
+import { searchMatches } from '@/lib/search'
 import type { Item, ItemInsert, ItemUpdate, ItemCost, ItemMedia } from '@/lib/types'
 
 // Temporary debug function — can be removed later
@@ -264,21 +265,27 @@ export async function getItemStats() {
 const ITEM_STATUS_VALUES = ['INTAKE', 'AVAILABLE', 'RESERVED', 'REPAIR', 'MISSING', 'SOLD', 'SUPPLIER_RETURN', 'REMOVED'] as const
 
 export async function getItemStatusCounts(filters: Omit<ItemFilters, 'status'> = {}) {
-  const counts: Record<string, number> = {}
-
-  // Pre-resolve G-code searches to item IDs (once for all count queries)
+  // Tab badges must reflect the SAME fuzzy search the visible list uses, so the count
+  // is computed client-side with the shared `searchMatches` + `buildItemSearchHaystack`
+  // (the list's exact matcher) rather than server-side `item_code ILIKE`. Items is a
+  // small table (~1.6k rows) and the active "all" tab already loads every row, so a
+  // lightweight all-status fetch here is cheap. Grade/source/supplier (simple equality)
+  // stay server-side to shrink the payload; the text/G-code search runs over the rows.
   const gCodeItemIds = filters.search && G_CODE_PATTERN.test(filters.search.trim())
     ? await resolveGCodeToItemIds(filters.search.trim())
     : null
+  const gCodeIdSet = gCodeItemIds !== null ? new Set(gCodeItemIds) : null
 
-  // Run count queries in parallel for each status + total
-  const promises = ITEM_STATUS_VALUES.map(async (status) => {
+  const buildQuery = () => {
     let query = supabase
       .from('items')
-      .select('*', { head: true, count: 'exact' })
-      .eq('item_status', status)
+      .select(`
+        id, item_status, is_live_selling, item_code, brand, model_name, color,
+        cpu, ram_gb, storage_gb, screen_size, os_family, supplier_description, condition_notes,
+        product_models(brand, model_name, color, cpu, ram_gb, storage_gb, screen_size, os_family, short_description)
+      `)
+      .order('id', { ascending: true })
 
-    if (filters.search) query = applySearchFilter(query, filters.search, gCodeItemIds) as typeof query
     if (filters.grade) {
       if (filters.grade === 'UNGRADED') {
         query = query.is('condition_grade', null)
@@ -288,64 +295,30 @@ export async function getItemStatusCounts(filters: Omit<ItemFilters, 'status'> =
     }
     if (filters.source) query = query.eq('source_type', filters.source)
     if (filters.supplierId) query = query.eq('supplier_id', filters.supplierId)
+    return query
+  }
 
-    const { count, error } = await query
-    if (error) throw error
-    return { status, count: count ?? 0 }
-  })
+  type CountRow = NonNullable<Awaited<ReturnType<typeof buildQuery>>['data']>[number]
+  const rows = await fetchAllPages<CountRow>((from, to) => buildQuery().range(from, to))
 
-  // Also get total count
-  const totalPromise = (async () => {
-    let query = supabase
-      .from('items')
-      .select('*', { head: true, count: 'exact' })
+  const isMatch = (row: CountRow) => {
+    if (gCodeIdSet !== null) return gCodeIdSet.has(row.id)
+    if (filters.search) return searchMatches(buildItemSearchHaystack(row), filters.search)
+    return true
+  }
 
-    if (filters.search) query = applySearchFilter(query, filters.search, gCodeItemIds) as typeof query
-    if (filters.grade) {
-      if (filters.grade === 'UNGRADED') {
-        query = query.is('condition_grade', null)
-      } else {
-        query = query.eq('condition_grade', filters.grade)
-      }
-    }
-    if (filters.source) query = query.eq('source_type', filters.source)
-    if (filters.supplierId) query = query.eq('supplier_id', filters.supplierId)
-
-    const { count, error } = await query
-    if (error) throw error
-    return count ?? 0
-  })()
-
-  // Also get live selling count
-  const liveSellingPromise = (async () => {
-    let query = supabase
-      .from('items')
-      .select('*', { head: true, count: 'exact' })
-      .eq('is_live_selling', true)
-
-    if (filters.search) query = applySearchFilter(query, filters.search, gCodeItemIds) as typeof query
-    if (filters.grade) {
-      if (filters.grade === 'UNGRADED') {
-        query = query.is('condition_grade', null)
-      } else {
-        query = query.eq('condition_grade', filters.grade)
-      }
-    }
-    if (filters.source) query = query.eq('source_type', filters.source)
-    if (filters.supplierId) query = query.eq('supplier_id', filters.supplierId)
-
-    const { count, error } = await query
-    if (error) throw error
-    return count ?? 0
-  })()
-
-  const [results, total, liveSellingCount] = await Promise.all([Promise.all(promises), totalPromise, liveSellingPromise])
-
-  for (const { status, count } of results) {
-    counts[status] = count
+  const counts: Record<string, number> = {}
+  for (const status of ITEM_STATUS_VALUES) counts[status] = 0
+  let total = 0
+  let liveSelling = 0
+  for (const row of rows) {
+    if (!isMatch(row)) continue
+    total++
+    counts[row.item_status] = (counts[row.item_status] ?? 0) + 1
+    if (row.is_live_selling) liveSelling++
   }
   counts.all = total
-  counts.LIVE_SELLING = liveSellingCount
+  counts.LIVE_SELLING = liveSelling
 
   return counts
 }

@@ -3,38 +3,15 @@ import { fetchAllPages } from '@/lib/fetch-all-pages'
 import type { Order, OrderInsert, OrderUpdate, Item } from '@/lib/types'
 
 interface OrderFilters {
-  search?: string
   status?: string
   source?: string
   customerId?: string
 }
 
 export async function getOrders(filters: OrderFilters = {}) {
-  // If searching, first find matching customer IDs (PostgREST can't .or() across joins)
-  let matchingCustomerIds: string[] | null = null
-  if (filters.search) {
-    const term = filters.search
-    const { data: customers } = await supabase
-      .from('customers')
-      .select('id')
-      .or(
-        `customer_code.ilike.%${term}%,last_name.ilike.%${term}%,first_name.ilike.%${term}%,email.ilike.%${term}%,phone.ilike.%${term}%`
-      )
-    matchingCustomerIds = customers?.map((c) => c.id) ?? []
-  }
-
-  // Also search by receiver name on orders directly
-  let receiverOrderIds: string[] | null = null
-  if (filters.search) {
-    const term = filters.search
-    const { data: receiverOrders } = await supabase
-      .from('orders')
-      .select('id')
-      .or(
-        `receiver_first_name.ilike.%${term}%,receiver_last_name.ilike.%${term}%`
-      )
-    receiverOrderIds = receiverOrders?.map((o) => o.id) ?? []
-  }
+  // The Orders page loads every order and runs its text search CLIENT-side (fuzzy, over
+  // order_code + customer + receiver fields — see orders.tsx searchedOrders), so this
+  // function no longer filters by search; it just applies the status/source/customer facets.
 
   // Build a fresh, fully-filtered query for a given page. Rebuilt per page because
   // a PostgREST query builder is single-use once awaited.
@@ -54,17 +31,6 @@ export async function getOrders(filters: OrderFilters = {}) {
       // Stable tiebreaker so rows can't shift across page boundaries (skips/dupes).
       .order('id', { ascending: true })
 
-    if (filters.search) {
-      // Match orders by order_code, customer, or receiver name
-      const orParts = [`order_code.ilike.%${filters.search}%`]
-      if (matchingCustomerIds && matchingCustomerIds.length > 0) {
-        orParts.push(`customer_id.in.(${matchingCustomerIds.join(',')})`)
-      }
-      if (receiverOrderIds && receiverOrderIds.length > 0) {
-        orParts.push(`id.in.(${receiverOrderIds.join(',')})`)
-      }
-      query = query.or(orParts.join(','))
-    }
     if (filters.status) {
       query = query.eq('order_status', filters.status)
     }
