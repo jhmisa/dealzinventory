@@ -103,21 +103,39 @@ export function ProductPicker({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="h-8 w-full justify-between text-xs font-normal"
+          className="h-auto min-h-8 w-full justify-between py-1 text-xs font-normal"
         >
           {selected ? (
-            <span className="flex items-center gap-1.5 truncate">
+            <span className="flex items-center gap-1.5 min-w-0">
               {selected.hero_image_url ? (
                 <img
                   src={selected.hero_image_url}
                   alt=""
-                  className="h-5 w-5 rounded object-cover shrink-0"
+                  className="h-7 w-7 rounded object-cover shrink-0"
                 />
               ) : (
                 <ImageIcon className="h-4 w-4 text-muted-foreground shrink-0" />
               )}
-              <span className="truncate">
-                {selected.brand} {selected.model_name}
+              {/* Show the full fetched identity (code · color · RAM · storage · CPU) so staff can
+                  confirm the auto-matched model is exactly what the listing parsed to. */}
+              <span className="flex flex-col min-w-0 text-left leading-tight">
+                <span className="truncate">
+                  {selected.brand} {selected.model_name}
+                </span>
+                {(() => {
+                  const ident = [
+                    selected.model_number,
+                    selected.color,
+                    selected.ram_gb ? `${selected.ram_gb}GB` : null,
+                    selected.storage_gb ? `${selected.storage_gb}GB` : null,
+                    selected.cpu ?? selected.chipset,
+                  ].filter(Boolean)
+                  return ident.length > 0 ? (
+                    <span className="truncate text-[11px] font-normal text-muted-foreground">
+                      {ident.join(' · ')}
+                    </span>
+                  ) : null
+                })()}
               </span>
             </span>
           ) : (

@@ -121,6 +121,88 @@ function cleanCell(s: string): string {
   return decodeEntities(s.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim())
 }
 
+// iosys 付属品 vocabulary → English. The accessory list is a small, finite set of phrases;
+// longest keys are tried first so compound terms (元箱, 取扱説明書, USBケーブル) win over their
+// substrings. Unknown tokens are kept verbatim so nothing is silently dropped.
+const ACCESSORY_JA_EN: Record<string, string> = {
+  "付属品なし": "None",
+  "なし": "None",
+  "元箱": "Original Box",
+  "純正箱": "Original Box",
+  "化粧箱": "Box",
+  "箱": "Box",
+  "取扱説明書": "Manual",
+  "取説": "Manual",
+  "説明書": "Manual",
+  "マニュアル": "Manual",
+  "クイックスタートガイド": "Quick Start Guide",
+  "保証書": "Warranty Card",
+  "純正充電器": "Charger",
+  "充電器": "Charger",
+  "ACアダプタ": "Power Adapter",
+  "ACアダプター": "Power Adapter",
+  "電源アダプタ": "Power Adapter",
+  "電源アダプター": "Power Adapter",
+  "アダプタ": "Adapter",
+  "アダプター": "Adapter",
+  "USBケーブル": "USB Cable",
+  "USB-Cケーブル": "USB-C Cable",
+  "充電ケーブル": "Charging Cable",
+  "ケーブル": "Cable",
+  "イヤホン": "Earphones",
+  "イヤフォン": "Earphones",
+  "純正イヤホン": "Earphones",
+  "SIMピン": "SIM Ejector Pin",
+  "SIM取り出しピン": "SIM Ejector Pin",
+  "SIMトレイ": "SIM Tray",
+  "ケース": "Case",
+  "カバー": "Cover",
+  "保護フィルム": "Screen Protector",
+  "フィルム": "Film",
+  "クロス": "Cloth",
+  "ステッカー": "Stickers",
+  "Apple純正": "Apple Genuine",
+  "純正": "Genuine",
+}
+
+/**
+ * Translate an iosys 付属品 string to English. Splits on the separators iosys uses
+ * (／/、,・ and spaces), maps each token via ACCESSORY_JA_EN (longest-key-first), keeps
+ * unknown tokens as-is, and re-joins with " / ". Returns null for empty input.
+ */
+export function translateAccessories(raw: string | null): string | null {
+  if (!raw) return null
+  const tokens = raw.split(/[\/／、,・\s]+/).map((t) => t.trim()).filter(Boolean)
+  if (tokens.length === 0) return null
+  const keysByLen = Object.keys(ACCESSORY_JA_EN).sort((a, b) => b.length - a.length)
+  const out = tokens.map((tok) => {
+    if (ACCESSORY_JA_EN[tok]) return ACCESSORY_JA_EN[tok]
+    // Token may be a compound without separators (e.g. "箱マニュアル"): translate the
+    // longest known substrings greedily, leaving any unknown remainder verbatim.
+    let rest = tok
+    let translated = ""
+    let matchedAny = false
+    while (rest.length > 0) {
+      const key = keysByLen.find((k) => rest.startsWith(k))
+      if (key) {
+        translated += (translated ? " " : "") + ACCESSORY_JA_EN[key]
+        rest = rest.slice(key.length)
+        matchedAny = true
+      } else {
+        // consume one char into a pending-unknown buffer
+        const next = keysByLen.find((k) => rest.indexOf(k) > 0)
+        const cut = next ? rest.indexOf(next) : rest.length
+        translated += (translated ? " " : "") + rest.slice(0, cut)
+        rest = rest.slice(cut)
+      }
+    }
+    return matchedAny ? translated : tok
+  })
+  // De-dup consecutive repeats (e.g. two "Manual") while preserving order.
+  const deduped = out.filter((v, i) => i === 0 || v !== out[i - 1])
+  return deduped.join(" / ") || null
+}
+
 /** Parse the <div id="spec"> ... <table> ... </table> into a label->value map. */
 function parseSpecTable(html: string): Record<string, string> {
   const out: Record<string, string> = {}
@@ -302,7 +384,7 @@ function parse(html: string, input: string): NormalizedSupplierProduct {
   // Included accessories (付属品): verbatim text. Spec table first, then the labelled
   // subtitle/content block (the SO-52C page lists it as a <p class="subtitle">付属品</p>
   // followed by a <div class="content"><p>箱/マニュアル</p></div>), then a <td> fallback.
-  const includedAccessories =
+  const includedAccessoriesJa =
     (spec["付属品"] ?? null) ??
     (() => {
       const m = html.match(
@@ -314,6 +396,9 @@ function parse(html: string, input: string): NormalizedSupplierProduct {
       const m = html.match(/付属品[\s\S]{0,40}?<td[^>]*>([\s\S]*?)<\/td>/i)
       return m ? cleanCell(m[1]) || null : null
     })()
+  // Translate the small finite 付属品 vocabulary to English (unknown tokens kept verbatim),
+  // so the field arrives English-ready for the (Filipino) customer-facing side. Still editable.
+  const includedAccessories = translateAccessories(includedAccessoriesJa)
 
   // Price: prefer JSON-LD, fall back to the visible price block.
   const supplierPrice =

@@ -1,4 +1,4 @@
-import { iosysAdapter } from "./iosys.ts"
+import { iosysAdapter, translateAccessories } from "./iosys.ts"
 import { assertEquals } from "https://deno.land/std/assert/mod.ts"
 
 const code = "384323"
@@ -61,8 +61,19 @@ Deno.test("iosys: SO-52C Android — modelNumber, JP color, grade, spec table, a
   assertEquals(p.storageGb, 128)
   assertEquals(p.specs.ramGb, 6)
   assertEquals((p.specs.cpu ?? "").includes("Snapdragon 695") || (p.specs.cpu ?? "").includes("Snapdragon695"), true)
-  assertEquals((p.includedAccessories ?? "").includes("箱"), true)
-  assertEquals((p.includedAccessories ?? "").includes("マニュアル"), true)
+  // 付属品 "箱/マニュアル" is translated to English on parse.
+  assertEquals(p.includedAccessories, "Box / Manual")
+})
+
+Deno.test("iosys: accessory translation — known terms → English, unknown kept verbatim", () => {
+  assertEquals(translateAccessories("箱/マニュアル"), "Box / Manual")
+  assertEquals(translateAccessories("充電器、ケーブル"), "Charger / Cable")
+  assertEquals(translateAccessories("元箱・取扱説明書・SIMピン"), "Original Box / Manual / SIM Ejector Pin")
+  assertEquals(translateAccessories("付属品なし"), "None")
+  assertEquals(translateAccessories("箱マニュアル"), "Box Manual") // compound w/o separator
+  assertEquals(translateAccessories("Lightningケーブル"), "Lightning Cable") // unknown prefix kept
+  assertEquals(translateAccessories(null), null)
+  assertEquals(translateAccessories(""), null)
 })
 
 // --- Apple iPad — color must NOT drag the trailing part#/model-code tokens -------------
