@@ -7,6 +7,9 @@ import {
 } from "https://deno.land/x/imagemagick_deno@0.0.31/mod.ts";
 import { cropToSquareWebp } from "./square-crop.ts";
 
+// Initialize ImageMagick for the test helpers (makeNonSquarePng / dimsOf).
+// cropToSquareWebp has its own once-guarded init internally; this call is
+// required by the helpers and cannot be shared with the SUT's guard.
 await initializeImageMagick();
 
 function makeNonSquarePng(w: number, h: number): Uint8Array {
@@ -31,7 +34,7 @@ Deno.test("cropToSquareWebp produces an exact square at the requested size", asy
   const { w, h, format } = dimsOf(output);
   assertEquals(w, 256);
   assertEquals(h, 256);
-  assertEquals(format.toLowerCase().includes("webp"), true);
+  assertEquals(format.toLowerCase(), "webp");
 });
 
 Deno.test("cropToSquareWebp on a landscape input is also square", async () => {
@@ -40,4 +43,13 @@ Deno.test("cropToSquareWebp on a landscape input is also square", async () => {
   const { w, h } = dimsOf(output);
   assertEquals(w, 256);
   assertEquals(h, 256);
+});
+
+Deno.test("cropToSquareWebp on an already-square input produces correct output", async () => {
+  const input = makeNonSquarePng(400, 400);
+  const output = await cropToSquareWebp(input, 256, 80);
+  const { w, h, format } = dimsOf(output);
+  assertEquals(w, 256);
+  assertEquals(h, 256);
+  assertEquals(format.toLowerCase(), "webp");
 });
