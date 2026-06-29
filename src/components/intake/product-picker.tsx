@@ -25,6 +25,16 @@ import { useProductModelSearch } from '@/hooks/use-product-models'
 import type { ProductModelWithHeroImage } from '@/lib/types'
 import type { ProductModelFormValues } from '@/validators/product-model'
 
+// Append "GB" only when the value isn't already unit-suffixed (catalog storage_gb is
+// inconsistent: some rows store "256", some "256GB").
+const withGb = (v: string | number | null | undefined): string | null => {
+  if (v == null || v === '') return null
+  const s = String(v).trim()
+  // Already unit-suffixed (e.g. "256GB", "1 TB")? leave it. Note: no leading \b before the
+  // unit — "256GB" has no word boundary between the digit and "G", so we match a trailing unit.
+  return /(gb|tb)\b/i.test(s) ? s : `${s}GB`
+}
+
 interface ProductPickerProps {
   value: string
   onSelect: (productId: string) => void
@@ -106,7 +116,7 @@ export function ProductPicker({
           className="h-auto min-h-8 w-full justify-between py-1 text-xs font-normal"
         >
           {selected ? (
-            <span className="flex items-center gap-1.5 min-w-0">
+            <span className="flex flex-1 items-center gap-1.5 min-w-0">
               {selected.hero_image_url ? (
                 <img
                   src={selected.hero_image_url}
@@ -118,20 +128,20 @@ export function ProductPicker({
               )}
               {/* Show the full fetched identity (code · color · RAM · storage · CPU) so staff can
                   confirm the auto-matched model is exactly what the listing parsed to. */}
-              <span className="flex flex-col min-w-0 text-left leading-tight">
-                <span className="truncate">
+              <span className="flex flex-1 flex-col min-w-0 text-left leading-tight">
+                <span className="block w-full truncate">
                   {selected.brand} {selected.model_name}
                 </span>
                 {(() => {
                   const ident = [
                     selected.model_number,
                     selected.color,
-                    selected.ram_gb ? `${selected.ram_gb}GB` : null,
-                    selected.storage_gb ? `${selected.storage_gb}GB` : null,
+                    withGb(selected.ram_gb),
+                    withGb(selected.storage_gb),
                     selected.cpu ?? selected.chipset,
                   ].filter(Boolean)
                   return ident.length > 0 ? (
-                    <span className="truncate text-[11px] font-normal text-muted-foreground">
+                    <span className="block w-full truncate text-[11px] font-normal text-muted-foreground">
                       {ident.join(' · ')}
                     </span>
                   ) : null
@@ -234,8 +244,8 @@ export function ProductPicker({
                       {(() => {
                         const specs = [
                           product.cpu,
-                          product.ram_gb ? `${product.ram_gb}GB` : null,
-                          product.storage_gb ? `${product.storage_gb}GB` : null,
+                          withGb(product.ram_gb),
+                          withGb(product.storage_gb),
                           product.screen_size ? `${product.screen_size}"` : null,
                           product.short_description ? product.color : null,
                         ].filter(Boolean)

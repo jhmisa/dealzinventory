@@ -58,6 +58,11 @@ import type { ProductModelFormValues } from '@/validators/product-model'
 
 const GRADES = ['S', 'A', 'B', 'C', 'D', 'J'] as const
 
+// Hide native number-input spinner carets. Scoped to this dialog's inputs only (we don't touch
+// the base ui/input.tsx to avoid global side effects).
+const NO_SPINNER =
+  '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none'
+
 // The link-parsed specs we treat as the source of truth for THIS unit. Storage + color come
 // from the supplier listing; the selected product model must match them (we warn if it doesn't).
 interface ParsedSupplierSpecs {
@@ -620,7 +625,7 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
         </DialogHeader>
 
         {/* SOURCE — paste box (not a form field; lives above the Form) */}
-        <section className="rounded-lg border bg-muted/40 p-4">
+        <section className="rounded-lg border bg-muted/40 p-3">
           <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Source
           </h3>
@@ -651,10 +656,10 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
         </section>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-5">
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {/* LEFT — Product & Specs */}
-              <section className="space-y-4 rounded-lg border bg-card p-4">
+              <section className="space-y-4 rounded-lg border bg-card p-3">
                 <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Product &amp; Specs
                 </h3>
@@ -783,6 +788,7 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
                             min={0}
                             {...field}
                             value={field.value ?? ''}
+                            className={NO_SPINNER}
                           />
                         </FormControl>
                         <FormMessage />
@@ -803,6 +809,7 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
                             min={0}
                             {...field}
                             value={field.value ?? ''}
+                            className={NO_SPINNER}
                           />
                         </FormControl>
                         <FormMessage />
@@ -844,9 +851,9 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
               </section>
 
               {/* RIGHT — Pricing + Stock & Fulfillment */}
-              <div className="space-y-5">
+              <div className="space-y-4">
                 {/* Pricing */}
-                <section className="space-y-4 rounded-lg border bg-card p-4">
+                <section className="space-y-4 rounded-lg border bg-card p-3">
                   <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Pricing
                   </h3>
@@ -858,13 +865,14 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
                       name="supplier_price"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Supplier Price (JPY)</FormLabel>
+                          <FormLabel className="whitespace-nowrap">Supplier (¥)</FormLabel>
                           <FormControl>
                             <Input
                               type="number"
                               min={0}
                               {...field}
                               value={field.value ?? ''}
+                              className={NO_SPINNER}
                             />
                           </FormControl>
                           <FormMessage />
@@ -878,13 +886,14 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
                       name="markup_jpy"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Markup (JPY)</FormLabel>
+                          <FormLabel className="whitespace-nowrap">Markup (¥)</FormLabel>
                           <FormControl>
                             <Input
                               type="number"
                               min={0}
                               {...field}
                               value={field.value ?? ''}
+                              className={NO_SPINNER}
                             />
                           </FormControl>
                           <FormMessage />
@@ -898,13 +907,14 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
                       name="discount_amount"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Discount (JPY)</FormLabel>
+                          <FormLabel className="whitespace-nowrap">Discount (¥)</FormLabel>
                           <FormControl>
                             <Input
                               type="number"
                               min={0}
                               {...field}
                               value={field.value ?? ''}
+                              className={NO_SPINNER}
                             />
                           </FormControl>
                           <FormMessage />
@@ -919,9 +929,9 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
                     name="selling_price"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Selling Price (JPY) *</FormLabel>
+                        <FormLabel>Selling Price (¥) *</FormLabel>
                         <FormControl>
-                          <Input type="number" min={0} {...field} />
+                          <Input type="number" min={0} {...field} className={NO_SPINNER} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -977,7 +987,7 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
                 </section>
 
                 {/* Stock & Fulfillment */}
-                <section className="space-y-4 rounded-lg border bg-card p-4">
+                <section className="space-y-4 rounded-lg border bg-card p-3">
                   <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Stock &amp; Fulfillment
                   </h3>
@@ -996,6 +1006,7 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
                               min={0}
                               {...field}
                               value={field.value ?? ''}
+                              className={NO_SPINNER}
                             />
                           </FormControl>
                           <FormMessage />
@@ -1011,7 +1022,7 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
                         <FormItem>
                           <FormLabel>Quantity *</FormLabel>
                           <FormControl>
-                            <Input type="number" min={1} {...field} />
+                            <Input type="number" min={1} {...field} className={NO_SPINNER} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -1027,7 +1038,7 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
                         <FormItem>
                           <FormLabel>Lead Time Min (working days)</FormLabel>
                           <FormControl>
-                            <Input type="number" min={0} {...field} />
+                            <Input type="number" min={0} {...field} className={NO_SPINNER} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -1041,7 +1052,7 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
                         <FormItem>
                           <FormLabel>Lead Time Max (working days)</FormLabel>
                           <FormControl>
-                            <Input type="number" min={0} {...field} />
+                            <Input type="number" min={0} {...field} className={NO_SPINNER} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -1053,7 +1064,7 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
             </div>
 
             {/* PHOTOS — full width */}
-            <section className="space-y-2 rounded-lg border bg-card p-4">
+            <section className="space-y-2 rounded-lg border bg-card p-3">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">
                   Photos{' '}
@@ -1135,7 +1146,7 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
               )}
             </section>
 
-            <DialogFooter>
+            <DialogFooter className="sticky bottom-0 z-10 -mx-6 -mb-6 border-t bg-background px-6 pb-6 pt-3 mt-2">
               <Button
                 type="button"
                 variant="outline"
