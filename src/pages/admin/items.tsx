@@ -39,6 +39,7 @@ import { formatDate, formatPrice, cn, buildShortDescription, formatCustomerName,
 import { toast } from 'sonner'
 import { printItemLabel } from '@/components/items/label-print'
 import { resolveSoldTo, resolveReservedBy, reservedByMessageLink, type ReservedByInfo } from '@/lib/item-sale'
+import { searchMatches } from '@/lib/search'
 import type { Accessory, AccessoryMedia, ConditionGrade } from '@/lib/types'
 import type { LiveSellingSellGroup } from '@/services/sell-groups'
 import { listBackorderLines, type BackorderLineListItem } from '@/services/backorders'
@@ -694,10 +695,10 @@ export default function ItemListPage() {
         desc = buildShortDescription(resolvedValues, descFields)
       }
       if (!desc) desc = item.supplier_description || ''
-      if (!desc.toLowerCase().includes(debouncedDescSearch.toLowerCase())) return false
+      if (!searchMatches(desc, debouncedDescSearch)) return false
     }
     if (debouncedConditionSearch) {
-      if (!item.condition_notes?.toLowerCase().includes(debouncedConditionSearch.toLowerCase())) return false
+      if (!searchMatches(item.condition_notes ?? '', debouncedConditionSearch)) return false
     }
     const pf = priceFrom ? Number(priceFrom) : null
     const pt = priceTo ? Number(priceTo) : null
@@ -800,13 +801,14 @@ export default function ItemListPage() {
     return (lines ?? [])
       .filter((line) => {
         if ((line.available ?? 0) <= 0) return false
-        if (debouncedSearch && !line.backorder_code.toLowerCase().includes(debouncedSearch.toLowerCase())) return false
+        // Fuzzy main search over B-code + product description (brand/model/specs) — @/lib/search
+        if (debouncedSearch && !searchMatches(`${line.backorder_code} ${getBackorderDesc(line)}`, debouncedSearch)) return false
         if (debouncedDescSearch) {
           const desc = getBackorderDesc(line)
-          if (!desc.toLowerCase().includes(debouncedDescSearch.toLowerCase())) return false
+          if (!searchMatches(desc, debouncedDescSearch)) return false
         }
         if (debouncedConditionSearch) {
-          if (!line.condition_notes?.toLowerCase().includes(debouncedConditionSearch.toLowerCase())) return false
+          if (!searchMatches(line.condition_notes ?? '', debouncedConditionSearch)) return false
         }
         const pmBrand = line.product_models?.brand
         const pmCategory = line.product_models?.categories?.name

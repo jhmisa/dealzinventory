@@ -8,10 +8,11 @@
  *   - fold full-width → half-width and lower-case (foldSearchText)
  *   - additionally strip ALL whitespace + punctuation + JP separators (・ ー ― ‐),
  *     keeping alphanumerics and non-ASCII letters (normalizeSearchText)
- *   - match token-AND: every typed word must be present, BUT a pure-numeric token
- *     must hit a word boundary (so "11" matches "iPhone 11"/"256GB" but never the
- *     middle of a part number), while a token containing letters uses a
- *     separator-insensitive substring (so "11pro", "so51aa", "1ii", "iphone11" hit).
+ *   - match token-AND: every typed word must be present, BUT a SHORT pure-numeric token
+ *     (≤3 digits) must hit a word boundary (so "11" matches "iPhone 11"/"256GB" but never
+ *     the middle of a part number), while tokens with letters OR long numbers (4+ digits:
+ *     A-numbers, codes) use a separator-insensitive substring (so "11pro", "so51aa", "1ii",
+ *     "iphone11", "C 001439" all hit).
  *
  *   normalizeSearchText('SO-51Aa')        === 'so51aa'
  *   searchMatches('Sony Xperia 1 II SO-51Aa Black', 'SO51aa')      === true
@@ -55,8 +56,9 @@ export function searchMatches(haystack: string | null | undefined, query: string
   const normHay = normalizeSearchText(haystack)
   const foldHay = foldSearchText(haystack)
   return tokens.every((tok) => {
-    if (/^[0-9]+$/.test(tok)) {
-      // pure number: word-start boundary (not preceded by another alnum) — mirrors \m
+    if (/^[0-9]{1,3}$/.test(tok)) {
+      // SHORT pure number: word-start boundary (not preceded by another alnum) — mirrors \m.
+      // Longer numbers (4+ digits: A-numbers, codes, SKUs) use substring below.
       return new RegExp(`(?<![a-z0-9])${tok}`).test(foldHay)
     }
     return normHay.includes(tok)

@@ -1,4 +1,6 @@
 import { supabase } from '@/lib/supabase'
+import { fetchAllPages } from '@/lib/fetch-all-pages'
+import { searchMatches } from '@/lib/search'
 import type { InventorySearchFilters } from '@/services/items'
 import type {
   Accessory,
@@ -33,39 +35,44 @@ interface AccessoryFilters {
 }
 
 export async function getAccessories(filters: AccessoryFilters = {}) {
-  let query = supabase
-    .from('accessories')
-    .select(`
-      *,
-      categories(name),
-      accessory_media(id, file_url, media_type, sort_order)
-    `)
-    .order('created_at', { ascending: false })
+  type Row = Accessory & { categories: { name: string } | null; accessory_media: AccessoryMedia[] }
 
-  if (filters.search) {
-    query = query.or(
-      `accessory_code.ilike.%${filters.search}%,name.ilike.%${filters.search}%,brand.ilike.%${filters.search}%`
-    )
-  }
-  if (filters.categoryId) {
-    query = query.eq('category_id', filters.categoryId)
-  }
-  if (filters.active !== undefined) {
-    query = query.eq('active', filters.active)
-  }
-  if (filters.shopVisible !== undefined) {
-    query = query.eq('shop_visible', filters.shopVisible)
-  }
-  if (filters.inStock) {
-    query = query.gt('stock_quantity', 0)
-  }
-  if (filters.isLiveSelling !== undefined) {
-    query = query.eq('is_live_selling', filters.isLiveSelling)
+  const buildQuery = () => {
+    let query = supabase
+      .from('accessories')
+      .select(`
+        *,
+        categories(name),
+        accessory_media(id, file_url, media_type, sort_order)
+      `)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: true })
+
+    if (filters.categoryId) {
+      query = query.eq('category_id', filters.categoryId)
+    }
+    if (filters.active !== undefined) {
+      query = query.eq('active', filters.active)
+    }
+    if (filters.shopVisible !== undefined) {
+      query = query.eq('shop_visible', filters.shopVisible)
+    }
+    if (filters.inStock) {
+      query = query.gt('stock_quantity', 0)
+    }
+    if (filters.isLiveSelling !== undefined) {
+      query = query.eq('is_live_selling', filters.isLiveSelling)
+    }
+    return query
   }
 
-  const { data, error } = await query
-  if (error) throw error
-  return (data ?? []) as (Accessory & { categories: { name: string } | null; accessory_media: AccessoryMedia[] })[]
+  // Page through all rows so separator-insensitive fuzzy search (below) can't miss
+  // matches past the 1000-row cap.
+  const rows = await fetchAllPages<Row>((from, to) => buildQuery().range(from, to))
+
+  // Separator-insensitive fuzzy search over code + name + brand (@/lib/search).
+  if (!filters.search) return rows
+  return rows.filter((a) => searchMatches([a.accessory_code, a.name, a.brand].filter(Boolean).join(' '), filters.search!))
 }
 
 export async function getAccessory(id: string) {

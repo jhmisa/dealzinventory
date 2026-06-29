@@ -1,4 +1,6 @@
 import { supabase } from '@/lib/supabase'
+import { fetchAllPages } from '@/lib/fetch-all-pages'
+import { searchMatches } from '@/lib/search'
 import type { KaitoriRequest, KaitoriRequestInsert, KaitoriRequestUpdate, KaitoriStatus, KaitoriPaymentMethod } from '@/lib/types'
 
 interface KaitoriFilters {
@@ -7,26 +9,37 @@ interface KaitoriFilters {
 }
 
 export async function getKaitoriRequests(filters: KaitoriFilters = {}) {
-  let query = supabase
-    .from('kaitori_requests')
-    .select(`
-      *,
-      customers(id, last_name, first_name, email, phone, customer_code),
-      product_models(brand, model_name, cpu, ram_gb, storage_gb),
-      kaitori_request_media(id, file_url, media_type, role, sort_order)
-    `)
-    .order('created_at', { ascending: false })
+  const buildQuery = () => {
+    let query = supabase
+      .from('kaitori_requests')
+      .select(`
+        *,
+        customers(id, last_name, first_name, email, phone, customer_code),
+        product_models(brand, model_name, cpu, ram_gb, storage_gb),
+        kaitori_request_media(id, file_url, media_type, role, sort_order)
+      `)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: true })
 
-  if (filters.status) {
-    query = query.eq('request_status', filters.status)
-  }
-  if (filters.search) {
-    query = query.or(`kaitori_code.ilike.%${filters.search}%`)
+    if (filters.status) {
+      query = query.eq('request_status', filters.status)
+    }
+    return query
   }
 
-  const { data, error } = await query
-  if (error) throw error
-  return data ?? []
+  type Row = NonNullable<Awaited<ReturnType<typeof buildQuery>>['data']>[number]
+  const rows = await fetchAllPages<Row>((from, to) => buildQuery().range(from, to))
+
+  // Separator-insensitive fuzzy search over code + customer + product (@/lib/search).
+  if (!filters.search) return rows
+  return rows.filter((r) => {
+    const c = r.customers as { last_name: string | null; first_name: string | null; email: string | null; phone: string | null; customer_code: string | null } | null
+    const pm = r.product_models as { brand: string | null; model_name: string | null } | null
+    const hay = [r.kaitori_code, c?.customer_code, c?.last_name, c?.first_name, c?.email, c?.phone, pm?.brand, pm?.model_name]
+      .filter(Boolean)
+      .join(' ')
+    return searchMatches(hay, filters.search!)
+  })
 }
 
 export async function getKaitoriRequest(id: string) {

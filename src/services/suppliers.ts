@@ -1,29 +1,42 @@
 import { supabase } from '@/lib/supabase'
+import { fetchAllPages } from '@/lib/fetch-all-pages'
+import { searchMatches } from '@/lib/search'
 import type { Supplier, SupplierInsert, SupplierUpdate } from '@/lib/types'
 
 export async function getSuppliers(
   search?: string,
   opts?: { excludeReferenceOnly?: boolean },
 ) {
-  let query = supabase
-    .from('suppliers')
-    .select('*, items(count)')
-    .order('supplier_name')
+  const buildQuery = () => {
+    let query = supabase
+      .from('suppliers')
+      .select('*, items(count)')
+      .order('supplier_name')
+      .order('id', { ascending: true })
 
-  if (search) {
-    query = query.ilike('supplier_name', `%${search}%`)
+    // Reference-only suppliers (e.g. an iosys online listing) are a sourcing/price reference,
+    // not a physical intake source — callers like Intake exclude them from selection.
+    if (opts?.excludeReferenceOnly) {
+      query = query.eq('is_reference_only', false)
+    }
+    return query
   }
-  // Reference-only suppliers (e.g. an iosys online listing) are a sourcing/price reference,
-  // not a physical intake source — callers like Intake exclude them from selection.
-  if (opts?.excludeReferenceOnly) {
-    query = query.eq('is_reference_only', false)
-  }
 
-  const { data, error } = await query
+  type Row = Supplier & { items: { count: number }[] }
+  const rows = await fetchAllPages<Row>((from, to) => buildQuery().range(from, to))
 
-  if (error) throw error
+  // Separator-insensitive fuzzy search over name + contact fields (@/lib/search).
+  const filtered = !search
+    ? rows
+    : rows.filter((s) => {
+        const r = s as unknown as Record<string, unknown>
+        const hay = [r.supplier_name, r.contact_person, r.phone, r.email]
+          .filter((v): v is string => typeof v === 'string')
+          .join(' ')
+        return searchMatches(hay, search)
+      })
 
-  return (data ?? []).map((s) => ({
+  return filtered.map((s) => ({
     ...s,
     item_count: (s.items as unknown as { count: number }[])?.[0]?.count ?? 0,
   }))

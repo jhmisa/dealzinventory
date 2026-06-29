@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { searchMatches } from '@/lib/search'
 
 export interface ShopFilters {
   search?: string
@@ -90,15 +91,13 @@ export async function getShopItems(filters: ShopFilters = {}) {
 
   let results = data ?? []
 
-  // Client-side filtering for search and brand
-  const searchTerm = filters.search?.toLowerCase()
+  // Client-side filtering for search and brand (separator-insensitive fuzzy — @/lib/search)
+  const searchTerm = filters.search
   results = results.filter((item) => {
     if (searchTerm) {
-      const pm = item.product_models as { brand: string; model_name: string } | null
-      const name = pm ? `${pm.brand} ${pm.model_name}`.toLowerCase() : ''
-      if (!name.includes(searchTerm) && !item.item_code.toLowerCase().includes(searchTerm)) {
-        return false
-      }
+      const pm = item.product_models as { brand: string; model_name: string; color: string | null; short_description: string | null } | null
+      const hay = [pm?.brand, pm?.model_name, pm?.color, pm?.short_description, item.item_code].filter(Boolean).join(' ')
+      if (!searchMatches(hay, searchTerm)) return false
     }
     if (filters.brand) {
       const pm = item.product_models as { brand: string } | null
@@ -155,14 +154,12 @@ export async function getShopSellGroups(filters: ShopFilters = {}) {
     results = results.filter(sg => sg._selling_price > 0)
   }
 
-  const searchTerm = filters.search?.toLowerCase()
+  const searchTerm = filters.search
   results = results.filter((sg) => {
     if (searchTerm) {
-      const pm = sg.product_models as { brand: string; model_name: string } | null
-      const name = pm ? `${pm.brand} ${pm.model_name}`.toLowerCase() : ''
-      if (!name.includes(searchTerm) && !sg.sell_group_code.toLowerCase().includes(searchTerm)) {
-        return false
-      }
+      const pm = sg.product_models as { brand: string; model_name: string; color: string | null; short_description: string | null } | null
+      const hay = [pm?.brand, pm?.model_name, pm?.color, pm?.short_description, sg.sell_group_code].filter(Boolean).join(' ')
+      if (!searchMatches(hay, searchTerm)) return false
     }
     if (filters.brand) {
       const pm = sg.product_models as { brand: string } | null

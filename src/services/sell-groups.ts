@@ -1,4 +1,6 @@
 import { supabase } from '@/lib/supabase'
+import { fetchAllPages } from '@/lib/fetch-all-pages'
+import { searchMatches } from '@/lib/search'
 import type { SellGroup, SellGroupInsert, SellGroupUpdate } from '@/lib/types'
 
 interface SellGroupFilters {
@@ -23,32 +25,39 @@ const REP_ITEM_SELECT = `
 `
 
 export async function getSellGroups(filters: SellGroupFilters = {}) {
-  let query = supabase
-    .from('sell_groups')
-    .select(`
-      *,
-      product_models(*, categories(name, description_fields)),
-      ${REP_ITEM_SELECT}
-    `)
-    .order('created_at', { ascending: false })
+  const buildQuery = () => {
+    let query = supabase
+      .from('sell_groups')
+      .select(`
+        *,
+        product_models(*, categories(name, description_fields)),
+        ${REP_ITEM_SELECT}
+      `)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: true })
 
-  if (filters.search) {
-    query = query.ilike('sell_group_code', `%${filters.search}%`)
-  }
-  if (filters.active !== undefined) {
-    query = query.eq('active', filters.active)
-  }
-  if (filters.productId) {
-    query = query.eq('product_id', filters.productId)
-  }
-  if (filters.grade) {
-    query = query.eq('condition_grade', filters.grade)
+    if (filters.active !== undefined) {
+      query = query.eq('active', filters.active)
+    }
+    if (filters.productId) {
+      query = query.eq('product_id', filters.productId)
+    }
+    if (filters.grade) {
+      query = query.eq('condition_grade', filters.grade)
+    }
+    return query
   }
 
-  const { data, error } = await query
+  type Row = NonNullable<Awaited<ReturnType<typeof buildQuery>>['data']>[number]
+  const rows = await fetchAllPages<Row>((from, to) => buildQuery().range(from, to))
 
-  if (error) throw error
-  return data ?? []
+  // Separator-insensitive fuzzy search over G-code + product identity (@/lib/search).
+  if (!filters.search) return rows
+  return rows.filter((sg) => {
+    const pm = sg.product_models as { brand: string | null; model_name: string | null; color: string | null; short_description: string | null } | null
+    const hay = [sg.sell_group_code, pm?.brand, pm?.model_name, pm?.color, pm?.short_description].filter(Boolean).join(' ')
+    return searchMatches(hay, filters.search!)
+  })
 }
 
 export async function getSellGroup(id: string) {
@@ -312,18 +321,12 @@ export async function getUnassignedAvailableItems(filters: UnassignedItemFilters
       }
     })
 
-  // Client-side search across item_code, brand, and model_name
+  // Separator-insensitive fuzzy search across item_code, brand, model_name, color (@/lib/search)
   if (filters.search) {
-    const words = filters.search.toLowerCase().split(/\s+/).filter(Boolean)
     results = results.filter(item => {
       const pm = item.product_models as { brand: string; model_name: string; color: string } | null
-      const text = [
-        item.item_code,
-        pm?.brand ?? '',
-        pm?.model_name ?? '',
-        pm?.color ?? '',
-      ].join(' ').toLowerCase()
-      return words.every(w => text.includes(w))
+      const text = [item.item_code, pm?.brand, pm?.model_name, pm?.color].filter(Boolean).join(' ')
+      return searchMatches(text, filters.search!)
     })
   }
 
@@ -408,33 +411,40 @@ interface SellGroupListFilters {
 }
 
 export async function getSellGroupsForList(filters: SellGroupListFilters = {}) {
-  let query = supabase
-    .from('sell_groups')
-    .select(`
-      *,
-      product_models(
-        id, brand, model_name, color, short_description, cpu, ram_gb, storage_gb, screen_size, os_family,
-        categories(name, description_fields),
-        product_media(id, file_url, media_type, sort_order)
-      ),
-      ${REP_ITEM_SELECT}
-    `)
-    .order('created_at', { ascending: false })
+  const buildQuery = () => {
+    let query = supabase
+      .from('sell_groups')
+      .select(`
+        *,
+        product_models(
+          id, brand, model_name, color, short_description, cpu, ram_gb, storage_gb, screen_size, os_family,
+          categories(name, description_fields),
+          product_media(id, file_url, media_type, sort_order)
+        ),
+        ${REP_ITEM_SELECT}
+      `)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: true })
 
-  if (filters.search) {
-    query = query.ilike('sell_group_code', `%${filters.search}%`)
-  }
-  if (filters.grade) {
-    query = query.eq('condition_grade', filters.grade)
-  }
-  if (filters.isLiveSelling !== undefined) {
-    query = query.eq('is_live_selling', filters.isLiveSelling)
+    if (filters.grade) {
+      query = query.eq('condition_grade', filters.grade)
+    }
+    if (filters.isLiveSelling !== undefined) {
+      query = query.eq('is_live_selling', filters.isLiveSelling)
+    }
+    return query
   }
 
-  const { data, error } = await query
+  type Row = NonNullable<Awaited<ReturnType<typeof buildQuery>>['data']>[number]
+  const rows = await fetchAllPages<Row>((from, to) => buildQuery().range(from, to))
 
-  if (error) throw error
-  return data ?? []
+  // Separator-insensitive fuzzy search over G-code + product identity (@/lib/search).
+  if (!filters.search) return rows
+  return rows.filter((sg) => {
+    const pm = sg.product_models as { brand: string | null; model_name: string | null; color: string | null; short_description: string | null } | null
+    const hay = [sg.sell_group_code, pm?.brand, pm?.model_name, pm?.color, pm?.short_description].filter(Boolean).join(' ')
+    return searchMatches(hay, filters.search!)
+  })
 }
 
 export type SellGroupListItem = Awaited<ReturnType<typeof getSellGroupsForList>>[number]

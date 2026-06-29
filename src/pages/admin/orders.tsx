@@ -17,6 +17,7 @@ import { usePersistedFilters } from '@/hooks/use-persisted-filters'
 import { useOffers, useCancelOffer } from '@/hooks/use-offers'
 import { ORDER_STATUSES, ORDER_SOURCES, OFFER_STATUSES, getYamatoStatusConfig } from '@/lib/constants'
 import { formatDateTime, formatPrice, formatCustomerName, cn } from '@/lib/utils'
+import { searchMatches } from '@/lib/search'
 import { printBatchInvoices } from '@/components/orders/batch-invoice-print'
 import { validateOrders, generateDempyoXlsx, downloadBlob, generateDempyoFilename } from '@/lib/yamato'
 import { YamatoTrackingImportDialog } from '@/components/orders/yamato-tracking-import-dialog'
@@ -333,8 +334,9 @@ export default function OrderListPage() {
     statusCounts[order.order_status] = (statusCounts[order.order_status] ?? 0) + 1
   }
 
-  // Client-side search across offer code, FB name, customer (name/code/email/phone), and order code
-  const offerSearchQuery = mainTab === 'offers' ? search.trim().toLowerCase() : ''
+  // Separator-insensitive fuzzy search across offer code, FB name, customer
+  // (name/code/email/phone), and order code (@/lib/search)
+  const offerSearchQuery = mainTab === 'offers' ? search.trim() : ''
   const searchedOffers = offerSearchQuery
     ? offers.filter((o) => {
         const c = o.customers
@@ -351,8 +353,7 @@ export default function OrderListPage() {
         ]
           .filter(Boolean)
           .join(' ')
-          .toLowerCase()
-        return haystack.includes(offerSearchQuery)
+        return searchMatches(haystack, offerSearchQuery)
       })
     : offers
 
