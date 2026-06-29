@@ -6,12 +6,15 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('product-media', 'product-media', true)
 ON CONFLICT (id) DO NOTHING;
 
+DROP POLICY IF EXISTS "product-media public read" ON storage.objects;
 CREATE POLICY "product-media public read"
   ON storage.objects FOR SELECT USING (bucket_id = 'product-media');
+
+DROP POLICY IF EXISTS "product-media authenticated insert" ON storage.objects;
 CREATE POLICY "product-media authenticated insert"
   ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'product-media' AND auth.role() = 'authenticated');
-CREATE POLICY "product-media service insert"
-  ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'product-media' AND auth.role() = 'service_role');
+
+DROP POLICY IF EXISTS "product-media authenticated delete" ON storage.objects;
 CREATE POLICY "product-media authenticated delete"
   ON storage.objects FOR DELETE USING (bucket_id = 'product-media' AND auth.role() = 'authenticated');
 
