@@ -24,6 +24,7 @@ import { useProductColorGroups, useCreateProductModel } from '@/hooks/use-produc
 import { useCategories } from '@/hooks/use-categories'
 import { useDebounce } from '@/hooks/use-debounce'
 import { cn } from '@/lib/utils'
+import { normalizeSearchText, searchQueryTokens } from '@/lib/search'
 import type { ProductColorGroup } from '@/services/product-models'
 import type { ProductModelFormValues } from '@/validators/product-model'
 
@@ -33,13 +34,9 @@ function formatStorage(storage: string | null): string {
   return n >= 1024 ? `${n / 1024}TB` : `${n}GB`
 }
 
-// Split the search box into lowercased tokens (multi-token AND mirrors the RPC).
-function searchTokens(search: string): string[] {
-  return search.trim().toLowerCase().split(/\s+/).filter(Boolean)
-}
-
 function buildColumns(search: string): ColumnDef<ProductColorGroup>[] {
-  const tokens = searchTokens(search)
+  // Separator-insensitive tokens (matches the server fuzzy RPC via @/lib/search).
+  const tokens = searchQueryTokens(search)
   return [
     {
       id: 'category',
@@ -59,7 +56,7 @@ function buildColumns(search: string): ColumnDef<ProductColorGroup>[] {
         // Does a SKU line match the search? (storage or part# contains a token.)
         const lineMatches = (sku: { storage_gb: string | null; part_number: string | null }) => {
           if (tokens.length === 0) return false
-          const hay = `${formatStorage(sku.storage_gb)} ${sku.part_number ?? ''}`.toLowerCase()
+          const hay = normalizeSearchText(`${formatStorage(sku.storage_gb)} ${sku.part_number ?? ''}`)
           return tokens.some((t) => hay.includes(t))
         }
         const anyLineMatches = g.skus.some(lineMatches)
