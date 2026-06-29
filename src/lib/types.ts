@@ -214,6 +214,7 @@ export type BodyCondition = Enums['body_condition']
 export type KaitoriMediaRole = Enums['kaitori_media_role']
 export type IntakeAdjustmentType = Enums['intake_adjustment_type']
 export type OfferStatus = Enums['offer_status']
+export type NetworkRestrictionStatus = Enums['network_restriction_status']
 
 export type SupplierReturnStatus = Enums['supplier_return_status']
 export type SupplierReturnResolution = Enums['supplier_return_resolution']

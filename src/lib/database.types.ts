@@ -1,4 +1,3 @@
-Initialising login role...
 export type Json =
   | string
   | number
@@ -12,6 +11,31 @@ export type Database = {
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.1"
+  }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -1658,6 +1682,7 @@ export type Database = {
           missing_since: string | null
           model_name: string | null
           model_number: string | null
+          network_restriction_status: Database["public"]["Enums"]["network_restriction_status"]
           os_family: string | null
           other_features: string | null
           part_number: string | null
@@ -1721,6 +1746,7 @@ export type Database = {
           missing_since?: string | null
           model_name?: string | null
           model_number?: string | null
+          network_restriction_status?: Database["public"]["Enums"]["network_restriction_status"]
           os_family?: string | null
           other_features?: string | null
           part_number?: string | null
@@ -1784,6 +1810,7 @@ export type Database = {
           missing_since?: string | null
           model_name?: string | null
           model_number?: string | null
+          network_restriction_status?: Database["public"]["Enums"]["network_restriction_status"]
           os_family?: string | null
           other_features?: string | null
           part_number?: string | null
@@ -1928,6 +1955,7 @@ export type Database = {
           auto_quote_price: number
           battery_condition: Database["public"]["Enums"]["battery_condition"]
           body_condition: Database["public"]["Enums"]["body_condition"]
+          carrier: string | null
           created_at: string
           customer_id: string
           delivery_method: Database["public"]["Enums"]["kaitori_delivery_method"]
@@ -1955,6 +1983,7 @@ export type Database = {
           auto_quote_price: number
           battery_condition: Database["public"]["Enums"]["battery_condition"]
           body_condition: Database["public"]["Enums"]["body_condition"]
+          carrier?: string | null
           created_at?: string
           customer_id: string
           delivery_method: Database["public"]["Enums"]["kaitori_delivery_method"]
@@ -1982,6 +2011,7 @@ export type Database = {
           auto_quote_price?: number
           battery_condition?: Database["public"]["Enums"]["battery_condition"]
           body_condition?: Database["public"]["Enums"]["body_condition"]
+          carrier?: string | null
           created_at?: string
           customer_id?: string
           delivery_method?: Database["public"]["Enums"]["kaitori_delivery_method"]
@@ -4233,6 +4263,12 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      search_fold: { Args: { p: string }; Returns: string }
+      search_matches: {
+        Args: { haystack: string; query: string }
+        Returns: boolean
+      }
+      search_normalize: { Args: { p: string }; Returns: string }
       search_product_models: {
         Args: { p_category_id?: string; p_limit?: number; p_search?: string }
         Returns: {
@@ -4334,6 +4370,7 @@ export type Database = {
       message_role: "customer" | "assistant" | "staff" | "system" | "internal"
       message_status: "DRAFT" | "SENDING" | "SENT" | "FAILED" | "REJECTED"
       message_type: "REPLY" | "REVIEW_REQUEST" | "DELIVERY_ALERT"
+      network_restriction_status: "CLEAN" | "CAUTION" | "BLOCKED" | "UNKNOWN"
       offer_status: "PENDING" | "CLAIMED" | "EXPIRED" | "CANCELLED"
       order_source: "SHOP" | "LIVE_SELLING" | "WALK_IN" | "FB" | "YOUTUBE"
       order_status:
@@ -4498,6 +4535,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       ac_adapter_status: ["CORRECT", "INCORRECT", "MISSING"],
@@ -4569,6 +4609,7 @@ export const Constants = {
       message_role: ["customer", "assistant", "staff", "system", "internal"],
       message_status: ["DRAFT", "SENDING", "SENT", "FAILED", "REJECTED"],
       message_type: ["REPLY", "REVIEW_REQUEST", "DELIVERY_ALERT"],
+      network_restriction_status: ["CLEAN", "CAUTION", "BLOCKED", "UNKNOWN"],
       offer_status: ["PENDING", "CLAIMED", "EXPIRED", "CANCELLED"],
       order_source: ["SHOP", "LIVE_SELLING", "WALK_IN", "FB", "YOUTUBE"],
       order_status: [
@@ -4609,5 +4650,3 @@ export const Constants = {
     },
   },
 } as const
-A new version of Supabase CLI is available: v2.108.0 (currently installed v2.90.0)
-We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli

@@ -262,6 +262,7 @@ export default function KaitoriDetailPage() {
             <div className="flex justify-between"><span className="text-muted-foreground">Code</span><CodeDisplay code={kt.kaitori_code} /></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Device</span><span>{pm ? `${pm.brand} ${pm.model_name}` : '—'}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Config</span><span>{pm ? `${pm.cpu ?? ''} / ${pm.ram_gb ?? '?'} / ${pm.storage_gb ?? '?'}` : '—'}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Carrier</span><span>{kt.carrier || '—'}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Delivery</span><span>{deliveryLabel}</span></div>
             {kt.tracking_number && <div className="flex justify-between"><span className="text-muted-foreground">Tracking</span><span className="font-mono">{kt.tracking_number}</span></div>}
             <div className="flex justify-between"><span className="text-muted-foreground">Created</span><span>{formatDateTime(kt.created_at)}</span></div>

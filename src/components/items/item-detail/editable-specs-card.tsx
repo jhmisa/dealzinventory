@@ -9,10 +9,12 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useUpdateItem } from '@/hooks/use-items'
 import { itemSpecsSchema, type ItemSpecsFormValues } from '@/validators/item'
-import { getSpecFieldLabel } from '@/lib/constants'
-import type { Item, ProductModel, ItemUpdate } from '@/lib/types'
+import { getSpecFieldLabel, NETWORK_RESTRICTION_STATUSES } from '@/lib/constants'
+import { cn } from '@/lib/utils'
+import type { Item, ProductModel, ItemUpdate, NetworkRestrictionStatus } from '@/lib/types'
 
 type ProductModelJoined = ProductModel & {
   categories?: { name: string; form_fields: string[] } | null
@@ -85,6 +87,7 @@ export function EditableSpecsCard({ item, productModel, locked }: EditableSpecsC
       is_unlocked: item.is_unlocked ?? null,
       imei: item.imei ?? '',
       imei2: item.imei2 ?? '',
+      network_restriction_status: item.network_restriction_status ?? 'UNKNOWN',
       battery_health_pct: item.battery_health_pct ?? null,
       year: item.year ?? null,
       model_number: item.model_number ?? '',
@@ -135,6 +138,15 @@ export function EditableSpecsCard({ item, productModel, locked }: EditableSpecsC
       const newVal = values[key] || null
       if (newVal !== (item[key] ?? null)) {
         ;(updates as Record<string, unknown>)[key] = newVal
+        hasChanges = true
+      }
+    }
+
+    // Network restriction status (enum, defaults to UNKNOWN)
+    {
+      const newVal = values.network_restriction_status ?? 'UNKNOWN'
+      if (newVal !== (item.network_restriction_status ?? 'UNKNOWN')) {
+        updates.network_restriction_status = newVal
         hasChanges = true
       }
     }
@@ -312,6 +324,22 @@ export function EditableSpecsCard({ item, productModel, locked }: EditableSpecsC
                     <Label className="text-xs text-muted-foreground">IMEI 2</Label>
                     <Input {...form.register('imei2')} placeholder="—" className="h-8 text-sm" />
                   </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Network Restriction</Label>
+                    <Select
+                      value={form.watch('network_restriction_status') ?? 'UNKNOWN'}
+                      onValueChange={(v) => form.setValue('network_restriction_status', v as NetworkRestrictionStatus, { shouldDirty: true })}
+                    >
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {NETWORK_RESTRICTION_STATUSES.map((s) => (
+                          <SelectItem key={s.value} value={s.value}>{s.symbol} {s.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </>
               )}
             </div>
@@ -394,6 +422,10 @@ export function EditableSpecsCard({ item, productModel, locked }: EditableSpecsC
           <>
             <Row label="IMEI" value={item.imei} />
             <Row label="IMEI 2" value={item.imei2} />
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground">Network Restriction</span>
+              <RestrictionBadge value={item.network_restriction_status} />
+            </div>
           </>
         )}
 
@@ -436,6 +468,15 @@ function Row({ label, value }: { label: string; value: string | number | null | 
       <span className="text-muted-foreground">{label}</span>
       <span>{value || '—'}</span>
     </div>
+  )
+}
+
+function RestrictionBadge({ value }: { value: NetworkRestrictionStatus | null | undefined }) {
+  const s = NETWORK_RESTRICTION_STATUSES.find((x) => x.value === (value ?? 'UNKNOWN')) ?? NETWORK_RESTRICTION_STATUSES[3]
+  return (
+    <span className={cn('inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium', s.color)}>
+      {s.symbol} {s.label}
+    </span>
   )
 }
 

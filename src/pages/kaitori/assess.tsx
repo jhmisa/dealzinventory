@@ -35,6 +35,7 @@ import {
   SCREEN_CONDITIONS,
   BODY_CONDITIONS,
   KAITORI_DELIVERY_METHODS,
+  CARRIER_OPTIONS,
 } from '@/lib/constants'
 import { formatPrice, cn } from '@/lib/utils'
 
@@ -52,6 +53,7 @@ export default function KaitoriAssessPage() {
     resolver: zodResolver(kaitoriRequestSchema),
     defaultValues: {
       product_model_id: '',
+      carrier: '',
       seller_notes: '',
     },
   })
@@ -96,6 +98,7 @@ export default function KaitoriAssessPage() {
     // For MVP, use a placeholder customer_id (real flow uses customer-auth)
     createMutation.mutate({
       ...values,
+      carrier: values.carrier || null,
       customer_id: '00000000-0000-0000-0000-000000000000',
       auto_quote_price: quotePrice ?? 0,
       request_status: 'QUOTED',
@@ -193,6 +196,29 @@ export default function KaitoriAssessPage() {
                             <SelectItem key={m.id} value={m.id}>
                               {m.brand} {m.model_name}
                             </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="carrier"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Carrier</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select carrier (optional)" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {CARRIER_OPTIONS.map((c) => (
+                            <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>

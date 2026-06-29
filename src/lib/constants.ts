@@ -1,4 +1,4 @@
-import type { ConditionGrade, ItemStatus, SourceType, SupplierType, ProductStatus, AcAdapterStatus, OrderStatus, OrderSource, KaitoriStatus, KaitoriDeliveryMethod, KaitoriPaymentMethod, BatteryCondition, ScreenCondition, BodyCondition, KaitoriMediaRole, IntakeAdjustmentType, OfferStatus, SupplierReturnStatus, SupplierReturnResolution, RefundPaymentMethod, InventoryRemovalReason, InventoryRemovalStatus, TicketStatus, TicketPriority } from './types'
+import type { ConditionGrade, ItemStatus, SourceType, SupplierType, ProductStatus, AcAdapterStatus, OrderStatus, OrderSource, KaitoriStatus, KaitoriDeliveryMethod, KaitoriPaymentMethod, BatteryCondition, ScreenCondition, BodyCondition, KaitoriMediaRole, IntakeAdjustmentType, OfferStatus, SupplierReturnStatus, SupplierReturnResolution, RefundPaymentMethod, InventoryRemovalReason, InventoryRemovalStatus, TicketStatus, TicketPriority, NetworkRestrictionStatus } from './types'
 
 // --- Device Category Groupings ---
 
@@ -81,6 +81,25 @@ export const CONDITION_GRADES: { value: ConditionGrade; label: string; color: st
   { value: 'C', label: 'C — Fair', color: 'bg-amber-100 text-amber-800 border-amber-300' },
   { value: 'D', label: 'D — As-Is', color: 'bg-orange-100 text-orange-800 border-orange-300' },
   { value: 'J', label: 'J — Junk', color: 'bg-red-100 text-red-800 border-red-300' },
+]
+
+// Network utilization restriction (ネットワーク利用制限) — Japanese carrier blacklist status.
+export const NETWORK_RESTRICTION_STATUSES: { value: NetworkRestrictionStatus; label: string; symbol: string; color: string }[] = [
+  { value: 'CLEAN', label: 'Clean', symbol: '○', color: 'bg-green-100 text-green-800 border-green-300' },
+  { value: 'CAUTION', label: 'Caution', symbol: '△', color: 'bg-amber-100 text-amber-800 border-amber-300' },
+  { value: 'BLOCKED', label: 'Blocked', symbol: '×', color: 'bg-red-100 text-red-800 border-red-300' },
+  { value: 'UNKNOWN', label: 'Not checked', symbol: '—', color: 'bg-gray-100 text-gray-700 border-gray-300' },
+]
+
+// Common Japanese carriers for kaitori / item provenance (free-text values).
+export const CARRIER_OPTIONS: { value: string; label: string }[] = [
+  { value: 'SIM-free', label: 'SIM-free' },
+  { value: 'docomo', label: 'docomo' },
+  { value: 'au', label: 'au' },
+  { value: 'SoftBank', label: 'SoftBank' },
+  { value: 'Rakuten', label: 'Rakuten Mobile' },
+  { value: 'Y!mobile', label: 'Y!mobile' },
+  { value: 'UQ mobile', label: 'UQ mobile' },
 ]
 
 export const ITEM_STATUSES: { value: ItemStatus; label: string; color: string }[] = [

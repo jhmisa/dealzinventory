@@ -6,6 +6,7 @@ export const kaitoriRequestSchema = z.object({
   screen_condition: z.enum(['GOOD', 'FAIR', 'POOR', 'CRACKED'], { required_error: 'Screen condition is required' }),
   body_condition: z.enum(['GOOD', 'FAIR', 'POOR', 'DAMAGED'], { required_error: 'Body condition is required' }),
   delivery_method: z.enum(['SHIP', 'WALK_IN'], { required_error: 'Delivery method is required' }),
+  carrier: z.string().optional().or(z.literal('')),
   seller_notes: z.string().optional().or(z.literal('')),
 })
 

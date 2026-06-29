@@ -42,7 +42,7 @@ import { useItem, useUpdateItem } from '@/hooks/use-items'
 import { useProductModelsWithHeroImage, useProductModel } from '@/hooks/use-product-models'
 import { useItemDefects } from '@/hooks/use-item-defects'
 import { inspectionSchema, type InspectionFormValues } from '@/validators/inspection'
-import { CONDITION_GRADES, DEFECT_TYPES, FUNCTIONALITY_CHECKS, SPEC_CHECK_FIELDS } from '@/lib/constants'
+import { CONDITION_GRADES, DEFECT_TYPES, FUNCTIONALITY_CHECKS, SPEC_CHECK_FIELDS, NETWORK_RESTRICTION_STATUSES } from '@/lib/constants'
 import type { DeviceCategory } from '@/lib/constants'
 import type { ProductModel, ItemCost, ItemMedia } from '@/lib/types'
 import { cn, formatPrice } from '@/lib/utils'
@@ -483,6 +483,7 @@ export default function InspectItemPage() {
       carrier: item.carrier ?? pm?.carrier ?? '',
       is_unlocked: item.is_unlocked ?? pm?.is_unlocked ?? null,
       imei: item.imei ?? '',
+      network_restriction_status: item.network_restriction_status ?? 'UNKNOWN',
       specs_verified: false,
       specs_notes: item.specs_notes ?? '',
       condition_notes: item.condition_notes ?? '',
@@ -499,6 +500,8 @@ export default function InspectItemPage() {
     (f) => !deviceCategory || f.categories.includes(deviceCategory)
   )
   const showAcAdapter = !deviceCategory || ['COMPUTER', 'TABLET', 'OTHER'].includes(deviceCategory)
+  // Network restriction is phone-only — mirror IMEI visibility
+  const showRestriction = specFields.some((f) => f.key === 'imei')
 
   // Price calculations
   const purchasePrice = form.watch('purchase_price') ?? 0
@@ -711,6 +714,7 @@ export default function InspectItemPage() {
           carrier: values.carrier || null,
           is_unlocked: values.is_unlocked ?? null,
           imei: values.imei || null,
+          network_restriction_status: values.network_restriction_status ?? 'UNKNOWN',
           specs_notes: values.specs_notes || null,
           condition_notes: values.condition_notes || null,
           purchase_price: values.purchase_price ?? null,
@@ -961,6 +965,31 @@ export default function InspectItemPage() {
                 )
               })}
             </div>
+
+            {/* Network Restriction (phones only) */}
+            {showRestriction && (
+              <div className="flex flex-col gap-0.5 w-full sm:w-64">
+                <span className="text-[10px] lg:text-[11px] text-muted-foreground leading-3.5">
+                  Network Restriction (利用制限)
+                </span>
+                <Controller
+                  control={form.control}
+                  name="network_restriction_status"
+                  render={({ field }) => (
+                    <Select value={field.value ?? 'UNKNOWN'} onValueChange={field.onChange}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {NETWORK_RESTRICTION_STATUSES.map((s) => (
+                          <SelectItem key={s.value} value={s.value}>{s.symbol} {s.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
+            )}
 
             {/* Specs Verified Checkbox */}
             <label className={cn(

@@ -56,6 +56,7 @@ export const inspectionSchema = z.object({
   carrier: z.string().optional().or(z.literal('')),
   is_unlocked: z.boolean().nullable().optional(),
   imei: z.string().optional().or(z.literal('')),
+  network_restriction_status: z.enum(['CLEAN', 'CAUTION', 'BLOCKED', 'UNKNOWN']).optional(),
 
   // Specs verified by IT (confirms specs match what's in the system)
   specs_verified: z.boolean().default(false),
