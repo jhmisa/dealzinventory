@@ -42,6 +42,7 @@ import { arrowsSpec } from "./arrows-specs.ts"
 import { huaweiSpec } from "./huawei-specs.ts"
 import { asusSpec } from "./asus-specs.ts"
 import { motorolaSpec } from "./motorola-specs.ts"
+import { extractCardImageMap, normalizeAltKey } from "./card-images.ts"
 
 export interface CarrierSection {
   path: string // url segment, e.g. "simfree" / "wifi"
@@ -88,6 +89,7 @@ export interface CatalogRow {
   source_url: string
   carrier_path: string
   raw_title: string
+  image_url?: string | null // representative listing photo, attached centrally post-parse
   listing_count: number
   specs: Record<string, unknown>
 }
@@ -464,6 +466,11 @@ export async function harvestCatalog(opts: HarvestOptions): Promise<HarvestResul
       if (rows.length === 0) {
         log(`[${section.path}] page ${page} had 0 cards — end of section`)
         break
+      }
+      // Attach the representative listing photo to each row (central join; parsers untouched).
+      const imgMap = extractCardImageMap(html, baseUrl)
+      for (const row of rows) {
+        row.image_url = imgMap.get(normalizeAltKey(row.raw_title)) ?? null
       }
       let newOnPage = 0
       for (const row of rows) {

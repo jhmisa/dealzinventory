@@ -1,5 +1,5 @@
 import { assertEquals } from "https://deno.land/std/assert/mod.ts"
-import { harvestCatalog } from "./harvest.ts"
+import { harvestCatalog, IPHONE_CATEGORY } from "./harvest.ts"
 
 const page1 = await Deno.readTextFile(
   new URL("./__fixtures__/iosys-iphone-simfree-p1.html", import.meta.url),
@@ -40,6 +40,18 @@ Deno.test("harvest: single section, dedupes + enriches + stops at empty page", a
 
   // unknown 2025+ models are flagged, not guessed
   assertEquals(Array.isArray(res.stats.unknownModels), true)
+})
+
+Deno.test("harvest: attaches image_url to rows from card images", async () => {
+  const res = await harvestCatalog({
+    category: IPHONE_CATEGORY,
+    sections: [{ path: "simfree", carrier: "SIM-Free" }],
+    maxPagesPerSection: 1,
+    throttleMs: 0,
+    fetchPage: () => Promise.resolve(page1),
+  })
+  const withImg = res.rows.filter((r) => r.image_url)
+  if (withImg.length === 0) throw new Error("expected at least one row with image_url")
 })
 
 Deno.test("harvest: respects maxPages cap (no infinite loop on a repeating page)", async () => {
