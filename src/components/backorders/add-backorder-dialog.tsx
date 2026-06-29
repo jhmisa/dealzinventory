@@ -610,7 +610,7 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[640px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[960px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add Backorder</DialogTitle>
           <DialogDescription>
@@ -619,406 +619,441 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
           </DialogDescription>
         </DialogHeader>
 
-        {/* Paste box */}
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium">Supplier URL</label>
-          <div className="flex gap-2">
-            <Input
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://iosys.co.jp/..."
-              className="flex-1"
-            />
-            <Button type="button" onClick={handleFetch} disabled={fetching}>
-              {fetching ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                'Fetch'
-              )}
-            </Button>
+        {/* SOURCE — paste box (not a form field; lives above the Form) */}
+        <section className="rounded-lg border bg-muted/40 p-4">
+          <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Source
+          </h3>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Supplier URL</label>
+            <div className="flex gap-2">
+              <Input
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://iosys.co.jp/..."
+                className="flex-1"
+              />
+              <Button type="button" onClick={handleFetch} disabled={fetching}>
+                {fetching ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  'Fetch'
+                )}
+              </Button>
+            </div>
+            {parsedHint && (
+              <p className="text-xs text-muted-foreground">
+                Parsed: <span className="font-medium">{parsedHint}</span> — pick the
+                matching product model below.
+              </p>
+            )}
           </div>
-          {parsedHint && (
-            <p className="text-xs text-muted-foreground">
-              Parsed: <span className="font-medium">{parsedHint}</span> — pick the
-              matching product model below.
-            </p>
-          )}
-        </div>
+        </section>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-            {/* Product model (required) */}
-            <FormField
-              control={form.control}
-              name="product_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Product Model *</FormLabel>
-                  <FormControl>
-                    <ProductPicker
-                      value={field.value}
-                      onSelect={field.onChange}
-                      products={productList}
-                      initialSearch={pickerSearch || parsedHint || undefined}
-                      categoryId={matchedModel?.category_id ?? undefined}
-                      onCreate={handleCreateProduct}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                  {modelMismatches.length > 0 && (
-                    <p className="mt-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                      ⚠ This model doesn&apos;t match the fetched listing: {modelMismatches.join('; ')}.
-                      Pick the product model that matches the supplier link.
-                    </p>
-                  )}
-                </FormItem>
-              )}
-            />
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-5">
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+              {/* LEFT — Product & Specs */}
+              <section className="space-y-4 rounded-lg border bg-card p-4">
+                <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Product &amp; Specs
+                </h3>
 
-            {/* Supplier (required) */}
-            <FormField
-              control={form.control}
-              name="supplier_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Supplier *</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select supplier..." />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {supplierList.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          {s.supplier_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-2 gap-4">
-              {/* Grade */}
-              <FormField
-                control={form.control}
-                name="condition_grade"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Grade *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                {/* Product model (required) */}
+                <FormField
+                  control={form.control}
+                  name="product_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Product Model *</FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Grade" />
-                        </SelectTrigger>
+                        <ProductPicker
+                          value={field.value}
+                          onSelect={field.onChange}
+                          products={productList}
+                          initialSearch={pickerSearch || parsedHint || undefined}
+                          categoryId={matchedModel?.category_id ?? undefined}
+                          onCreate={handleCreateProduct}
+                        />
                       </FormControl>
-                      <SelectContent>
-                        {GRADES.map((g) => (
-                          <SelectItem key={g} value={g}>
-                            {g}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Selling price */}
-              <FormField
-                control={form.control}
-                name="selling_price"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Selling Price (JPY) *</FormLabel>
-                    <FormControl>
-                      <Input type="number" min={0} {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Color (English) — shown in inventory + customer-facing surfaces */}
-              <FormField
-                control={form.control}
-                name="color"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Color (English)</FormLabel>
-                    <FormControl>
-                      <Input {...field} value={field.value ?? ''} placeholder="e.g. Desert Titanium" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Color (Japanese) — kept for the Kaitori side */}
-              <FormField
-                control={form.control}
-                name="color_ja"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Color (日本語)</FormLabel>
-                    <FormControl>
-                      <Input {...field} value={field.value ?? ''} placeholder="例: デザートチタニウム" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Storage */}
-              <FormField
-                control={form.control}
-                name="storage_gb"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Storage (GB)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min={0}
-                        {...field}
-                        value={field.value ?? ''}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* RAM */}
-              <FormField
-                control={form.control}
-                name="ram_gb"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>RAM (GB)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min={0}
-                        {...field}
-                        value={field.value ?? ''}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* CPU */}
-              <FormField
-                control={form.control}
-                name="cpu"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>CPU</FormLabel>
-                    <FormControl>
-                      <Input {...field} value={field.value ?? ''} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Included accessories — prefilled from the iosys 付属品 list, editable; carried
-                  onto the item when the backorder is received. */}
-              <FormField
-                control={form.control}
-                name="included_accessories"
-                render={({ field }) => (
-                  <FormItem className="col-span-2">
-                    <FormLabel>Included Accessories</FormLabel>
-                    <FormControl>
-                      <Input {...field} value={field.value ?? ''} placeholder="e.g. 箱 / マニュアル" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Supplier price */}
-              <FormField
-                control={form.control}
-                name="supplier_price"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Supplier Price (JPY)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min={0}
-                        {...field}
-                        value={field.value ?? ''}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Markup — added to supplier price to derive the selling price */}
-              <FormField
-                control={form.control}
-                name="markup_jpy"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Markup (JPY)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min={0}
-                        {...field}
-                        value={field.value ?? ''}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Discount — optional customer discount off the selling price (pre-orders can be discounted) */}
-              <FormField
-                control={form.control}
-                name="discount_amount"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Discount (JPY)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min={0}
-                        {...field}
-                        value={field.value ?? ''}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Pricing summary — visualizes Selling = Supplier + Markup, then the effective price
-                  after any discount and the resulting profit (Sell − Disc − Cost). */}
-              <div className="col-span-2 rounded-lg border bg-muted/40 p-4">
-                <div className="flex flex-wrap items-end justify-between gap-4">
-                  <div className="flex items-end gap-3 text-sm tabular-nums">
-                    <div className="flex flex-col">
-                      <span className="text-xs font-medium text-muted-foreground">Supplier</span>
-                      <span className="font-semibold">{yen(pricingSupplier)}</span>
-                    </div>
-                    <span className="pb-0.5 text-muted-foreground">+</span>
-                    <div className="flex flex-col">
-                      <span className="text-xs font-medium text-muted-foreground">Markup</span>
-                      <span className="font-semibold">{yen(pricingMarkup)}</span>
-                    </div>
-                    <span className="pb-0.5 text-muted-foreground">=</span>
-                  </div>
-                  <div className="flex flex-col text-right">
-                    <span className="text-xs font-medium text-muted-foreground">
-                      {pricingDiscount > 0 ? 'Customer Pays' : 'Selling Price'}
-                    </span>
-                    <span className="text-2xl font-bold leading-none tabular-nums">
-                      {pricingDiscount > 0 && (
-                        <span className="mr-1 align-middle text-base font-normal text-muted-foreground line-through">
-                          {yen(pricingSelling)}
-                        </span>
+                      <FormMessage />
+                      {modelMismatches.length > 0 && (
+                        <p className="mt-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                          ⚠ This model doesn&apos;t match the fetched listing: {modelMismatches.join('; ')}.
+                          Pick the product model that matches the supplier link.
+                        </p>
                       )}
-                      {yen(pricingEffective)}
-                    </span>
-                  </div>
-                </div>
-                <div className="mt-2 flex items-center justify-between text-xs tabular-nums">
-                  {pricingDiscount > 0 ? (
-                    <span className="text-muted-foreground">Discount −{yen(pricingDiscount)}</span>
-                  ) : (
-                    <span />
+                    </FormItem>
                   )}
-                  <span className={cn('font-medium', pricingProfit >= 0 ? 'text-green-600' : 'text-red-500')}>
-                    Profit {yen(pricingProfit)}
-                  </span>
+                />
+
+                {/* Supplier (required) */}
+                <FormField
+                  control={form.control}
+                  name="supplier_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Supplier *</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select supplier..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {supplierList.map((s) => (
+                            <SelectItem key={s.id} value={s.id}>
+                              {s.supplier_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Grade */}
+                  <FormField
+                    control={form.control}
+                    name="condition_grade"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Grade *</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Grade" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {GRADES.map((g) => (
+                              <SelectItem key={g} value={g}>
+                                {g}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Color (English) — shown in inventory + customer-facing surfaces */}
+                  <FormField
+                    control={form.control}
+                    name="color"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Color (English)</FormLabel>
+                        <FormControl>
+                          <Input {...field} value={field.value ?? ''} placeholder="e.g. Desert Titanium" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Color (Japanese) — kept for the Kaitori side */}
+                  <FormField
+                    control={form.control}
+                    name="color_ja"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Color (日本語)</FormLabel>
+                        <FormControl>
+                          <Input {...field} value={field.value ?? ''} placeholder="例: デザートチタニウム" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Storage */}
+                  <FormField
+                    control={form.control}
+                    name="storage_gb"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Storage (GB)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min={0}
+                            {...field}
+                            value={field.value ?? ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* RAM */}
+                  <FormField
+                    control={form.control}
+                    name="ram_gb"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>RAM (GB)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min={0}
+                            {...field}
+                            value={field.value ?? ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* CPU */}
+                  <FormField
+                    control={form.control}
+                    name="cpu"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>CPU</FormLabel>
+                        <FormControl>
+                          <Input {...field} value={field.value ?? ''} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
-                {pricingOverridden && (
-                  <p className="mt-2 text-xs text-amber-600">
-                    Manually adjusted — auto = {yen(pricingComputed)} (supplier + markup).
-                  </p>
-                )}
+
+                {/* Included accessories — prefilled from the iosys 付属品 list, editable; carried
+                    onto the item when the backorder is received. */}
+                <FormField
+                  control={form.control}
+                  name="included_accessories"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Included Accessories</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value ?? ''} placeholder="e.g. 箱 / マニュアル" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </section>
+
+              {/* RIGHT — Pricing + Stock & Fulfillment */}
+              <div className="space-y-5">
+                {/* Pricing */}
+                <section className="space-y-4 rounded-lg border bg-card p-4">
+                  <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Pricing
+                  </h3>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    {/* Supplier price */}
+                    <FormField
+                      control={form.control}
+                      name="supplier_price"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Supplier Price (JPY)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min={0}
+                              {...field}
+                              value={field.value ?? ''}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Markup — added to supplier price to derive the selling price */}
+                    <FormField
+                      control={form.control}
+                      name="markup_jpy"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Markup (JPY)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min={0}
+                              {...field}
+                              value={field.value ?? ''}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Discount — optional customer discount off the selling price (pre-orders can be discounted) */}
+                    <FormField
+                      control={form.control}
+                      name="discount_amount"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Discount (JPY)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min={0}
+                              {...field}
+                              value={field.value ?? ''}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {/* Selling price */}
+                  <FormField
+                    control={form.control}
+                    name="selling_price"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Selling Price (JPY) *</FormLabel>
+                        <FormControl>
+                          <Input type="number" min={0} {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Pricing summary — visualizes Selling = Supplier + Markup, then the effective price
+                      after any discount and the resulting profit (Sell − Disc − Cost). */}
+                  <div className="rounded-lg border bg-muted/40 p-4">
+                    <div className="flex flex-wrap items-end justify-between gap-4">
+                      <div className="flex items-end gap-3 text-sm tabular-nums">
+                        <div className="flex flex-col">
+                          <span className="text-xs font-medium text-muted-foreground">Supplier</span>
+                          <span className="font-semibold">{yen(pricingSupplier)}</span>
+                        </div>
+                        <span className="pb-0.5 text-muted-foreground">+</span>
+                        <div className="flex flex-col">
+                          <span className="text-xs font-medium text-muted-foreground">Markup</span>
+                          <span className="font-semibold">{yen(pricingMarkup)}</span>
+                        </div>
+                        <span className="pb-0.5 text-muted-foreground">=</span>
+                      </div>
+                      <div className="flex flex-col text-right">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          {pricingDiscount > 0 ? 'Customer Pays' : 'Selling Price'}
+                        </span>
+                        <span className="text-2xl font-bold leading-none tabular-nums">
+                          {pricingDiscount > 0 && (
+                            <span className="mr-1 align-middle text-base font-normal text-muted-foreground line-through">
+                              {yen(pricingSelling)}
+                            </span>
+                          )}
+                          {yen(pricingEffective)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between text-xs tabular-nums">
+                      {pricingDiscount > 0 ? (
+                        <span className="text-muted-foreground">Discount −{yen(pricingDiscount)}</span>
+                      ) : (
+                        <span />
+                      )}
+                      <span className={cn('font-medium', pricingProfit >= 0 ? 'text-green-600' : 'text-red-500')}>
+                        Profit {yen(pricingProfit)}
+                      </span>
+                    </div>
+                    {pricingOverridden && (
+                      <p className="mt-2 text-xs text-amber-600">
+                        Manually adjusted — auto = {yen(pricingComputed)} (supplier + markup).
+                      </p>
+                    )}
+                  </div>
+                </section>
+
+                {/* Stock & Fulfillment */}
+                <section className="space-y-4 rounded-lg border bg-card p-4">
+                  <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Stock &amp; Fulfillment
+                  </h3>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Supplier stock */}
+                    <FormField
+                      control={form.control}
+                      name="supplier_stock"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Supplier Stock</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min={0}
+                              {...field}
+                              value={field.value ?? ''}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Quantity */}
+                    <FormField
+                      control={form.control}
+                      name="quantity_total"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Quantity *</FormLabel>
+                          <FormControl>
+                            <Input type="number" min={1} {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Lead time — working-day range (min .. max). Shown to customers as
+                        "min–max working days" on pre-order offers. */}
+                    <FormField
+                      control={form.control}
+                      name="lead_time_min_days"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Lead Time Min (working days)</FormLabel>
+                          <FormControl>
+                            <Input type="number" min={0} {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="lead_time_days"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Lead Time Max (working days)</FormLabel>
+                          <FormControl>
+                            <Input type="number" min={0} {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </section>
               </div>
-
-              {/* Supplier stock */}
-              <FormField
-                control={form.control}
-                name="supplier_stock"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Supplier Stock</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min={0}
-                        {...field}
-                        value={field.value ?? ''}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Quantity */}
-              <FormField
-                control={form.control}
-                name="quantity_total"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Quantity *</FormLabel>
-                    <FormControl>
-                      <Input type="number" min={1} {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Lead time — working-day range (min .. max). Shown to customers as
-                  "min–max working days" on pre-order offers. */}
-              <FormField
-                control={form.control}
-                name="lead_time_min_days"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Lead Time Min (working days)</FormLabel>
-                    <FormControl>
-                      <Input type="number" min={0} {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="lead_time_days"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Lead Time Max (working days)</FormLabel>
-                    <FormControl>
-                      <Input type="number" min={0} {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
             </div>
 
-            {/* Photo curate grid */}
-            <div className="space-y-2">
+            {/* PHOTOS — full width */}
+            <section className="space-y-2 rounded-lg border bg-card p-4">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">
                   Photos{' '}
@@ -1062,7 +1097,7 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
                   No photos yet. Fetch a listing or search the web.
                 </p>
               ) : (
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-8 gap-2">
                   {photos.map((photoUrl) => {
                     const isKept = kept.has(photoUrl)
                     return (
@@ -1098,7 +1133,7 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
                   })}
                 </div>
               )}
-            </div>
+            </section>
 
             <DialogFooter>
               <Button
