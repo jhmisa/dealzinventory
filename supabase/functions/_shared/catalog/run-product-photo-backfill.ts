@@ -5,6 +5,15 @@
 //   deno run --allow-env --allow-net supabase/functions/_shared/catalog/run-product-photo-backfill.ts
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
+// SAFETY BRAKE (added 2026-06-30 during product_media recovery): the runner refuses to run
+// unless BACKFILL_ARMED=1 is set. This prevents a stray background respawn from writing data
+// while the team's deleted product photos/videos are being restored. When re-running the clean
+// backfill intentionally, export BACKFILL_ARMED=1.
+if (Deno.env.get("BACKFILL_ARMED") !== "1") {
+  console.log("backfill runner DISABLED (set BACKFILL_ARMED=1 to run intentionally). Exiting.");
+  Deno.exit(0);
+}
+
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const LIMIT = Number(Deno.env.get("BACKFILL_LIMIT") ?? "0"); // 0 = all
