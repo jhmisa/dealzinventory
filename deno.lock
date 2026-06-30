@@ -14,6 +14,7 @@
     "npm:@ffmpeg/ffmpeg@~0.12.15": "0.12.15",
     "npm:@ffmpeg/util@~0.12.2": "0.12.2",
     "npm:@hookform/resolvers@^5.2.2": "5.4.0_react-hook-form@7.78.0__react@19.2.7_react@19.2.7",
+    "npm:@imagemagick/magick-wasm@0.0.31": "0.0.31",
     "npm:@supabase/auth-js@2.108.0": "2.108.0",
     "npm:@supabase/functions-js@2.108.0": "2.108.0",
     "npm:@supabase/postgrest-js@2.108.0": "2.108.0",
@@ -678,6 +679,9 @@
     },
     "@humanwhocodes/retry@0.4.3": {
       "integrity": "sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ=="
+    },
+    "@imagemagick/magick-wasm@0.0.31": {
+      "integrity": "sha512-QNivAUxSaItuiY8ziI/vRy6TtoecD7TOsD1LGZCG3wv8lfbdGbIj2QiJk0FlGkGwAVR966NlD3mkxPNvQrvq0w=="
     },
     "@inquirer/ansi@2.0.7": {
       "integrity": "sha512-3eTuUO1vH2cZm2ZKHeQxnOqlTi9EfZDGgIe3BL3I4u+rJHocr9Fz86M4fjYABPvFnQG/gGK551HqDiIcETwU6Q=="
@@ -5449,7 +5453,8 @@
     "https://deno.land/std@0.224.0/fmt/colors.ts": "508563c0659dd7198ba4bbf87e97f654af3c34eb56ba790260f252ad8012e1c5",
     "https://deno.land/std@0.224.0/internal/diff.ts": "6234a4b493ebe65dc67a18a0eb97ef683626a1166a1906232ce186ae9f65f4e6",
     "https://deno.land/std@0.224.0/internal/format.ts": "0a98ee226fd3d43450245b1844b47003419d34d210fa989900861c79820d21c2",
-    "https://deno.land/std@0.224.0/internal/mod.ts": "534125398c8e7426183e12dc255bb635d94e06d0f93c60a297723abe69d3b22e"
+    "https://deno.land/std@0.224.0/internal/mod.ts": "534125398c8e7426183e12dc255bb635d94e06d0f93c60a297723abe69d3b22e",
+    "https://deno.land/x/imagemagick_deno@0.0.31/mod.ts": "124d7f045429f6e6c486b86e72d025410d09576bc0d8075e69f97118a1a33413"
   },
   "workspace": {
     "packageJson": {
