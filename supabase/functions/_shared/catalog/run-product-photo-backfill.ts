@@ -28,10 +28,11 @@ for (let i = 0; i < (jobs?.length ?? 0); i++) {
       headers: { "Authorization": `Bearer ${SERVICE_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({ product_model_id: job.product_id, image_url: job.image_url }),
     });
-    const out = await r.json();
+    let out: Record<string, unknown> = {};
+    try { out = await r.json(); } catch { out = { error: `non-JSON response (HTTP ${r.status})` }; }
     if (out.ok) ok++;
     else if (out.skipped) skipped++;
-    else { failed++; console.warn(`fail ${job.product_id}: ${out.error}`); }
+    else { failed++; console.warn(`fail ${job.product_id} [${r.status}]: ${out.error}`); }
   } catch (e) {
     failed++; console.warn(`error ${job.product_id}: ${String(e)}`);
   }
