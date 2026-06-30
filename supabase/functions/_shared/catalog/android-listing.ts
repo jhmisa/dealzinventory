@@ -162,9 +162,11 @@ export function parseAndroidListingTitle(
   // 4b. Storage/RAM can sit in the NAME segment, immediately before the code (OPPO
   //     "Reno3 A 6GB 128GB CPH2013 White"). Pull a trailing "{ram}GB {rom}GB" (or lone "{n}GB") run
   //     out of the name so it doesn't pollute the model name; keep it as a storage/RAM fallback.
+  //     An optional trailing Single/Dual-SIM marker after the run is consumed too (ZTE "Nubia Red
+  //     Magic7 18GB 256GB Dual-SIM NX679J ...").
   let nameStorage: number | null = null
   let nameRam: number | null = null
-  const nameSto = nameSeg.match(/\s+((?:\d+\s*GB\s+)*\d+\s*(?:GB|TB))\s*$/i)
+  const nameSto = nameSeg.match(/\s+((?:\d+\s*GB\s+)*\d+\s*(?:GB|TB))(?:\s+(?:Single|Dual)[- ]?SIM)?\s*$/i)
   if (nameSto && nameSto.index != null) {
     const nums = [...nameSto[1].matchAll(/(\d+)\s*(GB|TB)/gi)]
       .map((m) => toStorageGb(m[1], m[2]))
@@ -1079,4 +1081,65 @@ export const MOTOROLA_CONFIG: AndroidBrandConfig = {
       .replace(/\s+/g, " ")
       .trim(),
   colorJaToEn: motorolaColorJaToEn,
+}
+
+// ---------------------------------------------------------------------------
+
+// ZTE Corporation family — sub-brands nubia (flagship) / RED MAGIC (gaming) / Libero (Y!mobile
+// mass-market) / Axon / Blade. Like Xiaomi/Motorola, brand="ZTE" with the sub-brand line kept in
+// model_name. iosys paths: /zte/{simfree,softbank,rakuten,ymobile} (Libero lives ONLY under
+// /zte/ymobile, so ZTE adds a ymobile crawl section — see harvest.ts ZTE_SECTIONS).
+//
+// Code shapes: nubia/RED MAGIC SIM-free NX###J; Rakuten nubia Z####R; Y!mobile/SoftBank (A)###ZT.
+// nubia S2 Lite is code-less (nameConsumeRe fallback). RED MAGIC themed colors (Supernova/Void/
+// Flare/Hailstone/Dusk/Moonlight/Phantom/Prism/Cryo) are ASCII English → flow straight through as
+// color_en; only the basic katakana colors need mapping.
+export const ZTE_COLORS_JA_EN: Record<string, string> = {
+  "ブラック": "Black",
+  "ホワイト": "White",
+  "パープル": "Purple",
+  "ネイビー": "Navy",
+  "ブルー": "Blue",
+  "グレー": "Gray",
+  "シルバー": "Silver",
+  "レッド": "Red",
+  "グリーン": "Green",
+  "ゴールド": "Gold",
+  "ピンク": "Pink",
+}
+
+export function zteColorJaToEn(ja: string | null): string | null {
+  if (!ja) return null
+  return ZTE_COLORS_JA_EN[ja] ?? null
+}
+
+export const ZTE_CONFIG: AndroidBrandConfig = {
+  brand: "ZTE",
+  brandPrefixes: ["ZTE"],
+  // Lenient (contains) so a leading Y!mobile MVNO word ("Y!mobile Libero S10") doesn't fail the
+  // device test — the canonicalizer strips it (CARRIER_WORD only covers docomo/au/softbank/rakuten).
+  modelNameRe: /\b(nubia|red\s*magic|libero|axon|blade)/i, // no trailing \b — names glue the number ("Axon10", "RED MAGIC10")
+  // nubia/RED MAGIC SIM-free NX###J; Rakuten nubia Z####R; Y!mobile/SoftBank (A)###ZT. First wins.
+  modelCodeRe: /\b(NX\d{3}J|Z\d{4}R|A?\d{3}ZT)\b/,
+  // Code-less SIM-free fallback ("nubia S2 Lite ブラック").
+  nameConsumeRe:
+    /^(?:nubia|RED\s*MAGIC|Nubia\s+Red\s+Magic|Libero|Axon|Blade)(?:\s+(?:[A-Za-z]*\d[A-Za-z0-9]*|Pro|Air|Ultra|Max|Lite|Plus|Flip|II|III|IV|V|[45]G))*/i,
+  canonicalModelName: (seg) => {
+    let s = seg.replace(/\s+/g, " ").trim()
+    // 1. Peel a leading Y!mobile/UQ/mineo MVNO word (engine CARRIER_WORD misses these).
+    s = s.replace(/^(Y!?mobile|UQ\s?mobile|UQ|mineo)\s+/i, "")
+    // 2. Peel a leftover "ZTE " brand word if an MVNO/carrier word preceded it.
+    s = s.replace(/^ZTE\s+/i, "")
+    // 3. RED MAGIC: drop the "Nubia " that precedes "Red Magic"; normalize casing → "RED MAGIC";
+    //    insert the space before the number ("RED MAGIC10"→"RED MAGIC 10", "10S"→"10S").
+    s = s.replace(/^nubia\s+(?=red\s*magic)/i, "")
+    s = s.replace(/^red\s*magic/i, "RED MAGIC").replace(/^RED MAGIC(?=\d)/, "RED MAGIC ")
+    // 4. Space a glued Axon number ("Axon10"→"Axon 10"); normalize nubia/Libero/Blade casing.
+    s = s.replace(/^Axon(?=\d)/i, "Axon ")
+    s = s.replace(/^nubia/i, "nubia").replace(/^libero/i, "Libero").replace(/^blade/i, "Blade")
+    // 5. Strip SIM markers. KEEP 5G — model marker ("Libero 5G III", "Axon 10 Pro 5G").
+    s = s.replace(/\b(Single|Dual)[- ]?SIM\b/gi, "")
+    return s.replace(/\s+/g, " ").trim()
+  },
+  colorJaToEn: zteColorJaToEn,
 }

@@ -80,15 +80,23 @@ recategorize any real data-bearing rows. Verify 0 orphaned items afterward (mirr
       brands; 14 spurious JA/EN dup rows archived (superseded_by); 7 colors left JA-token (unverified,
       by design). 207 deno tests green. Data-ops: 2026-07-01-{ipad-fill-gaps, galaxy-s26-spec-backfill,
       android-color-en-cleanup, android-color-dup-archive}.sql.
-- [ ] Phase 2 ZTE/nubia/RED MAGIC (formula + harvest + promote + verify + legacy clean)  ← NEXT
-- [ ] Phase 2 Nothing/CMF
+- [x] **Phase 2 ZTE/nubia/RED MAGIC/Libero DONE (2026-07-01).** New brand built per runbook §3:
+      ZTE_CONFIG + ZTE_COLORS + zte-specs.ts + 13 TDD tests; wired ZTE_CATEGORY w/ a new **ymobile**
+      crawl section (Libero lives only there) via an optional `sections` param on androidCategory().
+      Harvested 18 SKUs (0 unknown, 0 unmapped). Legacy reconcile: 17 COMPUTER rows / 53 items →
+      ANDROID, names cleaned, 2 dups archived. **33 ACTIVE ZTE SKUs, 0 COMPUTER, 0 orphaned items.**
+      Generic engine gain: step 4b tolerates trailing Dual-SIM after in-name storage. 220 tests green.
+      Data-ops: 2026-07-01-zte-{fill-gaps,legacy-reconcile}.sql. Registry §5 updated.
+- [ ] Phase 2 Nothing/CMF  ← NEXT
 - [ ] Phase 2 Kyocera smartphones
 - [ ] Phase 2 HTC
 - [ ] Phase 3 AirPods
 - [ ] Finalize: version bump · PROJECT_STATE · PR
 
 ## Status checkpoint (as of 2026-07-01)
-- **Phase 1 complete & committed.** Next action on resume: Phase 2, brand 1 = **ZTE / nubia / RED MAGIC
-  / Libero** — new-brand recipe per runbook §3 (curl fixture → TDD config in android-listing.ts →
-  research-verified specs+colors → wire harvest.ts + run-harvest-local.ts arm → harvest → fill-gaps →
-  legacy reconcile of the ~17 ZTE COMPUTER junk rows → verify). Photo-recovery goal (prior) DONE; PR #1 open.
+- **Phase 1 + Phase 2 ZTE complete & committed.** Next action on resume: **Phase 2 brand 2 = Nothing
+  (+ CMF)** — new-brand recipe per runbook §3 (curl `/items/smartphone/nothing` fixture → eyeball
+  grammar → TDD NOTHING_CONFIG in android-listing.ts → research-verified specs+colors → wire
+  NOTHING_CATEGORY + run-harvest arm → harvest → fill-gaps → legacy reconcile the 1 Nothing COMPUTER
+  row → verify). Then Kyocera (smartphones only: TORQUE/Android One, EXCLUDE feature phones/tablets),
+  then HTC, then AirPods. Photo-recovery goal (prior) DONE; PR #1 open.

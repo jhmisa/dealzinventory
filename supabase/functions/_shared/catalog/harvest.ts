@@ -31,6 +31,7 @@ import {
   PIXEL_CONFIG,
   XIAOMI_CONFIG,
   XPERIA_CONFIG,
+  ZTE_CONFIG,
 } from "./android-listing.ts"
 import { galaxySpec } from "./galaxy-specs.ts"
 import { xperiaSpec } from "./xperia-specs.ts"
@@ -42,6 +43,7 @@ import { arrowsSpec } from "./arrows-specs.ts"
 import { huaweiSpec } from "./huawei-specs.ts"
 import { asusSpec } from "./asus-specs.ts"
 import { motorolaSpec } from "./motorola-specs.ts"
+import { zteSpec } from "./zte-specs.ts"
 import { extractCardImageMap, normalizeAltKey } from "./card-images.ts"
 
 export interface CarrierSection {
@@ -332,10 +334,11 @@ export function androidCategory(
   config: AndroidBrandConfig,
   specLookup: (modelName: string) => ReturnType<typeof galaxySpec>,
   deviceCategory = "ANDROID",
+  sections: CarrierSection[] = ANDROID_SECTIONS,
 ): HarvestCategory {
   return {
     pathPrefix,
-    sections: ANDROID_SECTIONS,
+    sections,
     pageToRows: (html, section, src) =>
       parseAndroidListingPage(html, config, section.carrier).map((sku) =>
         androidRow(sku, specLookup(sku.model_name), deviceCategory, section, src)
@@ -408,6 +411,22 @@ export const MOTOROLA_CATEGORY: HarvestCategory = androidCategory(
   "items/smartphone/motorola",
   MOTOROLA_CONFIG,
   motorolaSpec,
+)
+
+// ZTE family (nubia / RED MAGIC / Libero / Axon). The Libero mass-market line lives ONLY under
+// /zte/ymobile, so ZTE adds a ymobile crawl section (mapped to the SoftBank carrier — Y!mobile is a
+// SoftBank brand; carrier is per-unit on items, never stored on product_models).
+export const ZTE_SECTIONS: CarrierSection[] = [
+  ...ANDROID_SECTIONS,
+  { path: "ymobile", carrier: "SoftBank" },
+]
+
+export const ZTE_CATEGORY: HarvestCategory = androidCategory(
+  "items/smartphone/zte",
+  ZTE_CONFIG,
+  zteSpec,
+  "ANDROID",
+  ZTE_SECTIONS,
 )
 
 export interface HarvestOptions {

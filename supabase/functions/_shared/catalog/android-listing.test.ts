@@ -13,12 +13,14 @@ import {
   PIXEL_CONFIG,
   XIAOMI_CONFIG,
   XPERIA_CONFIG,
+  ZTE_CONFIG,
 } from "./android-listing.ts"
 
 const arrows = (t: string) => parseAndroidListingTitle(t, ARROWS_CONFIG)
 const huawei = (t: string) => parseAndroidListingTitle(t, HUAWEI_CONFIG)
 const asus = (t: string) => parseAndroidListingTitle(t, ASUS_CONFIG)
 const moto = (t: string) => parseAndroidListingTitle(t, MOTOROLA_CONFIG)
+const zte = (t: string) => parseAndroidListingTitle(t, ZTE_CONFIG)
 
 const galaxy = (t: string) => parseAndroidListingTitle(t, GALAXY_CONFIG)
 const xperia = (t: string) => parseAndroidListingTitle(t, XPERIA_CONFIG)
@@ -1176,4 +1178,103 @@ Deno.test("moto: page extraction (motorola fixture)", () => {
   assertEquals(skus.length > 5, true)
   assertEquals(skus.every((s) => s.brand === "Motorola"), true)
   assertEquals(skus.every((s) => s.color_en != null || s.color_ja != null), true)
+})
+
+// ===================== ZTE family (nubia / RED MAGIC / Libero / Axon) =====================
+
+Deno.test("zte: RED MAGIC simfree, RAM/ROM bracket, ASCII color, glued number spaced", () => {
+  const s = zte("RED MAGIC10 Pro NX789J Dusk【RAM16GB/ROM512GB 国内版SIMフリー】")
+  assertEquals(s?.brand, "ZTE")
+  assertEquals(s?.model_name, "RED MAGIC 10 Pro")
+  assertEquals(s?.model_number, "NX789J")
+  assertEquals(s?.storage_gb, 512)
+  assertEquals(s?.color_en, "Dusk")
+})
+
+Deno.test("zte: RED MAGIC 10S Pro keeps the S", () => {
+  const s = zte("RED MAGIC10S Pro NX789J Moonlight【RAM16GB/ROM512GB 国内版SIMフリー】")
+  assertEquals(s?.model_name, "RED MAGIC 10S Pro")
+  assertEquals(s?.color_en, "Moonlight")
+  assertEquals(s?.storage_gb, 512)
+})
+
+Deno.test("zte: RED MAGIC 11 Air", () => {
+  const s = zte("RED MAGIC11 Air NX799J Phantom【RAM12GB/ROM256GB 国内版SIMフリー】")
+  assertEquals(s?.model_name, "RED MAGIC 11 Air")
+  assertEquals(s?.model_number, "NX799J")
+  assertEquals(s?.storage_gb, 256)
+  assertEquals(s?.color_en, "Phantom")
+})
+
+Deno.test("zte: Nubia Red Magic7 inline storage before code, Dual-SIM stripped", () => {
+  const s = zte("Nubia Red Magic7 18GB 256GB Dual-SIM NX679J Supernova【国内版 SIMフリー】")
+  assertEquals(s?.model_name, "RED MAGIC 7")
+  assertEquals(s?.model_number, "NX679J")
+  assertEquals(s?.storage_gb, 256)
+  assertEquals(s?.color_en, "Supernova")
+})
+
+Deno.test("zte: nubia Z70 Ultra, JA-absent ASCII color", () => {
+  const s = zte("nubia Z70 Ultra NX733J Black 【RAM12GB/ROM256GB 国内版SIMフリー】")
+  assertEquals(s?.model_name, "nubia Z70 Ultra")
+  assertEquals(s?.model_number, "NX733J")
+  assertEquals(s?.storage_gb, 256)
+  assertEquals(s?.color_en, "Black")
+})
+
+Deno.test("zte: nubia S2 Lite code-less, JA color", () => {
+  const s = zte("nubia S2 Lite ブラック【国内版SIMフリー】")
+  assertEquals(s?.model_name, "nubia S2 Lite")
+  assertEquals(s?.model_number, null)
+  assertEquals(s?.color_ja, "ブラック")
+  assertEquals(s?.color_en, "Black")
+})
+
+Deno.test("zte: nubia S2R Rakuten Z-code, JA color", () => {
+  const s = zte("nubia S2R Z6305R ホワイト【楽天版SIMフリー】")
+  assertEquals(s?.model_name, "nubia S2R")
+  assertEquals(s?.model_number, "Z6305R")
+  assertEquals(s?.color_en, "White")
+  assertEquals(s?.carrier, "Rakuten")
+})
+
+Deno.test("zte: nubia S2e SoftBank A###ZT code", () => {
+  const s = zte("【ネットワーク利用制限▲】nubia S2e A506ZT ブラック【SoftBank版SIMフリー】")
+  assertEquals(s?.model_name, "nubia S2e")
+  assertEquals(s?.model_number, "A506ZT")
+  assertEquals(s?.color_en, "Black")
+})
+
+Deno.test("zte: Libero 5G III Y!mobile, A###ZT, keeps 5G in name", () => {
+  const s = zte("Libero 5G III A202ZT パープル【Y!mobile版SIMフリー】")
+  assertEquals(s?.model_name, "Libero 5G III")
+  assertEquals(s?.model_number, "A202ZT")
+  assertEquals(s?.color_en, "Purple")
+})
+
+Deno.test("zte: Libero Flip Y!mobile", () => {
+  const s = zte("Libero Flip A304ZT ホワイト【Y!mobile版SIMフリー】")
+  assertEquals(s?.model_name, "Libero Flip")
+  assertEquals(s?.model_number, "A304ZT")
+  assertEquals(s?.color_en, "White")
+})
+
+Deno.test("zte: Libero S10 leading Y!mobile carrier word stripped, ###ZT code", () => {
+  const s = zte("【SIMロック解除済】Y!mobile Libero S10 901ZT ネイビー")
+  assertEquals(s?.model_name, "Libero S10")
+  assertEquals(s?.model_number, "901ZT")
+  assertEquals(s?.color_en, "Navy")
+  assertEquals(s?.is_unlocked, true)
+})
+
+Deno.test("zte: Axon10 Pro 5G SoftBank, glued number spaced, keeps 5G", () => {
+  const s = zte("【SIMロック解除済】【ネットワーク利用制限▲】SoftBank Axon10 Pro 5G 902ZT Blue")
+  assertEquals(s?.model_name, "Axon 10 Pro 5G")
+  assertEquals(s?.model_number, "902ZT")
+  assertEquals(s?.color_en, "Blue")
+})
+
+Deno.test("zte: nav thumbnail (no code) -> null", () => {
+  assertEquals(zte("Red Magicの画像"), null)
+  assertEquals(zte("nubia Z80 Ultraの画像"), null)
 })

@@ -203,6 +203,7 @@ Re-harvest for new Apple models follows the same shape as §2 (add specs → re-
 | iPad | Apple | `items/tablet/ios/ipad` | part# | `ipad-specs.ts` / `apple-colors.ts` | phase4-ipad data-ops | `iosys-ipad-*-p1.html` | ✅ |
 | Mac | Apple | `items/pc/notepc/macbook` + `items/pc/deskpc/mac` | part# (config in title bracket) | (none — config in title) / `apple-colors.ts` | `2026-06-29-{macbook,deskmac}-fill-gaps.sql` | `iosys-{macbook,deskmac}-p1.html` | ✅ MacBook+desktop; legacy reconcile DEFERRED |
 | Apple Watch | Apple | `items/wearable/apple` | part# (band dropped from identity) | `apple-watch-specs.ts` / `apple-colors.ts` | `2026-06-29-applewatch-{fill-gaps,reconcile}.sql` | `iosys-applewatch-p1.html` | ✅ legacy reconciled inline (7 merged, 8 cleaned) |
+| ZTE | ZTE (nubia/RED MAGIC/Libero/Axon) | `items/smartphone/zte` (+ **ymobile** section) | `NX\d{3}J \| Z\d{4}R \| A?\d{3}ZT` | `zte-specs.ts` / `ZTE_COLORS_JA_EN` | `2026-07-01-zte-{fill-gaps,legacy-reconcile}.sql` | `iosys-zte-p1.html` | ✅ legacy reconciled inline (17 COMPUTER rows / 53 items → ANDROID, 2 dups archived) |
 
 ### Galaxy (Samsung)
 - **Codes:** SIM-free `SM-…Q/C` · au `SCG##`/`SCV##` · docomo `SC-##L`.
@@ -336,6 +337,33 @@ Re-harvest for new Apple models follows the same shape as §2 (add specs → re-
 - **Legacy reconcile:** ~33 COMPUTER phone rows / ~125 items DEFERRED as open debt (size ≈ the
   Samsung pass) — not done inline. Out-of-scope rows left as-is: Redmi Buds (earbuds), Redmi Pad
   (tablet→Phase C), Smart Band, Sound Pocket speaker.
+
+### ZTE (nubia / RED MAGIC / Libero / Axon)
+- **First brand needing a non-default crawl section.** Libero (Y!mobile mass-market) lives ONLY under
+  `/zte/ymobile`, which isn't in `ANDROID_SECTIONS`. Added an optional `sections` param to
+  `androidCategory()` + `ZTE_SECTIONS = [...ANDROID_SECTIONS, {path:"ymobile", carrier:"SoftBank"}]`
+  (Y!mobile carrier mapped to SoftBank — carrier is per-unit on items, never on product_models).
+- **One brand, four sub-brand lines** kept in `model_name` (brand="ZTE", like Xiaomi/POCO): nubia
+  (flagship/mid), RED MAGIC (gaming), Libero (Y!mobile), Axon. Blade = nav-only (no real cards).
+- **Codes:** nubia/RED MAGIC SIM-free `NX###J`; Rakuten nubia `Z####R`; Y!mobile/SoftBank `(A)###ZT`.
+  nubia S2 Lite is code-less → `nameConsumeRe` fallback. **`modelNameRe` is lenient (contains, no
+  trailing `\b`)** — names glue the number ("Axon10", "RED MAGIC10") so a trailing `\b` would fail; and
+  a leading Y!mobile MVNO word is peeled in the canonicalizer (CARRIER_WORD covers only docomo/au/sb/rkt).
+- **Canonicalizer:** "Nubia Red Magic7"/"RED MAGIC10S Pro" → "RED MAGIC 7" / "RED MAGIC 10S Pro" (drop
+  the "Nubia " before "Red Magic", normalize casing, space the number); "Axon10"→"Axon 10"; KEEP 5G
+  (model marker: "Libero 5G III", "Axon 10 Pro 5G"). RED MAGIC themed colors (Supernova/Void/Flare/
+  Dusk/Moonlight/Phantom/Prism/Cryo/Hailstone) are ASCII → flow straight through; only basic katakana
+  colors mapped.
+- **Generic engine capability added with ZTE:** step 4b now tolerates a trailing Single/Dual-SIM marker
+  after the in-name storage run ("Nubia Red Magic7 18GB 256GB Dual-SIM NX679J ...").
+- **Brand casing:** `canonical_brands` already maps `zte → ZTE` (kept all-caps, NOT INITCAP'd to "Zte");
+  fill-gaps still uses the `lower(brand)` guard (OPPO precaution). **Z70 Ultra note:** iosys labels the
+  NX733J card "nubia Z70 Ultra" (officially the Z70S Ultra refresh; same SD 8 Elite) — spec'd as harvested.
+- **Legacy reconcile (inline):** 17 COMPUTER rows / 53 items → ANDROID; names cleaned (trailing code →
+  model_number, "Nubia"→"nubia", "Flip 2"→"Flip2"); Libero 5G III + Libero Flip enriched; 2 fresh
+  null-storage rows superseded by storage-bearing legacy siblings. Legacy-only models (Libero 5G/5G IV,
+  nubia Flip2 5G/S 5G/S2) left spec-less (flagged, never guessed). ⚠️ Postgres regex word boundary is
+  `\y` not `\b` — the first reconcile pass's `^Nubia\b` silently no-op'd; fixed to anchor on the space.
 
 ---
 

@@ -25,6 +25,7 @@ import {
   PIXEL_CATEGORY,
   XIAOMI_CATEGORY,
   XPERIA_CATEGORY,
+  ZTE_CATEGORY,
 } from "./harvest.ts"
 
 const UA =
@@ -61,6 +62,8 @@ const category = which === "ipad"
   ? ROG_CATEGORY
   : which === "motorola"
   ? MOTOROLA_CATEGORY
+  : which === "zte"
+  ? ZTE_CATEGORY
   : IPHONE_CATEGORY
 console.error(`=== harvesting category: ${which} ===`)
 
