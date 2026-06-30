@@ -87,16 +87,25 @@ recategorize any real data-bearing rows. Verify 0 orphaned items afterward (mirr
       ANDROID, names cleaned, 2 dups archived. **33 ACTIVE ZTE SKUs, 0 COMPUTER, 0 orphaned items.**
       Generic engine gain: step 4b tolerates trailing Dual-SIM after in-name storage. 220 tests green.
       Data-ops: 2026-07-01-zte-{fill-gaps,legacy-reconcile}.sql. Registry §5 updated.
-- [ ] Phase 2 Nothing/CMF  ← NEXT
-- [ ] Phase 2 Kyocera smartphones
+- [x] **Phase 2 Nothing (+ CMF) DONE (2026-07-01).** New brand built per runbook §3 — FIRST fully
+      code-less brand (no carrier codes at all; `modelCodeRe` sentinel `/(?!)/` → `nameConsumeRe` only).
+      NOTHING_CONFIG + NOTHING_COLORS_JA_EN + nothing-specs.ts (8 models, research-verified) + 13 TDD
+      tests; handles BOTH the Nothing paren grammar (`Phone(3a) Lite`) and CMF glued grammar
+      (`CMF Phone2 Pro`); brand="Nothing", sub-brands in model_name ("Phone (1)", "CMF Phone 2 Pro").
+      Harvested 32 SKUs (0 unknown, 0 unmapped) → 26 promoted + 1 legacy COMPUTER row reconciled
+      (`Nothing Phone/(2A)/White` → ANDROID `Phone (2a)`) = **27 ACTIVE Nothing SKUs (20 color groups),
+      0 COMPUTER, 0 orphaned items, 0 dups.** 232 deno tests green. UI-verified (`/admin/products?q=nothing`
+      renders "Nothing Phone (1)", "Nothing CMF Phone 2 Pro"). Data-ops: 2026-07-01-nothing-{fill-gaps,
+      legacy-reconcile}.sql. Registry §5 updated.
+- [ ] Phase 2 Kyocera smartphones  ← NEXT (TORQUE/Android One only; EXCLUDE feature phones/tablets)
 - [ ] Phase 2 HTC
 - [ ] Phase 3 AirPods
 - [ ] Finalize: version bump · PROJECT_STATE · PR
 
 ## Status checkpoint (as of 2026-07-01)
-- **Phase 1 + Phase 2 ZTE complete & committed.** Next action on resume: **Phase 2 brand 2 = Nothing
-  (+ CMF)** — new-brand recipe per runbook §3 (curl `/items/smartphone/nothing` fixture → eyeball
-  grammar → TDD NOTHING_CONFIG in android-listing.ts → research-verified specs+colors → wire
-  NOTHING_CATEGORY + run-harvest arm → harvest → fill-gaps → legacy reconcile the 1 Nothing COMPUTER
-  row → verify). Then Kyocera (smartphones only: TORQUE/Android One, EXCLUDE feature phones/tablets),
-  then HTC, then AirPods. Photo-recovery goal (prior) DONE; PR #1 open.
+- **Phase 1 + Phase 2 ZTE + Phase 2 Nothing complete.** Next action on resume: **Phase 2 brand 3 =
+  Kyocera (smartphones ONLY: TORQUE rugged + Android One; EXCLUDE feature phones/ガラケー, tablets,
+  routers — gate on device shape, not just the maker filter)** — new-brand recipe per runbook §3 (curl
+  `/items/smartphone/kyocera` fixture → eyeball grammar → TDD KYOCERA_CONFIG in android-listing.ts →
+  research-verified specs+colors → wire KYOCERA_CATEGORY + run-harvest arm → harvest → fill-gaps →
+  legacy reconcile → verify). Then HTC, then AirPods (Phase 3). Photo-recovery goal (prior) DONE; PR #1 open.

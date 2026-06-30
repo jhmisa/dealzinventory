@@ -1143,3 +1143,63 @@ export const ZTE_CONFIG: AndroidBrandConfig = {
   },
   colorJaToEn: zteColorJaToEn,
 }
+
+// ---------------------------------------------------------------------------
+
+// Nothing + CMF-by-Nothing. A fully CODE-LESS brand: Nothing/CMF sell in Japan ONLY as SIM-free /
+// Rakuten — no carrier (docomo/au/SoftBank) model codes exist at all, so `modelCodeRe` never matches
+// and every card goes through the `nameConsumeRe` path (like Xiaomi SIM-free, but with no coded
+// variants whatsoever). brand="Nothing" with the product line kept in model_name: Nothing phones →
+// "Phone (N)" (display prepends "Nothing" → "Nothing Phone (1)"); CMF keeps its sub-brand word →
+// "CMF Phone 2 Pro" (→ "Nothing CMF Phone 2 Pro", mirroring ZTE's "nubia …"). iosys path:
+// /items/smartphone/nothing (one page covers both Nothing + CMF; no carrier sections).
+//
+// Title grammars (no model code on any card):
+//   "Nothing Phone(1) Black【RAM8GB/ROM256GB 国内版 SIMフリー】"      (paren form, ASCII color)
+//   "Nothing Phone(2a) ミルク【RAM8GB/ROM128GB 国内版 SIMフリー】"     (paren form, JA color)
+//   "Nothing Phone(3a) Lite ブラック【楽天版SIMフリー】"               (Lite tier, storage omitted → NULL)
+//   "CMF Phone2 Pro オレンジ【RAM8GB/ROM256GB 楽天版SIMフリー】"        (CMF, glued number)
+export const NOTHING_COLORS_JA_EN: Record<string, string> = {
+  "ブラック": "Black",
+  "ホワイト": "White",
+  "ダークグレー": "Dark Gray", // Nothing Phone (2)
+  "ミルク": "Milk", // Nothing Phone (2a) — official EN marketing name, not a transliteration artifact
+  "ブルー": "Blue",
+  "レッド": "Red",
+  "ピンク": "Pink",
+  "オレンジ": "Orange", // CMF Phone 2 Pro
+  "ライトグリーン": "Light Green", // CMF global color — NOT a JP SKU, mapped for completeness/safety
+}
+
+export function nothingColorJaToEn(ja: string | null): string | null {
+  if (!ja) return null
+  return NOTHING_COLORS_JA_EN[ja] ?? null
+}
+
+export const NOTHING_CONFIG: AndroidBrandConfig = {
+  brand: "Nothing",
+  brandPrefixes: [], // "Nothing" is the brand AND the start of the product name ("Nothing Phone");
+  // peeling + CMF handling live in nameConsumeRe + canonicalModelName (the Xiaomi pattern).
+  modelNameRe: /phone/i, // lenient (contains) — the anchored nameConsumeRe is the real gate
+  // No code exists on ANY Nothing/CMF JP card — sentinel that never matches, forcing the
+  // nameConsumeRe path for every card. (Must be /g-free per the engine contract.)
+  modelCodeRe: /(?!)/,
+  // Code-less path: consume the model-name prefix. Optional leading "Nothing " maker word (CMF cards
+  // omit it), then EITHER the CMF glued-number form ("CMF Phone2 Pro") OR the Nothing paren form
+  // ("Phone(1)", "Phone(3a)", "Phone(3a) Lite"). Anchored; stops at the first color token.
+  nameConsumeRe:
+    /^(?:Nothing\s+)?(?:CMF\s+Phone\s*\d+[a-z]?(?:\s+(?:Pro|Plus|Lite))*|Phone\s*\(\d+[a-z]?\)(?:\s+(?:Lite|Pro|Plus))*)/i,
+  canonicalModelName: (seg) => {
+    let s = seg.replace(/\s+/g, " ").trim()
+    // 1. Peel the leading "Nothing " maker word (brand renders it back; CMF cards have none).
+    s = s.replace(/^Nothing\s+/i, "")
+    // 2. Normalize the paren form to the official "Phone (N)" styling (space before the paren).
+    s = s.replace(/^Phone\s*\(/i, "Phone (")
+    // 3. CMF: space the glued number ("CMF Phone2 Pro" → "CMF Phone 2 Pro").
+    s = s.replace(/^CMF\s+Phone\s*(?=\d)/i, "CMF Phone ")
+    // 4. Title-case a trailing tier word (Lite/Pro/Plus) so it matches the spec-table keys.
+    s = s.replace(/\b(lite|pro|plus)\b/gi, (m) => m[0].toUpperCase() + m.slice(1).toLowerCase())
+    return s.replace(/\s+/g, " ").trim()
+  },
+  colorJaToEn: nothingColorJaToEn,
+}

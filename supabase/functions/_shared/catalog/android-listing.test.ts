@@ -14,6 +14,7 @@ import {
   XIAOMI_CONFIG,
   XPERIA_CONFIG,
   ZTE_CONFIG,
+  NOTHING_CONFIG,
 } from "./android-listing.ts"
 
 const arrows = (t: string) => parseAndroidListingTitle(t, ARROWS_CONFIG)
@@ -21,6 +22,7 @@ const huawei = (t: string) => parseAndroidListingTitle(t, HUAWEI_CONFIG)
 const asus = (t: string) => parseAndroidListingTitle(t, ASUS_CONFIG)
 const moto = (t: string) => parseAndroidListingTitle(t, MOTOROLA_CONFIG)
 const zte = (t: string) => parseAndroidListingTitle(t, ZTE_CONFIG)
+const nothing = (t: string) => parseAndroidListingTitle(t, NOTHING_CONFIG)
 
 const galaxy = (t: string) => parseAndroidListingTitle(t, GALAXY_CONFIG)
 const xperia = (t: string) => parseAndroidListingTitle(t, XPERIA_CONFIG)
@@ -1277,4 +1279,108 @@ Deno.test("zte: Axon10 Pro 5G SoftBank, glued number spaced, keeps 5G", () => {
 Deno.test("zte: nav thumbnail (no code) -> null", () => {
   assertEquals(zte("Red Magicの画像"), null)
   assertEquals(zte("nubia Z80 Ultraの画像"), null)
+})
+
+// ---------------------------------------------------------------------------
+// Nothing + CMF-by-Nothing — fully code-less brand, paren + glued grammars
+// ---------------------------------------------------------------------------
+
+Deno.test("nothing: Phone(1) paren form, ASCII color, RAM/ROM bracket, no code", () => {
+  const s = nothing("Nothing Phone(1) Black【RAM8GB/ROM256GB 国内版 SIMフリー】")
+  assertEquals(s?.brand, "Nothing")
+  assertEquals(s?.model_name, "Phone (1)")
+  assertEquals(s?.model_number, null)
+  assertEquals(s?.storage_gb, 256)
+  assertEquals(s?.ram_gb, 8)
+  assertEquals(s?.color_en, "Black")
+  assertEquals(s?.carrier, "SIM-Free")
+})
+
+Deno.test("nothing: Phone(2) White, 12GB tier (title RAM overrides spec base)", () => {
+  const s = nothing("Nothing Phone(2) White【RAM12GB/ROM256GB 国内版 SIMフリー】")
+  assertEquals(s?.model_name, "Phone (2)")
+  assertEquals(s?.storage_gb, 256)
+  assertEquals(s?.ram_gb, 12)
+  assertEquals(s?.color_en, "White")
+})
+
+Deno.test("nothing: Phone(2a) JA color ミルク -> Milk", () => {
+  const s = nothing("Nothing Phone(2a) ミルク【RAM8GB/ROM128GB 国内版 SIMフリー】")
+  assertEquals(s?.model_name, "Phone (2a)")
+  assertEquals(s?.storage_gb, 128)
+  assertEquals(s?.color_ja, "ミルク")
+  assertEquals(s?.color_en, "Milk")
+})
+
+Deno.test("nothing: Phone(3) flagship, JA color, 16GB tier, Rakuten", () => {
+  const s = nothing("Nothing Phone(3) ホワイト【RAM16GB/ROM512GB 楽天版SIMフリー】")
+  assertEquals(s?.model_name, "Phone (3)")
+  assertEquals(s?.storage_gb, 512)
+  assertEquals(s?.color_en, "White")
+  assertEquals(s?.carrier, "Rakuten")
+})
+
+Deno.test("nothing: Phone(3a) Lite tier, storage omitted -> NULL (flagged, never guessed)", () => {
+  const s = nothing("Nothing Phone(3a) Lite ブラック【楽天版SIMフリー】")
+  assertEquals(s?.model_name, "Phone (3a) Lite")
+  assertEquals(s?.storage_gb, null)
+  assertEquals(s?.color_en, "Black")
+  assertEquals(s?.carrier, "Rakuten")
+})
+
+Deno.test("nothing: Phone(3a) plain (not Lite)", () => {
+  const s = nothing("Nothing Phone(3a) ブルー【RAM12GB/ROM256GB 楽天版SIMフリー】")
+  assertEquals(s?.model_name, "Phone (3a)")
+  assertEquals(s?.storage_gb, 256)
+  assertEquals(s?.color_en, "Blue")
+})
+
+Deno.test("nothing: Phone(4a) paren form", () => {
+  const s = nothing("Nothing Phone(4a) ホワイト【RAM8GB/ROM128GB 国内版SIMフリー】")
+  assertEquals(s?.model_name, "Phone (4a)")
+  assertEquals(s?.storage_gb, 128)
+  assertEquals(s?.color_en, "White")
+})
+
+Deno.test("nothing: CMF Phone2 Pro glued number spaced, ASCII color", () => {
+  const s = nothing("CMF Phone2 Pro Black【RAM8GB/ROM128GB 国内版SIMフリー】")
+  assertEquals(s?.brand, "Nothing")
+  assertEquals(s?.model_name, "CMF Phone 2 Pro")
+  assertEquals(s?.model_number, null)
+  assertEquals(s?.storage_gb, 128)
+  assertEquals(s?.color_en, "Black")
+})
+
+Deno.test("nothing: CMF Phone2 Pro JA color オレンジ -> Orange, Rakuten", () => {
+  const s = nothing("CMF Phone2 Pro オレンジ【RAM8GB/ROM256GB 楽天版SIMフリー】")
+  assertEquals(s?.model_name, "CMF Phone 2 Pro")
+  assertEquals(s?.storage_gb, 256)
+  assertEquals(s?.color_ja, "オレンジ")
+  assertEquals(s?.color_en, "Orange")
+})
+
+Deno.test("nothing: nav thumbnails (no bracket) -> null", () => {
+  assertEquals(nothing("Nothing Phone (1)シリーズの画像"), null)
+  assertEquals(nothing("CMF Phone1シリーズの画像"), null)
+  assertEquals(nothing("CMF Phone2 Proシリーズの画像"), null)
+})
+
+Deno.test("nothing: non-Nothing card -> null", () => {
+  assertEquals(nothing("Galaxy S24 SM-S921Q ブラック【国内版 SIMフリー】"), null)
+})
+
+Deno.test("nothing: page extraction keeps SKU cards, drops nav thumbs", () => {
+  const html = Deno.readTextFileSync(
+    new URL("./__fixtures__/iosys-nothing-p1.html", import.meta.url),
+  )
+  const titles = extractAndroidCardTitles(html, NOTHING_CONFIG)
+  assertEquals(titles.length > 5, true)
+  assertEquals(titles.every((t) => !/シリーズ|の画像/.test(t)), true)
+  const skus = parseAndroidListingPage(html, NOTHING_CONFIG)
+  assertEquals(skus.length > 5, true)
+  assertEquals(skus.every((s) => s.brand === "Nothing"), true)
+  assertEquals(skus.every((s) => s.color_en != null || s.color_ja != null), true)
+  // both sub-brand lines present
+  assertEquals(skus.some((s) => /^Phone \(/.test(s.model_name)), true)
+  assertEquals(skus.some((s) => /^CMF Phone/.test(s.model_name)), true)
 })

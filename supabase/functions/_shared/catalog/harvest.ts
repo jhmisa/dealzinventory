@@ -29,6 +29,7 @@ import {
   OPPO_CONFIG,
   parseAndroidListingPage,
   PIXEL_CONFIG,
+  NOTHING_CONFIG,
   XIAOMI_CONFIG,
   XPERIA_CONFIG,
   ZTE_CONFIG,
@@ -44,6 +45,7 @@ import { huaweiSpec } from "./huawei-specs.ts"
 import { asusSpec } from "./asus-specs.ts"
 import { motorolaSpec } from "./motorola-specs.ts"
 import { zteSpec } from "./zte-specs.ts"
+import { nothingSpec } from "./nothing-specs.ts"
 import { extractCardImageMap, normalizeAltKey } from "./card-images.ts"
 
 export interface CarrierSection {
@@ -427,6 +429,14 @@ export const ZTE_CATEGORY: HarvestCategory = androidCategory(
   zteSpec,
   "ANDROID",
   ZTE_SECTIONS,
+)
+
+// Nothing + CMF-by-Nothing — one page covers both sub-brands. Code-less, JP SIM-free / Rakuten only;
+// default sections (docomo/au/softbank return 0 cards and stop immediately, like every code-less brand).
+export const NOTHING_CATEGORY: HarvestCategory = androidCategory(
+  "items/smartphone/nothing",
+  NOTHING_CONFIG,
+  nothingSpec,
 )
 
 export interface HarvestOptions {

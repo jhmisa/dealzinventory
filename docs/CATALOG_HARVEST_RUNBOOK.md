@@ -204,6 +204,7 @@ Re-harvest for new Apple models follows the same shape as §2 (add specs → re-
 | Mac | Apple | `items/pc/notepc/macbook` + `items/pc/deskpc/mac` | part# (config in title bracket) | (none — config in title) / `apple-colors.ts` | `2026-06-29-{macbook,deskmac}-fill-gaps.sql` | `iosys-{macbook,deskmac}-p1.html` | ✅ MacBook+desktop; legacy reconcile DEFERRED |
 | Apple Watch | Apple | `items/wearable/apple` | part# (band dropped from identity) | `apple-watch-specs.ts` / `apple-colors.ts` | `2026-06-29-applewatch-{fill-gaps,reconcile}.sql` | `iosys-applewatch-p1.html` | ✅ legacy reconciled inline (7 merged, 8 cleaned) |
 | ZTE | ZTE (nubia/RED MAGIC/Libero/Axon) | `items/smartphone/zte` (+ **ymobile** section) | `NX\d{3}J \| Z\d{4}R \| A?\d{3}ZT` | `zte-specs.ts` / `ZTE_COLORS_JA_EN` | `2026-07-01-zte-{fill-gaps,legacy-reconcile}.sql` | `iosys-zte-p1.html` | ✅ legacy reconciled inline (17 COMPUTER rows / 53 items → ANDROID, 2 dups archived) |
+| Nothing | Nothing (+ CMF) | `items/smartphone/nothing` | **NONE — fully code-less** (sentinel `/(?!)/`; all SIM-free/Rakuten) → `nameConsumeRe` only | `nothing-specs.ts` / `NOTHING_COLORS_JA_EN` | `2026-07-01-nothing-{fill-gaps,legacy-reconcile}.sql` | `iosys-nothing-p1.html` | ✅ legacy reconciled inline (1 COMPUTER row / 1 item → ANDROID) |
 
 ### Galaxy (Samsung)
 - **Codes:** SIM-free `SM-…Q/C` · au `SCG##`/`SCV##` · docomo `SC-##L`.
@@ -364,6 +365,27 @@ Re-harvest for new Apple models follows the same shape as §2 (add specs → re-
   null-storage rows superseded by storage-bearing legacy siblings. Legacy-only models (Libero 5G/5G IV,
   nubia Flip2 5G/S 5G/S2) left spec-less (flagged, never guessed). ⚠️ Postgres regex word boundary is
   `\y` not `\b` — the first reconcile pass's `^Nubia\b` silently no-op'd; fixed to anchor on the space.
+
+### Nothing (+ CMF-by-Nothing)
+- **First FULLY code-less brand.** Unlike Xiaomi/ZTE (which carry codes on carrier variants), Nothing/CMF
+  sell in Japan ONLY as SIM-free / Rakuten — there is NO carrier model code on any card. `modelCodeRe` is a
+  never-matching sentinel `/(?!)/` so every card goes through `nameConsumeRe`; `model_number` is always NULL.
+- **One brand, two sub-brand lines** kept in `model_name` (brand="Nothing", like ZTE/Xiaomi): Nothing phones →
+  `Phone (N)` (display prepends "Nothing" → "Nothing Phone (1)"); CMF keeps its word → `CMF Phone 2 Pro`
+  (→ "Nothing CMF Phone 2 Pro", mirroring "ZTE nubia").
+- **Two title grammars:** Nothing uses the **paren** form (`Nothing Phone(3a) Lite ブラック【…】`); CMF uses a
+  **glued number** (`CMF Phone2 Pro オレンジ【…】`). `nameConsumeRe` handles both with an optional leading
+  "Nothing " maker word (CMF cards omit it). Canonicalizer: peel "Nothing ", normalize `Phone(N)`→`Phone (N)`
+  and `CMF Phone2`→`CMF Phone 2`, title-case the trailing tier (Lite/Pro/Plus).
+- **Default sections** (no custom crawl): docomo/au/softbank return 0 cards and stop immediately; simfree (国内版)
+  + rakuten (楽天版) carry everything. **Phone (3a) Lite cards omit storage** in the title → those land
+  storage NULL (flagged, never guessed). Colors come ASCII (Black/White/Dark Grey verbatim) OR katakana
+  (ブラック/ミルク=Milk/オレンジ=Orange…); ミルク = official "Milk" (Phone 2a), not a transliteration artifact.
+- **Spec gotchas:** Phone (3) is the 2025 FLAGSHIP (Snapdragon 8s Gen 4, JP base 12GB) — distinct from the
+  cheaper (3a) tier (Snapdragon 7s Gen 3). Phone (2a) plain = Dimensity 7200 Pro (NOT the (2a) Plus's 7350).
+  Phone (3a) Lite + CMF Phone 2 Pro share the Dimensity 7300 Pro. Phone (4a) = 2026 (Snapdragon 7s Gen 4).
+- **Legacy reconcile (inline):** 1 COMPUTER row `Nothing Phone / (2A) / White / 128GB` (1 item) cleaned
+  in place → ANDROID `Nothing / Phone (2a) / White / 128GB` + specs (no harvest twin to merge).
 
 ---
 
