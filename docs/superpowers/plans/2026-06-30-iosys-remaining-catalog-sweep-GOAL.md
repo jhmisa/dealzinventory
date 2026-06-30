@@ -115,14 +115,24 @@ recategorize any real data-bearing rows. Verify 0 orphaned items afterward (mirr
       distinct devices). **Generic engine win:** step 8d pulls trailing storage off the color tail ("Ice
       White 64GB"). Harvested 4 SKUs (0 unknown, 0 unmapped) → **4 ACTIVE HTC SKUs (Desire 22 pro ×3 +
       U11), 0 COMPUTER (no legacy), 0 dups**; 258 tests green; UI-verified. Data-op `2026-07-01-htc-fill-gaps.sql`.
-- [ ] Phase 3 AirPods  ← NEXT (Apple part# pipeline; completes Apple lineup)
-- [ ] Finalize: version bump · PROJECT_STATE · PR
+- [x] **Phase 3 AirPods DONE (2026-07-01) — completes the Apple lineup (5th part# shape).** New
+      `airpods-listing.ts` + `airpods-specs.ts` + 15 TDD tests. Identity = part_number (no collapse).
+      Grammar handles 【第N世代】 gen / 【箱傷み】 condition / Max colors / trailing 【year】 (overrides spec
+      year — Pro MLWK3J/A=2021 MagSafe vs MWP22J/A=2019). AirPods Max 2 confirmed REAL (2026 H2, MHWN
+      prefix). Harvested 29 SKUs (0 unknown/unmapped) → 25 promoted + 5 legacy COMPUTER rows reconciled
+      (26 items kept) → **30 ACTIVE AirPods product_models, 0 COMPUTER, 0 AirPods dup part#s**; 273 tests
+      green; UI-verified (Category=Accessories, reconciled rows kept photos/videos). Data-ops
+      `2026-07-01-airpods-{reconcile,fill-gaps}.sql`. Registry §5 + Apple §4 updated.
+- [x] **Finalize:** version bump + PROJECT_STATE + PR (in progress — see commit log).
 
-## Status checkpoint (as of 2026-07-01)
-- **Phase 1 + Phase 2 (ALL 4 new brands: ZTE, Nothing, Kyocera, HTC) COMPLETE.** Next action on resume:
-  **Phase 3 = AirPods** — the LAST Apple part#-keyed device shape (runbook §4). Recipe: curl
-  `/items/audio/apple` (or the AirPods listing path) fixture → build an `airpods-listing.ts` parser (name
-  + part# + year; simpler than Apple Watch — mirror its OTHER/wearable column decisions, confirm mapping)
-  + specs + TDD → wire AIRPODS_CATEGORY → harvest → fill-gaps → reconcile → verify. Then FINALIZE: bump
-  `package.json` (once this session), update PROJECT_STATE, open the PR to main (do NOT merge without Joey).
-  Photo-recovery goal (prior) DONE; PR #1 open.
+## 🎉 GOAL COMPLETE (2026-07-01)
+All in-scope work done: Phase 1 (re-harvest existing brands) + Phase 2 (4 new brands: ZTE, Nothing,
+Kyocera, HTC) + Phase 3 (AirPods → Apple lineup complete). DEFERRED (NOT this loop, as scoped): Phase C
+non-phones (Android tablets, Galaxy/Pixel watches, non-AirPods earbuds) + Phase D kaitori pricing wiring.
+
+## Status checkpoint (as of 2026-07-01) — GOAL COMPLETE
+- **Phase 1 + Phase 2 (ZTE, Nothing, Kyocera, HTC) + Phase 3 (AirPods) ALL COMPLETE.** Nothing left in
+  scope. The remaining work is DEFERRED by design (Joey's locked scope): Phase C non-phones (Android
+  tablets, Galaxy/Pixel watches, non-AirPods earbuds) and Phase D kaitori pricing wiring — start those
+  only when Joey reopens scope. Finalize step (version bump + PROJECT_STATE + PR to main) handled this
+  session; do NOT merge without Joey.

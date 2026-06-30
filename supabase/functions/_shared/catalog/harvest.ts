@@ -17,6 +17,8 @@ import { ipadSpec } from "./ipad-specs.ts"
 import { type MacListingSku, parseMacListingPage } from "./mac-listing.ts"
 import { type AppleWatchListingSku, parseAppleWatchListingPage } from "./apple-watch-listing.ts"
 import { appleWatchSpec } from "./apple-watch-specs.ts"
+import { type AirPodsListingSku, parseAirPodsListingPage } from "./airpods-listing.ts"
+import { airpodsSpec } from "./airpods-specs.ts"
 import {
   type AndroidBrandConfig,
   type AndroidListingSku,
@@ -285,6 +287,44 @@ export const APPLEWATCH_CATEGORY: HarvestCategory = {
   sections: [{ path: "apple", carrier: null }],
   pageToRows: (html, section, src) =>
     parseAppleWatchListingPage(html).map((sku) => watchRow(sku, section, src)),
+}
+
+// AirPods — Apple part#-keyed, device_category=OTHER (audio accessory). Identity = part_number (each
+// Apple SKU is distinct; no collapse). chip/year enriched from airpods-specs (a title 【year】 wins).
+function airpodsRow(sku: AirPodsListingSku, section: CarrierSection, sourceUrl: string): CatalogRow {
+  const spec = airpodsSpec(sku.model_name)
+  return {
+    sku_key: sku.part_number,
+    part_number: sku.part_number,
+    model_number: null, // AirPods carry no A-number on iosys cards
+    brand: "Apple",
+    model_name: sku.model_name,
+    storage_gb: null,
+    color_ja: sku.color_ja,
+    color_en: sku.color_en,
+    carrier: null,
+    connectivity: null,
+    device_category: "OTHER",
+    source_url: sourceUrl,
+    carrier_path: section.path,
+    raw_title: sku.raw_title,
+    listing_count: 1,
+    specs: {
+      chipset: spec?.chip ?? null,
+      year: sku.year ?? spec?.year ?? null, // title year wins over the spec ref
+      generation: sku.generation,
+      region_code: sku.region_code,
+      is_domestic: sku.is_domestic,
+      spec_known: spec != null,
+    },
+  }
+}
+
+export const AIRPODS_CATEGORY: HarvestCategory = {
+  pathPrefix: "items/audio",
+  sections: [{ path: "airpods", carrier: null }],
+  pageToRows: (html, section, src) =>
+    parseAirPodsListingPage(html).map((sku) => airpodsRow(sku, section, src)),
 }
 
 // Android brands have no part_number → dedupe identity is (brand, model, storage, color, carrier).

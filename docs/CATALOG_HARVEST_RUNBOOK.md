@@ -175,8 +175,17 @@ because the title grammar differs.
   `os_family='watchOS'`, `model_name` omits the "Apple" prefix ("Watch Series 7"). Bare titanium case →
   "Natural", bare stainless → "Silver". Partial UNIQUE on `(brand,model_name,form_factor,color,has_cellular)
   WHERE device_category='OTHER'`.
-- **Not yet built (Phase B):** AirPods (simple name+part#+year) — the last Apple shape. Reuse part#-as-key
-  + `apple-colors`; likely also `device_category='OTHER'`.
+- **AirPods (`airpods-listing.ts` + `airpods-specs.ts`, DONE 2026-07-01):** path `items/audio/airpods`,
+  `device_category='OTHER'` (audio accessory). The FIFTH & FINAL Apple shape — completes the Apple lineup.
+  **Identity = part_number** (each Apple SKU distinct; NO collapse — unlike Watch, AirPods have no band
+  explosion, so region variants are honestly separate rows). Grammar: optional leading 【第N世代】 (regular
+  AirPods gen) / 【箱傷み】 (condition, dropped) → "AirPods" + descriptor (+ Max color) → part# → optional
+  trailing 【year】 (which OVERRIDES the spec-ref year — e.g. AirPods Pro MLWK3J/A is the 2021 MagSafe
+  refresh, MWP22J/A the 2019 original). Only AirPods Max has colors (`AIRPODS_MAX_COLORS_JA_EN`); all
+  earbuds → "White". chip/year from `airpods-specs`. `category_id`=Accessories, `os_family`=NULL.
+  **AirPods Max 2 is REAL** (2026, H2, MHWN/MHWP prefix) — distinct from the 2024 USB-C Max (H1, MWW
+  prefix); both share color names, only the SKU prefix tells them apart. Legacy reconcile: 5 COMPUTER
+  rows / 26 items cleaned in place → OTHER (part#-matched; "Pro 3" got the unambiguous MFHP4J/A).
 
 Re-harvest for new Apple models follows the same shape as §2 (add specs → re-run → idempotent upsert).
 
@@ -203,6 +212,7 @@ Re-harvest for new Apple models follows the same shape as §2 (add specs → re-
 | iPad | Apple | `items/tablet/ios/ipad` | part# | `ipad-specs.ts` / `apple-colors.ts` | phase4-ipad data-ops | `iosys-ipad-*-p1.html` | ✅ |
 | Mac | Apple | `items/pc/notepc/macbook` + `items/pc/deskpc/mac` | part# (config in title bracket) | (none — config in title) / `apple-colors.ts` | `2026-06-29-{macbook,deskmac}-fill-gaps.sql` | `iosys-{macbook,deskmac}-p1.html` | ✅ MacBook+desktop; legacy reconcile DEFERRED |
 | Apple Watch | Apple | `items/wearable/apple` | part# (band dropped from identity) | `apple-watch-specs.ts` / `apple-colors.ts` | `2026-06-29-applewatch-{fill-gaps,reconcile}.sql` | `iosys-applewatch-p1.html` | ✅ legacy reconciled inline (7 merged, 8 cleaned) |
+| AirPods | Apple | `items/audio/airpods` | part# (identity; no collapse) | `airpods-specs.ts` / `AIRPODS_MAX_COLORS_JA_EN` | `2026-07-01-airpods-{reconcile,fill-gaps}.sql` | `iosys-airpods-p1.html` | ✅ device_category=OTHER; 5 legacy COMPUTER rows reconciled (26 items); **completes Apple lineup** |
 | ZTE | ZTE (nubia/RED MAGIC/Libero/Axon) | `items/smartphone/zte` (+ **ymobile** section) | `NX\d{3}J \| Z\d{4}R \| A?\d{3}ZT` | `zte-specs.ts` / `ZTE_COLORS_JA_EN` | `2026-07-01-zte-{fill-gaps,legacy-reconcile}.sql` | `iosys-zte-p1.html` | ✅ legacy reconciled inline (17 COMPUTER rows / 53 items → ANDROID, 2 dups archived) |
 | Nothing | Nothing (+ CMF) | `items/smartphone/nothing` | **NONE — fully code-less** (sentinel `/(?!)/`; all SIM-free/Rakuten) → `nameConsumeRe` only | `nothing-specs.ts` / `NOTHING_COLORS_JA_EN` | `2026-07-01-nothing-{fill-gaps,legacy-reconcile}.sql` | `iosys-nothing-p1.html` | ✅ legacy reconciled inline (1 COMPUTER row / 1 item → ANDROID) |
 | Kyocera | Kyocera (京セラ) | `items/smartphone/kyocera` (+ **ymobile** section) | au `KYV\d+ \| KYG\d+` · SoftBank `A\d{3}KC \| \d{3}KC` · SIM-free `KC-S\d+` (Android One = code-less) | `kyocera-specs.ts` / `KYOCERA_COLORS_JA_EN` | `2026-07-01-kyocera-fill-gaps.sql` | `iosys-kyocera-p1.html` | ✅ SMARTPHONES ONLY; no legacy rows (0 COMPUTER) |
