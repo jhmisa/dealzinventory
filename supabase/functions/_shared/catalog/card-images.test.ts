@@ -37,6 +37,18 @@ Deno.test("extractCardImageMap prefers data-src over a dummy src placeholder and
   );
 });
 
+Deno.test("extractCardImageMap rejects a src-only dummy placeholder (no data-src) → no entry", () => {
+  const html = `<li class="item"><img src="/common_img/dummy/dummy.gif" alt="Some iPhone 128GB"></li>`;
+  const map = extractCardImageMap(html, "https://iosys.co.jp");
+  assertEquals(map.has(normalizeAltKey("Some iPhone 128GB")), false);
+});
+
+Deno.test("extractCardImageMap falls through a dummy data-src to a real src", () => {
+  const html = `<li class="item"><img data-src="/common_img/dummy/dummy.gif" src="https://d27ea4kkb8flj9.cloudfront.net/55555_1_M.jpg" alt="iPad Air 256GB Blue"></li>`;
+  const map = extractCardImageMap(html, "https://iosys.co.jp");
+  assertEquals(map.get(normalizeAltKey("iPad Air 256GB Blue")), "https://d27ea4kkb8flj9.cloudfront.net/55555_1_L.jpg");
+});
+
 Deno.test("normalizeAltKey collapses whitespace and decodes entities", () => {
   assertEquals(normalizeAltKey("iPhone&nbsp;12  64GB"), normalizeAltKey("iPhone 12 64GB"));
 });

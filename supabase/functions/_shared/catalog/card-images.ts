@@ -56,9 +56,9 @@ export function extractCardImageMap(html: string, baseUrl = "https://iosys.co.jp
       tag.match(/\ssrc="([^"]*)"/i)?.[1],
     ];
     for (const c of candidates) {
-      if (!c) continue;
+      if (!c || isPlaceholder(c)) continue;
       const u = normalizeSrc(c, baseUrl);
-      if (u && !isPlaceholder(u)) {
+      if (u) {
         map.set(key, u);
         break;
       }

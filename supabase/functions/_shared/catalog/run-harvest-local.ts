@@ -91,14 +91,14 @@ const json = JSON.stringify(res.rows)
 const sql = `-- iosys_catalog harvest (${res.rows.length} SKUs, ${res.stats.pagesFetched} pages)
 INSERT INTO public.iosys_catalog
   (sku_key, part_number, model_number, brand, model_name, storage_gb, color_ja, color_en,
-   carrier, connectivity, device_category, source_url, carrier_path, raw_title, listing_count, specs)
+   carrier, connectivity, device_category, source_url, carrier_path, raw_title, image_url, listing_count, specs)
 SELECT x.sku_key, x.part_number, x.model_number, x.brand, x.model_name, x.storage_gb, x.color_ja,
        x.color_en, NULLIF(x.carrier,'')::jp_carrier, x.connectivity, x.device_category, x.source_url,
-       x.carrier_path, x.raw_title, x.listing_count, x.specs
+       x.carrier_path, x.raw_title, x.image_url, x.listing_count, x.specs
 FROM jsonb_to_recordset($json$${json}$json$::jsonb) AS x(
   sku_key text, part_number text, model_number text, brand text, model_name text, storage_gb int,
   color_ja text, color_en text, carrier text, connectivity text, device_category text, source_url text,
-  carrier_path text, raw_title text, listing_count int, specs jsonb)
+  carrier_path text, raw_title text, image_url text, listing_count int, specs jsonb)
 ON CONFLICT (sku_key) DO UPDATE SET
   part_number = EXCLUDED.part_number,
   model_number = EXCLUDED.model_number,
@@ -113,6 +113,7 @@ ON CONFLICT (sku_key) DO UPDATE SET
   source_url = EXCLUDED.source_url,
   carrier_path = EXCLUDED.carrier_path,
   raw_title = EXCLUDED.raw_title,
+  image_url = EXCLUDED.image_url,
   listing_count = EXCLUDED.listing_count,
   specs = EXCLUDED.specs,
   harvested_at = now(),

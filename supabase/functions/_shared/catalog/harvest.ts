@@ -475,9 +475,13 @@ export async function harvestCatalog(opts: HarvestOptions): Promise<HarvestResul
       let newOnPage = 0
       for (const row of rows) {
         counts.set(row.sku_key, (counts.get(row.sku_key) ?? 0) + 1)
-        if (!bySku.has(row.sku_key)) {
+        const existing = bySku.get(row.sku_key)
+        if (!existing) {
           bySku.set(row.sku_key, row)
           newOnPage++
+        } else if (!existing.image_url && row.image_url) {
+          // backfill a missing photo from a later listing of the same SKU (first-wins otherwise)
+          existing.image_url = row.image_url
         }
       }
       log(`[${section.path}] page ${page}: ${rows.length} cards, ${newOnPage} new (total ${bySku.size})`)
