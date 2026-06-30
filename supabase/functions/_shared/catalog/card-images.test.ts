@@ -49,6 +49,10 @@ Deno.test("extractCardImageMap falls through a dummy data-src to a real src", ()
   assertEquals(map.get(normalizeAltKey("iPad Air 256GB Blue")), "https://d27ea4kkb8flj9.cloudfront.net/55555_1_L.jpg");
 });
 
-Deno.test("normalizeAltKey collapses whitespace and decodes entities", () => {
-  assertEquals(normalizeAltKey("iPhone&nbsp;12  64GB"), normalizeAltKey("iPhone 12 64GB"));
+Deno.test("normalizeAltKey collapses real whitespace (incl full-width) and trims, but does not decode &nbsp;", () => {
+  // real spaces / full-width space collapse
+  assertEquals(normalizeAltKey("iPhone　12  64GB"), "iPhone 12 64GB");
+  assertEquals(normalizeAltKey("  Galaxy S24  "), "Galaxy S24");
+  // a literal &nbsp; entity is preserved (mirrors the parsers' raw_title, so the join matches)
+  assertEquals(normalizeAltKey("iPhone&nbsp;12"), "iPhone&nbsp;12");
 });
