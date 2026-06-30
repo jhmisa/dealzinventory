@@ -15,6 +15,7 @@ import {
   XPERIA_CONFIG,
   ZTE_CONFIG,
   NOTHING_CONFIG,
+  KYOCERA_CONFIG,
 } from "./android-listing.ts"
 
 const arrows = (t: string) => parseAndroidListingTitle(t, ARROWS_CONFIG)
@@ -23,6 +24,8 @@ const asus = (t: string) => parseAndroidListingTitle(t, ASUS_CONFIG)
 const moto = (t: string) => parseAndroidListingTitle(t, MOTOROLA_CONFIG)
 const zte = (t: string) => parseAndroidListingTitle(t, ZTE_CONFIG)
 const nothing = (t: string) => parseAndroidListingTitle(t, NOTHING_CONFIG)
+const kyocera = (t: string, pc?: "SoftBank" | "au" | null) =>
+  parseAndroidListingTitle(t, KYOCERA_CONFIG, pc ?? undefined)
 
 const galaxy = (t: string) => parseAndroidListingTitle(t, GALAXY_CONFIG)
 const xperia = (t: string) => parseAndroidListingTitle(t, XPERIA_CONFIG)
@@ -1383,4 +1386,128 @@ Deno.test("nothing: page extraction keeps SKU cards, drops nav thumbs", () => {
   // both sub-brand lines present
   assertEquals(skus.some((s) => /^Phone \(/.test(s.model_name)), true)
   assertEquals(skus.some((s) => /^CMF Phone/.test(s.model_name)), true)
+})
+
+// ---------------------------------------------------------------------------
+// Kyocera — SMARTPHONES ONLY (coded TORQUE/DIGNO/DURA + code-less Android One)
+// ---------------------------------------------------------------------------
+
+Deno.test("kyocera: TORQUE G06 au KYG code, JA color", () => {
+  const s = kyocera("TORQUE G06 KYG03 ブラック【au版SIMフリー】")
+  assertEquals(s?.brand, "Kyocera")
+  assertEquals(s?.model_name, "TORQUE G06")
+  assertEquals(s?.model_number, "KYG03")
+  assertEquals(s?.color_en, "Black")
+})
+
+Deno.test("kyocera: TORQUE G03 leading unlock + au carrier word, KYV code", () => {
+  const s = kyocera("【SIMロック解除済】au TORQUE G03 KYV41 ブラック")
+  assertEquals(s?.model_name, "TORQUE G03")
+  assertEquals(s?.model_number, "KYV41")
+  assertEquals(s?.color_en, "Black")
+  assertEquals(s?.carrier, "au")
+  assertEquals(s?.is_unlocked, true)
+})
+
+Deno.test("kyocera: TORQUE 5G keeps 5G in name (KYG01)", () => {
+  const s = kyocera("TORQUE 5G KYG01 イエロー【au版SIMフリー】")
+  assertEquals(s?.model_name, "TORQUE 5G")
+  assertEquals(s?.model_number, "KYG01")
+  assertEquals(s?.color_en, "Yellow")
+})
+
+Deno.test("kyocera: DIGNO BX3 SoftBank A###KC code", () => {
+  const s = kyocera("DIGNO BX3 A401KC ブラック【SoftBank版 SIMフリー】")
+  assertEquals(s?.model_name, "DIGNO BX3")
+  assertEquals(s?.model_number, "A401KC")
+  assertEquals(s?.color_en, "Black")
+})
+
+Deno.test("kyocera: DIGNO BX SoftBank ###KC (no trailing bracket), leading unlock", () => {
+  const s = kyocera("【SIMロック解除済】SoftBank DIGNO BX 901KC ブラック")
+  assertEquals(s?.model_name, "DIGNO BX")
+  assertEquals(s?.model_number, "901KC")
+  assertEquals(s?.color_en, "Black")
+  assertEquals(s?.carrier, "SoftBank")
+})
+
+Deno.test("kyocera: DIGNO SX4 SIM-free KC-S### code", () => {
+  const s = kyocera("DIGNO SX4 KC-S305 ブラック 【国内版 SIMフリー】")
+  assertEquals(s?.model_name, "DIGNO SX4")
+  assertEquals(s?.model_number, "KC-S305")
+  assertEquals(s?.color_en, "Black")
+  assertEquals(s?.carrier, "SIM-Free")
+})
+
+Deno.test("kyocera: DURA FORCE PRO KC-S702", () => {
+  const s = kyocera("DURA FORCE PRO KC-S702 ブラック【国内版SIMフリー】")
+  assertEquals(s?.model_name, "DURA FORCE PRO")
+  assertEquals(s?.model_number, "KC-S702")
+  assertEquals(s?.color_en, "Black")
+})
+
+Deno.test("kyocera: かんたんスマホ3 Y!mobile A###KC code", () => {
+  const s = kyocera("かんたんスマホ3 A205KC シルバー【Y!mobile版SIMフリー】")
+  assertEquals(s?.model_name, "かんたんスマホ3")
+  assertEquals(s?.model_number, "A205KC")
+  assertEquals(s?.color_en, "Silver")
+})
+
+Deno.test("kyocera: GRATINA KYV48 smartphone, code split off name", () => {
+  const s = kyocera("GRATINA KYV48 ホワイト【au版SIMフリー】")
+  assertEquals(s?.model_name, "GRATINA")
+  assertEquals(s?.model_number, "KYV48")
+  assertEquals(s?.color_en, "White")
+})
+
+Deno.test("kyocera: Android One S9 code-less, trailing Y!mobile bracket", () => {
+  const s = kyocera("Android One S9 ブラック【Y!mobile版SIMフリー】")
+  assertEquals(s?.model_name, "Android One S9")
+  assertEquals(s?.model_number, null)
+  assertEquals(s?.color_en, "Black")
+})
+
+Deno.test("kyocera: Android One S2 code-less, LEADING unlock bracket only (no trailing)", () => {
+  const s = kyocera("【SIMロック解除済】Y!mobile Android One S2 ホワイト")
+  assertEquals(s?.model_name, "Android One S2")
+  assertEquals(s?.model_number, null)
+  assertEquals(s?.color_ja, "ホワイト")
+  assertEquals(s?.color_en, "White")
+  assertEquals(s?.is_unlocked, true)
+})
+
+Deno.test("kyocera: Android One S6 code-less, JA compound color", () => {
+  const s = kyocera("【SIMロック解除済】Y!mobile Android One S6 ラベンダーブルー")
+  assertEquals(s?.model_name, "Android One S6")
+  assertEquals(s?.color_en, "Lavender Blue")
+})
+
+Deno.test("kyocera: feature-phone name rejected (ケータイ guard)", () => {
+  // A SoftBank DIGNO ケータイ would carry a ###KC code but is NOT a smartphone.
+  assertEquals(kyocera("DIGNO ケータイ3 902KC ブラック【SoftBank版】"), null)
+})
+
+Deno.test("kyocera: non-Kyocera / nav -> null", () => {
+  assertEquals(kyocera("Galaxy S24 SM-S921Q ブラック【国内版 SIMフリー】"), null)
+  assertEquals(kyocera("Android One S9シリーズの画像"), null)
+})
+
+Deno.test("kyocera: page extraction keeps coded + code-less smartphone cards", () => {
+  const html = Deno.readTextFileSync(
+    new URL("./__fixtures__/iosys-kyocera-p1.html", import.meta.url),
+  )
+  const titles = extractAndroidCardTitles(html, KYOCERA_CONFIG)
+  assertEquals(titles.length > 5, true)
+  assertEquals(titles.every((t) => !/シリーズ|の画像/.test(t)), true)
+  const skus = parseAndroidListingPage(html, KYOCERA_CONFIG)
+  assertEquals(skus.length > 5, true)
+  assertEquals(skus.every((s) => s.brand === "Kyocera"), true)
+  // Most cards carry a color; the fill-gaps filters the rare genuinely-colorless card (the iosys
+  // "DIGNO WX KC-S303" alt has no color text → color stays null, never guessed → not promoted).
+  assertEquals(skus.filter((s) => s.color_en != null || s.color_ja != null).length > 5, true)
+  // both a coded line and the code-less Android One line present
+  assertEquals(skus.some((s) => /^(TORQUE|DIGNO|DURA)/.test(s.model_name)), true)
+  assertEquals(skus.some((s) => /^Android One/.test(s.model_name)), true)
+  // the generic leading-unlock fix captured the trailing-bracket-less Android One cards
+  assertEquals(skus.some((s) => /^Android One S2/.test(s.model_name)), true)
 })

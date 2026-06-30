@@ -205,6 +205,7 @@ Re-harvest for new Apple models follows the same shape as §2 (add specs → re-
 | Apple Watch | Apple | `items/wearable/apple` | part# (band dropped from identity) | `apple-watch-specs.ts` / `apple-colors.ts` | `2026-06-29-applewatch-{fill-gaps,reconcile}.sql` | `iosys-applewatch-p1.html` | ✅ legacy reconciled inline (7 merged, 8 cleaned) |
 | ZTE | ZTE (nubia/RED MAGIC/Libero/Axon) | `items/smartphone/zte` (+ **ymobile** section) | `NX\d{3}J \| Z\d{4}R \| A?\d{3}ZT` | `zte-specs.ts` / `ZTE_COLORS_JA_EN` | `2026-07-01-zte-{fill-gaps,legacy-reconcile}.sql` | `iosys-zte-p1.html` | ✅ legacy reconciled inline (17 COMPUTER rows / 53 items → ANDROID, 2 dups archived) |
 | Nothing | Nothing (+ CMF) | `items/smartphone/nothing` | **NONE — fully code-less** (sentinel `/(?!)/`; all SIM-free/Rakuten) → `nameConsumeRe` only | `nothing-specs.ts` / `NOTHING_COLORS_JA_EN` | `2026-07-01-nothing-{fill-gaps,legacy-reconcile}.sql` | `iosys-nothing-p1.html` | ✅ legacy reconciled inline (1 COMPUTER row / 1 item → ANDROID) |
+| Kyocera | Kyocera (京セラ) | `items/smartphone/kyocera` (+ **ymobile** section) | au `KYV\d+ \| KYG\d+` · SoftBank `A\d{3}KC \| \d{3}KC` · SIM-free `KC-S\d+` (Android One = code-less) | `kyocera-specs.ts` / `KYOCERA_COLORS_JA_EN` | `2026-07-01-kyocera-fill-gaps.sql` | `iosys-kyocera-p1.html` | ✅ SMARTPHONES ONLY; no legacy rows (0 COMPUTER) |
 
 ### Galaxy (Samsung)
 - **Codes:** SIM-free `SM-…Q/C` · au `SCG##`/`SCV##` · docomo `SC-##L`.
@@ -386,6 +387,31 @@ Re-harvest for new Apple models follows the same shape as §2 (add specs → re-
   Phone (3a) Lite + CMF Phone 2 Pro share the Dimensity 7300 Pro. Phone (4a) = 2026 (Snapdragon 7s Gen 4).
 - **Legacy reconcile (inline):** 1 COMPUTER row `Nothing Phone / (2A) / White / 128GB` (1 item) cleaned
   in place → ANDROID `Nothing / Phone (2a) / White / 128GB` + specs (no harvest twin to merge).
+
+### Kyocera (TORQUE / DIGNO / DURA FORCE / Android One / BASIO / かんたんスマホ / Qua phone)
+- **SMARTPHONES ONLY** (Joey's locked scope). Kyocera also makes FEATURE PHONES (GRATINA 4G, DIGNO
+  ケータイ, KYF-coded ガラケー) which are OUT. Two gates: (1) crawl ONLY `/items/smartphone/kyocera`
+  (iosys's own device-shape filter); (2) the parser matches only smartphone code shapes — **KYF feature-
+  phone codes are deliberately NOT in `modelCodeRe`** — and the canonicalizer returns "" for ケータイ/
+  らくらくホン names. A feature phone would have to slip BOTH gates to land (none do).
+- **Mixed brand:** coded lines (au `KYV##`/`KYG##`, SoftBank `A###KC`/`###KC`, SIM-free `KC-S###`) +
+  the **code-less Android One** line (handled by `nameConsumeRe`, like Xiaomi/ZTE). brand="Kyocera",
+  line+model in model_name ("TORQUE G06", "DIGNO SX4", "Android One S9"). Adds a **ymobile** crawl
+  section (Android One + かんたんスマホ are Y!mobile) mapped to SoftBank, like ZTE's Libero.
+- **Two generic engine capabilities added with Kyocera** (both safe, code-less-only): (1) the nav-noise
+  guard now admits a code-less card with NO trailing bracket when it carries a LEADING 【SIMロック解除済 /
+  SIMフリー】 unlock marker (`leadingUnlock`) — Kyocera lists unlocked Android One as
+  "【SIMロック解除済】Y!mobile Android One S2 ホワイト" (no carrier bracket); nav thumbnails never carry an
+  unlock marker. (2) `extractAndroidCardTitles` strips leading 【…】 brackets before the `nameConsumeRe`
+  test so those leading-bracket code-less cards aren't dropped at extraction.
+- **Research traps (verified, do NOT re-add):** "TORQUE G05" and "BASIO5" DO NOT EXIST (G05 = informal
+  alias of TORQUE 5G/KYG01). "BASIO active" (A205SH) is SHARP, not Kyocera — its non-KC code auto-excludes
+  it. GRATINA KYV48 IS the Kyocera smartphone (name seg = "GRATINA", code split off) ≠ GRATINA 4G feature
+  phone. Android One S2/S4/S6/S8/S9 = genuinely Kyocera (-KC); odd S1/S3/S5/S7 = Sharp. DIGNO BX3 screen
+  unverified → NULL (the first brand exercising the shared `AndroidSpec.screen_size: number|null`).
+- **No legacy rows** — 0 pre-existing Kyocera product_models (no COMPUTER miscategorization to reconcile).
+  The colorless iosys card "DIGNO WX KC-S303" (alt has no color) is parsed but the fill-gaps drops it
+  (color NOT NULL; never guessed Black).
 
 ---
 

@@ -30,6 +30,7 @@ import {
   parseAndroidListingPage,
   PIXEL_CONFIG,
   NOTHING_CONFIG,
+  KYOCERA_CONFIG,
   XIAOMI_CONFIG,
   XPERIA_CONFIG,
   ZTE_CONFIG,
@@ -46,6 +47,7 @@ import { asusSpec } from "./asus-specs.ts"
 import { motorolaSpec } from "./motorola-specs.ts"
 import { zteSpec } from "./zte-specs.ts"
 import { nothingSpec } from "./nothing-specs.ts"
+import { kyoceraSpec } from "./kyocera-specs.ts"
 import { extractCardImageMap, normalizeAltKey } from "./card-images.ts"
 
 export interface CarrierSection {
@@ -296,9 +298,22 @@ function androidSkuKey(sku: AndroidListingSku): string {
   ].join("|")
 }
 
+// Minimal shape every <brand>-specs lookup returns. screen_size may be null when a model's screen
+// is unverified (e.g. Kyocera DIGNO BX3 has a verified chipset/year but no confirmed inch figure —
+// flagged, never guessed); all other brands narrow it to a non-null number, which is assignable here.
+type AndroidSpec =
+  | {
+    chipset: string
+    screen_size: number | null
+    year: number
+    ram_gb: number
+    os_family: "Android"
+  }
+  | null
+
 function androidRow(
   sku: AndroidListingSku,
-  spec: ReturnType<typeof galaxySpec>,
+  spec: AndroidSpec,
   deviceCategory: string,
   section: CarrierSection,
   sourceUrl: string,
@@ -334,7 +349,7 @@ function androidRow(
 export function androidCategory(
   pathPrefix: string,
   config: AndroidBrandConfig,
-  specLookup: (modelName: string) => ReturnType<typeof galaxySpec>,
+  specLookup: (modelName: string) => AndroidSpec,
   deviceCategory = "ANDROID",
   sections: CarrierSection[] = ANDROID_SECTIONS,
 ): HarvestCategory {
@@ -437,6 +452,22 @@ export const NOTHING_CATEGORY: HarvestCategory = androidCategory(
   "items/smartphone/nothing",
   NOTHING_CONFIG,
   nothingSpec,
+)
+
+// Kyocera SMARTPHONES (TORQUE / DIGNO / DURA FORCE / Android One / BASIO / かんたんスマホ / Qua phone).
+// Android One + かんたんスマホ live under Y!mobile, so add a ymobile crawl section (mapped to SoftBank,
+// its parent carrier — carrier is per-unit on items, never on product_models), like ZTE's Libero.
+export const KYOCERA_SECTIONS: CarrierSection[] = [
+  ...ANDROID_SECTIONS,
+  { path: "ymobile", carrier: "SoftBank" },
+]
+
+export const KYOCERA_CATEGORY: HarvestCategory = androidCategory(
+  "items/smartphone/kyocera",
+  KYOCERA_CONFIG,
+  kyoceraSpec,
+  "ANDROID",
+  KYOCERA_SECTIONS,
 )
 
 export interface HarvestOptions {

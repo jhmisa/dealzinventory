@@ -195,8 +195,11 @@ export function parseAndroidListingTitle(
   }
 
   // A code-less parse with no spec bracket is nav noise ("Redmi 12シリーズ の画像"), not a SKU —
-  // every real code-less Xiaomi card carries a 【RAM../ROM../版】 bracket. (Coded cards may omit it.)
-  if (model_number == null && region_note == null) return null
+  // every real code-less Xiaomi card carries a 【RAM../ROM../版】 bracket. EXCEPTION: a card
+  // explicitly marked 【SIMロック解除済 / SIMフリー】 in a LEADING bracket is a real unlocked unit even
+  // when it has no trailing carrier bracket (Kyocera "【SIMロック解除済】Y!mobile Android One S2
+  // ホワイト") — nav thumbnails never carry an unlock marker, so leadingUnlock safely admits these.
+  if (model_number == null && region_note == null && !leadingUnlock) return null
 
   // 7. Inline storage immediately after the code (e.g. "SC-52D 256GB クリーム").
   let storage_gb: number | null = null
@@ -319,10 +322,13 @@ export function extractAndroidCardTitles(html: string, config: AndroidBrandConfi
       out.push(t)
       continue
     }
-    // Code-less brands (Xiaomi SIM-free): keep alts whose name prefix matches and that carry a
-    // spec bracket, excluding the bracket-less nav thumbnails ("Redmi 12シリーズ の画像").
+    // Code-less brands (Xiaomi SIM-free, Kyocera Android One): keep alts whose name prefix matches
+    // (after peeling any leading 【…】 condition/unlock brackets — Kyocera marks unlocked Android One
+    // units with a LEADING 【SIMロック解除済】 before the name) and that carry a bracket, excluding
+    // bracket-less nav thumbnails ("Redmi 12シリーズ の画像").
+    const stripped = t.replace(/^(?:【[^】]*】\s*)+/, "")
     if (
-      config.nameConsumeRe && config.nameConsumeRe.test(t) && /【/.test(t) &&
+      config.nameConsumeRe && config.nameConsumeRe.test(stripped) && /【/.test(t) &&
       !/シリーズ|の画像/.test(t)
     ) {
       out.push(t)
@@ -1202,4 +1208,83 @@ export const NOTHING_CONFIG: AndroidBrandConfig = {
     return s.replace(/\s+/g, " ").trim()
   },
   colorJaToEn: nothingColorJaToEn,
+}
+
+// ---------------------------------------------------------------------------
+
+// Kyocera (京セラ) — SMARTPHONES ONLY (TORQUE rugged / DIGNO / DURA FORCE / Android One / BASIO /
+// かんたんスマホ / GRATINA smartphone / Qua phone). Kyocera also makes FEATURE PHONES (GRATINA 4G,
+// DIGNO ケータイ, KYF-coded ガラケー) which are OUT of scope — we crawl ONLY /items/smartphone/kyocera
+// (iosys's own device-shape gate) and the parser is a second gate: it matches only smartphone code
+// shapes (KYF feature-phone codes are NOT in modelCodeRe) and rejects ケータイ/らくらくホン names.
+//
+// Mixed brand: most lines carry a code (au KYV##/KYG##, SoftBank A###KC/###KC, SIM-free KC-S###);
+// Android One is code-less in the title (handled by nameConsumeRe, like Xiaomi/ZTE). brand="Kyocera",
+// the line + model kept in model_name ("TORQUE G06", "DIGNO SX4", "Android One S9").
+//
+// Title grammars seen:
+//   "TORQUE G06 KYG03 ブラック【au版SIMフリー】"                        (au KYG code)
+//   "DIGNO BX3 A401KC ブラック【SoftBank版 SIMフリー】"                 (SoftBank A###KC)
+//   "DIGNO BX 901KC ブラック"                                          (SoftBank ###KC, no trailing bracket)
+//   "DIGNO SX4 KC-S305 ブラック 【国内版 SIMフリー】"                    (SIM-free KC-S###)
+//   "Android One S9 ブラック【Y!mobile版SIMフリー】"                     (code-less, trailing bracket)
+//   "【SIMロック解除済】Y!mobile Android One S2 ホワイト"                (code-less, LEADING unlock bracket only)
+export const KYOCERA_COLORS_JA_EN: Record<string, string> = {
+  // basic
+  "ブラック": "Black",
+  "ホワイト": "White",
+  "レッド": "Red",
+  "ブルー": "Blue",
+  "グリーン": "Green",
+  "イエロー": "Yellow",
+  "シルバー": "Silver",
+  "ネイビー": "Navy",
+  "ピンク": "Pink",
+  "パープル": "Purple",
+  "ローズ": "Rose",
+  "マゼンタ": "Magenta",
+  "インディゴ": "Indigo",
+  // compound / marketing (research-verified per Kyocera/carrier spec pages)
+  "ライトブルー": "Light Blue",
+  "ライトピンク": "Light Pink",
+  "ラベンダーブルー": "Lavender Blue", // Android One S6
+  "ペールブルー": "Pale Blue", // Android One S8
+  "シルキーホワイト": "Silky White", // Android One S9
+  "アイスブルー": "Ice Blue", // Qua phone KYV37
+  "シャンパンゴールド": "Champagne Gold", // BASIO4
+  "ロイヤルブルー": "Royal Blue", // BASIO4
+  "ワインレッド": "Wine Red", // BASIO4
+  "チョコミント": "Choco Mint", // Qua phone QZ
+  "カシスピンク": "Cassis Pink", // Qua phone QZ
+  "シトラスレモン": "Citrus Lemon", // Qua phone QZ
+}
+
+export function kyoceraColorJaToEn(ja: string | null): string | null {
+  if (!ja) return null
+  return KYOCERA_COLORS_JA_EN[ja] ?? null
+}
+
+export const KYOCERA_CONFIG: AndroidBrandConfig = {
+  brand: "Kyocera",
+  brandPrefixes: ["Kyocera", "京セラ"],
+  // Lenient (contains) — leading carrier/MVNO words are stripped in the canonicalizer.
+  modelNameRe: /\b(TORQUE|DIGNO|DURA\s*FORCE|Android\s*One|BASIO|GRATINA|Qua\s*phone)\b|かんたんスマホ/i,
+  // Kyocera SMARTPHONE codes only (feature-phone KYF## deliberately excluded): au KYV##/KYG##;
+  // SoftBank A###KC then ###KC; SIM-free KC-S###. First match wins; A###KC before ###KC.
+  modelCodeRe: /\b(KYV\d+|KYG\d+|KC-S\d+|A\d{3}KC|\d{3}KC)\b/,
+  // Android One is the only code-less Kyocera line; an optional leading Y!mobile MVNO word is
+  // tolerated (peeled in the canonicalizer). Anchored.
+  nameConsumeRe: /^(?:Y!?mobile\s+)?Android\s*One\s+S\d+/i,
+  canonicalModelName: (seg) => {
+    let s = seg.replace(/\s+/g, " ").trim()
+    // Peel a leading Y!mobile/UQ/mineo MVNO word (engine CARRIER_WORD covers only docomo/au/sb/rkt).
+    s = s.replace(/^(Y!?mobile|UQ\s?mobile|UQ|mineo)\s+/i, "")
+    // Peel a leftover Kyocera brand word if an MVNO/carrier word preceded it.
+    s = s.replace(/^(Kyocera|京セラ)\s+/i, "")
+    // Feature-phone guard (defensive — the /smartphone/ path already excludes these): never a SKU.
+    if (/ケータイ|らくらくホン/i.test(s)) return ""
+    // KEEP 5G — model marker ("TORQUE 5G"). Just normalize whitespace.
+    return s.replace(/\s+/g, " ").trim()
+  },
+  colorJaToEn: kyoceraColorJaToEn,
 }
