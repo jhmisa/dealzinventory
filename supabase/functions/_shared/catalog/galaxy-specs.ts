@@ -29,6 +29,7 @@ export const GALAXY_SPECS: Record<string, GalaxyModelSpec> = {
 
   // --- S21 series (2021) — JP uses Snapdragon 888 ---
   "Galaxy S21": { chipset: "Snapdragon 888", screen_size: 6.2, year: 2021, ram_gb: 8, os_family: "Android" },
+  "Galaxy S21+": { chipset: "Snapdragon 888", screen_size: 6.7, year: 2021, ram_gb: 8, os_family: "Android" },
   "Galaxy S21 Ultra": { chipset: "Snapdragon 888", screen_size: 6.8, year: 2021, ram_gb: 12, os_family: "Android" }, // 16GB high tier also existed
 
   // --- S22 series (2022) — JP uses Snapdragon 8 Gen 1 ---
@@ -48,6 +49,11 @@ export const GALAXY_SPECS: Record<string, GalaxyModelSpec> = {
   "Galaxy S25": { chipset: "Snapdragon 8 Elite for Galaxy", screen_size: 6.2, year: 2025, ram_gb: 12, os_family: "Android" },
   "Galaxy S25 Ultra": { chipset: "Snapdragon 8 Elite for Galaxy", screen_size: 6.9, year: 2025, ram_gb: 12, os_family: "Android" },
 
+  // --- S26 series (2026) — JP/NA/China use Snapdragon 8 Elite Gen 5 for Galaxy (Exynos 2600 elsewhere on base/+) ---
+  "Galaxy S26": { chipset: "Snapdragon 8 Elite Gen 5 for Galaxy", screen_size: 6.3, year: 2026, ram_gb: 12, os_family: "Android" },
+  "Galaxy S26+": { chipset: "Snapdragon 8 Elite Gen 5 for Galaxy", screen_size: 6.7, year: 2026, ram_gb: 12, os_family: "Android" },
+  "Galaxy S26 Ultra": { chipset: "Snapdragon 8 Elite Gen 5 for Galaxy", screen_size: 6.9, year: 2026, ram_gb: 12, os_family: "Android" }, // 16GB on 1TB tier
+
   // --- Z Flip (main folding display) ---
   "Galaxy Z Flip3": { chipset: "Snapdragon 888", screen_size: 6.7, year: 2021, ram_gb: 8, os_family: "Android" },
   "Galaxy Z Flip4": { chipset: "Snapdragon 8+ Gen 1", screen_size: 6.7, year: 2022, ram_gb: 8, os_family: "Android" },
@@ -56,8 +62,10 @@ export const GALAXY_SPECS: Record<string, GalaxyModelSpec> = {
   "Galaxy Z Flip7": { chipset: "Exynos 2500", screen_size: 6.9, year: 2025, ram_gb: 12, os_family: "Android" }, // UNVERIFIED JP chipset
 
   // --- Z Fold (inner display) ---
+  "Galaxy Z Fold3": { chipset: "Snapdragon 888", screen_size: 7.6, year: 2021, ram_gb: 12, os_family: "Android" },
   "Galaxy Z Fold4": { chipset: "Snapdragon 8+ Gen 1", screen_size: 7.6, year: 2022, ram_gb: 12, os_family: "Android" },
   "Galaxy Z Fold5": { chipset: "Snapdragon 8 Gen 2 for Galaxy", screen_size: 7.6, year: 2023, ram_gb: 12, os_family: "Android" },
+  "Galaxy Z Fold6": { chipset: "Snapdragon 8 Gen 3 for Galaxy", screen_size: 7.6, year: 2024, ram_gb: 12, os_family: "Android" },
   "Galaxy Z Fold7": { chipset: "Snapdragon 8 Elite for Galaxy", screen_size: 8.0, year: 2025, ram_gb: 12, os_family: "Android" }, // 16GB high tier exists
 
   // --- A-series ---

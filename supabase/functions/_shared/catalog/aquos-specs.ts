@@ -69,6 +69,7 @@ export const AQUOS_SPECS: Record<string, AquosModelSpec> = {
   "AQUOS zero2": { chipset: "Snapdragon 855", screen_size: 6.4, year: 2020, ram_gb: 8, os_family: "Android" },
   "AQUOS zero5G basic": { chipset: "Snapdragon 765G", screen_size: 6.4, year: 2020, ram_gb: 6, os_family: "Android" },
   "AQUOS zero5G basic DX": { chipset: "Snapdragon 765G", screen_size: 6.4, year: 2020, ram_gb: 8, os_family: "Android" }, // au SHG02, 8GB
+  "AQUOS zero6": { chipset: "Snapdragon 750G 5G", screen_size: 6.4, year: 2021, ram_gb: 8, os_family: "Android" },
 }
 
 /** Look up AQUOS specs by canonical model name, or null if not in the reference. */

@@ -11,8 +11,7 @@
 // pages / KHwang9883 MobileModels DB (2026-06-28 research pass).
 //
 // DELIBERATELY OMITTED (research flagged UNVERIFIED — they harvest as spec_known=false, flagged,
-// never guessed; backfill when confirmed): "Redmi 15", "Redmi Note 15" (base), "POCO M8" (RAM
-// tier unverified), "Xiaomi 17T Pro" (screen size unverified).
+// never guessed; backfill when confirmed): "Xiaomi 17T Pro" (screen size unverified).
 
 export interface XiaomiModelSpec {
   chipset: string
@@ -28,6 +27,7 @@ export const XIAOMI_SPECS: Record<string, XiaomiModelSpec> = {
   "Xiaomi 11T Pro": { chipset: "Snapdragon 888", screen_size: 6.67, year: 2021, ram_gb: 8, os_family: "Android" },
   "Xiaomi 12T Pro": { chipset: "Snapdragon 8+ Gen 1", screen_size: 6.67, year: 2022, ram_gb: 8, os_family: "Android" },
   "Xiaomi 13T": { chipset: "MediaTek Dimensity 8200-Ultra", screen_size: 6.67, year: 2023, ram_gb: 8, os_family: "Android" },
+  "Xiaomi 13T Pro": { chipset: "MediaTek Dimensity 9200+", screen_size: 6.67, year: 2023, ram_gb: 12, os_family: "Android" }, // JP carrier SKU typically 12GB/256GB
   "Xiaomi 14T": { chipset: "MediaTek Dimensity 8300-Ultra", screen_size: 6.67, year: 2024, ram_gb: 12, os_family: "Android" },
   "Xiaomi 14T Pro": { chipset: "MediaTek Dimensity 9300+", screen_size: 6.67, year: 2024, ram_gb: 12, os_family: "Android" },
   "Xiaomi 15T Pro": { chipset: "MediaTek Dimensity 9400+", screen_size: 6.83, year: 2025, ram_gb: 12, os_family: "Android" },
@@ -41,6 +41,7 @@ export const XIAOMI_SPECS: Record<string, XiaomiModelSpec> = {
   "Redmi 12": { chipset: "Snapdragon 4 Gen 2", screen_size: 6.79, year: 2023, ram_gb: 4, os_family: "Android" }, // JP "Redmi 12 5G" (au XIG03 / SoftBank A401XM)
   "Redmi 12C": { chipset: "MediaTek Helio G85", screen_size: 6.71, year: 2023, ram_gb: 4, os_family: "Android" },
   "Redmi 14C": { chipset: "MediaTek Helio G81-Ultra", screen_size: 6.88, year: 2024, ram_gb: 4, os_family: "Android" },
+  "Redmi 15": { chipset: "Snapdragon 6s Gen 3", screen_size: 6.9, year: 2025, ram_gb: 4, os_family: "Android" }, // base tier; separate Redmi 15 4G (SD685) also exists
   "Redmi Note 9S": { chipset: "Snapdragon 720G", screen_size: 6.67, year: 2020, ram_gb: 4, os_family: "Android" },
   "Redmi Note 9T": { chipset: "MediaTek Dimensity 800U", screen_size: 6.53, year: 2021, ram_gb: 4, os_family: "Android" }, // JP SoftBank A001XM
   "Redmi Note 10T": { chipset: "Snapdragon 480 5G", screen_size: 6.5, year: 2022, ram_gb: 4, os_family: "Android" }, // JP SoftBank A101XM
@@ -48,9 +49,11 @@ export const XIAOMI_SPECS: Record<string, XiaomiModelSpec> = {
   "Redmi Note 11": { chipset: "Snapdragon 680", screen_size: 6.43, year: 2022, ram_gb: 4, os_family: "Android" },
   "Redmi Note 13 Pro": { chipset: "Snapdragon 7s Gen 2", screen_size: 6.67, year: 2024, ram_gb: 8, os_family: "Android" }, // JP au XIG05
   "Redmi Note 13 Pro+": { chipset: "MediaTek Dimensity 7200-Ultra", screen_size: 6.67, year: 2023, ram_gb: 8, os_family: "Android" },
+  "Redmi Note 15": { chipset: "Snapdragon 6 Gen 3", screen_size: 6.77, year: 2025, ram_gb: 6, os_family: "Android" }, // base; distinct from Note 15 Pro/Pro+
   "Redmi Note 15 Pro": { chipset: "MediaTek Dimensity 7400-Ultra", screen_size: 6.83, year: 2025, ram_gb: 8, os_family: "Android" },
 
   // --- POCO line ---
+  "POCO M8": { chipset: "Snapdragon 6 Gen 3", screen_size: 6.77, year: 2026, ram_gb: 6, os_family: "Android" },
   "POCO F4 GT": { chipset: "Snapdragon 8 Gen 1", screen_size: 6.67, year: 2022, ram_gb: 8, os_family: "Android" },
   "POCO F6 Pro": { chipset: "Snapdragon 8 Gen 2", screen_size: 6.67, year: 2024, ram_gb: 12, os_family: "Android" },
   "POCO F7": { chipset: "Snapdragon 8s Gen 4", screen_size: 6.83, year: 2025, ram_gb: 12, os_family: "Android" },

@@ -49,6 +49,8 @@ export const IPAD_SPECS: Record<string, IpadModelSpec> = {
   "iPad Air 13-inch (M2)": { chipset: "M2", screen_size: 13.0, year: 2024, ram_gb: 8, os_family: "iPadOS" },
   "iPad Air 11-inch (M3)": { chipset: "M3", screen_size: 11.0, year: 2025, ram_gb: 8, os_family: "iPadOS" },
   "iPad Air 13-inch (M3)": { chipset: "M3", screen_size: 13.0, year: 2025, ram_gb: 8, os_family: "iPadOS" },
+  "iPad Air 11-inch (M4)": { chipset: "M4", screen_size: 11.0, year: 2026, ram_gb: 12, os_family: "iPadOS" },
+  "iPad Air 13-inch (M4)": { chipset: "M4", screen_size: 13.0, year: 2026, ram_gb: 12, os_family: "iPadOS" },
 
   // --- iPad Pro ---
   "iPad Pro 9.7-inch": { chipset: "A9X", screen_size: 9.7, year: 2016, ram_gb: 2, os_family: "iPadOS" },

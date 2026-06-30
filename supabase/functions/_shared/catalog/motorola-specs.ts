@@ -28,6 +28,9 @@ export const MOTOROLA_SPECS: Record<string, MotorolaModelSpec> = {
   // --- edge line ---
   "edge 20": { chipset: "Snapdragon 778G 5G", screen_size: 6.7, year: 2021, ram_gb: 6, os_family: "Android" }, // XT2143-1
   "edge 20 fusion": { chipset: "MediaTek Dimensity 800U", screen_size: 6.7, year: 2021, ram_gb: 6, os_family: "Android" }, // XT2139-2
+  "edge 30 Pro": { chipset: "Snapdragon 8 Gen 1", screen_size: 6.7, year: 2022, ram_gb: 8, os_family: "Android" }, // PASS0022JP
+  "edge 40 neo": { chipset: "MediaTek Dimensity 7030", screen_size: 6.55, year: 2023, ram_gb: 8, os_family: "Android" },
+  "edge 50 pro": { chipset: "Snapdragon 7 Gen 3", screen_size: 6.7, year: 2024, ram_gb: 8, os_family: "Android" }, // PB1K0001JP
   "edge 60": { chipset: "MediaTek Dimensity 7400", screen_size: 6.67, year: 2025, ram_gb: 8, os_family: "Android" }, // XT2505-5 (JP got 7400, not global 7300)
 
   // --- razr line (foldable; screen_size = main/internal display) ---
@@ -36,7 +39,10 @@ export const MOTOROLA_SPECS: Record<string, MotorolaModelSpec> = {
   "razr 40s": { chipset: "Snapdragon 7 Gen 1", screen_size: 6.9, year: 2023, ram_gb: 8, os_family: "Android" }, // SoftBank A303MO (rebadge of razr 40)
   "razr 50": { chipset: "MediaTek Dimensity 7300X", screen_size: 6.9, year: 2024, ram_gb: 8, os_family: "Android" }, // XT2453-9
   "razr 50d": { chipset: "MediaTek Dimensity 7300X", screen_size: 6.9, year: 2024, ram_gb: 8, os_family: "Android" }, // docomo M-51E (= base razr 50, NOT Ultra)
+  "razr 50 Ultra": { chipset: "Snapdragon 8s Gen 3", screen_size: 6.9, year: 2024, ram_gb: 12, os_family: "Android" }, // XT2453-3
   "razr 60": { chipset: "MediaTek Dimensity 7400X", screen_size: 6.9, year: 2025, ram_gb: 8, os_family: "Android" }, // XT2553-8
+  "razr 60d": { chipset: "MediaTek Dimensity 7400X", screen_size: 6.9, year: 2025, ram_gb: 8, os_family: "Android" }, // docomo M-51F (= base razr 60, 8GB JP)
+  "razr 60s": { chipset: "MediaTek Dimensity 7400X", screen_size: 6.9, year: 2025, ram_gb: 8, os_family: "Android" }, // SoftBank (= base razr 60, 8GB JP)
   "razr 60 Ultra": { chipset: "Snapdragon 8 Elite", screen_size: 7.0, year: 2025, ram_gb: 12, os_family: "Android" }, // XT2551-7
 }
 

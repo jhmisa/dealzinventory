@@ -70,15 +70,25 @@ recategorize any real data-bearing rows. Verify 0 orphaned items afterward (mirr
 - Open PR to main (do NOT merge without Joey).
 
 ## Progress log (update as you go — survives context clears)
-- [ ] Phase 1 re-harvests: iPhone __ · iPad __ · Galaxy __ · Xperia __ · Xiaomi __ · AQUOS __ · Pixel __ ·
-      OPPO __ · Motorola __ · Huawei __ · arrows __ · ASUS __  (record new-model delta each)
-- [ ] Phase 2 ZTE/nubia/RED MAGIC (formula + harvest + promote + verify + legacy clean)
+- [x] **Phase 1 re-harvests DONE (2026-07-01).** Net ACTIVE deltas vs gap-analysis baseline:
+      iPhone +0 (17 family already promoted) · **iPad +67** (added Air M4 11"/13" specs, 2026/12GB) ·
+      Galaxy +0 rows but **S26/S26+/S26 Ultra specs backfilled** (were promoted spec-less in a prior
+      run; SD 8 Elite Gen 5 for Galaxy / 12GB / 2026; also added Z Fold3/Fold6/S21+ spec gaps) ·
+      Xperia +4 · Xiaomi +7 (added Redmi Note 15, POCO M8, 13T Pro, Redmi 15) · AQUOS +6 (added zero6) ·
+      Pixel +12 · OPPO +1 (added Find X8/X9/N6 5G, A5 5G) · Motorola +4 (edge 30 Pro/40 neo/50 pro,
+      razr 50 Ultra/60d/60s) · Huawei +4 · arrows +5 · ASUS +4. ~25 colors verified→mapped across
+      brands; 14 spurious JA/EN dup rows archived (superseded_by); 7 colors left JA-token (unverified,
+      by design). 207 deno tests green. Data-ops: 2026-07-01-{ipad-fill-gaps, galaxy-s26-spec-backfill,
+      android-color-en-cleanup, android-color-dup-archive}.sql.
+- [ ] Phase 2 ZTE/nubia/RED MAGIC (formula + harvest + promote + verify + legacy clean)  ← NEXT
 - [ ] Phase 2 Nothing/CMF
 - [ ] Phase 2 Kyocera smartphones
 - [ ] Phase 2 HTC
 - [ ] Phase 3 AirPods
 - [ ] Finalize: version bump · PROJECT_STATE · PR
 
-## Status checkpoint (as of 2026-06-30 setup)
-- Goal scoped + approved; gap analysis written. NO harvesting started yet. Phase 1 (existing-brand
-  re-sweeps) is the first action on resume. Photo-recovery goal (prior) is DONE; PR #1 open, unmerged.
+## Status checkpoint (as of 2026-07-01)
+- **Phase 1 complete & committed.** Next action on resume: Phase 2, brand 1 = **ZTE / nubia / RED MAGIC
+  / Libero** — new-brand recipe per runbook §3 (curl fixture → TDD config in android-listing.ts →
+  research-verified specs+colors → wire harvest.ts + run-harvest-local.ts arm → harvest → fill-gaps →
+  legacy reconcile of the ~17 ZTE COMPUTER junk rows → verify). Photo-recovery goal (prior) DONE; PR #1 open.

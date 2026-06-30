@@ -421,8 +421,10 @@ export const GALAXY_COLORS_JA_EN: Record<string, string> = {
   "ミスティックブラック": "Mystic Black",
   "ライトブルー": "Light Blue",
   "バーガンティ": "Burgundy", // katakana spelling variant of バーガンディ
+  "チタニウムシルバーブルー": "Titanium Silverblue", // S25 Ultra (verified Samsung.com)
+  "プリズムブリックスブラック": "Prism Bricks Black", // A51 5G (SCG07)
+  "プリズムブリックスホワイト": "Prism Bricks White", // A51 5G (SCG07)
   // NOTE: deliberately NOT mapped (uncertain official EN name) — left flagged, never guessed:
-  //   プリズムブリックスブラック / プリズムブリックスホワイト, チタニウムシルバーブルー,
   //   チタニウムピンクゴールド
 }
 
@@ -487,9 +489,12 @@ export const XPERIA_COLORS_JA_EN: Record<string, string> = {
   "ミント": "Mint",
   "ターコイズ": "Turquoise",
   "ブリックオレンジ": "Brick Orange",
+  "チャコールブラック": "Charcoal Black", // Xperia 10 VI/VII (verified Amazon.co.jp EN title)
+  "アイスホワイト": "Ice White", // Xperia 1 IV
+  "ミストグレー": "Mist Gray", // Xperia 10 V Fun Edition (SO-52D)
+  "フロストグレー": "Frost Gray", // Xperia 1 III Frost lineup
   // NOTE: deliberately NOT mapped (no official Sony EN name verified — flagged null, never
-  // guessed; still promote as the JA token via coalesce in the fill-gaps): チャコールブラック,
-  // アイスホワイト, ミストグレー, フロストグレー, フロストグリーン
+  // guessed; still promote as the JA token via coalesce in the fill-gaps): フロストグリーン
 }
 
 export function xperiaColorJaToEn(ja: string | null): string | null {
@@ -524,10 +529,13 @@ export const XPERIA_CONFIG: AndroidBrandConfig = {
 // Seed color map (observed on iosys + Sharp official EN names; verified research pass 2026-06-28).
 // Unmapped JA colors stay null (flagged, never guessed) — they still promote as the JA token via
 // coalesce in the fill-gaps. ASCII colors (e.g. "Charcoal", "Olive Green") flow straight through.
-// Deliberately NOT mapped (no verified Sharp EN spelling, ambiguous marketing name): クラッシィブルー,
+// Deliberately NOT mapped (no verified Sharp EN spelling, ambiguous marketing name):
 // サクラ, アッシュイエロー, and the sense2-gen pastel cluster (ラベンダーブルー/ペールピンク/ミントグリーン/
 // アクアブルー/コーラルマゼンタ/アイスグリーン/ブルーミングレッド/ボタニカルグリーン).
 export const AQUOS_COLORS_JA_EN: Record<string, string> = {
+  "フルブラック": "Full Black", // sense10 (2025)
+  "トレンチベージュ": "Trench Beige", // R10
+  "クラッシィブルー": "Classy Blue", // sense3 plus サウンド (SHV46)
   // Generic / basic (verified-direct)
   "ブラック": "Black",
   "ホワイト": "White",
@@ -674,8 +682,11 @@ export const XIAOMI_COLORS_JA_EN: Record<string, string> = {
   "コズミックグレー": "Cosmic Gray",
   "クロームシルバー": "Chrome Silver", // NB: distinct katakana ordering from シルバークローム — kept separate
   "ドリームホワイト": "Dream White",
+  "スターリットグリーン": "Starlit Green", // Xiaomi 17 Ultra (2026)
+  "リップルグリーン": "Ripple Green", // Redmi 15
+  "チタニウムグレー": "Titan Gray", // Xiaomi uses "Titan" not "Titanium" (14T/Redmi 15; JP also タイタングレー)
   // NOTE: deliberately UNMAPPED (research flagged UNVERIFIED — promote as the JA token via coalesce,
-  // never guessed): レイクブルー, ディープブルー, スターリットグリーン, リップルグリーン.
+  // never guessed): レイクブルー, ディープブルー, ナイトタイムブルー.
 }
 
 export function xiaomiColorJaToEn(ja: string | null): string | null {
@@ -752,6 +763,7 @@ export const PIXEL_CONFIG: AndroidBrandConfig = {
 // accessory-bundle suffix ("Find N6 … OPPO AI Pen Kit付属", step 9). Colors come in katakana OR
 // English; verified research pass 2026-06-28, unmapped JA colors stay null (flagged, never guessed).
 export const OPPO_COLORS_JA_EN: Record<string, string> = {
+  "スターグレー": "Star Grey", // Find X8 (OPPO official copy uses British "Grey")
   // Generic / basic (verified-direct transliterations)
   "ブラック": "Black",
   "ホワイト": "White",
@@ -847,6 +859,7 @@ export const ARROWS_COLORS_JA_EN: Record<string, string> = {
   "ライトブルー": "Light Blue", // We2 (Rakuten/au)
   "スレートグレイ": "Slate Gray", // We2 Plus (F-51E)
   "シャンパンシルバー": "Champagne Silver", // We2 Plus (F-51E)
+  "ターコイズ": "Turquoise", // arrows We
 }
 
 export function arrowsColorJaToEn(ja: string | null): string | null {
@@ -1039,6 +1052,9 @@ export const MOTOROLA_COLORS_JA_EN: Record<string, string> = {
   "ブラックオイスター": "Black Oyster", // moto g66j 5G (Pantone)
   "ディルグリーン": "Dill Green", // moto g66j 5G (Pantone)
   "グレーミスト": "Grey Mist", // moto g66j 5G (Pantone)
+  "リュクスラベンダー": "Luxe Lavender", // edge 50 pro
+  "コスモブルー": "Cosmos Blue", // edge 30 Pro (plural "Cosmos", not "Cosmo")
+  "ライトスカイホワイト": "PANTONE Lightest Sky", // razr 60 / 60d / 60s (Pantone 11-4804 TPG)
 }
 
 export function motorolaColorJaToEn(ja: string | null): string | null {

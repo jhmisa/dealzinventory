@@ -9,10 +9,9 @@
 // os_family always "Android". Values verified by a research subagent vs oppo.com/jp + GSMArena +
 // KHwang9883 MobileModels DB (2026-06-28 pass).
 //
-// DELIBERATELY OMITTED (research flagged UNVERIFIED — harvest as spec_known=false, flagged never
-// guessed; backfill when confirmed): "A5 5G" (no verifiable JP SoC for the OPG06 SKU), "Find X9"
-// (exact screen unconfirmed), "Find N6 5G" (RAM unconfirmed). A77 (JP) = Helio G35 4G, NOT the
-// global A77 5G — keyed here as the JP entry model.
+// A77 (JP) = Helio G35 4G, NOT the global A77 5G — keyed here as the JP entry model.
+// A5 5G keyed to the JP Rakuten Mobile CPH2735 config (Dimensity 6300, 4GB) — distinct from the
+// global A5 5G's 4/6/8GB tiers; do NOT conflate with "A5 Pro 5G" / "A5i".
 
 export interface OppoModelSpec {
   chipset: string
@@ -25,6 +24,7 @@ export interface OppoModelSpec {
 export const OPPO_SPECS: Record<string, OppoModelSpec> = {
   // --- A-series ---
   "A5 2020": { chipset: "Snapdragon 665", screen_size: 6.5, year: 2020, ram_gb: 4, os_family: "Android" },
+  "A5 5G": { chipset: "MediaTek Dimensity 6300", screen_size: 6.7, year: 2025, ram_gb: 4, os_family: "Android" }, // JP Rakuten CPH2735, 4GB only
   "A54 5G": { chipset: "Snapdragon 480 5G", screen_size: 6.5, year: 2021, ram_gb: 4, os_family: "Android" }, // au OPG02
   "A55s 5G": { chipset: "MediaTek Dimensity 700", screen_size: 6.5, year: 2021, ram_gb: 4, os_family: "Android" }, // CPH2309
   "A73": { chipset: "Snapdragon 662", screen_size: 6.44, year: 2020, ram_gb: 4, os_family: "Android" }, // CPH2099
@@ -34,6 +34,9 @@ export const OPPO_SPECS: Record<string, OppoModelSpec> = {
 
   // --- Find series ---
   "Find X3 Pro 5G": { chipset: "Snapdragon 888 5G", screen_size: 6.7, year: 2021, ram_gb: 12, os_family: "Android" }, // au OPG03
+  "Find X8": { chipset: "MediaTek Dimensity 9400", screen_size: 6.59, year: 2024, ram_gb: 12, os_family: "Android" }, // JP CPH2651
+  "Find X9": { chipset: "MediaTek Dimensity 9500", screen_size: 6.59, year: 2025, ram_gb: 12, os_family: "Android" },
+  "Find N6 5G": { chipset: "Snapdragon 8 Elite Gen 5", screen_size: 8.12, year: 2026, ram_gb: 12, os_family: "Android" }, // foldable, inner display
 
   // --- R / Reno (older + A-line + Pro) ---
   "R17 Pro": { chipset: "Snapdragon 710", screen_size: 6.4, year: 2018, ram_gb: 6, os_family: "Android" }, // CPH1877

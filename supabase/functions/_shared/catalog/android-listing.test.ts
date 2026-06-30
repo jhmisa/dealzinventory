@@ -186,7 +186,7 @@ Deno.test("xperia: Fun Edition kept in name", () => {
   const s = xperia("Xperia10 V Fun Edition SO-52D ミストグレー【docomo版 SIMフリー】")
   assertEquals(s?.model_name, "Xperia 10 V Fun Edition")
   assertEquals(s?.color_ja, "ミストグレー")
-  assertEquals(s?.color_en, null) // unverified color left null, never guessed
+  assertEquals(s?.color_en, "Mist Gray") // verified 2026-07-01 (Xperia 10 V Fun Edition)
 })
 
 Deno.test("xperia: docomo ahamo sub-brand prefix + SO-51Aa lowercase suffix", () => {
@@ -359,7 +359,7 @@ Deno.test("aquos: サウンド variant kept in name", () => {
   assertEquals(s?.model_name, "AQUOS sense3 plus サウンド")
   assertEquals(s?.model_number, "SHV46")
   assertEquals(s?.color_ja, "クラッシィブルー")
-  assertEquals(s?.color_en, null) // unverified EN, never guessed
+  assertEquals(s?.color_en, "Classy Blue") // verified 2026-07-01 (sense3 plus サウンド)
 })
 
 Deno.test("aquos: SoftBank A###SH code", () => {
