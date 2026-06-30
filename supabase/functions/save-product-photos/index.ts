@@ -2,7 +2,8 @@
 // Fetch a product photo (iosys/CloudFront listing image), center-crop it to a square, encode 1080²
 // display + 256² thumbnail WebP, upload both to the product-media bucket, and insert ONE
 // product_media hero row. The trg_fanout_product_media trigger replicates the hero to every
-// product_model sharing the same color_key. Idempotent: skips a color group that already has a hero.
+// product_model sharing the same color_key. Idempotent: only fills genuinely EMPTY color groups —
+// skips a color group where ANY product_media row (of any role) already exists.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { cropToSquareWebp } from "../_shared/image/square-crop.ts";
@@ -49,23 +50,21 @@ Deno.serve(async (req) => {
       const { data: existing } = await supabase
         .from("product_media")
         .select("id, product_models!inner(color_key)")
-        .eq("role", "hero")
         .eq("product_models.color_key", model.color_key)
         .limit(1);
       if (existing && existing.length > 0) {
-        return jsonResponse({ skipped: "color group already has a hero", product_model_id: productModelId }, 200);
+        return jsonResponse({ skipped: "color group already has an image", product_model_id: productModelId }, 200);
       }
     } else {
-      // No color_key to group on: fall back to a per-model hero check so a manual
-      // re-call doesn't create a duplicate hero on this exact product_model.
+      // No color_key to group on: fall back to a per-model check so we only add our
+      // photo when this exact product_model has NO image of any role yet.
       const { data: existing } = await supabase
         .from("product_media")
         .select("id")
         .eq("product_id", productModelId)
-        .eq("role", "hero")
         .limit(1);
       if (existing && existing.length > 0) {
-        return jsonResponse({ skipped: "model already has a hero", product_model_id: productModelId }, 200);
+        return jsonResponse({ skipped: "model already has an image", product_model_id: productModelId }, 200);
       }
     }
 

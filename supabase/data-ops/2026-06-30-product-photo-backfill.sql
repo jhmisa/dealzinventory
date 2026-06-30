@@ -1,8 +1,9 @@
 -- supabase/data-ops/2026-06-30-product-photo-backfill.sql
 -- Build a job list of (product_model_id, image_url): one representative model per color_key that
--- (a) matches an iosys_catalog row carrying an image_url and (b) has no product_media hero yet.
+-- (a) matches an iosys_catalog row carrying an image_url and (b) is a genuinely EMPTY color group
+--     (no product_media row of ANY role on any model sharing that color_key).
 -- The runner (run-product-photo-backfill.ts) reads product_photo_jobs and calls save-product-photos.
--- Idempotent: re-running rebuilds the table and re-excludes color groups that now have a hero.
+-- Idempotent: re-running rebuilds the table and re-excludes color groups that now have any image.
 BEGIN;
 
 DROP TABLE IF EXISTS public.product_photo_jobs;
@@ -54,7 +55,7 @@ ranked AS (
     AND NOT EXISTS (
       SELECT 1 FROM public.product_media x
       JOIN public.product_models pmx ON pmx.id = x.product_id
-      WHERE x.role = 'hero' AND pmx.color_key = pm.color_key
+      WHERE pmx.color_key = pm.color_key
     )
   ORDER BY pm.color_key, m.product_id
 )
