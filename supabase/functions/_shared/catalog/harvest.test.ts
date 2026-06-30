@@ -52,6 +52,10 @@ Deno.test("harvest: attaches image_url to rows from card images", async () => {
   })
   const withImg = res.rows.filter((r) => r.image_url)
   if (withImg.length === 0) throw new Error("expected at least one row with image_url")
+  // real CloudFront photos, never the /common_img/dummy/dummy.gif lazy-load placeholder
+  if (withImg.some((r) => /dummy/i.test(r.image_url!))) {
+    throw new Error("captured a dummy placeholder URL")
+  }
 })
 
 Deno.test("harvest: respects maxPages cap (no infinite loop on a repeating page)", async () => {

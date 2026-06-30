@@ -29,20 +29,40 @@ function normalizeSrc(src: string, baseUrl: string): string | null {
   return u;
 }
 
-/** Map every card image on a listing page: normalized alt title -> absolute large image URL. */
+/** True for lazy-load placeholder images (e.g. /common_img/dummy/dummy.gif) that aren't real photos. */
+function isPlaceholder(url: string): boolean {
+  return /\/dummy\//i.test(url) || /dummy\.gif/i.test(url);
+}
+
+/**
+ * Map every card image on a listing page: normalized alt title -> absolute large image URL.
+ *
+ * iosys cards lazy-load: the real photo lives in `data-src` (CloudFront) while `src` is a
+ * `/common_img/dummy/dummy.gif` placeholder. Consider candidates in priority order
+ * data-src → data-original → src, and pick the first that resolves to a valid http(s) URL
+ * AND is not a placeholder. A card with only a real `src` still works (src is the fallback).
+ */
 export function extractCardImageMap(html: string, baseUrl = "https://iosys.co.jp"): Map<string, string> {
   const map = new Map<string, string>();
   for (const m of html.matchAll(/<img\b[^>]*>/gi)) {
     const tag = m[0];
     const alt = tag.match(/\salt="([^"]*)"/i)?.[1];
-    const rawSrc = tag.match(/\ssrc="([^"]*)"/i)?.[1] ??
-      tag.match(/\sdata-src="([^"]*)"/i)?.[1] ??
-      tag.match(/\sdata-original="([^"]*)"/i)?.[1];
-    if (!alt || !rawSrc) continue;
+    if (!alt) continue;
     const key = normalizeAltKey(alt);
     if (!key || map.has(key)) continue; // first card for a title wins
-    const src = normalizeSrc(rawSrc, baseUrl);
-    if (src) map.set(key, src);
+    const candidates = [
+      tag.match(/\sdata-src="([^"]*)"/i)?.[1],
+      tag.match(/\sdata-original="([^"]*)"/i)?.[1],
+      tag.match(/\ssrc="([^"]*)"/i)?.[1],
+    ];
+    for (const c of candidates) {
+      if (!c) continue;
+      const u = normalizeSrc(c, baseUrl);
+      if (u && !isPlaceholder(u)) {
+        map.set(key, u);
+        break;
+      }
+    }
   }
   return map;
 }

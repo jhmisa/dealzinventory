@@ -27,6 +27,16 @@ Deno.test("extractCardImageMap keys by normalized alt and forces the _L large va
   assertEquals(map.get(normalizeAltKey("thumb only")), "https://iosys.co.jp/img/items/00000_1_L.jpg");
 });
 
+Deno.test("extractCardImageMap prefers data-src over a dummy src placeholder and forces _L", () => {
+  const html =
+    `<li class="item"><img src="/common_img/dummy/dummy.gif" data-src="https://d27ea4kkb8flj9.cloudfront.net/400021_1_M.jpg" alt="iPhone 17e A3575 黒"></li>`;
+  const map = extractCardImageMap(html, "https://iosys.co.jp");
+  assertEquals(
+    map.get(normalizeAltKey("iPhone 17e A3575 黒")),
+    "https://d27ea4kkb8flj9.cloudfront.net/400021_1_L.jpg",
+  );
+});
+
 Deno.test("normalizeAltKey collapses whitespace and decodes entities", () => {
   assertEquals(normalizeAltKey("iPhone&nbsp;12  64GB"), normalizeAltKey("iPhone 12 64GB"));
 });
