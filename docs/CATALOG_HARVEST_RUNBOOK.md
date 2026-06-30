@@ -206,6 +206,7 @@ Re-harvest for new Apple models follows the same shape as §2 (add specs → re-
 | ZTE | ZTE (nubia/RED MAGIC/Libero/Axon) | `items/smartphone/zte` (+ **ymobile** section) | `NX\d{3}J \| Z\d{4}R \| A?\d{3}ZT` | `zte-specs.ts` / `ZTE_COLORS_JA_EN` | `2026-07-01-zte-{fill-gaps,legacy-reconcile}.sql` | `iosys-zte-p1.html` | ✅ legacy reconciled inline (17 COMPUTER rows / 53 items → ANDROID, 2 dups archived) |
 | Nothing | Nothing (+ CMF) | `items/smartphone/nothing` | **NONE — fully code-less** (sentinel `/(?!)/`; all SIM-free/Rakuten) → `nameConsumeRe` only | `nothing-specs.ts` / `NOTHING_COLORS_JA_EN` | `2026-07-01-nothing-{fill-gaps,legacy-reconcile}.sql` | `iosys-nothing-p1.html` | ✅ legacy reconciled inline (1 COMPUTER row / 1 item → ANDROID) |
 | Kyocera | Kyocera (京セラ) | `items/smartphone/kyocera` (+ **ymobile** section) | au `KYV\d+ \| KYG\d+` · SoftBank `A\d{3}KC \| \d{3}KC` · SIM-free `KC-S\d+` (Android One = code-less) | `kyocera-specs.ts` / `KYOCERA_COLORS_JA_EN` | `2026-07-01-kyocera-fill-gaps.sql` | `iosys-kyocera-p1.html` | ✅ SMARTPHONES ONLY; no legacy rows (0 COMPUTER) |
+| HTC | HTC | `items/smartphone/htc` | **coarse only** SoftBank `\d{3}HT` · au `HTV3[23]` (=10/U11); J-series codes KEPT in name | `htc-specs.ts` / `HTC_COLORS_JA_EN` | `2026-07-01-htc-fill-gaps.sql` | `iosys-htc-p1.html` | ✅ closed JP lineup; no legacy rows (0 COMPUTER) |
 
 ### Galaxy (Samsung)
 - **Codes:** SIM-free `SM-…Q/C` · au `SCG##`/`SCV##` · docomo `SC-##L`.
@@ -412,6 +413,25 @@ Re-harvest for new Apple models follows the same shape as §2 (add specs → re-
 - **No legacy rows** — 0 pre-existing Kyocera product_models (no COMPUTER miscategorization to reconcile).
   The colorless iosys card "DIGNO WX KC-S303" (alt has no color) is parsed but the fill-gaps drops it
   (color NOT NULL; never guessed Black).
+
+### HTC (U-series / Desire / "HTC J" line)
+- **Closed JP lineup** — HTC exited Japan; the spec ref is effectively complete (no new models ever).
+  Sold as au ("HTC J" HTL##/HTV##), SoftBank (`###HT`), and HTC NIPPON SIM-free (U-series + Desire).
+- **KEY identity rule:** the au/SoftBank code is COARSE for U11/10 (same model also sold SIM-free → one
+  product_model), but IDENTITY for the **"J butterfly" line** — HTL21 (2012) / HTL23 (2014) / HTV31
+  (2015) are three DISTINCT devices sharing the name "J butterfly", so the code MUST stay in the name.
+  Because the lineup is closed we match EXACTLY the coarse codes — SoftBank `\d{3}HT` + au `HTV3[23]`
+  (=HTV32 "10", HTV33 "U11") — and let every J-series code (HTL##, HTV31, ISW##HT) fall through to
+  `nameConsumeRe` so it is kept ("J butterfly HTL23", "J butterfly HTV31", "J One HTL22"). Verified safe:
+  the only au HTC codes that ever existed are HTV31/32/33 + the HTL/ISW J-codes.
+- **Generic engine capability added with HTC:** step 8d pulls a trailing storage token off the END of
+  the color tail ("Ice White 64GB" → color "Ice White" + storage 64) — HTC SoftBank U11 prints
+  `{multi-word ASCII color} {NN}GB` with no bracket. Reusable for any "color then storage" grammar.
+- **Research traps (verified):** U Ultra (SD821) + U23 pro (SD7 Gen 1) are IMPORT-ONLY / unconfirmed
+  JP-domestic → OMITTED from specs (harvest spec_known=false if ever stocked). HTC 10 (au HTV32) JP
+  colors = Carbon Gray / Topaz Gold / Camellia Red only. Desire 626 JP = 2GB variant. サルサレッド =
+  Salsa Red is a Desire 22 pro JP-exclusive color.
+- **No legacy rows** (0 COMPUTER). Current iosys stock = Desire 22 pro (SIM-free, 3 colors) + U11 601HT.
 
 ---
 

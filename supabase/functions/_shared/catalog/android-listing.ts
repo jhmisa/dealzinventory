@@ -249,6 +249,16 @@ export function parseAndroidListingTitle(
   if (storage_gb == null) storage_gb = nameStorage
   if (ram_gb == null) ram_gb = nameRam
 
+  // 8d. Trailing storage AFTER the color, no bracket: "Ice White 64GB" (HTC SoftBank U11 601HT, where
+  //     color is multi-word ASCII and storage trails it). Pull it off the tail so the color is clean.
+  if (storage_gb == null) {
+    const trailSto = tail.match(/\s+(\d+)\s*(GB|TB)\s*$/i)
+    if (trailSto && trailSto.index != null) {
+      storage_gb = toStorageGb(trailSto[1], trailSto[2])
+      tail = tail.slice(0, trailSto.index).trim()
+    }
+  }
+
   // 9. Color: prefer the text after the code; strip any trailing full-SKU / code-like token
   //    (ASCII alnum with a digit, e.g. "ブラック SCV46SKV") and the corporate-channel marketing
   //    marker 法人モデル (business SKU; brand-agnostic JP retail noise, e.g. "ブラック 法人モデル").
@@ -1287,4 +1297,93 @@ export const KYOCERA_CONFIG: AndroidBrandConfig = {
     return s.replace(/\s+/g, " ").trim()
   },
   colorJaToEn: kyoceraColorJaToEn,
+}
+
+// ---------------------------------------------------------------------------
+
+// HTC — a CLOSED JP smartphone lineup (HTC exited Japan; no new models will appear). Sold as au
+// ("HTC J" line, HTL##/HTV## codes), SoftBank (###HT), and HTC NIPPON SIM-free (U-series + Desire).
+// brand="HTC", model kept in model_name ("U11", "Desire 22 pro", "J butterfly HTL23").
+//
+// KEY IDENTITY SUBTLETY: the au code is COARSE for U11/10 (the same model also sold SIM-free / on
+// SoftBank, so HTV33=U11 / HTV32=10 collapse to one product_model) but is IDENTITY for the "J
+// butterfly" line — HTL21 (2012) / HTL23 (2014) / HTV31 (2015) are three DISTINCT devices that all
+// share the name "J butterfly", so the code MUST stay in the model_name or they collide. Because the
+// lineup is closed we can match exactly the coarse codes — SoftBank `\d{3}HT` and the two au codes
+// `HTV3[23]` (=HTV32 "10", HTV33 "U11") — and let every J-series code (HTL##, HTV31, ISW##HT) fall
+// through to nameConsumeRe so it is KEPT in the name ("J butterfly HTL23", "J butterfly HTV31").
+//
+// Title grammars seen:
+//   "HTC Desire 22 pro サルサレッド【国内版 SIMフリー】"                 (SIM-free, code-less, JA color)
+//   "【SIMロック解除済】Softbank HTC U11 601HT  Ice White 64GB"          (SoftBank ###HT, ASCII color + trailing storage, no bracket)
+export const HTC_COLORS_JA_EN: Record<string, string> = {
+  // generic
+  "ブラック": "Black",
+  "ホワイト": "White",
+  "レッド": "Red",
+  // HTC U11 (au HTV33 / SoftBank 601HT / SIM-free)
+  "ブリリアントブラック": "Brilliant Black",
+  "サファイアブルー": "Sapphire Blue",
+  "アメージングシルバー": "Amazing Silver",
+  "アイスホワイト": "Ice White",
+  "ソーラーレッド": "Solar Red",
+  // HTC U12+
+  "トランスルーセントブルー": "Translucent Blue",
+  "セラミックブラック": "Ceramic Black",
+  "フレームレッド": "Flame Red",
+  // HTC 10 (au HTV32)
+  "カーボングレイ": "Carbon Gray",
+  "トパーズゴールド": "Topaz Gold",
+  "カメリアレッド": "Camellia Red",
+  // HTC J butterfly HTL23 / HTV31
+  "ルージュ": "Rouge",
+  "キャンバス": "Canvas",
+  "インディゴ": "Indigo",
+  "ロッソ": "Rosso", // HTV31 (Italian "rosso" = red; transliteration)
+  "シルク": "Silk", // HTV31
+  // HTC J One HTL22 ("Metal" finishes)
+  "ホワイトメタル": "White Metal",
+  "ブラックメタル": "Black Metal",
+  "レッドメタル": "Red Metal",
+  // HTC Desire EYE
+  "スカーレット": "Scarlet",
+  "マリーン": "Marine",
+  // HTC Desire 626
+  "マカロンピンク": "Macaron Pink",
+  "マリーンブルー": "Marine Blue",
+  // HTC Desire 22 pro (JP lineup = exactly these 3; サルサレッド is a JP-exclusive color)
+  "ダークオーク": "Dark Oak",
+  "チェリーブロッサム": "Cherry Blossom",
+  "サルサレッド": "Salsa Red",
+}
+
+export function htcColorJaToEn(ja: string | null): string | null {
+  if (!ja) return null
+  return HTC_COLORS_JA_EN[ja] ?? null
+}
+
+export const HTC_CONFIG: AndroidBrandConfig = {
+  brand: "HTC",
+  brandPrefixes: ["HTC"],
+  // Lenient (contains) — leading carrier words are stripped in the canonicalizer.
+  modelNameRe: /Desire|butterfly|\bU\s*\d|U\s*Ultra|\bJ\s+One|\bJ\s+ISW|^10\b/i,
+  // COARSE carrier codes only (see header): SoftBank \d{3}HT; au HTV32/HTV33. Every J-series code
+  // (HTL##, HTV31, ISW##HT) is deliberately NOT matched → it stays in the name via nameConsumeRe.
+  modelCodeRe: /\b(\d{3}HT|HTV3[23])\b/,
+  // Code-less / J-series fallback: consume the HTC model-name prefix (optional leading "HTC " for the
+  // extract-filter path). Desire EYE/NNN/NN pro, U-series (U11/U12+/U11 life/U Ultra), and the J line
+  // WITH its code kept ("J butterfly HTL23", "J One HTL22", "J butterfly HTV31", "J ISW13HT"). Anchored.
+  nameConsumeRe:
+    /^(?:HTC\s+)?(?:Desire\s+(?:EYE|\d+\s*(?:pro|plus|\+)?)|U\s*\d+\s*\+?(?:\s+life)?|U\s+Ultra|J\s+(?:butterfly|One)(?:\s+HT[LV]\d+)?|J\s+ISW\d+HT)/i,
+  canonicalModelName: (seg) => {
+    let s = seg.replace(/\s+/g, " ").trim()
+    // Peel a leftover carrier/MVNO word (engine CARRIER_WORD already handled docomo/au/sb/rkt prefixes,
+    // but a leading one can survive on the nameConsume path).
+    s = s.replace(/^(docomo|au|softbank|Y!?mobile|UQ\s?mobile|UQ|mineo)\s+/i, "")
+    // Peel a leftover HTC brand word.
+    s = s.replace(/^HTC\s+/i, "")
+    // KEEP "+" and lowercase "pro" (official HTC styling: "U12+", "Desire 22 pro"). Just normalize ws.
+    return s.replace(/\s+/g, " ").trim()
+  },
+  colorJaToEn: htcColorJaToEn,
 }

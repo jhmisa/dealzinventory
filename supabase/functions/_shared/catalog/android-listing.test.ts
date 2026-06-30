@@ -16,6 +16,7 @@ import {
   ZTE_CONFIG,
   NOTHING_CONFIG,
   KYOCERA_CONFIG,
+  HTC_CONFIG,
 } from "./android-listing.ts"
 
 const arrows = (t: string) => parseAndroidListingTitle(t, ARROWS_CONFIG)
@@ -26,6 +27,7 @@ const zte = (t: string) => parseAndroidListingTitle(t, ZTE_CONFIG)
 const nothing = (t: string) => parseAndroidListingTitle(t, NOTHING_CONFIG)
 const kyocera = (t: string, pc?: "SoftBank" | "au" | null) =>
   parseAndroidListingTitle(t, KYOCERA_CONFIG, pc ?? undefined)
+const htc = (t: string) => parseAndroidListingTitle(t, HTC_CONFIG)
 
 const galaxy = (t: string) => parseAndroidListingTitle(t, GALAXY_CONFIG)
 const xperia = (t: string) => parseAndroidListingTitle(t, XPERIA_CONFIG)
@@ -1510,4 +1512,94 @@ Deno.test("kyocera: page extraction keeps coded + code-less smartphone cards", (
   assertEquals(skus.some((s) => /^Android One/.test(s.model_name)), true)
   // the generic leading-unlock fix captured the trailing-bracket-less Android One cards
   assertEquals(skus.some((s) => /^Android One S2/.test(s.model_name)), true)
+})
+
+// ---------------------------------------------------------------------------
+// HTC — closed JP lineup; coarse U/10 codes vs identity-bearing J-series codes
+// ---------------------------------------------------------------------------
+
+Deno.test("htc: Desire 22 pro SIM-free code-less, JA color, storage omitted -> NULL", () => {
+  const s = htc("HTC Desire 22 pro サルサレッド【国内版 SIMフリー】")
+  assertEquals(s?.brand, "HTC")
+  assertEquals(s?.model_name, "Desire 22 pro")
+  assertEquals(s?.model_number, null)
+  assertEquals(s?.storage_gb, null)
+  assertEquals(s?.color_ja, "サルサレッド")
+  assertEquals(s?.color_en, "Salsa Red")
+  assertEquals(s?.carrier, "SIM-Free")
+})
+
+Deno.test("htc: U11 SoftBank ###HT, leading unlock, ASCII color + trailing storage (no bracket)", () => {
+  const s = htc("【SIMロック解除済】Softbank HTC U11 601HT  Ice White 64GB")
+  assertEquals(s?.model_name, "U11")
+  assertEquals(s?.model_number, "601HT")
+  assertEquals(s?.storage_gb, 64) // pulled off the trailing "64GB" after the color
+  assertEquals(s?.color_en, "Ice White")
+  assertEquals(s?.carrier, "SoftBank")
+  assertEquals(s?.is_unlocked, true)
+})
+
+Deno.test("htc: U11 au HTV33 coarse code collapses to same 'U11'", () => {
+  const s = htc("au HTC U11 HTV33 ブリリアントブラック【au版SIMフリー】")
+  assertEquals(s?.model_name, "U11")
+  assertEquals(s?.model_number, "HTV33")
+  assertEquals(s?.color_en, "Brilliant Black")
+})
+
+Deno.test("htc: HTC 10 au HTV32 coarse code, name '10'", () => {
+  const s = htc("HTC 10 HTV32 カーボングレイ【au版SIMフリー】")
+  assertEquals(s?.model_name, "10")
+  assertEquals(s?.model_number, "HTV32")
+  assertEquals(s?.color_en, "Carbon Gray")
+})
+
+Deno.test("htc: U12+ SIM-free code-less, keeps the +", () => {
+  const s = htc("HTC U12+ セラミックブラック【国内版 SIMフリー】")
+  assertEquals(s?.model_name, "U12+")
+  assertEquals(s?.model_number, null)
+  assertEquals(s?.color_en, "Ceramic Black")
+})
+
+Deno.test("htc: J butterfly HTL23 — code KEPT in name (identity, not coarse)", () => {
+  const s = htc("au HTC J butterfly HTL23 ルージュ【au版SIMフリー】")
+  assertEquals(s?.model_name, "J butterfly HTL23")
+  assertEquals(s?.model_number, null)
+  assertEquals(s?.color_en, "Rouge")
+})
+
+Deno.test("htc: J butterfly HTV31 — HTV31 NOT coarse (kept in name), distinct from HTL23", () => {
+  const s = htc("HTC J butterfly HTV31 ロッソ【au版SIMフリー】")
+  assertEquals(s?.model_name, "J butterfly HTV31")
+  assertEquals(s?.model_number, null)
+  assertEquals(s?.color_en, "Rosso")
+})
+
+Deno.test("htc: J One HTL22 — code kept, distinct from butterfly", () => {
+  const s = htc("au HTC J One HTL22 ホワイトメタル【au版SIMフリー】")
+  assertEquals(s?.model_name, "J One HTL22")
+  assertEquals(s?.color_en, "White Metal")
+})
+
+Deno.test("htc: Desire EYE SIM-free, JA color", () => {
+  const s = htc("HTC Desire EYE スカーレット【国内版 SIMフリー】")
+  assertEquals(s?.model_name, "Desire EYE")
+  assertEquals(s?.color_en, "Scarlet")
+})
+
+Deno.test("htc: non-HTC / nav -> null", () => {
+  assertEquals(htc("Galaxy S24 SM-S921Q ブラック【国内版 SIMフリー】"), null)
+  assertEquals(htc("HTC U11の画像"), null)
+})
+
+Deno.test("htc: page extraction keeps HTC SKU cards", () => {
+  const html = Deno.readTextFileSync(
+    new URL("./__fixtures__/iosys-htc-p1.html", import.meta.url),
+  )
+  const titles = extractAndroidCardTitles(html, HTC_CONFIG)
+  assertEquals(titles.every((t) => !/シリーズ|の画像/.test(t)), true)
+  const skus = parseAndroidListingPage(html, HTC_CONFIG)
+  assertEquals(skus.every((s) => s.brand === "HTC"), true)
+  assertEquals(skus.filter((s) => s.color_en != null || s.color_ja != null).length >= 1, true)
+  // the SIM-free Desire 22 pro cards are on the bare fixture page
+  assertEquals(skus.some((s) => s.model_name === "Desire 22 pro"), true)
 })

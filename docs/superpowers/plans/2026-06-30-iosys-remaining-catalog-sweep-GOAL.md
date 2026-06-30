@@ -108,13 +108,21 @@ recategorize any real data-bearing rows. Verify 0 orphaned items afterward (mirr
       Also widened shared `AndroidSpec.screen_size` to `number|null` (DIGNO BX3 screen unverified). Harvested
       12 SKUs (0 unknown, 0 unmapped) → **12 ACTIVE Kyocera SKUs, 0 COMPUTER (no legacy), 0 dups**; 247
       tests green; UI-verified. Data-op `2026-07-01-kyocera-fill-gaps.sql`. Registry §5 updated.
-- [ ] Phase 2 HTC  ← NEXT
-- [ ] Phase 3 AirPods
+- [x] **Phase 2 HTC DONE (2026-07-01) — Phase 2 (all 4 new brands) COMPLETE.** New brand per runbook §3,
+      closed JP lineup. HTC_CONFIG + colors + htc-specs.ts (12 confirmed JP models; U Ultra/U23 pro omitted
+      as import-only) + 11 TDD tests. **Key identity rule:** au/SoftBank codes coarse for U11/10 (match
+      `\d{3}HT`/`HTV3[23]`) but the J-butterfly line keeps its code in the name (HTL21/HTL23/HTV31 are
+      distinct devices). **Generic engine win:** step 8d pulls trailing storage off the color tail ("Ice
+      White 64GB"). Harvested 4 SKUs (0 unknown, 0 unmapped) → **4 ACTIVE HTC SKUs (Desire 22 pro ×3 +
+      U11), 0 COMPUTER (no legacy), 0 dups**; 258 tests green; UI-verified. Data-op `2026-07-01-htc-fill-gaps.sql`.
+- [ ] Phase 3 AirPods  ← NEXT (Apple part# pipeline; completes Apple lineup)
 - [ ] Finalize: version bump · PROJECT_STATE · PR
 
 ## Status checkpoint (as of 2026-07-01)
-- **Phase 1 + Phase 2 ZTE + Nothing + Kyocera complete.** Next action on resume: **Phase 2 brand 4 =
-  HTC** — new-brand recipe per runbook §3 (curl `/items/smartphone/htc` fixture → eyeball grammar → TDD
-  HTC_CONFIG in android-listing.ts → research-verified specs+colors → wire HTC_CATEGORY + run-harvest arm
-  → harvest → fill-gaps → legacy reconcile → verify). HTC is the LAST new brand; then AirPods (Phase 3),
-  then finalize (version bump + PROJECT_STATE + PR). Photo-recovery goal (prior) DONE; PR #1 open.
+- **Phase 1 + Phase 2 (ALL 4 new brands: ZTE, Nothing, Kyocera, HTC) COMPLETE.** Next action on resume:
+  **Phase 3 = AirPods** — the LAST Apple part#-keyed device shape (runbook §4). Recipe: curl
+  `/items/audio/apple` (or the AirPods listing path) fixture → build an `airpods-listing.ts` parser (name
+  + part# + year; simpler than Apple Watch — mirror its OTHER/wearable column decisions, confirm mapping)
+  + specs + TDD → wire AIRPODS_CATEGORY → harvest → fill-gaps → reconcile → verify. Then FINALIZE: bump
+  `package.json` (once this session), update PROJECT_STATE, open the PR to main (do NOT merge without Joey).
+  Photo-recovery goal (prior) DONE; PR #1 open.

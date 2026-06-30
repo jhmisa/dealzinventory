@@ -31,6 +31,7 @@ import {
   PIXEL_CONFIG,
   NOTHING_CONFIG,
   KYOCERA_CONFIG,
+  HTC_CONFIG,
   XIAOMI_CONFIG,
   XPERIA_CONFIG,
   ZTE_CONFIG,
@@ -48,6 +49,7 @@ import { motorolaSpec } from "./motorola-specs.ts"
 import { zteSpec } from "./zte-specs.ts"
 import { nothingSpec } from "./nothing-specs.ts"
 import { kyoceraSpec } from "./kyocera-specs.ts"
+import { htcSpec } from "./htc-specs.ts"
 import { extractCardImageMap, normalizeAltKey } from "./card-images.ts"
 
 export interface CarrierSection {
@@ -468,6 +470,14 @@ export const KYOCERA_CATEGORY: HarvestCategory = androidCategory(
   kyoceraSpec,
   "ANDROID",
   KYOCERA_SECTIONS,
+)
+
+// HTC — closed JP lineup (au "HTC J" + SoftBank + HTC NIPPON SIM-free). Default sections cover
+// simfree/au/softbank (docomo/rakuten return 0 and stop immediately).
+export const HTC_CATEGORY: HarvestCategory = androidCategory(
+  "items/smartphone/htc",
+  HTC_CONFIG,
+  htcSpec,
 )
 
 export interface HarvestOptions {
