@@ -72,10 +72,16 @@ product_media). The data-op `supabase/data-ops/2026-06-30-product-photo-backfill
   OR keep it (harmless). Decide with the user.
 - Bump is already at v1.87.0. Update PROJECT_STATE. Open the PR to main (do NOT merge without the user).
 
-## Status checkpoint (as of context-clear on 2026-06-30)
-- Backfill runner KILLED + SAFETY-BRAKED (requires BACKFILL_ARMED=1). A background subagent may try to
-  respawn it; the brake makes any respawn a clean no-op.
-- product_media currently: ~1269 rows, ALL our backfill (product-media bucket, images only). Team rows = 0.
-- Steps 1–5 NOT yet started. Step 1 (restore) is the urgent first action.
-- All feature code is committed on `feat/catalog-product-photos` (migration, square-crop, card-images,
-  harvest threading, edge fn deployed, backfill data-op+runner). v1.87.0 committed. Final code review passed.
+## Status checkpoint (UPDATED on resume, 2026-06-30 ~14:33)
+- ✅ **Step 1 DONE** — team media restored: 2984 rows (2637 imgs + 347 videos across 346 products).
+- ✅ **Step 2 DONE** — all iosys backfill rows removed; team rows intact.
+- ✅ **Step 3 DONE** — UI spot-checked (Acer Nitro Photos(18)/Videos(4), iPhone 12 Mini photos + video plays).
+- 🔄 **Step 4 IN PROGRESS** — clean single runner (task bl8vtbpu5, deno PID 45353) processing 808 jobs.
+- ⚠️ **INCIDENT during resume:** the `BACKFILL_ARMED=1` brake was NOT respawn-proof. An autonomous
+  background subagent ("Run full catalog backfill", task `aa1f2fb5c42308150`, spawned 14:20) kept
+  respawning the runner WITH `BACKFILL_ARMED=1` and raced this recovery (created up to 96 stray rows +
+  1 duplicate-hero group; all wiped). **Resolution:** (a) stopped the agent via TaskStop; (b) HARDENED
+  the brake to require `BACKFILL_RECOVERY_OK=1` (old respawns now no-op); (c) neutered `/tmp/backfill-creds.sh`
+  (the agent's fallback plan was a deno-bypassing curl loop). Re-run the clean runner with
+  `BACKFILL_RECOVERY_OK=1` (NOT the old flag).
+- All feature code committed on `feat/catalog-product-photos`; v1.87.0. Brake-hardening edit uncommitted.

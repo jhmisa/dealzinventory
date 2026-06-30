@@ -34,7 +34,7 @@ INSERT INTO public.product_media (product_id, file_url, media_type, role, sort_o
 SELECT
   split_part(o.name, '/', 2)::uuid AS product_id,
   'https://aeiyinpxmazmfubotpdk.supabase.co/storage/v1/object/public/photo-group-media/' || o.name AS file_url,
-  CASE WHEN o.name ~* '\.(mp4|mov|webm)$' THEN 'video' ELSE 'image' END AS media_type,
+  (CASE WHEN o.name ~* '\.(mp4|mov|webm)$' THEN 'video' ELSE 'image' END)::media_type AS media_type,
   'gallery' AS role,
   (row_number() OVER (PARTITION BY split_part(o.name, '/', 2) ORDER BY o.created_at) - 1)::int AS sort_order
 FROM storage.objects o
