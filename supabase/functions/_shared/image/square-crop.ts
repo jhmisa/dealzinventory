@@ -22,10 +22,15 @@ let _initialized: Promise<void> | null = null;
 function ensureInit(): Promise<void> {
   if (!_initialized) {
     _initialized = (async () => {
-      const res = await fetch(WASM_URL);
+      const res = await fetch(WASM_URL, { signal: AbortSignal.timeout(15_000) });
       if (!res.ok) throw new Error(`magick.wasm fetch failed: HTTP ${res.status}`);
       await initializeImageMagick(new Uint8Array(await res.arrayBuffer()));
     })();
+    // Reset on failure so a hung/failed CDN fetch doesn't permanently break the
+    // module: the next caller retries instead of awaiting a cached rejection.
+    _initialized.catch(() => {
+      _initialized = null;
+    });
   }
   return _initialized;
 }

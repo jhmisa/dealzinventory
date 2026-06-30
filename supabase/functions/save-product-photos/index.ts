@@ -55,6 +55,18 @@ Deno.serve(async (req) => {
       if (existing && existing.length > 0) {
         return jsonResponse({ skipped: "color group already has a hero", product_model_id: productModelId }, 200);
       }
+    } else {
+      // No color_key to group on: fall back to a per-model hero check so a manual
+      // re-call doesn't create a duplicate hero on this exact product_model.
+      const { data: existing } = await supabase
+        .from("product_media")
+        .select("id")
+        .eq("product_id", productModelId)
+        .eq("role", "hero")
+        .limit(1);
+      if (existing && existing.length > 0) {
+        return jsonResponse({ skipped: "model already has a hero", product_model_id: productModelId }, 200);
+      }
     }
 
     const res = await fetch(imageUrl, { headers: { "User-Agent": BROWSER_UA } });
@@ -66,20 +78,36 @@ Deno.serve(async (req) => {
 
     // Storage keys allow only a restricted charset; color_key contains `|` and
     // spaces. Slugify the prefix (the canonical color_key still lives on the row).
-    const prefix = (model.color_key ?? productModelId)
+    const slugged = (model.color_key ?? productModelId)
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "");
+    // A color_key that is entirely non-ASCII slugs to "", which would yield a
+    // leading-slash storage path Storage rejects. Fall back to the model UUID.
+    const prefix = slugged.length > 0 ? slugged : productModelId.replace(/-/g, "");
     const base = `${prefix}/${crypto.randomUUID()}`;
     const displayPath = `${base}_display.webp`;
     const thumbPath = `${base}_thumb.webp`;
+
+    // Track successfully-uploaded objects so we can clean them up if a later
+    // upload or the DB insert fails, avoiding orphaned storage objects.
+    const uploadedPaths: string[] = [];
+    const cleanupUploads = async () => {
+      if (uploadedPaths.length > 0) {
+        await supabase.storage.from(BUCKET).remove(uploadedPaths).catch(() => {});
+      }
+    };
 
     for (const [path, bytes] of [[displayPath, displayBytes], [thumbPath, thumbBytes]] as const) {
       const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, bytes, {
         contentType: "image/webp",
         upsert: false,
       });
-      if (upErr) return jsonResponse({ error: `upload failed: ${upErr.message}` }, 500);
+      if (upErr) {
+        await cleanupUploads();
+        return jsonResponse({ error: `upload failed: ${upErr.message}` }, 500);
+      }
+      uploadedPaths.push(path);
     }
 
     const displayUrl = supabase.storage.from(BUCKET).getPublicUrl(displayPath).data.publicUrl;
@@ -95,7 +123,10 @@ Deno.serve(async (req) => {
       })
       .select()
       .single();
-    if (insErr) return jsonResponse({ error: `insert failed: ${insErr.message}` }, 500);
+    if (insErr) {
+      await cleanupUploads();
+      return jsonResponse({ error: `insert failed: ${insErr.message}` }, 500);
+    }
 
     return jsonResponse({ ok: true, media: row, display_url: displayUrl, thumb_path: thumbPath }, 200);
   } catch (err) {
