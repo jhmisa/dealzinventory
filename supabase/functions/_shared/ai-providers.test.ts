@@ -82,6 +82,16 @@ Deno.test('parseAIResponse defaults needs_clarification to false on non-JSON rep
   assertEquals(parseAIResponse('just a plain sentence reply').needs_clarification, false);
 });
 
+Deno.test('parseAIResponse extracts used_template_name when present', () => {
+  const text = JSON.stringify({ reply: 'hi', confidence: 0.9, used_template_name: 'Info: Express Service' });
+  assertEquals(parseAIResponse(text).used_template_name, 'Info: Express Service');
+});
+
+Deno.test('parseAIResponse defaults used_template_name to null', () => {
+  assertEquals(parseAIResponse(JSON.stringify({ reply: 'hi', confidence: 0.9 })).used_template_name, null);
+  assertEquals(parseAIResponse('just a plain sentence reply').used_template_name, null);
+});
+
 import { buildEnhancedPrompt } from './ai-providers.ts';
 
 Deno.test('buildEnhancedPrompt keeps the persona and appends both rule blocks', () => {
