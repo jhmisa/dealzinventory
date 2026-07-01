@@ -183,3 +183,63 @@ export async function getShowcaseAccessory(accessoryCode: string): Promise<Showc
     videos,
   }
 }
+
+export async function getShowcaseBackorder(bCode: string): Promise<ShowcaseItem | null> {
+  // Resolve a B-code to its backorder line, joined to the tied product model's
+  // catalog media plus any curated backorder-line photos. Mirrors the media
+  // precedence in getClaimableBackorder (services/mine.ts) so the staff showcase
+  // matches the customer /mine view.
+  const { data, error } = await supabase
+    .from('backorder_lines')
+    .select(`
+      *,
+      product_models(
+        brand, model_name, color, short_description, cpu, ram_gb, storage_gb, screen_size,
+        categories(name, description_fields),
+        product_media(id, file_url, media_type, sort_order)
+      ),
+      backorder_line_media(id, file_url, sort_order)
+    `)
+    .eq('backorder_code', bCode.toUpperCase())
+    .maybeSingle()
+
+  if (error || !data) return null
+
+  const pm = data.product_models as Record<string, unknown> | null
+  const productMedia = (pm?.product_media ?? []) as Array<{ id: string; file_url: string; media_type: string; sort_order: number }>
+  const curated = (data.backorder_line_media ?? []) as Array<{ id: string; file_url: string; sort_order: number }>
+
+  const category = pm?.categories as { name: string; description_fields: string[] } | null
+  const description = getItemDescription(data as unknown as Record<string, unknown>, pm, category?.description_fields)
+
+  // Photos: curated backorder shots first, then catalog product-model images.
+  const curatedPhotos = curated
+    .slice()
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((m) => ({ id: m.id, url: m.file_url }))
+  const catalogPhotos = productMedia
+    .filter((m) => m.media_type === 'image')
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((m) => ({ id: m.id, url: m.file_url }))
+
+  // Videos: catalog product-model only (curated backorder media is photos-only).
+  const videos = productMedia
+    .filter((m) => m.media_type === 'video')
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((m) => ({ id: m.id, url: m.file_url }))
+
+  const discount = Number(data.discount_amount ?? 0)
+
+  return {
+    id: data.id,
+    item_code: data.backorder_code,
+    selling_price: data.selling_price,
+    purchase_price: null,
+    discount: discount > 0 ? discount : null,
+    condition_grade: data.condition_grade,
+    condition_notes: null,
+    description,
+    photos: [...curatedPhotos, ...catalogPhotos],
+    videos,
+  }
+}
