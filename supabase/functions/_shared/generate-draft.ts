@@ -16,6 +16,7 @@ import {
   buildSpecialistSystemPrompt,
   specialistForIntent,
   type SpecialistRow,
+  type CompanyFact,
 } from "./build-specialist-prompt.ts";
 import { searchInventory, deriveOfferCodes, type InventorySearchResult } from "./inventory-search.ts";
 import { assembleOfferReply } from "./offer-reply.ts";
@@ -104,6 +105,15 @@ export async function generateAndSaveDraft(
     .filter((e) => e.entry_type === 'knowledge')
     .map((e) => ({ title: e.title, content: e.content, specialist_tags: e.specialist_tags ?? [] }));
 
+  // 2b-bis. Fetch active structured company facts (authoritative reference block).
+  const { data: factRows } = await supabase
+    .from('company_facts')
+    .select('key, label, value_en, value_ja, category, sort_order')
+    .eq('is_active', true)
+    .order('category')
+    .order('sort_order');
+  const companyFacts = (factRows ?? []) as CompanyFact[];
+
   // 2c. Fetch active specialists (per-topic playbooks).
   const { data: specialistRows } = await supabase
     .from('messaging_specialists')
@@ -152,6 +162,7 @@ export async function generateAndSaveDraft(
     guardrails,
     personaSystemPrompt: persona.system_prompt,
     knowledge,
+    companyFacts,
     specialists,
     templates: templateCatalog.map((t) => ({
       name: t.name, content_en: t.content_en, specialist_slug: t.specialist_slug,
