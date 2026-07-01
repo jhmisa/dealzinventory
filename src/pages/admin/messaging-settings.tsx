@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
-import { Plus, Trash2, Check, Bot, Sparkles, FileText, Pencil, ShieldAlert, BookOpen, FlaskConical, Send, ChevronUp, ChevronDown, RotateCcw, Power, RefreshCw, CheckCircle2, AlertTriangle, Loader2, ImagePlus, X, Search } from 'lucide-react'
+import { Plus, Trash2, Check, Bot, Sparkles, FileText, Pencil, ShieldAlert, BookOpen, FlaskConical, Send, ChevronUp, ChevronDown, RotateCcw, Power, RefreshCw, CheckCircle2, AlertTriangle, Loader2, ImagePlus, X, Search, Paperclip, FileIcon, FilmIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatCustomerName } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -39,6 +39,7 @@ import {
   useCreateTemplate,
   useUpdateTemplate,
   useDeleteTemplate,
+  useUploadAttachment,
   useKnowledgeBase,
   useCreateKnowledgeBaseEntry,
   useUpdateKnowledgeBaseEntry,
@@ -56,7 +57,8 @@ import {
   type MessageSyncProgress,
 } from '@/hooks/use-messaging'
 import { useCustomers } from '@/hooks/use-customers'
-import type { AiProvider, MessagingTemplate, MessagingTemplateInsert, TemplateAiUsage, KnowledgeBaseEntry, MessagingSpecialist, TestAIMessage, TestAIResponse, TestAIImage } from '@/lib/types'
+import { getAttachmentSignedUrl } from '@/services/messaging'
+import type { AiProvider, MessagingTemplate, MessagingTemplateInsert, TemplateAiUsage, KnowledgeBaseEntry, MessagingSpecialist, MessageAttachment, TestAIMessage, TestAIResponse, TestAIImage } from '@/lib/types'
 import { compressImageForMessaging } from '@/lib/image-compression'
 import { useClipboardPaste } from '@/hooks/use-clipboard-paste'
 
@@ -218,10 +220,51 @@ function TemplateFormDialog({
   const [variables, setVariables] = useState(template?.variables?.join(', ') ?? '')
   const [specialistSlug, setSpecialistSlug] = useState<string>(template?.specialist_slug ?? '')
   const [aiUsage, setAiUsage] = useState<TemplateAiUsage>(template?.ai_usage ?? 'REFERENCE')
+  const [attachments, setAttachments] = useState<MessageAttachment[]>(template?.attachments ?? [])
+  const [attThumbs, setAttThumbs] = useState<Record<string, string>>({})
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const createTemplate = useCreateTemplate()
   const updateTemplate = useUpdateTemplate()
+  const uploadAttachment = useUploadAttachment()
   const { data: specialists = [] } = useSpecialists()
+  const isUploading = uploadAttachment.isPending
+
+  // Lazily resolve signed URLs so existing attachments can be previewed / opened.
+  useEffect(() => {
+    let cancelled = false
+    attachments.forEach((att) => {
+      if (attThumbs[att.file_url]) return
+      getAttachmentSignedUrl(att.file_url)
+        .then((url) => { if (!cancelled) setAttThumbs((p) => ({ ...p, [att.file_url]: url })) })
+        .catch(() => { /* leave as filename-only if signing fails */ })
+    })
+    return () => { cancelled = true }
+  }, [attachments, attThumbs])
+
+  async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? [])
+    e.target.value = ''
+    for (const file of files) {
+      const isVideo = file.type.startsWith('video/')
+      const maxBytes = isVideo ? 50 * 1024 * 1024 : 10 * 1024 * 1024
+      if (file.size > maxBytes) {
+        toast.error(`"${file.name}" exceeds the ${isVideo ? '50MB' : '10MB'} limit`)
+        continue
+      }
+      try {
+        const pathPrefix = `templates/${template?.id ?? 'new'}`
+        const att = await uploadAttachment.mutateAsync({ file, pathPrefix })
+        setAttachments((prev) => [...prev, att])
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : `Failed to upload ${file.name}`)
+      }
+    }
+  }
+
+  function removeAttachment(fileUrl: string) {
+    setAttachments((prev) => prev.filter((a) => a.file_url !== fileUrl))
+  }
 
   const isEdit = !!template
   if (isEdit && name !== template.name && !createTemplate.isPending) {
@@ -233,6 +276,7 @@ function TemplateFormDialog({
     setVariables(template.variables?.join(', ') ?? '')
     setSpecialistSlug(template.specialist_slug ?? '')
     setAiUsage(template.ai_usage ?? 'REFERENCE')
+    setAttachments(template.attachments ?? [])
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -246,6 +290,7 @@ function TemplateFormDialog({
       variables: variables.split(',').map((v) => v.trim()).filter(Boolean),
       specialist_slug: specialistSlug || null,
       ai_usage: aiUsage,
+      attachments,
     }
 
     if (isEdit) {
@@ -332,6 +377,46 @@ function TemplateFormDialog({
                 </SelectContent>
               </Select>
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Attachments (photo / video)</Label>
+            <input ref={fileInputRef} type="file" className="hidden" multiple onChange={handleFileSelect} />
+            {attachments.length > 0 && (
+              <div className="space-y-1">
+                {attachments.map((att, idx) => (
+                  <div key={idx} className="flex items-center gap-2 rounded border px-2 py-1.5 text-xs">
+                    {att.mime_type?.startsWith('image/') && attThumbs[att.file_url] ? (
+                      <button type="button" onClick={() => window.open(attThumbs[att.file_url], '_blank')} className="shrink-0" title="Open attachment">
+                        <img src={attThumbs[att.file_url]} alt={att.filename} className="h-8 w-8 rounded object-cover" />
+                      </button>
+                    ) : att.mime_type?.startsWith('video/') ? (
+                      <FilmIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    ) : (
+                      <FileIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => { const url = attThumbs[att.file_url]; if (url) window.open(url, '_blank') }}
+                      className="truncate flex-1 text-left hover:underline disabled:no-underline"
+                      disabled={!attThumbs[att.file_url]}
+                      title="Open attachment"
+                    >
+                      {att.filename}
+                    </button>
+                    {att.size_bytes && (
+                      <span className="text-muted-foreground shrink-0">{(att.size_bytes / 1024).toFixed(0)}KB</span>
+                    )}
+                    <button type="button" onClick={() => removeAttachment(att.file_url)} className="p-0.5 hover:bg-destructive/10 rounded">
+                      <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <Button type="button" variant="outline" size="sm" className="gap-1 text-xs" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
+              {isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
+              Add attachment
+            </Button>
           </div>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
