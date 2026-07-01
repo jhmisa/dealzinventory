@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from 'react'
-import { Plus, Trash2, Check, Bot, Sparkles, FileText, Pencil, ShieldAlert, BookOpen, FlaskConical, Send, ChevronUp, ChevronDown, RotateCcw, Power, RefreshCw, CheckCircle2, AlertTriangle, Loader2, ImagePlus, X } from 'lucide-react'
+import { useState, useRef, useEffect, useMemo } from 'react'
+import { Plus, Trash2, Check, Bot, Sparkles, FileText, Pencil, ShieldAlert, BookOpen, FlaskConical, Send, ChevronUp, ChevronDown, RotateCcw, Power, RefreshCw, CheckCircle2, AlertTriangle, Loader2, ImagePlus, X, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatCustomerName } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -25,6 +25,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { PageHeader } from '@/components/shared/page-header'
 import {
   useAiProviders,
@@ -578,6 +579,33 @@ export default function MessagingSettingsPage() {
 
   const guardrails = kbEntries.filter((e) => e.entry_type === 'guardrail')
   const knowledgeArticles = kbEntries.filter((e) => e.entry_type === 'knowledge')
+
+  const [templateSearch, setTemplateSearch] = useState('')
+
+  const groupedTemplates = useMemo(() => {
+    const q = templateSearch.trim().toLowerCase()
+    const filtered = q
+      ? templates.filter(
+          (t) =>
+            t.name.toLowerCase().includes(q) ||
+            t.content_en.toLowerCase().includes(q) ||
+            t.content_ja.toLowerCase().includes(q),
+        )
+      : templates
+    const specialistLabel = (slug: string | null) => {
+      if (!slug) return 'Uncategorized / Global'
+      return specialists.find((s) => s.slug === slug)?.name ?? slug
+    }
+    const groups = new Map<string, { label: string; items: typeof templates }>()
+    for (const t of filtered) {
+      const key = t.specialist_slug ?? '__global__'
+      if (!groups.has(key)) groups.set(key, { label: specialistLabel(t.specialist_slug), items: [] })
+      groups.get(key)!.items.push(t)
+    }
+    return Array.from(groups.entries())
+      .map(([key, g]) => ({ key, ...g }))
+      .sort((a, b) => (a.key === '__global__' ? 1 : b.key === '__global__' ? -1 : a.label.localeCompare(b.label)))
+  }, [templates, specialists, templateSearch])
 
   // Persona form state
   const [personaName, setPersonaName] = useState('')
@@ -1378,6 +1406,15 @@ export default function MessagingSettingsPage() {
               New Template
             </Button>
           </div>
+          <div className="relative mt-3">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={templateSearch}
+              onChange={(e) => setTemplateSearch(e.target.value)}
+              placeholder="Search canned responses by name or content…"
+              className="pl-8"
+            />
+          </div>
         </CardHeader>
         <CardContent>
           {loadingTemplates ? (
@@ -1388,50 +1425,64 @@ export default function MessagingSettingsPage() {
             </p>
           ) : (
             <div className="space-y-3">
-              {templates.map((t) => (
-                <div
-                  key={t.id}
-                  className="rounded-lg border p-3 space-y-2"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-medium">{t.name}</span>
-                      <Badge variant={AI_USAGE_BADGE[t.ai_usage] ?? 'outline'}>{t.ai_usage}</Badge>
-                      {t.specialist_slug && <Badge variant="outline">{t.specialist_slug}</Badge>}
-                      {(t.attachments?.length ?? 0) > 0 && <Badge variant="secondary">📎 {t.attachments.length}</Badge>}
-                      {!t.is_active && <Badge variant="secondary">Inactive</Badge>}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        size="icon-xs"
-                        variant="ghost"
-                        onClick={() => { setEditTemplate(t); setTemplateFormOpen(true) }}
-                      >
-                        <Pencil className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        size="icon-xs"
-                        variant="ghost"
-                        onClick={() => {
-                          deleteTemplateMutation.mutate(t.id, {
-                            onSuccess: () => toast.success('Template deleted'),
-                            onError: (err) => toast.error(`Failed: ${err.message}`),
-                          })
-                        }}
-                        disabled={deleteTemplateMutation.isPending}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                  {t.description && (
-                    <p className="text-xs text-muted-foreground">{t.description}</p>
-                  )}
-                  <div className="text-xs text-muted-foreground">
-                    Variables: {t.variables.length > 0 ? t.variables.map((v) => `{{${v}}}`).join(', ') : 'None'}
-                  </div>
-                </div>
-              ))}
+              {groupedTemplates.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">No matching canned responses.</p>
+              ) : (
+                groupedTemplates.map((group) => (
+                  <Collapsible key={group.key} defaultOpen={!!templateSearch}>
+                    <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md bg-muted/50 px-3 py-2 text-sm font-medium">
+                      <span>{group.label} <span className="text-muted-foreground">({group.items.length})</span></span>
+                      <ChevronDown className="h-4 w-4" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-3 pt-2">
+                      {group.items.map((t) => (
+                        <div
+                          key={t.id}
+                          className="rounded-lg border p-3 space-y-2"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm font-medium">{t.name}</span>
+                              <Badge variant={AI_USAGE_BADGE[t.ai_usage] ?? 'outline'}>{t.ai_usage}</Badge>
+                              {t.specialist_slug && <Badge variant="outline">{t.specialist_slug}</Badge>}
+                              {(t.attachments?.length ?? 0) > 0 && <Badge variant="secondary">📎 {t.attachments.length}</Badge>}
+                              {!t.is_active && <Badge variant="secondary">Inactive</Badge>}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                size="icon-xs"
+                                variant="ghost"
+                                onClick={() => { setEditTemplate(t); setTemplateFormOpen(true) }}
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                size="icon-xs"
+                                variant="ghost"
+                                onClick={() => {
+                                  deleteTemplateMutation.mutate(t.id, {
+                                    onSuccess: () => toast.success('Template deleted'),
+                                    onError: (err) => toast.error(`Failed: ${err.message}`),
+                                  })
+                                }}
+                                disabled={deleteTemplateMutation.isPending}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                          {t.description && (
+                            <p className="text-xs text-muted-foreground">{t.description}</p>
+                          )}
+                          <div className="text-xs text-muted-foreground">
+                            Variables: {t.variables.length > 0 ? t.variables.map((v) => `{{${v}}}`).join(', ') : 'None'}
+                          </div>
+                        </div>
+                      ))}
+                    </CollapsibleContent>
+                  </Collapsible>
+                ))
+              )}
             </div>
           )}
         </CardContent>
