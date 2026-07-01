@@ -23,7 +23,9 @@ The Dealz messaging system has **two disjoint knowledge stores** that have drift
 
 Make the canned-response library (`messaging_templates`) the **single authoritative source** that both staff and the AI draw from — read **live** by the AI at draft time, so nothing is copied and nothing can drift. Plus a content-quality pass on the 20 templates first (better English, real Japanese).
 
-**Non-goals (YAGNI):** merging the two tables into one physical store; a generic bidirectional sync engine; a standalone "drift detector" dashboard. Live-read + de-duplication achieves single-source without them.
+**Approach (decided 2026-07-01):** *logical unification, physical separation.* Keep `messaging_templates` and `knowledge_base` as separate physical stores (each tuned to its shape and dependents), but present them through **one unified "Agent Knowledge" management surface** so staff experience a single knowledge area. The fact-vs-sendable-message distinction (`entry_type` / `ai_usage`) persists regardless of table count, so a physical merge would buy editing-UX, not data integrity — at much higher migration risk. Deferred, not chosen.
+
+**Non-goals (YAGNI):** merging the two tables into one physical store (revisit only if the org goes fully AI-first); a generic bidirectional sync engine; a standalone "drift detector" dashboard. Live-read + de-duplication + a unified editing surface achieves single-source without them.
 
 ---
 
@@ -81,14 +83,18 @@ Migration adds to `messaging_templates`:
 - In `build-specialist-prompt.ts`: after specialist/sub-intent classification, load active, non-`OFF` templates for that specialist (and matching sub-intent when set). Inject an **"Approved Replies"** section: for each → `name`, `content_en`, `has_photo`, `ai_usage`.
 - Prompt instruction: *these are approved canonical replies; prefer their exact wording, fill `{{variables}}`; where they conflict with any other knowledge, THESE WIN.*
 - **Effective auto-send = stricter of** the sub-intent `autonomy` (OFF/DRAFT/SEND) **and** the template `ai_usage`. A `REFERENCE` template can never auto-send even under a SEND sub-intent.
-- **Photos:** the reply pass returns a `used_template_id` (structured field, mirroring how the existing AI-offer photo path returns a code rather than model markdown). If that template has `attachments`, `generate-draft.ts` attaches them to the draft/message. Files already live in `messaging-attachments`; reuse the existing attachment-send path in `send-message`.
+- **Media (photo/video):** the reply pass returns a `used_template_id` (structured field, mirroring how the existing AI-offer photo path returns a code rather than model markdown). If that template has `attachments` (image or video), `generate-draft.ts` attaches them to the draft/message. Files already live in `messaging-attachments`; reuse the existing attachment-send path in `send-message`.
 - Confidence/telemetry: record the chosen template id in the existing AI context/usage logging so we can audit which templates the AI uses.
 
 ### Phase 3 — Reconcile the knowledge_base (deferrable, but recommended now)
 De-duplicate `knowledge_base` articles whose facts are now owned by a template (shipping fee, payment options, express service, warranty/ranking): trim or retire the overlapping KB entry so the template is the sole source. Proposed KB edits listed in the same review table. **This phase is isolated so it can ship as a follow-up without blocking Phases 0–2.**
 
-### Phase 4 — Settings UI
-Extend `canned-response-form.tsx` (and the `messaging-templates` service/hooks + types) with a **specialist/sub-intent picker** and an **`ai_usage` selector**, so staff keep full control of how the AI uses each template. Optionally surface on the Responses panel a small badge showing a template's `ai_usage`.
+### Phase 4 — Unified "Agent Knowledge" management surface
+Deliver the "one knowledge area" experience over the two physical tables.
+- In Settings → AI Agent (`src/pages/admin/messaging-settings.tsx`), add a unified **Agent Knowledge** view that lists **both** `knowledge_base` entries **and** `messaging_templates` (canned messages) together — one filterable list with an entry-type/`ai_usage` filter and the specialist taxonomy shared across both. Editing either kind happens from this one surface.
+- Extend the canned-message editor (`canned-response-form.tsx` + `messaging-templates` service/hooks + types) with the **specialist/sub-intent picker** and **`ai_usage` selector** from Phase 1, plus **photo _and video_ attachments** (the `attachments jsonb` model is `mime_type`-agnostic; add video upload/preview; images still follow the 1080/256 WebP standard, video stored as-is in `messaging-attachments`).
+- The staff **Responses panel stays** as the fast "insert / send" projection of the canned-message subset (a filtered view of the same data) — the human quick-reply workflow is unchanged.
+- Surface a small badge on both the Responses panel and the unified view showing each template's `ai_usage` (AUTO / DRAFT / REFERENCE / OFF) so staff see at a glance how the AI treats it.
 
 ---
 
