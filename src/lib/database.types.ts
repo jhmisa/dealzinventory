@@ -1,3 +1,4 @@
+Initialising login role...
 export type Json =
   | string
   | number
@@ -677,6 +678,45 @@ export type Database = {
           slug?: string
           sort_order?: number
           updated_at?: string
+        }
+        Relationships: []
+      }
+      company_facts: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          is_active: boolean
+          key: string
+          label: string
+          sort_order: number
+          updated_at: string
+          value_en: string
+          value_ja: string | null
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key: string
+          label: string
+          sort_order?: number
+          updated_at?: string
+          value_en: string
+          value_ja?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key?: string
+          label?: string
+          sort_order?: number
+          updated_at?: string
+          value_en?: string
+          value_ja?: string | null
         }
         Relationships: []
       }
@@ -1390,6 +1430,78 @@ export type Database = {
         }
         Relationships: []
       }
+      iosys_backorder_candidates: {
+        Row: {
+          accessories_ja: string | null
+          brand: string | null
+          carrier: string | null
+          color_en: string | null
+          color_ja: string | null
+          device: string
+          grade: string
+          harvested_at: string
+          image_url: string | null
+          iosys_code: string
+          is_unlocked: boolean | null
+          model_name: string | null
+          model_number: string | null
+          part_number: string | null
+          rank_text: string | null
+          section: string | null
+          stock: number | null
+          storage_gb: number | null
+          supplier_price: number | null
+          supplier_url: string | null
+          title: string | null
+        }
+        Insert: {
+          accessories_ja?: string | null
+          brand?: string | null
+          carrier?: string | null
+          color_en?: string | null
+          color_ja?: string | null
+          device: string
+          grade: string
+          harvested_at?: string
+          image_url?: string | null
+          iosys_code: string
+          is_unlocked?: boolean | null
+          model_name?: string | null
+          model_number?: string | null
+          part_number?: string | null
+          rank_text?: string | null
+          section?: string | null
+          stock?: number | null
+          storage_gb?: number | null
+          supplier_price?: number | null
+          supplier_url?: string | null
+          title?: string | null
+        }
+        Update: {
+          accessories_ja?: string | null
+          brand?: string | null
+          carrier?: string | null
+          color_en?: string | null
+          color_ja?: string | null
+          device?: string
+          grade?: string
+          harvested_at?: string
+          image_url?: string | null
+          iosys_code?: string
+          is_unlocked?: boolean | null
+          model_name?: string | null
+          model_number?: string | null
+          part_number?: string | null
+          rank_text?: string | null
+          section?: string | null
+          stock?: number | null
+          storage_gb?: number | null
+          supplier_price?: number | null
+          supplier_url?: string | null
+          title?: string | null
+        }
+        Relationships: []
+      }
       iosys_catalog: {
         Row: {
           brand: string | null
@@ -1402,6 +1514,7 @@ export type Database = {
           device_category: string | null
           harvested_at: string
           id: string
+          image_url: string | null
           listing_count: number | null
           model_name: string
           model_number: string | null
@@ -1425,6 +1538,7 @@ export type Database = {
           device_category?: string | null
           harvested_at?: string
           id?: string
+          image_url?: string | null
           listing_count?: number | null
           model_name: string
           model_number?: string | null
@@ -1448,6 +1562,7 @@ export type Database = {
           device_category?: string | null
           harvested_at?: string
           id?: string
+          image_url?: string | null
           listing_count?: number | null
           model_name?: string
           model_number?: string | null
@@ -2407,6 +2522,7 @@ export type Database = {
       }
       messaging_templates: {
         Row: {
+          ai_usage: string
           attachments: Json | null
           content_en: string
           content_ja: string
@@ -2416,10 +2532,13 @@ export type Database = {
           is_active: boolean
           message_type: Database["public"]["Enums"]["message_type"]
           name: string
+          specialist_slug: string | null
+          sub_intent_slug: string | null
           updated_at: string
           variables: string[]
         }
         Insert: {
+          ai_usage?: string
           attachments?: Json | null
           content_en: string
           content_ja: string
@@ -2429,10 +2548,13 @@ export type Database = {
           is_active?: boolean
           message_type: Database["public"]["Enums"]["message_type"]
           name: string
+          specialist_slug?: string | null
+          sub_intent_slug?: string | null
           updated_at?: string
           variables?: string[]
         }
         Update: {
+          ai_usage?: string
           attachments?: Json | null
           content_en?: string
           content_ja?: string
@@ -2442,6 +2564,8 @@ export type Database = {
           is_active?: boolean
           message_type?: Database["public"]["Enums"]["message_type"]
           name?: string
+          specialist_slug?: string | null
+          sub_intent_slug?: string | null
           updated_at?: string
           variables?: string[]
         }
@@ -3099,6 +3223,21 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      product_photo_jobs: {
+        Row: {
+          image_url: string | null
+          product_id: string | null
+        }
+        Insert: {
+          image_url?: string | null
+          product_id?: string | null
+        }
+        Update: {
+          image_url?: string | null
+          product_id?: string | null
+        }
+        Relationships: []
       }
       return_request_items: {
         Row: {
@@ -4650,3 +4789,5 @@ export const Constants = {
     },
   },
 } as const
+A new version of Supabase CLI is available: v2.109.0 (currently installed v2.90.0)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
