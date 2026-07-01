@@ -36,12 +36,49 @@ export interface TemplateReply {
   has_media: boolean;
 }
 
+// A structured company fact (bank/SmartPit numbers, PayPal name, addresses, rates,
+// order format). Rendered as an authoritative reference block the AI treats as fact.
+export interface CompanyFact {
+  key: string;
+  label: string;
+  value_en: string;
+  value_ja?: string | null;
+  category: string;
+}
+
 export interface BuildSpecialistPromptArgs {
   guardrails: GuardrailEntry[];
   personaSystemPrompt: string;
   knowledge: KnowledgeEntry[];
   specialists: SpecialistRow[];
   templates?: TemplateReply[];
+  companyFacts?: CompanyFact[];
+}
+
+// Render active company facts as a "# Company Facts" section, grouped by category.
+// Categories appear in first-seen order (input is pre-sorted by category, sort_order);
+// facts keep loader order within a category. Returns '' when there are no facts.
+function renderCompanyFacts(facts: CompanyFact[]): string {
+  if (facts.length === 0) return '';
+  const order: string[] = [];
+  const byCategory = new Map<string, CompanyFact[]>();
+  for (const f of facts) {
+    if (!byCategory.has(f.category)) {
+      byCategory.set(f.category, []);
+      order.push(f.category);
+    }
+    byCategory.get(f.category)!.push(f);
+  }
+  const sections = order
+    .map((cat) => {
+      const lines = byCategory
+        .get(cat)!
+        .map((f) => `- ${f.label}: ${f.value_en}${f.value_ja ? ` (JA: ${f.value_ja})` : ''}`)
+        .join('\n');
+      return `## ${cat}\n${lines}`;
+    })
+    .join('\n\n');
+  return `\n\n# Company Facts (authoritative — use these EXACT values; never invent account numbers, company names, addresses, or rates. If a needed fact is missing, escalate.)\n${sections}`;
 }
 
 // "tracking, order_status" -> "tracking, order status" (human-readable intent list for headers).
@@ -76,6 +113,9 @@ export function buildSpecialistSystemPrompt(args: BuildSpecialistPromptArgs): st
 
   // 2. Base persona.
   prompt += personaSystemPrompt;
+
+  // Company Facts: authoritative reference block, right after the persona.
+  prompt += renderCompanyFacts(args.companyFacts ?? []);
 
   // 3. Specialist playbooks (active, sorted), each with its tagged knowledge.
   const active = specialists

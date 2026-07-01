@@ -2,6 +2,7 @@ import { assert, assertEquals, assertStringIncludes } from 'jsr:@std/assert@1';
 import {
   buildSpecialistSystemPrompt,
   specialistForIntent,
+  type CompanyFact,
   type SpecialistRow,
   type TemplateReply,
 } from './build-specialist-prompt.ts';
@@ -157,4 +158,50 @@ Deno.test('buildSpecialistSystemPrompt shows a null-specialist template under ev
   });
   // Appears once under each of the 4 active specialists.
   assertEquals(prompt.split('GLOBAL_BODY').length - 1, 4);
+});
+
+Deno.test('buildSpecialistSystemPrompt renders company facts grouped by category', () => {
+  const prompt = buildSpecialistSystemPrompt({
+    guardrails: [],
+    personaSystemPrompt: 'PERSONA',
+    knowledge: [],
+    specialists: [],
+    companyFacts: [
+      { key: 'paypal_name', label: 'PayPal account name', value_en: 'Yehey Japan Kabushiki Kaisha', value_ja: null, category: 'Payment' },
+      { key: 'bank_holder', label: 'Bank account name', value_en: 'Yehey Japan K.K.', value_ja: 'ヤヘイジャパン株式会社', category: 'Banking' },
+    ],
+  });
+  assertStringIncludes(prompt, '# Company Facts');
+  assertStringIncludes(prompt, '## Payment');
+  assertStringIncludes(prompt, '- PayPal account name: Yehey Japan Kabushiki Kaisha');
+  assertStringIncludes(prompt, '## Banking');
+  assertStringIncludes(prompt, '- Bank account name: Yehey Japan K.K. (JA: ヤヘイジャパン株式会社)');
+});
+
+Deno.test('buildSpecialistSystemPrompt omits JA suffix when value_ja is empty', () => {
+  const prompt = buildSpecialistSystemPrompt({
+    guardrails: [], personaSystemPrompt: 'P', knowledge: [], specialists: [],
+    companyFacts: [{ key: 'order_format', label: 'Order number format', value_en: 'YJ-XXXXXX', value_ja: null, category: 'Orders' }],
+  });
+  assert(!prompt.includes('(JA:'));
+  assertStringIncludes(prompt, '- Order number format: YJ-XXXXXX');
+});
+
+Deno.test('buildSpecialistSystemPrompt omits the Company Facts block when there are no facts', () => {
+  const prompt = buildSpecialistSystemPrompt({
+    guardrails: [], personaSystemPrompt: 'P', knowledge: [], specialists: [],
+  });
+  assert(!prompt.includes('# Company Facts'));
+});
+
+Deno.test('Company Facts block sits after persona and before Specialist Playbooks', () => {
+  const prompt = buildSpecialistSystemPrompt({
+    guardrails: [], personaSystemPrompt: 'PERSONA_BODY', knowledge: [],
+    specialists: SPECIALISTS,
+    companyFacts: [{ key: 'k', label: 'L', value_en: 'V', value_ja: null, category: 'Orders' }],
+  });
+  const personaIdx = prompt.indexOf('PERSONA_BODY');
+  const factsIdx = prompt.indexOf('# Company Facts');
+  const playbookIdx = prompt.indexOf('# Specialist Playbooks');
+  assert(personaIdx < factsIdx && factsIdx < playbookIdx);
 });
