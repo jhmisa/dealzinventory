@@ -15,6 +15,9 @@ import type {
   KnowledgeBaseEntry,
   KnowledgeBaseEntryInsert,
   KnowledgeBaseEntryUpdate,
+  CompanyFact,
+  CompanyFactInsert,
+  CompanyFactUpdate,
   MessagingSpecialist,
   MessagingSpecialistUpdate,
   TestAIMessage,
@@ -546,6 +549,47 @@ export async function updateKnowledgeBaseEntry(id: string, updates: KnowledgeBas
 export async function deleteKnowledgeBaseEntry(id: string) {
   const { error } = await supabase
     .from('knowledge_base')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
+}
+
+// ---------- Company Facts ----------
+
+export async function getCompanyFacts() {
+  const { data, error } = await supabase
+    .from('company_facts')
+    .select('*')
+    .order('category')
+    .order('sort_order')
+  if (error) throw error
+  return (data ?? []) as CompanyFact[]
+}
+
+export async function createCompanyFact(fact: CompanyFactInsert) {
+  const { data, error } = await supabase
+    .from('company_facts')
+    .insert(fact)
+    .select()
+    .single()
+  if (error) throw error
+  return data as CompanyFact
+}
+
+export async function updateCompanyFact(id: string, updates: CompanyFactUpdate) {
+  const { data, error } = await supabase
+    .from('company_facts')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data as CompanyFact
+}
+
+export async function deleteCompanyFact(id: string) {
+  const { error } = await supabase
+    .from('company_facts')
     .delete()
     .eq('id', id)
   if (error) throw error

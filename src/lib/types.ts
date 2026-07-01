@@ -565,6 +565,40 @@ export interface KnowledgeBaseEntryUpdate {
   sort_order?: number
 }
 
+// Company Facts (structured company info the AI reads as fact)
+export interface CompanyFact {
+  id: string
+  key: string
+  label: string
+  value_en: string
+  value_ja: string | null
+  category: string
+  sort_order: number
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface CompanyFactInsert {
+  key: string
+  label: string
+  value_en: string
+  value_ja?: string | null
+  category?: string
+  sort_order?: number
+  is_active?: boolean
+}
+
+export interface CompanyFactUpdate {
+  key?: string
+  label?: string
+  value_en?: string
+  value_ja?: string | null
+  category?: string
+  sort_order?: number
+  is_active?: boolean
+}
+
 // Messaging Specialists (per-topic playbooks)
 export interface MessagingSpecialist {
   id: string

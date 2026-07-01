@@ -11,6 +11,8 @@ import type {
   MessagingPersonaUpdate,
   KnowledgeBaseEntryInsert,
   KnowledgeBaseEntryUpdate,
+  CompanyFactInsert,
+  CompanyFactUpdate,
   MessagingSpecialistUpdate,
   TestAIMessage,
 } from '@/lib/types'
@@ -318,6 +320,46 @@ export function useDeleteKnowledgeBaseEntry() {
     mutationFn: (id: string) => messagingService.deleteKnowledgeBaseEntry(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.messaging.knowledgeBase() })
+    },
+  })
+}
+
+// ---------- Company Facts ----------
+
+export function useCompanyFacts() {
+  return useQuery({
+    queryKey: queryKeys.messaging.companyFacts(),
+    queryFn: () => messagingService.getCompanyFacts(),
+  })
+}
+
+export function useCreateCompanyFact() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (fact: CompanyFactInsert) => messagingService.createCompanyFact(fact),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.messaging.companyFacts() })
+    },
+  })
+}
+
+export function useUpdateCompanyFact() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: CompanyFactUpdate }) =>
+      messagingService.updateCompanyFact(id, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.messaging.companyFacts() })
+    },
+  })
+}
+
+export function useDeleteCompanyFact() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => messagingService.deleteCompanyFact(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.messaging.companyFacts() })
     },
   })
 }
