@@ -446,6 +446,8 @@ export interface MessageInsert {
   sent_by?: string | null
 }
 
+export type TemplateAiUsage = 'AUTO' | 'DRAFT' | 'REFERENCE' | 'OFF'
+
 export interface MessagingTemplate {
   id: string
   name: string
@@ -456,6 +458,9 @@ export interface MessagingTemplate {
   variables: string[]
   attachments: MessageAttachment[]
   is_active: boolean
+  specialist_slug: string | null
+  sub_intent_slug: string | null
+  ai_usage: TemplateAiUsage
   created_at: string
   updated_at: string
 }
@@ -469,6 +474,9 @@ export interface MessagingTemplateInsert {
   variables?: string[]
   attachments?: MessageAttachment[]
   is_active?: boolean
+  specialist_slug?: string | null
+  sub_intent_slug?: string | null
+  ai_usage?: TemplateAiUsage
 }
 
 export interface AiProvider {
