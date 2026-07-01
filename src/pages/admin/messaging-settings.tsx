@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
-import { Plus, Trash2, Check, Bot, Sparkles, FileText, Pencil, ShieldAlert, BookOpen, FlaskConical, Send, ChevronUp, ChevronDown, RotateCcw, Power, RefreshCw, CheckCircle2, AlertTriangle, Loader2, ImagePlus, X, Search, Paperclip, FileIcon, FilmIcon } from 'lucide-react'
+import { Plus, Trash2, Check, Bot, Sparkles, FileText, Pencil, ShieldAlert, BookOpen, FlaskConical, Send, ChevronUp, ChevronDown, RotateCcw, Power, RefreshCw, CheckCircle2, AlertTriangle, Loader2, ImagePlus, X, Search, Paperclip, FileIcon, FilmIcon, Landmark } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatCustomerName } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -54,11 +54,15 @@ import {
   useSyncHealth,
   useActiveAlerts,
   useResolveAlert,
+  useCompanyFacts,
+  useCreateCompanyFact,
+  useUpdateCompanyFact,
+  useDeleteCompanyFact,
   type MessageSyncProgress,
 } from '@/hooks/use-messaging'
 import { useCustomers } from '@/hooks/use-customers'
 import { getAttachmentSignedUrl } from '@/services/messaging'
-import type { AiProvider, MessagingTemplate, MessagingTemplateInsert, TemplateAiUsage, KnowledgeBaseEntry, MessagingSpecialist, MessageAttachment, TestAIMessage, TestAIResponse, TestAIImage } from '@/lib/types'
+import type { AiProvider, MessagingTemplate, MessagingTemplateInsert, TemplateAiUsage, KnowledgeBaseEntry, MessagingSpecialist, MessageAttachment, TestAIMessage, TestAIResponse, TestAIImage, CompanyFact } from '@/lib/types'
 import { compressImageForMessaging } from '@/lib/image-compression'
 import { useClipboardPaste } from '@/hooks/use-clipboard-paste'
 
@@ -569,6 +573,146 @@ function KbEntryFormDialog({
   )
 }
 
+// ---------- Company Facts Form ----------
+
+const FACT_CATEGORY_OPTIONS = ['Company', 'Payment', 'Banking', 'Shipping', 'Contact', 'Orders'] as const
+
+// Auto-derive a stable key slug from the label so staff never hand-type it.
+function slugifyFactKey(label: string): string {
+  return label.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+}
+
+function CompanyFactFormDialog({
+  open,
+  onOpenChange,
+  fact,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  fact?: CompanyFact | null
+}) {
+  const [label, setLabel] = useState(fact?.label ?? '')
+  const [factKey, setFactKey] = useState(fact?.key ?? '')
+  const [keyEdited, setKeyEdited] = useState(!!fact)
+  const [valueEn, setValueEn] = useState(fact?.value_en ?? '')
+  const [valueJa, setValueJa] = useState(fact?.value_ja ?? '')
+  const [category, setCategory] = useState(fact?.category ?? 'Company')
+  const [isActive, setIsActive] = useState(fact?.is_active ?? true)
+
+  const createFact = useCreateCompanyFact()
+  const updateFact = useUpdateCompanyFact()
+
+  const isEdit = !!fact
+  const isPending = createFact.isPending || updateFact.isPending
+
+  // Re-sync when opened on a different fact (mirrors KbEntryFormDialog's reset pattern).
+  if (isEdit && label !== fact.label && !isPending) {
+    setLabel(fact.label)
+    setFactKey(fact.key)
+    setKeyEdited(true)
+    setValueEn(fact.value_en)
+    setValueJa(fact.value_ja ?? '')
+    setCategory(fact.category)
+    setIsActive(fact.is_active)
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!label || !valueEn) return
+    const finalKey = (factKey || slugifyFactKey(label)).trim()
+    if (!finalKey) return
+
+    if (isEdit) {
+      updateFact.mutate(
+        { id: fact.id, updates: { key: finalKey, label, value_en: valueEn, value_ja: valueJa || null, category, is_active: isActive } },
+        {
+          onSuccess: () => { toast.success('Fact updated'); onOpenChange(false) },
+          onError: (err) => toast.error(`Failed: ${err.message}`),
+        },
+      )
+    } else {
+      createFact.mutate(
+        { key: finalKey, label, value_en: valueEn, value_ja: valueJa || null, category, is_active: isActive },
+        {
+          onSuccess: () => { toast.success('Fact created'); onOpenChange(false) },
+          onError: (err) => toast.error(`Failed: ${err.message}`),
+        },
+      )
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{isEdit ? 'Edit' : 'New'} Company Fact</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label>Category</Label>
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {FACT_CATEGORY_OPTIONS.map((c) => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Label</Label>
+            <Input
+              value={label}
+              onChange={(e) => {
+                setLabel(e.target.value)
+                if (!keyEdited) setFactKey(slugifyFactKey(e.target.value))
+              }}
+              placeholder="e.g. PayPal account name"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Key <span className="text-xs text-muted-foreground">(auto-generated; edit only if needed)</span></Label>
+            <Input
+              value={factKey}
+              onChange={(e) => { setKeyEdited(true); setFactKey(e.target.value) }}
+              className="font-mono text-sm"
+              placeholder="paypal_account_name"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Value (EN)</Label>
+            <Textarea
+              value={valueEn}
+              onChange={(e) => setValueEn(e.target.value)}
+              className="min-h-[70px] text-sm"
+              placeholder="e.g. Yehey Japan Kabushiki Kaisha"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Value (JA) <span className="text-xs text-muted-foreground">(optional)</span></Label>
+            <Textarea
+              value={valueJa}
+              onChange={(e) => setValueJa(e.target.value)}
+              className="min-h-[70px] text-sm"
+              placeholder="日本語の値（任意）"
+            />
+          </div>
+          <div className="flex items-center gap-3">
+            <Switch checked={isActive} onCheckedChange={setIsActive} />
+            <Label>Active</Label>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" disabled={isPending || !label || !valueEn}>
+              {isEdit ? 'Save' : 'Create'}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // ---------- Confidence Badge ----------
 
 function ConfidenceBadge({ confidence }: { confidence: number }) {
@@ -646,6 +790,8 @@ export default function MessagingSettingsPage() {
   const [kbFormOpen, setKbFormOpen] = useState(false)
   const [editKbEntry, setEditKbEntry] = useState<KnowledgeBaseEntry | null>(null)
   const [kbFormType, setKbFormType] = useState<'knowledge' | 'guardrail'>('knowledge')
+  const [factFormOpen, setFactFormOpen] = useState(false)
+  const [editFact, setEditFact] = useState<CompanyFact | null>(null)
 
   const { data: providers = [], isLoading: loadingProviders } = useAiProviders()
   const { data: templates = [], isLoading: loadingTemplates } = useTemplates()
@@ -658,12 +804,24 @@ export default function MessagingSettingsPage() {
   const updatePersona = useUpdatePersona()
   const updateKbEntry = useUpdateKnowledgeBaseEntry()
   const deleteKbEntry = useDeleteKnowledgeBaseEntry()
+  const { data: companyFacts = [], isLoading: loadingFacts } = useCompanyFacts()
+  const updateFactMutation = useUpdateCompanyFact()
+  const deleteFactMutation = useDeleteCompanyFact()
 
   const { data: aiGlobalEnabled, isLoading: loadingAiGlobal } = useSystemSetting('ai_messaging_enabled')
   const updateSystemSetting = useUpdateSystemSetting()
 
   const guardrails = kbEntries.filter((e) => e.entry_type === 'guardrail')
   const knowledgeArticles = kbEntries.filter((e) => e.entry_type === 'knowledge')
+
+  const factsByCategory = useMemo(() => {
+    const groups = new Map<string, CompanyFact[]>()
+    for (const f of companyFacts) {
+      if (!groups.has(f.category)) groups.set(f.category, [])
+      groups.get(f.category)!.push(f)
+    }
+    return Array.from(groups.entries()).map(([category, items]) => ({ category, items }))
+  }, [companyFacts])
 
   const [templateSearch, setTemplateSearch] = useState('')
 
@@ -793,6 +951,33 @@ export default function MessagingSettingsPage() {
   function handleDeleteKbEntry(entry: KnowledgeBaseEntry) {
     deleteKbEntry.mutate(entry.id, {
       onSuccess: () => toast.success(`${entry.title} deleted`),
+      onError: (err) => toast.error(`Failed: ${err.message}`),
+    })
+  }
+
+  function handleToggleFact(fact: CompanyFact) {
+    updateFactMutation.mutate(
+      { id: fact.id, updates: { is_active: !fact.is_active } },
+      {
+        onSuccess: () => toast.success(`${fact.label} ${fact.is_active ? 'disabled' : 'enabled'}`),
+        onError: (err) => toast.error(`Failed: ${err.message}`),
+      },
+    )
+  }
+
+  function handleMoveFact(fact: CompanyFact, direction: 'up' | 'down') {
+    const sameCategory = companyFacts.filter((f) => f.category === fact.category)
+    const idx = sameCategory.findIndex((f) => f.id === fact.id)
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+    if (swapIdx < 0 || swapIdx >= sameCategory.length) return
+    const swap = sameCategory[swapIdx]
+    updateFactMutation.mutate({ id: fact.id, updates: { sort_order: swap.sort_order } })
+    updateFactMutation.mutate({ id: swap.id, updates: { sort_order: fact.sort_order } })
+  }
+
+  function handleDeleteFact(fact: CompanyFact) {
+    deleteFactMutation.mutate(fact.id, {
+      onSuccess: () => toast.success(`${fact.label} deleted`),
       onError: (err) => toast.error(`Failed: ${err.message}`),
     })
   }
@@ -1237,6 +1422,80 @@ export default function MessagingSettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Company Facts Section */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Landmark className="h-5 w-5" />
+                Company Facts
+              </CardTitle>
+              <CardDescription>Structured company info (bank/PayPal, addresses, rates, order format) the AI reads as authoritative fact</CardDescription>
+            </div>
+            <Button size="sm" onClick={() => { setEditFact(null); setFactFormOpen(true) }}>
+              <Plus className="h-4 w-4" />
+              Add Fact
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loadingFacts ? (
+            <p className="text-sm text-muted-foreground">Loading...</p>
+          ) : companyFacts.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">
+              No company facts yet. Add facts like PayPal name, bank details, or the order-number format.
+            </p>
+          ) : (
+            <div className="space-y-5">
+              {factsByCategory.map(({ category, items }) => (
+                <div key={category} className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{category}</p>
+                  <div className="space-y-2">
+                    {items.map((f, idx) => (
+                      <div
+                        key={f.id}
+                        className={`flex items-center justify-between rounded-lg border p-3 ${!f.is_active ? 'opacity-60' : ''}`}
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <Switch checked={f.is_active} onCheckedChange={() => handleToggleFact(f)} />
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">{f.label}</p>
+                            <p className="text-xs text-muted-foreground line-clamp-1">
+                              {f.value_en}{f.value_ja ? ` · JA: ${f.value_ja}` : ''}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0 ml-2">
+                          <Button size="icon-xs" variant="ghost" onClick={() => handleMoveFact(f, 'up')} disabled={idx === 0}>
+                            <ChevronUp className="h-3 w-3" />
+                          </Button>
+                          <Button size="icon-xs" variant="ghost" onClick={() => handleMoveFact(f, 'down')} disabled={idx === items.length - 1}>
+                            <ChevronDown className="h-3 w-3" />
+                          </Button>
+                          <Button size="icon-xs" variant="ghost" onClick={() => { setEditFact(f); setFactFormOpen(true) }}>
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                          <Button size="icon-xs" variant="ghost" onClick={() => handleDeleteFact(f)} disabled={deleteFactMutation.isPending}>
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <CompanyFactFormDialog
+        open={factFormOpen}
+        onOpenChange={setFactFormOpen}
+        fact={editFact}
+      />
 
       <KbEntryFormDialog
         open={kbFormOpen}
