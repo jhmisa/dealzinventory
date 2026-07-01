@@ -3,6 +3,7 @@ import {
   buildSpecialistSystemPrompt,
   specialistForIntent,
   type SpecialistRow,
+  type TemplateReply,
 } from './build-specialist-prompt.ts';
 
 const SPECIALISTS: SpecialistRow[] = [
@@ -115,4 +116,45 @@ Deno.test('buildSpecialistSystemPrompt renders a multi-tagged article under each
   // And therefore not in General Knowledge.
   // Use '\n## Condition Grades' to avoid false-positive: '## X' is a substring of '### X'.
   assertEquals(prompt.includes('\n## Condition Grades\n'), false);
+});
+
+Deno.test('buildSpecialistSystemPrompt renders Approved Replies under the owning specialist', () => {
+  const templates: TemplateReply[] = [
+    { name: 'Info: Express Service', content_en: 'EXPRESS_BODY', specialist_slug: 'sales', ai_usage: 'AUTO', has_media: true },
+    { name: 'Order: Offer Link', content_en: 'OFFER_BODY', specialist_slug: 'sales', ai_usage: 'REFERENCE', has_media: false },
+    { name: 'Off One', content_en: 'HIDDEN_BODY', specialist_slug: 'sales', ai_usage: 'OFF', has_media: false },
+    { name: 'Tracking: LBC', content_en: 'LBC_BODY', specialist_slug: 'order_tracking', ai_usage: 'REFERENCE', has_media: false },
+  ];
+  const prompt = buildSpecialistSystemPrompt({
+    guardrails: [], personaSystemPrompt: 'P', knowledge: [], specialists: SPECIALISTS, templates,
+  });
+  assertStringIncludes(prompt, 'Approved Replies');
+  assertStringIncludes(prompt, 'EXPRESS_BODY');
+  assertStringIncludes(prompt, '[AUTO]');
+  assertStringIncludes(prompt, '(has photo/video)');
+  assertStringIncludes(prompt, 'OFFER_BODY');
+  assertStringIncludes(prompt, '[REFERENCE]');
+  assertStringIncludes(prompt, 'LBC_BODY');
+  // OFF templates are never shown to the model.
+  assertEquals(prompt.includes('HIDDEN_BODY'), false);
+  // The sales templates appear under Sales, before the order_tracking one appears under Order & Tracking.
+  assert(prompt.indexOf('EXPRESS_BODY') < prompt.indexOf('LBC_BODY'), 'sales replies precede order_tracking replies');
+});
+
+Deno.test('buildSpecialistSystemPrompt omits Approved Replies when a specialist has none', () => {
+  const prompt = buildSpecialistSystemPrompt({
+    guardrails: [], personaSystemPrompt: 'P', knowledge: [], specialists: SPECIALISTS, templates: [],
+  });
+  assertEquals(prompt.includes('Approved Replies'), false);
+});
+
+Deno.test('buildSpecialistSystemPrompt shows a null-specialist template under every specialist', () => {
+  const templates: TemplateReply[] = [
+    { name: 'Global', content_en: 'GLOBAL_BODY', specialist_slug: null, ai_usage: 'AUTO', has_media: false },
+  ];
+  const prompt = buildSpecialistSystemPrompt({
+    guardrails: [], personaSystemPrompt: 'P', knowledge: [], specialists: SPECIALISTS, templates,
+  });
+  // Appears once under each of the 4 active specialists.
+  assertEquals(prompt.split('GLOBAL_BODY').length - 1, 4);
 });

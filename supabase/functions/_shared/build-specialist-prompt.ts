@@ -26,11 +26,22 @@ export interface KnowledgeEntry {
   specialist_tags: string[];
 }
 
+// A canned reply from messaging_templates the AI may reuse. content_en is the Taglish body;
+// ai_usage gates how far the AI may go (AUTO=near-verbatim send, DRAFT/REFERENCE=compose only).
+export interface TemplateReply {
+  name: string;
+  content_en: string;
+  specialist_slug: string | null; // null = shown under every specialist
+  ai_usage: 'AUTO' | 'DRAFT' | 'REFERENCE' | 'OFF';
+  has_media: boolean;
+}
+
 export interface BuildSpecialistPromptArgs {
   guardrails: GuardrailEntry[];
   personaSystemPrompt: string;
   knowledge: KnowledgeEntry[];
   specialists: SpecialistRow[];
+  templates?: TemplateReply[];
 }
 
 // "tracking, order_status" -> "tracking, order status" (human-readable intent list for headers).
@@ -52,6 +63,7 @@ export function specialistForIntent(
 
 export function buildSpecialistSystemPrompt(args: BuildSpecialistPromptArgs): string {
   const { guardrails, personaSystemPrompt, knowledge, specialists } = args;
+  const templates = args.templates ?? [];
   let prompt = '';
 
   // 1. Guardrails — always all, numbered + bolded.
@@ -82,6 +94,18 @@ export function buildSpecialistSystemPrompt(args: BuildSpecialistPromptArgs): st
       if (tagged.length > 0) {
         const articles = tagged.map((k) => `### ${k.title}\n${k.content}`).join('\n\n');
         prompt += `\n\nRelevant knowledge:\n${articles}`;
+      }
+      // Approved Replies: this specialist's canned templates (plus any global, null-specialist ones).
+      // OFF templates are never shown. These are the authoritative wording — they win over knowledge.
+      const replies = templates.filter(
+        (t) => t.ai_usage !== 'OFF' && (t.specialist_slug === s.slug || t.specialist_slug === null),
+      );
+      if (replies.length > 0) {
+        const block = replies
+          .map((t) => `- "${t.name}" [${t.ai_usage}]${t.has_media ? ' (has photo/video)' : ''}:\n${t.content_en}`)
+          .join('\n\n');
+        prompt +=
+          `\n\nApproved Replies (prefer this exact wording; fill {{variables}}; these OVERRIDE any other knowledge on conflict):\n${block}`;
       }
     }
   }
