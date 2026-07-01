@@ -3,6 +3,7 @@ import { buildCustomerContext, formatContextForPrompt, getLatestCustomerImages }
 import { generateAIReply, classifyMessage, type AIProvider } from "./ai-providers.ts";
 import {
   buildClassificationPrompt,
+  capAutonomyByTemplate,
   matchSubIntent,
   resolveAutonomy,
   type SubIntentRow,
@@ -111,6 +112,19 @@ export async function generateAndSaveDraft(
     .order('sort_order');
   const specialists = (specialistRows ?? []) as SpecialistRow[];
 
+  // 2c-bis. Fetch active canned templates the AI may reuse (Approved Replies). OFF ones are hidden.
+  const { data: templateRows } = await supabase
+    .from('messaging_templates')
+    .select('name, content_en, specialist_slug, sub_intent_slug, ai_usage, attachments')
+    .eq('is_active', true)
+    .neq('ai_usage', 'OFF')
+    .order('name');
+  const templateCatalog = (templateRows ?? []) as Array<{
+    name: string; content_en: string; specialist_slug: string | null;
+    sub_intent_slug: string | null; ai_usage: 'AUTO' | 'DRAFT' | 'REFERENCE' | 'OFF';
+    attachments: Array<{ file_url: string; filename: string; mime_type: string; size_bytes: number }> | null;
+  }>;
+
   // 2d. Fetch active sub-intents (joined to their specialist's slug) + the auto-send threshold.
   const { data: subIntentRows } = await supabase
     .from("messaging_sub_intents")
@@ -139,6 +153,10 @@ export async function generateAndSaveDraft(
     personaSystemPrompt: persona.system_prompt,
     knowledge,
     specialists,
+    templates: templateCatalog.map((t) => ({
+      name: t.name, content_en: t.content_en, specialist_slug: t.specialist_slug,
+      ai_usage: t.ai_usage, has_media: (t.attachments?.length ?? 0) > 0,
+    })),
   });
 
   // 3. Build customer context
@@ -245,6 +263,14 @@ export async function generateAndSaveDraft(
     executeTool,
   );
 
+  // Resolve which Approved Reply the model reused (if any) and cap autonomy by its ai_usage — an
+  // AUTO template may keep SEND; a REFERENCE/DRAFT one (or a blank body) is forced to DRAFT.
+  const usedTemplate = aiResponse.used_template_name
+    ? templateCatalog.find((t) => t.name === aiResponse.used_template_name) ?? null
+    : null;
+  const effectiveAutonomy = capAutonomyByTemplate(autonomy, usedTemplate?.ai_usage ?? null);
+  const templateAttachments = usedTemplate?.attachments ?? [];
+
   // 5b. Record token usage + estimated cost (best-effort; never block the draft).
   try {
     const usage = aiResponse.usage ?? { input_tokens: 0, output_tokens: 0 };
@@ -275,6 +301,9 @@ export async function generateAndSaveDraft(
   const offerAttachments = offerCodes.length
     ? await buildOfferAttachments(supabase, conversationId, offerCodes, offerCatalog)
     : [];
+  // Merge any offer photos with the reused template's own media (photos/videos already stored in
+  // messaging-attachments with the same shape) so the draft/sent message carries both.
+  const allAttachments = [...offerAttachments, ...templateAttachments];
   // Strip any Markdown the model emitted (despite the no-markdown rule) so the stored
   // DRAFT, the staff preview, and the sent message are all identical plain text.
   const finalReply = normalizeOutboundText(assembleOfferReply(aiResponse.reply, offerCodes, offerCatalog));
@@ -288,11 +317,12 @@ export async function generateAndSaveDraft(
     status: "DRAFT",
     message_type: "REPLY",
     ai_confidence: aiResponse.confidence,
-    attachments: offerAttachments,
+    attachments: allAttachments,
     ai_context_summary: JSON.stringify({
       intent: classification.intent,
       sub_intent_slug: classification.sub_intent_slug,
-      autonomy,
+      autonomy: effectiveAutonomy,
+      used_template_name: aiResponse.used_template_name ?? null,
       classify_confidence: classification.confidence,
       data_used: aiResponse.data_used,
       escalation_reason: aiResponse.escalation_reason,
@@ -302,11 +332,11 @@ export async function generateAndSaveDraft(
   }).select("id").single();
 
   // 7c. SEND — transmit immediately via the shared Missive sender (auto-approve this draft).
-  if (autonomy === "SEND" && inserted?.id) {
+  if (effectiveAutonomy === "SEND" && inserted?.id) {
     const sendResult = await sendViaMissive(supabase, {
       conversationId,
       content: finalReply,
-      attachments: offerAttachments,
+      attachments: allAttachments,
       approveDraftId: inserted.id,
       sentBy: null,        // system actor
       autoSent: true,
