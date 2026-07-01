@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Search, Image, Clock } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatPrice } from '@/lib/utils'
-import { getShowcaseItem, getShowcaseAccessory, getShowcaseSellGroup, type ShowcaseItem } from '@/services/showcase'
+import { getShowcaseItem, getShowcaseAccessory, getShowcaseSellGroup, getShowcaseBackorder, type ShowcaseItem } from '@/services/showcase'
 
 const TIMER_SECONDS = 3
 const DESIGN_W = 720
@@ -50,6 +50,7 @@ export default function ShowcasePage() {
     const upper = itemCode.toUpperCase()
     const fetcher = upper.startsWith('A') ? getShowcaseAccessory
       : upper.startsWith('G') ? getShowcaseSellGroup
+      : upper.startsWith('B') ? getShowcaseBackorder
       : getShowcaseItem
     setLoading(true)
     fetcher(itemCode).then((item) => {
@@ -72,6 +73,7 @@ export default function ShowcasePage() {
       const upper = itemCode.toUpperCase()
       const fetcher = upper.startsWith('A') ? getShowcaseAccessory
         : upper.startsWith('G') ? getShowcaseSellGroup
+        : upper.startsWith('B') ? getShowcaseBackorder
         : getShowcaseItem
       setLoading(true)
       fetcher(itemCode).then((item) => {
