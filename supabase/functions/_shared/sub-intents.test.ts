@@ -1,6 +1,20 @@
 import { assertEquals } from "jsr:@std/assert";
-import { resolveAutonomy, type SubIntentRow } from "./sub-intents.ts";
+import { resolveAutonomy, capAutonomyByTemplate, type SubIntentRow } from "./sub-intents.ts";
 import type { SpecialistRow } from "./build-specialist-prompt.ts";
+
+Deno.test("capAutonomyByTemplate: AUTO template keeps SEND", () => {
+  assertEquals(capAutonomyByTemplate("SEND", "AUTO"), "SEND");
+});
+Deno.test("capAutonomyByTemplate: REFERENCE/DRAFT/OFF template downgrades SEND to DRAFT", () => {
+  assertEquals(capAutonomyByTemplate("SEND", "REFERENCE"), "DRAFT");
+  assertEquals(capAutonomyByTemplate("SEND", "DRAFT"), "DRAFT");
+  assertEquals(capAutonomyByTemplate("SEND", "OFF"), "DRAFT");
+});
+Deno.test("capAutonomyByTemplate: no template used leaves autonomy unchanged", () => {
+  assertEquals(capAutonomyByTemplate("SEND", null), "SEND");
+  assertEquals(capAutonomyByTemplate("DRAFT", "AUTO"), "DRAFT");
+  assertEquals(capAutonomyByTemplate("OFF", "AUTO"), "OFF");
+});
 
 const sales: SpecialistRow = {
   slug: "sales", name: "Sales", intents: ["product_inquiry"], playbook: "",

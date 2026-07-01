@@ -39,6 +39,21 @@ export function resolveAutonomy(args: {
 }
 
 /**
+ * Cap an already-resolved autonomy by the ai_usage of the template the model chose to reuse.
+ * Only an AUTO template may keep SEND; any other level (DRAFT/REFERENCE/OFF, or a partially-blank
+ * body) forces DRAFT so a human approves. A null usage means the model composed its own reply
+ * (no template) — autonomy is unchanged. Never upgrades: a DRAFT/OFF autonomy stays as-is.
+ */
+export function capAutonomyByTemplate(
+  autonomy: Autonomy,
+  templateAiUsage: "AUTO" | "DRAFT" | "REFERENCE" | "OFF" | null,
+): Autonomy {
+  if (autonomy !== "SEND") return autonomy;
+  if (templateAiUsage === null) return "SEND";
+  return templateAiUsage === "AUTO" ? "SEND" : "DRAFT";
+}
+
+/**
  * Resolve a classified (specialistSlug, subIntentSlug) to its active SubIntentRow.
  * Returns null for a null slug (category default) or any non-active / cross-specialist slug.
  */
