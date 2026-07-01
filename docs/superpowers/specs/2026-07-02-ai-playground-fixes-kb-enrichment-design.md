@@ -71,13 +71,16 @@ Delivered as a single Supabase migration (applied via CLI). Each article: `entry
    Requesting redelivery of a missed Yamato delivery: 1) Find the attempted-delivery notice (ご不在連絡票) in your mailbox; redelivery info is on the back. 2) Note the delivery attempt date and your tracking number. 3) If you speak Japanese, call the driver directly using the number on the notice, give your tracking number, and coordinate redelivery. If you prefer English, call Yamato's automated phone service, provide your tracking number, and follow the voice prompts. 4) Wait for redelivery on your requested schedule.
    ```
 
-5. **"Condition Ranking & Warranty"** — tags: `sales`, `aftersales`
+5. **"Warranty & After-Sales Coverage"** (NEW article — warranty only; ranking lives in the existing "Condition Grades" article, updated separately below) — tags: `sales`, `aftersales`
    ```
-   Condition ranks (always describe S as "New" to the customer): S = New — pristine, factory condition; A = Very good — almost no scratches or signs of wear; B = Good — some scratches/signs of wear; C/D = Fair — noticeable scratches/signs of wear.
-   Warranty: New / Rank S = 3 months (7-day replacement + 2 months 3 weeks service warranty). Refurbished (Rank A/B/C/D) = 1 month (7-day replacement + 3 weeks service warranty). Accessories = 7-day replacement.
-   Replacement warranty covers factory defects (battery, screen, buttons, camera, speakers, ports). Service warranty covers device mishandling and factory defects unreported within 7 days. Claims require the unit and all inclusions returned in good condition as received.
+   Warranty by condition: New (Rank S) = 3 months (7-day replacement + 2 months 3 weeks service warranty). Refurbished (Rank A/B/C/D) = 1 month (7-day replacement + 3 weeks service warranty). Accessories = 7-day replacement.
+   Replacement warranty covers factory defects (battery, screen, buttons, camera, speakers, ports). Service warranty covers device mishandling and factory defects unreported within 7 days. Warranty claims require the unit and all inclusions returned in good condition as received.
    ```
-   > Note: S must be communicated as "New" to avoid confusing customers who read a bare "S". Don't volunteer "open box" — the item description already indicates open-box when it applies.
+
+**Update existing "Condition Grades" article** (don't create a duplicate ranking article). Current content defines S/A/B/C/D/J. Change only the S line to steer customer-facing wording:
+   - From: `- S: Brand new or open box, like-new condition`
+   - To: `- S: New — pristine, factory condition. Always describe rank S to customers as "New" (not "S"); do not volunteer "open box" — the item description already indicates open-box when it applies.`
+   Leave A/B/C/D/J lines unchanged.
 
 6. **"Special Order Request"** — tags: `sales`
    ```
@@ -110,11 +113,13 @@ Frontend-only. No schema/service change (existing `getTemplates()` returns all r
 
 ---
 
-### WS4 — Attachment preview bug (frontend, small)
+### WS4 — Attachment preview/open affordance (frontend, small)
 
-Template attachments stored in the private `messaging-attachments` bucket fail to load when the filename contains a space, because the signed-URL request path isn't URL-encoded. Locate where the admin/template UI builds the signed URL for attachment preview/download (service or component) and ensure the object path is `encodeURIComponent`-safe (encode path segments, or use the supabase-js `createSignedUrl` which handles this). Verify by previewing `Express Service Information.png` in the UI.
+**Real cause (verified):** the template editor (`src/components/messaging/canned-response-form.tsx`, lines ~227–253) renders each existing attachment as a static row — a File/Film icon + filename + size + a remove (X) button. There is **no way to view or open the attachment**, which is why Joey couldn't see the pricelist. (`createSignedUrl` handles spaces fine; the earlier raw-curl failure was a hand-built URL, not an app bug.)
 
-> If investigation shows the app already uses `supabase.storage.from().createSignedUrl()` (which encodes internally) and the failure is elsewhere, adjust the fix to the real cause found. The observable acceptance test is unchanged: the pricelist attachment previews in the admin UI.
+**Fix:** make each existing attachment openable in the form. For image mime types, show a small clickable thumbnail; for any type, make the filename a clickable link. On click, call the existing `getAttachmentSignedUrl(att.file_url)` (`src/services/messaging.ts:260`) and open the signed URL in a new tab (`window.open(url, '_blank')`). Load thumbnails lazily via a small effect (mirror the pattern in `src/components/messaging/message-composer.tsx:205–208`, which already builds a `thumbnails` map from `getAttachmentSignedUrl`). Newly-selected (not-yet-uploaded) attachments keep the current static row.
+
+Acceptance: opening `Info: Express Service` in the admin editor shows a clickable thumbnail/link that opens `Express Service Information.png`.
 
 ## Out of scope (YAGNI)
 
@@ -129,7 +134,7 @@ Template attachments stored in the private `messaging-attachments` bucket fail t
 - AI can explain PayPal steps, SmartPit steps, redelivery, condition ranks (S described as "New"), warranty periods, and special-order flow from KB text.
 - Test Playground output contains no `**` or `[...](...)`; multi-item suggestions render as stacked `{{OFFER:CODE}}` blocks with photos.
 - Canned Responses admin list has a working search and collapsible category groups.
-- `Express Service Information.png` (and other space-named attachments) preview in the admin UI.
+- In the admin template editor, existing attachments show a clickable thumbnail/link that opens the file (e.g. `Express Service Information.png` in `Info: Express Service`).
 
 ## Testing
 
