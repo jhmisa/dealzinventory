@@ -73,11 +73,11 @@ Delivered as a single Supabase migration (applied via CLI). Each article: `entry
 
 5. **"Condition Ranking & Warranty"** — tags: `sales`, `aftersales`
    ```
-   Condition ranks (always describe S as "New" to the customer): S = New (open box, never used) — pristine factory condition; A = Very good — almost no scratches or signs of wear; B = Good — some scratches/signs of wear; C/D = Fair — noticeable scratches/signs of wear.
+   Condition ranks (always describe S as "New" to the customer): S = New — pristine, factory condition; A = Very good — almost no scratches or signs of wear; B = Good — some scratches/signs of wear; C/D = Fair — noticeable scratches/signs of wear.
    Warranty: New / Rank S = 3 months (7-day replacement + 2 months 3 weeks service warranty). Refurbished (Rank A/B/C/D) = 1 month (7-day replacement + 3 weeks service warranty). Accessories = 7-day replacement.
    Replacement warranty covers factory defects (battery, screen, buttons, camera, speakers, ports). Service warranty covers device mishandling and factory defects unreported within 7 days. Claims require the unit and all inclusions returned in good condition as received.
    ```
-   > Note: S must be communicated as "New" (open-box, never used) to avoid confusing customers who read a bare "S".
+   > Note: S must be communicated as "New" to avoid confusing customers who read a bare "S". Don't volunteer "open box" — the item description already indicates open-box when it applies.
 
 6. **"Special Order Request"** — tags: `sales`
    ```
