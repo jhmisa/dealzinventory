@@ -10,6 +10,7 @@ import { buildSpecialistSystemPrompt, type SpecialistRow } from "../_shared/buil
 import { modelSupportsVision, type VisionImage } from "../_shared/ai-vision.ts";
 import { searchInventory, deriveOfferCodes, type InventorySearchResult } from "../_shared/inventory-search.ts";
 import { assembleOfferReply } from "../_shared/offer-reply.ts";
+import { normalizeOutboundText } from "../_shared/normalize-markdown.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -198,9 +199,9 @@ Deno.serve(async (req) => {
     // offers something, not only when it remembered to fill offer_codes.
     const offerCodes = deriveOfferCodes(aiResponse.reply, aiResponse.offer_codes, offerCatalog);
 
-    // Splice the emoji offer block into the reply so the playground shows the EXACT message
-    // a customer would receive (identical to generate-draft's saved content).
-    const finalReply = assembleOfferReply(aiResponse.reply, offerCodes, offerCatalog);
+    // Splice the emoji offer block into the reply, then normalize markdown, so the playground
+    // shows the EXACT message a customer would receive (identical to generate-draft's saved content).
+    const finalReply = normalizeOutboundText(assembleOfferReply(aiResponse.reply, offerCodes, offerCatalog));
 
     const offers: TestOffer[] = offerCodes
       .map((code) => {
