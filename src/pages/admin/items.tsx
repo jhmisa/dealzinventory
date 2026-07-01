@@ -980,7 +980,20 @@ export default function ItemListPage() {
           const desc = getBackorderDesc(r) || '—'
           return (
             <div className="flex items-center gap-3">
-              {thumbUrl ? (
+              {r.product_id ? (
+                <Link
+                  to={`/admin/products/${r.product_id}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="h-10 w-10 rounded border bg-muted flex-shrink-0 overflow-hidden hover:ring-2 hover:ring-primary/50 transition-shadow"
+                  title="Go to product model"
+                >
+                  {thumbUrl ? (
+                    <img src={thumbUrl} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="h-full w-full flex items-center justify-center text-muted-foreground text-xs">—</div>
+                  )}
+                </Link>
+              ) : thumbUrl ? (
                 <img src={thumbUrl} alt="" className="h-10 w-10 rounded border bg-muted flex-shrink-0 object-cover" />
               ) : (
                 <div className="h-10 w-10 rounded border bg-muted flex-shrink-0 flex items-center justify-center text-muted-foreground text-xs">—</div>
@@ -1004,6 +1017,24 @@ export default function ItemListPage() {
                     }}
                   >
                     <Link2 className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    title="Showcase Photos"
+                    onClick={(e) => { e.stopPropagation(); openShowcase(r.backorder_code, 'photos') }}
+                  >
+                    <Image className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    title="Showcase Videos"
+                    onClick={(e) => { e.stopPropagation(); openShowcase(r.backorder_code, 'videos') }}
+                  >
+                    <Play className="h-3 w-3" />
                   </Button>
                 </div>
                 <div className="text-sm text-muted-foreground truncate">{desc}</div>
