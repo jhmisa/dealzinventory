@@ -55,11 +55,18 @@ import {
   type MessageSyncProgress,
 } from '@/hooks/use-messaging'
 import { useCustomers } from '@/hooks/use-customers'
-import type { AiProvider, MessagingTemplate, MessagingTemplateInsert, KnowledgeBaseEntry, MessagingSpecialist, TestAIMessage, TestAIResponse, TestAIImage } from '@/lib/types'
+import type { AiProvider, MessagingTemplate, MessagingTemplateInsert, TemplateAiUsage, KnowledgeBaseEntry, MessagingSpecialist, TestAIMessage, TestAIResponse, TestAIImage } from '@/lib/types'
 import { compressImageForMessaging } from '@/lib/image-compression'
 import { useClipboardPaste } from '@/hooks/use-clipboard-paste'
 
 // ---------- AI Provider Form ----------
+
+const AI_USAGE_BADGE: Record<TemplateAiUsage, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+  AUTO: 'default',
+  DRAFT: 'secondary',
+  REFERENCE: 'outline',
+  OFF: 'destructive',
+}
 
 function ProviderFormDialog({
   open,
@@ -208,9 +215,12 @@ function TemplateFormDialog({
   const [contentJa, setContentJa] = useState(template?.content_ja ?? '')
   const [messageType, setMessageType] = useState<string>(template?.message_type ?? 'REPLY')
   const [variables, setVariables] = useState(template?.variables?.join(', ') ?? '')
+  const [specialistSlug, setSpecialistSlug] = useState<string>(template?.specialist_slug ?? '')
+  const [aiUsage, setAiUsage] = useState<TemplateAiUsage>(template?.ai_usage ?? 'REFERENCE')
 
   const createTemplate = useCreateTemplate()
   const updateTemplate = useUpdateTemplate()
+  const { data: specialists = [] } = useSpecialists()
 
   const isEdit = !!template
   if (isEdit && name !== template.name && !createTemplate.isPending) {
@@ -220,6 +230,8 @@ function TemplateFormDialog({
     setContentJa(template.content_ja)
     setMessageType(template.message_type)
     setVariables(template.variables?.join(', ') ?? '')
+    setSpecialistSlug(template.specialist_slug ?? '')
+    setAiUsage(template.ai_usage ?? 'REFERENCE')
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -231,6 +243,8 @@ function TemplateFormDialog({
       content_ja: contentJa,
       message_type: messageType as MessagingTemplateInsert['message_type'],
       variables: variables.split(',').map((v) => v.trim()).filter(Boolean),
+      specialist_slug: specialistSlug || null,
+      ai_usage: aiUsage,
     }
 
     if (isEdit) {
@@ -291,6 +305,32 @@ function TemplateFormDialog({
             <Label>Variables (comma-separated)</Label>
             <Input value={variables} onChange={(e) => setVariables(e.target.value)} placeholder="customer_name, order_code, tracking_number" />
             <p className="text-xs text-muted-foreground">Use {'{{variable_name}}'} in content. Available: customer_name, customer_code, order_code, order_status, tracking_number, yamato_status, total_price, shop_url</p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>AI usage</Label>
+              <Select value={aiUsage} onValueChange={(v) => setAiUsage(v as TemplateAiUsage)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="AUTO">AUTO — may auto-send</SelectItem>
+                  <SelectItem value="DRAFT">DRAFT — AI drafts, human sends</SelectItem>
+                  <SelectItem value="REFERENCE">REFERENCE — AI reads only</SelectItem>
+                  <SelectItem value="OFF">OFF — hidden from AI</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Specialist</Label>
+              <Select value={specialistSlug || '__none__'} onValueChange={(v) => setSpecialistSlug(v === '__none__' ? '' : v)}>
+                <SelectTrigger><SelectValue placeholder="All specialists" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">All specialists (global)</SelectItem>
+                  {specialists.map((s) => (
+                    <SelectItem key={s.slug} value={s.slug}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
@@ -1329,9 +1369,9 @@ export default function MessagingSettingsPage() {
             <div>
               <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
-                Message Templates
+                Canned Responses (Approved Replies)
               </CardTitle>
-              <CardDescription>Pre-built templates for automated messages (review requests, delivery alerts)</CardDescription>
+              <CardDescription>Staff canned replies — also read by the AI as Approved Replies. AUTO may auto-send; REFERENCE is read as fact only. Templates win over Knowledge on conflict.</CardDescription>
             </div>
             <Button size="sm" onClick={() => { setEditTemplate(null); setTemplateFormOpen(true) }}>
               <Plus className="h-4 w-4" />
@@ -1354,9 +1394,11 @@ export default function MessagingSettingsPage() {
                   className="rounded-lg border p-3 space-y-2"
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-medium">{t.name}</span>
-                      <Badge variant="outline">{t.message_type.replace('_', ' ')}</Badge>
+                      <Badge variant={AI_USAGE_BADGE[t.ai_usage] ?? 'outline'}>{t.ai_usage}</Badge>
+                      {t.specialist_slug && <Badge variant="outline">{t.specialist_slug}</Badge>}
+                      {(t.attachments?.length ?? 0) > 0 && <Badge variant="secondary">📎 {t.attachments.length}</Badge>}
                       {!t.is_active && <Badge variant="secondary">Inactive</Badge>}
                     </div>
                     <div className="flex items-center gap-1">

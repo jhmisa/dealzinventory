@@ -1,5 +1,5 @@
 import { memo, useState, useCallback, useRef } from 'react'
-import { Paperclip, X, FileIcon, Loader2 } from 'lucide-react'
+import { Paperclip, X, FileIcon, FilmIcon, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -7,10 +7,18 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { useCreateTemplate, useUpdateTemplate, useUploadAttachment } from '@/hooks/use-messaging'
-import type { MessagingTemplate, MessageAttachment } from '@/lib/types'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useCreateTemplate, useUpdateTemplate, useUploadAttachment, useSpecialists } from '@/hooks/use-messaging'
+import type { MessagingTemplate, MessageAttachment, TemplateAiUsage } from '@/lib/types'
 
 const AVAILABLE_VARIABLES = ['customer_name', 'customer_code', 'order_code']
+
+const AI_USAGE_OPTIONS: { value: TemplateAiUsage; label: string; hint: string }[] = [
+  { value: 'AUTO', label: 'AUTO — AI may auto-send near-verbatim', hint: 'Self-contained reply, safe to send as-is.' },
+  { value: 'DRAFT', label: 'DRAFT — AI may use, human approves', hint: 'AI drafts it; a person sends.' },
+  { value: 'REFERENCE', label: 'REFERENCE — AI reads as fact only', hint: 'Has blanks / never sent verbatim.' },
+  { value: 'OFF', label: 'OFF — hidden from AI', hint: 'AI never sees this template.' },
+]
 
 interface CannedResponseFormProps {
   template?: MessagingTemplate | null
@@ -29,12 +37,15 @@ export const CannedResponseForm = memo(function CannedResponseForm({
   const [contentEn, setContentEn] = useState(template?.content_en ?? '')
   const [contentJa, setContentJa] = useState(template?.content_ja ?? '')
   const [isActive, setIsActive] = useState(template?.is_active ?? true)
+  const [specialistSlug, setSpecialistSlug] = useState<string>(template?.specialist_slug ?? '')
+  const [aiUsage, setAiUsage] = useState<TemplateAiUsage>(template?.ai_usage ?? 'REFERENCE')
   const [attachments, setAttachments] = useState<MessageAttachment[]>(template?.attachments ?? [])
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const createTemplate = useCreateTemplate()
   const updateTemplate = useUpdateTemplate()
   const uploadAttachment = useUploadAttachment()
+  const { data: specialists } = useSpecialists()
 
   const isUploading = uploadAttachment.isPending
   const isSaving = createTemplate.isPending || updateTemplate.isPending
@@ -45,8 +56,10 @@ export const CannedResponseForm = memo(function CannedResponseForm({
       e.target.value = ''
 
       for (const file of files) {
-        if (file.size > 10 * 1024 * 1024) {
-          toast.error(`"${file.name}" exceeds the 10MB limit`)
+        const isVideo = file.type.startsWith('video/')
+        const maxBytes = isVideo ? 50 * 1024 * 1024 : 10 * 1024 * 1024
+        if (file.size > maxBytes) {
+          toast.error(`"${file.name}" exceeds the ${isVideo ? '50MB' : '10MB'} limit`)
           continue
         }
 
@@ -101,6 +114,8 @@ export const CannedResponseForm = memo(function CannedResponseForm({
       variables: usedVars,
       attachments,
       is_active: isActive,
+      specialist_slug: specialistSlug || null,
+      ai_usage: aiUsage,
     }
 
     try {
@@ -115,7 +130,7 @@ export const CannedResponseForm = memo(function CannedResponseForm({
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to save')
     }
-  }, [name, contentEn, contentJa, isActive, attachments, isEditing, template, createTemplate, updateTemplate, onSaved])
+  }, [name, contentEn, contentJa, isActive, specialistSlug, aiUsage, attachments, isEditing, template, createTemplate, updateTemplate, onSaved])
 
   return (
     <ScrollArea className="flex-1">
@@ -165,9 +180,43 @@ export const CannedResponseForm = memo(function CannedResponseForm({
           />
         </div>
 
+        {/* AI usage */}
+        <div className="space-y-1.5">
+          <Label className="text-xs">AI usage</Label>
+          <Select value={aiUsage} onValueChange={(v) => setAiUsage(v as TemplateAiUsage)}>
+            <SelectTrigger className="h-8 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {AI_USAGE_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value} className="text-sm">{o.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-[10px] text-muted-foreground">
+            {AI_USAGE_OPTIONS.find((o) => o.value === aiUsage)?.hint}
+          </p>
+        </div>
+
+        {/* Specialist */}
+        <div className="space-y-1.5">
+          <Label className="text-xs">Specialist</Label>
+          <Select value={specialistSlug || '__none__'} onValueChange={(v) => setSpecialistSlug(v === '__none__' ? '' : v)}>
+            <SelectTrigger className="h-8 text-sm">
+              <SelectValue placeholder="All specialists" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__" className="text-sm">All specialists (global)</SelectItem>
+              {(specialists ?? []).map((s) => (
+                <SelectItem key={s.slug} value={s.slug} className="text-sm">{s.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         {/* Attachments */}
         <div className="space-y-1.5">
-          <Label className="text-xs">Attachments</Label>
+          <Label className="text-xs">Attachments (photo / video)</Label>
           <input
             ref={fileInputRef}
             type="file"
@@ -182,7 +231,11 @@ export const CannedResponseForm = memo(function CannedResponseForm({
                   key={idx}
                   className="flex items-center gap-2 rounded border px-2 py-1.5 text-xs"
                 >
-                  <FileIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  {att.mime_type?.startsWith('video/') ? (
+                    <FilmIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  ) : (
+                    <FileIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  )}
                   <span className="truncate flex-1">{att.filename}</span>
                   {att.size_bytes && (
                     <span className="text-muted-foreground shrink-0">
