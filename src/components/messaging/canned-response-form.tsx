@@ -1,4 +1,4 @@
-import { memo, useState, useCallback, useRef } from 'react'
+import { memo, useState, useCallback, useRef, useEffect } from 'react'
 import { Paperclip, X, FileIcon, FilmIcon, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useCreateTemplate, useUpdateTemplate, useUploadAttachment, useSpecialists } from '@/hooks/use-messaging'
+import { getAttachmentSignedUrl } from '@/services/messaging'
 import type { MessagingTemplate, MessageAttachment, TemplateAiUsage } from '@/lib/types'
 
 const AVAILABLE_VARIABLES = ['customer_name', 'customer_code', 'order_code']
@@ -40,6 +41,18 @@ export const CannedResponseForm = memo(function CannedResponseForm({
   const [specialistSlug, setSpecialistSlug] = useState<string>(template?.specialist_slug ?? '')
   const [aiUsage, setAiUsage] = useState<TemplateAiUsage>(template?.ai_usage ?? 'REFERENCE')
   const [attachments, setAttachments] = useState<MessageAttachment[]>(template?.attachments ?? [])
+  const [attThumbs, setAttThumbs] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    let cancelled = false
+    attachments.forEach((att) => {
+      if (attThumbs[att.file_url]) return
+      getAttachmentSignedUrl(att.file_url)
+        .then((url) => { if (!cancelled) setAttThumbs((p) => ({ ...p, [att.file_url]: url })) })
+        .catch(() => { /* leave as filename-only if signing fails */ })
+    })
+    return () => { cancelled = true }
+  }, [attachments, attThumbs])
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const createTemplate = useCreateTemplate()
@@ -231,12 +244,36 @@ export const CannedResponseForm = memo(function CannedResponseForm({
                   key={idx}
                   className="flex items-center gap-2 rounded border px-2 py-1.5 text-xs"
                 >
-                  {att.mime_type?.startsWith('video/') ? (
+                  {att.mime_type?.startsWith('image/') && attThumbs[att.file_url] ? (
+                    <button
+                      type="button"
+                      onClick={() => window.open(attThumbs[att.file_url], '_blank')}
+                      className="shrink-0"
+                      title="Open attachment"
+                    >
+                      <img
+                        src={attThumbs[att.file_url]}
+                        alt={att.filename}
+                        className="h-8 w-8 rounded object-cover"
+                      />
+                    </button>
+                  ) : att.mime_type?.startsWith('video/') ? (
                     <FilmIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                   ) : (
                     <FileIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                   )}
-                  <span className="truncate flex-1">{att.filename}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const url = attThumbs[att.file_url]
+                      if (url) window.open(url, '_blank')
+                    }}
+                    className="truncate flex-1 text-left hover:underline disabled:no-underline"
+                    disabled={!attThumbs[att.file_url]}
+                    title="Open attachment"
+                  >
+                    {att.filename}
+                  </button>
                   {att.size_bytes && (
                     <span className="text-muted-foreground shrink-0">
                       {(att.size_bytes / 1024).toFixed(0)}KB
