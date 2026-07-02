@@ -2,6 +2,7 @@ import { memo, useRef, useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { User, AlertCircle, RotateCw, Bot, UserCheck, FileIcon, ExternalLink, X } from 'lucide-react'
 import { cn, formatCustomerName, decodeHtmlEntities } from '@/lib/utils'
+import { formatTime, formatDayLabel } from '@/lib/datetime'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
@@ -26,19 +27,6 @@ import { InventorySearchModal } from './inventory-search-modal'
 import { CreateTicketDialog } from '@/components/tickets'
 import type { Conversation, Message } from '@/lib/types'
 
-function formatTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
-
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr)
-  const today = new Date()
-  if (d.toDateString() === today.toDateString()) return 'Today'
-  const yesterday = new Date(today)
-  yesterday.setDate(yesterday.getDate() - 1)
-  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday'
-  return d.toLocaleDateString([], { month: 'short', day: 'numeric' })
-}
 
 // Convert URLs in text to clickable links
 function linkifyText(text: string): (string | React.ReactElement)[] {
@@ -244,7 +232,7 @@ export const ConversationThread = memo(function ConversationThread({
   // Group messages by date
   const groups: { date: string; messages: Message[] }[] = []
   for (const msg of messages) {
-    const date = formatDate(msg.created_at)
+    const date = formatDayLabel(msg.created_at)
     const last = groups[groups.length - 1]
     if (last?.date === date) {
       last.messages.push(msg)
