@@ -1,5 +1,6 @@
 import { type SupabaseClient } from "jsr:@supabase/supabase-js@2";
 import { normalizeOutboundText } from "./normalize-markdown.ts";
+import { buildApprovedDraftUpdate } from "./send-via-missive-helpers.ts";
 
 const MISSIVE_API_URL = "https://public.missiveapp.com/v1";
 
@@ -162,7 +163,11 @@ export async function sendViaMissive(
   }).eq("id", msg.id);
 
   if (approveDraftId) {
-    await supabase.from("messages").update({ status: sendError ? "FAILED" : "SENT", auto_sent: autoSent }).eq("id", approveDraftId);
+    // Persist the (possibly edited) content + attachments onto the surviving draft row — NOT just
+    // status — so the thread shows what was actually sent and a retry resends the edited text.
+    await supabase.from("messages").update(
+      buildApprovedDraftUpdate({ content, attachments: inputAttachments, autoSent, failed: !!sendError }),
+    ).eq("id", approveDraftId);
     if (!sendError) await supabase.from("messages").delete().eq("id", msg.id);
   }
 
