@@ -15,6 +15,9 @@ import type {
   CompanyFactUpdate,
   MessagingSpecialistUpdate,
   TestAIMessage,
+  AiCorrection,
+  AiCorrectionInsert,
+  AiCorrectionUpdate,
 } from '@/lib/types'
 
 // ---------- Conversations ----------
@@ -533,6 +536,59 @@ export interface MessageSyncProgress {
 
 const SYNC_BATCH_SIZE = 5
 const SYNC_MAX_ITERATIONS = 200
+
+// ---------- AI Corrections (Training) ----------
+
+export function useAiCorrections() {
+  return useQuery({
+    queryKey: queryKeys.messaging.corrections(),
+    queryFn: () => messagingService.getAiCorrections(),
+  })
+}
+
+export function useCreateAiCorrection() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (entry: AiCorrectionInsert) => messagingService.createAiCorrection(entry),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.messaging.corrections() }),
+  })
+}
+
+export function useUpdateAiCorrection() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: AiCorrectionUpdate }) =>
+      messagingService.updateAiCorrection(id, updates),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.messaging.corrections() }),
+  })
+}
+
+export function useDeleteAiCorrection() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => messagingService.deleteAiCorrection(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.messaging.corrections() }),
+  })
+}
+
+export function useApproveAiCorrection() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => messagingService.approveAiCorrection(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.messaging.corrections() }),
+  })
+}
+
+export function usePromoteAiCorrection() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (correction: AiCorrection) => messagingService.promoteAiCorrection(correction),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.messaging.corrections() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.messaging.knowledgeBase() })
+    },
+  })
+}
 
 export function useRunMessageSync() {
   const queryClient = useQueryClient()
