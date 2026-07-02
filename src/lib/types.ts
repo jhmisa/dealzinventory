@@ -565,6 +565,48 @@ export interface KnowledgeBaseEntryUpdate {
   sort_order?: number
 }
 
+// AI Corrections (human-curated wrong→correct reply pairs for AI training)
+export type AiCorrectionStatus = 'PENDING' | 'APPROVED' | 'PROMOTED' | 'REJECTED'
+
+export interface AiCorrection {
+  id: string
+  customer_message: string
+  wrong_reply: string | null
+  correct_reply: string
+  note: string | null
+  specialist_slug: string | null
+  sub_intent_slug: string | null
+  status: AiCorrectionStatus
+  source_conversation_id: string | null
+  source_message_id: string | null
+  promoted_knowledge_id: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface AiCorrectionInsert {
+  customer_message: string
+  wrong_reply?: string | null
+  correct_reply: string
+  note?: string | null
+  specialist_slug?: string | null
+  sub_intent_slug?: string | null
+  status?: AiCorrectionStatus
+  source_conversation_id?: string | null
+  source_message_id?: string | null
+}
+
+export interface AiCorrectionUpdate {
+  customer_message?: string
+  wrong_reply?: string | null
+  correct_reply?: string
+  note?: string | null
+  specialist_slug?: string | null
+  status?: AiCorrectionStatus
+  promoted_knowledge_id?: string | null
+}
+
 // Company Facts (structured company info the AI reads as fact)
 export interface CompanyFact {
   id: string
