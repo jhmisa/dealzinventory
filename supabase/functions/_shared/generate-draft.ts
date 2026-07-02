@@ -19,6 +19,7 @@ import {
   type CompanyFact,
 } from "./build-specialist-prompt.ts";
 import { searchInventory, deriveOfferCodes, type InventorySearchResult } from "./inventory-search.ts";
+import { getItemSpecs } from "./item-specs.ts";
 import { assembleOfferReply } from "./offer-reply.ts";
 import { normalizeOutboundText } from "./normalize-markdown.ts";
 
@@ -242,21 +243,29 @@ export async function generateAndSaveDraft(
   // The tool is offered on every OpenRouter call; the playbook + INVENTORY_RESPONSE_RULE gate it to SPECIFIC product asks, so non-sales intents simply never call it.
   const offerCatalog = new Map<string, InventorySearchResult>();
   const executeTool = async (name: string, args: unknown): Promise<unknown> => {
-    if (name !== 'search_inventory') return { error: `unknown tool: ${name}` };
     const a = (args ?? {}) as Record<string, unknown>;
-    const results = await searchInventory(supabase as ReturnType<typeof createClient>, {
-      query: String(a.query ?? ''),
-      category_id: a.category_id ? String(a.category_id) : undefined,
-      brand: a.brand ? String(a.brand) : undefined,
-      price_min: a.price_min != null ? Number(a.price_min) : undefined,
-      price_max: a.price_max != null ? Number(a.price_max) : undefined,
-    });
-    for (const r of results) offerCatalog.set(r.code, r);
-    // Return a compact shape for the model (include order_url so it can paste the link).
-    return results.map((r) => ({
-      type: r.type, code: r.code, description: r.description,
-      grade: r.grade, price: r.price, available_count: r.available_count, order_url: r.order_url,
-    }));
+    if (name === 'search_inventory') {
+      const results = await searchInventory(supabase as ReturnType<typeof createClient>, {
+        query: String(a.query ?? ''),
+        category_id: a.category_id ? String(a.category_id) : undefined,
+        brand: a.brand ? String(a.brand) : undefined,
+        price_min: a.price_min != null ? Number(a.price_min) : undefined,
+        price_max: a.price_max != null ? Number(a.price_max) : undefined,
+      });
+      for (const r of results) offerCatalog.set(r.code, r);
+      // Return a compact shape for the model (include order_url so it can paste the link).
+      return results.map((r) => ({
+        type: r.type, code: r.code, description: r.description,
+        grade: r.grade, price: r.price, available_count: r.available_count, order_url: r.order_url,
+      }));
+    }
+    if (name === 'get_item_specs') {
+      return await getItemSpecs(supabase as ReturnType<typeof createClient>, {
+        code: a.code ? String(a.code) : undefined,
+        query: a.query ? String(a.query) : undefined,
+      });
+    }
+    return { error: `unknown tool: ${name}` };
   };
 
   // Append the matched sub-intent's handling as a high-priority addendum so the reply follows it
