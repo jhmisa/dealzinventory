@@ -1,16 +1,17 @@
 import { assertEquals } from 'jsr:@std/assert@1';
 import { buildApprovedDraftUpdate } from './send-via-missive-helpers.ts';
+import type { MessageAttachment } from './send-via-missive.ts';
 
 Deno.test('buildApprovedDraftUpdate persists edited content + attachments on success', () => {
   const p = buildApprovedDraftUpdate({
     content: 'EDITED TEXT',
-    attachments: [{ file_url: 'a.jpg' }],
+    attachments: [{ file_url: 'a.jpg' }] as MessageAttachment[],
     autoSent: false,
     failed: false,
   });
   assertEquals(p.status, 'SENT');
   assertEquals(p.content, 'EDITED TEXT');
-  assertEquals(p.attachments, [{ file_url: 'a.jpg' }]);
+  assertEquals(p.attachments, [{ file_url: 'a.jpg' }] as MessageAttachment[]);
   assertEquals(p.auto_sent, false);
 });
 
