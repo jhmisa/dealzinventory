@@ -6,6 +6,8 @@ import { useAuth } from '@/hooks/use-auth'
 import { supabase } from '@/lib/supabase'
 import { useStaffProfiles } from '@/hooks/use-staff-profiles'
 import { ConversationList, ConversationThread, CustomerPanel, FolderSidebar } from '@/components/messaging'
+import { findCustomerMessageForDraft } from '@/lib/corrections'
+import { CorrectDraftDialog } from '@/components/messaging/correct-draft-dialog'
 import type { MessageAttachment } from '@/lib/types'
 import {
   useConversations,
@@ -40,6 +42,7 @@ export default function MessagesPage() {
   const [panelCollapsed, setPanelCollapsed] = useState(
     () => localStorage.getItem('messaging-panel-collapsed') === 'true'
   )
+  const [correctDraftId, setCorrectDraftId] = useState<string | null>(null)
 
   const handleTogglePanel = useCallback(() => {
     setPanelCollapsed((prev: boolean) => {
@@ -324,6 +327,7 @@ export default function MessagesPage() {
               onSend={handleSend}
               onApproveDraft={handleApproveDraft}
               onRejectDraft={handleRejectDraft}
+              onCorrectDraft={setCorrectDraftId}
               onRetryMessage={handleRetryMessage}
               onLinkCustomer={handleLinkCustomer}
               onToggleAi={handleToggleAi}
@@ -376,6 +380,31 @@ export default function MessagesPage() {
           />
         )}
       </div>
+
+      {(() => {
+        const draft = messages.find((m) => m.id === correctDraftId)
+        let specialist: string | null = null
+        let subIntent: string | null = null
+        if (draft?.ai_context_summary) {
+          try {
+            const s = JSON.parse(draft.ai_context_summary as string)
+            specialist = s.intent ?? null
+            subIntent = s.sub_intent_slug ?? null
+          } catch { /* ignore */ }
+        }
+        return (
+          <CorrectDraftDialog
+            open={!!correctDraftId}
+            onOpenChange={(o) => { if (!o) setCorrectDraftId(null) }}
+            customerMessage={correctDraftId ? findCustomerMessageForDraft(messages, correctDraftId) : ''}
+            wrongReply={draft?.content ?? ''}
+            specialistSlug={specialist}
+            subIntentSlug={subIntent}
+            conversationId={selectedConvId}
+            messageId={correctDraftId}
+          />
+        )
+      })()}
     </div>
   )
 }

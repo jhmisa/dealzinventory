@@ -185,6 +185,7 @@ interface ConversationThreadProps {
   onSend: (content: string, attachments?: MessageAttachment[]) => void
   onApproveDraft: (messageId: string, content: string, attachments?: MessageAttachment[]) => void
   onRejectDraft: (messageId: string) => void
+  onCorrectDraft?: (messageId: string) => void
   onRetryMessage: (messageId: string) => void
   onLinkCustomer: (customerId: string) => void
   onToggleAi: (enabled: boolean) => void
@@ -205,6 +206,7 @@ export const ConversationThread = memo(function ConversationThread({
   onSend,
   onApproveDraft,
   onRejectDraft,
+  onCorrectDraft,
   onRetryMessage,
   onLinkCustomer,
   onToggleAi,
@@ -381,6 +383,7 @@ export const ConversationThread = memo(function ConversationThread({
                             message={msg}
                             onApprove={(content, attachments) => onApproveDraft(msg.id, content, attachments)}
                             onReject={() => onRejectDraft(msg.id)}
+                            onCorrect={onCorrectDraft ? () => onCorrectDraft(msg.id) : undefined}
                             isLoading={isSending}
                           />
                         </div>

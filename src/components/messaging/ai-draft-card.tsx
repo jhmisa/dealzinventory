@@ -1,5 +1,5 @@
 import { memo, useState, useEffect } from 'react'
-import { Bot, Check, Pencil, X, Send } from 'lucide-react'
+import { Bot, Check, Pencil, X, Send, MessageSquareWarning } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
@@ -37,6 +37,7 @@ interface AiDraftCardProps {
   message: Message
   onApprove: (content: string, attachments?: MessageAttachment[]) => void
   onReject: () => void
+  onCorrect?: () => void
   isLoading?: boolean
 }
 
@@ -44,6 +45,7 @@ export const AiDraftCard = memo(function AiDraftCard({
   message,
   onApprove,
   onReject,
+  onCorrect,
   isLoading,
 }: AiDraftCardProps) {
   const [isEditing, setIsEditing] = useState(false)
@@ -112,6 +114,12 @@ export const AiDraftCard = memo(function AiDraftCard({
               <X className="h-3 w-3" />
               Reject
             </Button>
+            {onCorrect && (
+              <Button size="xs" variant="outline" onClick={onCorrect} disabled={isLoading}>
+                <MessageSquareWarning className="h-3 w-3" />
+                Correct
+              </Button>
+            )}
           </>
         )}
       </div>
