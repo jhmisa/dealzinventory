@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
-import { Plus, Trash2, Check, Bot, Sparkles, FileText, Pencil, ShieldAlert, BookOpen, FlaskConical, Send, ChevronUp, ChevronDown, RotateCcw, Power, RefreshCw, CheckCircle2, AlertTriangle, Loader2, ImagePlus, X, Search, Paperclip, FileIcon, FilmIcon, Landmark } from 'lucide-react'
+import { Plus, Trash2, Check, Bot, Sparkles, FileText, Pencil, ShieldAlert, BookOpen, FlaskConical, Send, ChevronUp, ChevronDown, RotateCcw, Power, RefreshCw, CheckCircle2, AlertTriangle, Loader2, ImagePlus, X, Search, Paperclip, FileIcon, FilmIcon, Landmark, GraduationCap, ArrowUpCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatCustomerName } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -58,11 +58,17 @@ import {
   useCreateCompanyFact,
   useUpdateCompanyFact,
   useDeleteCompanyFact,
+  useAiCorrections,
+  useCreateAiCorrection,
+  useUpdateAiCorrection,
+  useDeleteAiCorrection,
+  useApproveAiCorrection,
+  usePromoteAiCorrection,
   type MessageSyncProgress,
 } from '@/hooks/use-messaging'
 import { useCustomers } from '@/hooks/use-customers'
 import { getAttachmentSignedUrl } from '@/services/messaging'
-import type { AiProvider, MessagingTemplate, MessagingTemplateInsert, TemplateAiUsage, KnowledgeBaseEntry, MessagingSpecialist, MessageAttachment, TestAIMessage, TestAIResponse, TestAIImage, CompanyFact } from '@/lib/types'
+import type { AiProvider, MessagingTemplate, MessagingTemplateInsert, TemplateAiUsage, KnowledgeBaseEntry, MessagingSpecialist, MessageAttachment, TestAIMessage, TestAIResponse, TestAIImage, CompanyFact, AiCorrection } from '@/lib/types'
 import { compressImageForMessaging } from '@/lib/image-compression'
 import { useClipboardPaste } from '@/hooks/use-clipboard-paste'
 
@@ -713,6 +719,74 @@ function CompanyFactFormDialog({
   )
 }
 
+// ---------- AI Correction Form ----------
+
+function CorrectionFormDialog({
+  open, onOpenChange, correction,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  correction?: AiCorrection | null
+}) {
+  const [customerMessage, setCustomerMessage] = useState(correction?.customer_message ?? '')
+  const [correctReply, setCorrectReply] = useState(correction?.correct_reply ?? '')
+  const [note, setNote] = useState(correction?.note ?? '')
+  const createCorrection = useCreateAiCorrection()
+  const updateCorrection = useUpdateAiCorrection()
+
+  const isEdit = !!correction
+  if (isEdit && customerMessage !== correction.customer_message && !createCorrection.isPending && !updateCorrection.isPending) {
+    setCustomerMessage(correction.customer_message)
+    setCorrectReply(correction.correct_reply)
+    setNote(correction.note ?? '')
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!customerMessage.trim() || !correctReply.trim()) return
+    if (isEdit) {
+      updateCorrection.mutate(
+        { id: correction.id, updates: { customer_message: customerMessage.trim(), correct_reply: correctReply.trim(), note: note.trim() || null } },
+        { onSuccess: () => { toast.success('Correction updated'); onOpenChange(false) }, onError: (err) => toast.error(`Failed: ${err.message}`) },
+      )
+    } else {
+      createCorrection.mutate(
+        { customer_message: customerMessage.trim(), correct_reply: correctReply.trim(), note: note.trim() || null, status: 'PENDING' },
+        { onSuccess: () => { toast.success('Correction added'); setCustomerMessage(''); setCorrectReply(''); setNote(''); onOpenChange(false) }, onError: (err) => toast.error(`Failed: ${err.message}`) },
+      )
+    }
+  }
+
+  const isPending = createCorrection.isPending || updateCorrection.isPending
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{isEdit ? 'Edit' : 'New'} Correction</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label>Customer question</Label>
+            <Textarea value={customerMessage} onChange={(e) => setCustomerMessage(e.target.value)} className="min-h-[60px] text-sm" />
+          </div>
+          <div className="space-y-2">
+            <Label>Correct reply</Label>
+            <Textarea value={correctReply} onChange={(e) => setCorrectReply(e.target.value)} className="min-h-[100px] text-sm" />
+          </div>
+          <div className="space-y-2">
+            <Label>Why (optional)</Label>
+            <Textarea value={note} onChange={(e) => setNote(e.target.value)} className="min-h-[50px] text-sm" />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" disabled={isPending || !customerMessage.trim() || !correctReply.trim()}>{isEdit ? 'Update' : 'Create'}</Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // ---------- Confidence Badge ----------
 
 function ConfidenceBadge({ confidence }: { confidence: number }) {
@@ -807,6 +881,39 @@ export default function MessagingSettingsPage() {
   const { data: companyFacts = [], isLoading: loadingFacts } = useCompanyFacts()
   const updateFactMutation = useUpdateCompanyFact()
   const deleteFactMutation = useDeleteCompanyFact()
+
+  const [correctionFormOpen, setCorrectionFormOpen] = useState(false)
+  const [editCorrection, setEditCorrection] = useState<AiCorrection | null>(null)
+  const { data: corrections = [], isLoading: loadingCorrections } = useAiCorrections()
+  const approveCorrection = useApproveAiCorrection()
+  const promoteCorrection = usePromoteAiCorrection()
+  const deleteCorrection = useDeleteAiCorrection()
+  const updateCorrection = useUpdateAiCorrection()
+
+  function handleApproveCorrection(c: AiCorrection) {
+    approveCorrection.mutate(c.id, {
+      onSuccess: () => toast.success('Correction approved & added to AI memory'),
+      onError: (err) => toast.error(`Failed: ${err.message}`),
+    })
+  }
+  function handleRejectCorrection(c: AiCorrection) {
+    updateCorrection.mutate({ id: c.id, updates: { status: 'REJECTED' } }, {
+      onSuccess: () => toast.success('Correction rejected'),
+      onError: (err) => toast.error(`Failed: ${err.message}`),
+    })
+  }
+  function handlePromoteCorrection(c: AiCorrection) {
+    promoteCorrection.mutate(c, {
+      onSuccess: () => toast.success('Promoted to a permanent Knowledge Base rule'),
+      onError: (err) => toast.error(`Failed: ${err.message}`),
+    })
+  }
+  function handleDeleteCorrection(c: AiCorrection) {
+    deleteCorrection.mutate(c.id, {
+      onSuccess: () => toast.success('Correction deleted'),
+      onError: (err) => toast.error(`Failed: ${err.message}`),
+    })
+  }
 
   const { data: aiGlobalEnabled, isLoading: loadingAiGlobal } = useSystemSetting('ai_messaging_enabled')
   const updateSystemSetting = useUpdateSystemSetting()
@@ -1423,6 +1530,79 @@ export default function MessagingSettingsPage() {
         </CardContent>
       </Card>
 
+      {/* AI Training (Corrections) Section */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <GraduationCap className="h-5 w-5" />
+                AI Training
+              </CardTitle>
+              <CardDescription>
+                Review staff corrections. Approve to add them to the AI's memory; promote the important ones into permanent Knowledge Base rules.
+              </CardDescription>
+            </div>
+            <Button size="sm" onClick={() => { setEditCorrection(null); setCorrectionFormOpen(true) }}>
+              <Plus className="h-4 w-4" />
+              Add Correction
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loadingCorrections ? (
+            <p className="text-sm text-muted-foreground">Loading...</p>
+          ) : corrections.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">
+              No corrections yet. Use "Correct" on an AI draft, or add one here.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {corrections.map((c) => (
+                <div key={c.id} className="rounded-lg border p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <Badge variant={c.status === 'PENDING' ? 'secondary' : c.status === 'REJECTED' ? 'outline' : 'default'} className="shrink-0">
+                          {c.status}
+                        </Badge>
+                        {c.specialist_slug && <Badge variant="outline" className="shrink-0">{c.specialist_slug}</Badge>}
+                        <p className="text-sm font-medium truncate">{c.customer_message}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">-&gt; {c.correct_reply}</p>
+                      {c.note && <p className="text-[11px] text-muted-foreground mt-0.5 italic">Why: {c.note}</p>}
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {c.status === 'PENDING' && (
+                        <>
+                          <Button size="icon-xs" variant="ghost" title="Approve" onClick={() => handleApproveCorrection(c)} disabled={approveCorrection.isPending}>
+                            <Check className="h-3 w-3" />
+                          </Button>
+                          <Button size="icon-xs" variant="ghost" title="Reject" onClick={() => handleRejectCorrection(c)}>
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </>
+                      )}
+                      {c.status === 'APPROVED' && (
+                        <Button size="icon-xs" variant="ghost" title="Promote to Knowledge Base rule" onClick={() => handlePromoteCorrection(c)} disabled={promoteCorrection.isPending}>
+                          <ArrowUpCircle className="h-3 w-3" />
+                        </Button>
+                      )}
+                      <Button size="icon-xs" variant="ghost" title="Edit" onClick={() => { setEditCorrection(c); setCorrectionFormOpen(true) }}>
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                      <Button size="icon-xs" variant="ghost" title="Delete" onClick={() => handleDeleteCorrection(c)} disabled={deleteCorrection.isPending}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Company Facts Section */}
       <Card>
         <CardHeader>
@@ -1503,6 +1683,8 @@ export default function MessagingSettingsPage() {
         entry={editKbEntry}
         entryType={kbFormType}
       />
+
+      <CorrectionFormDialog open={correctionFormOpen} onOpenChange={setCorrectionFormOpen} correction={editCorrection} />
 
       {/* AI Test Playground Section */}
       <Card>
