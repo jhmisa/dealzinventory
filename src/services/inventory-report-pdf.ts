@@ -93,7 +93,7 @@ function addHeader(doc: jsPDF, snapshot: InventorySnapshot) {
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
   doc.setTextColor(...COLORS.muted)
-  doc.text(`Generated: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, pageW - 20, 30, { align: 'right' })
+  doc.text(`Generated: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Tokyo' })}`, pageW - 20, 30, { align: 'right' })
 
   // Divider
   doc.setDrawColor(...COLORS.border)

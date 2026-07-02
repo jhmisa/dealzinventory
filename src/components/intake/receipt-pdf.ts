@@ -81,7 +81,7 @@ export function generateReceiptPdf({ receipt, lineItems, adjustments, invoiceIma
         adj.adjustment_type,
         String(adj.quantity),
         adj.reason,
-        adj.created_at ? new Date(adj.created_at).toLocaleDateString('ja-JP') : '—',
+        adj.created_at ? new Date(adj.created_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '—',
       ]),
       styles: { fontSize: 8 },
       headStyles: { fillColor: [192, 57, 43] },
