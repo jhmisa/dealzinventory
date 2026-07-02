@@ -1,6 +1,5 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
-import { format } from "date-fns"
 import { getSpecFieldLabel } from '@/lib/constants'
 
 export function cn(...inputs: ClassValue[]) {
@@ -125,15 +124,9 @@ export function formatCode(code: string): string {
   return code
 }
 
-export function formatDate(dateString: string | null | undefined): string {
-  if (!dateString) return '—'
-  return format(new Date(dateString), 'yyyy-MM-dd')
-}
-
-export function formatDateTime(dateString: string | null | undefined): string {
-  if (!dateString) return '—'
-  return format(new Date(dateString), 'yyyy-MM-dd HH:mm')
-}
+// Timestamp formatters live in datetime.ts (JST-anchored). Re-exported here so existing
+// `import { formatDate } from '@/lib/utils'` call sites keep working unchanged.
+export { formatDate, formatDateTime } from './datetime'
 
 /**
  * Build a short description string from field values using an ordered list of field keys.
