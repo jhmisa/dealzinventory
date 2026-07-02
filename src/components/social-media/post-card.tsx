@@ -63,7 +63,7 @@ export function PostCard({ post, onQueue, onDelete, onRetry }: PostCardProps) {
               ? 'Immediate'
               : post.schedule_type === 'next_slot'
                 ? 'Next slot'
-                : new Date(post.scheduled_at!).toLocaleDateString()}
+                : new Date(post.scheduled_at!).toLocaleDateString(undefined, { timeZone: 'Asia/Tokyo' })}
           </span>
           <span className="mx-1">·</span>
           <span>{mediaUrls.length} media</span>

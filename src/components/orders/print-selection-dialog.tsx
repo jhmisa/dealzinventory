@@ -197,7 +197,7 @@ export function PrintSelectionDialog({
                       {order.delivery_date ?? '—'}
                     </td>
                     <td className="p-3 text-xs text-muted-foreground">
-                      {order.created_at ? new Date(order.created_at).toLocaleDateString('ja-JP') : '—'}
+                      {order.created_at ? new Date(order.created_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '—'}
                     </td>
                   </tr>
                 )

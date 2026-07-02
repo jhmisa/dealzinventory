@@ -2083,7 +2083,7 @@ function MessageSyncCard() {
               <div className="text-xs text-muted-foreground space-y-0.5 pt-1 border-t">
                 {syncStatus.inserted_preview.map((m, i) => (
                   <div key={i} className="truncate">
-                    {m.created_at ? new Date(m.created_at).toLocaleTimeString() : '?'} — {m.preview || '(attachment)'}
+                    {m.created_at ? new Date(m.created_at).toLocaleTimeString(undefined, { timeZone: 'Asia/Tokyo' }) : '?'} — {m.preview || '(attachment)'}
                   </div>
                 ))}
               </div>

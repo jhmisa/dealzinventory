@@ -42,7 +42,7 @@ export function FeedbackCard({ feedback, onSelect, onStatusChange }: FeedbackCar
             {feedback.staff_profiles?.display_name ?? 'Unknown'}
           </span>
           <span className="text-xs text-muted-foreground">
-            {new Date(feedback.created_at).toLocaleDateString()}
+            {new Date(feedback.created_at).toLocaleDateString(undefined, { timeZone: 'Asia/Tokyo' })}
           </span>
         </div>
         <div className="flex gap-1 pt-1" onClick={(e) => e.stopPropagation()}>

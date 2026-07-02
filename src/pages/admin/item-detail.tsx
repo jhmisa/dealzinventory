@@ -395,7 +395,7 @@ export default function ItemDetailPage() {
                 <p className="text-xs text-muted-foreground">{reservedBy.kind === 'offer' ? 'Expires' : 'Phone'}</p>
                 <p className="text-sm">
                   {reservedBy.kind === 'offer'
-                    ? (reservedBy.expiresAt ? new Date(reservedBy.expiresAt).toLocaleString() : '—')
+                    ? (reservedBy.expiresAt ? new Date(reservedBy.expiresAt).toLocaleString(undefined, { timeZone: 'Asia/Tokyo' }) : '—')
                     : (reservedBy.customer?.phone ?? '—')}
                 </p>
               </div>
@@ -410,7 +410,7 @@ export default function ItemDetailPage() {
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 text-red-600" />
             <span className="font-medium text-red-800">
-              Missing since {item.missing_since ? new Date(item.missing_since).toLocaleDateString() : 'unknown'}
+              Missing since {item.missing_since ? new Date(item.missing_since).toLocaleDateString(undefined, { timeZone: 'Asia/Tokyo' }) : 'unknown'}
             </span>
           </div>
           <div className="space-y-2">

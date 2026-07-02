@@ -86,7 +86,7 @@ export function FeedbackDetailDialog({ feedback, open, onOpenChange, onStatusCha
             </div>
             <div>
               <span className="text-muted-foreground">Created: </span>
-              {new Date(feedback.created_at).toLocaleString()}
+              {new Date(feedback.created_at).toLocaleString(undefined, { timeZone: 'Asia/Tokyo' })}
             </div>
           </div>
 

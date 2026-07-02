@@ -2133,7 +2133,7 @@ export default function ItemListPage() {
                   {sessionSales.map((sale, i) => (
                     <tr key={`${sale.itemId}-${i}`} className="border-b last:border-0">
                       <td className="py-2 pr-2 whitespace-nowrap text-muted-foreground">
-                        {sale.timestamp.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                        {sale.timestamp.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Tokyo' })}
                       </td>
                       <td className="py-2 pr-2 truncate max-w-[180px]" title={sale.description}>
                         {sale.description}

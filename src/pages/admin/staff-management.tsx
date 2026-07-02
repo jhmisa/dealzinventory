@@ -525,7 +525,7 @@ export default function StaffManagementPage() {
                       <StatusBadge isActive={profile.is_active} />
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {new Date(profile.created_at).toLocaleDateString()}
+                      {new Date(profile.created_at).toLocaleDateString(undefined, { timeZone: 'Asia/Tokyo' })}
                     </TableCell>
                   </TableRow>
                 ))}
