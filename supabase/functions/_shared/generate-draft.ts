@@ -14,10 +14,13 @@ import { modelSupportsVision } from "./ai-vision.ts";
 import { folderNameForIntent, shouldRouteOutOfInbox } from "./intent-routing.ts";
 import {
   buildSpecialistSystemPrompt,
+  renderLearnedCorrections,
   specialistForIntent,
   type SpecialistRow,
   type CompanyFact,
+  type CorrectionExample,
 } from "./build-specialist-prompt.ts";
+import { retrieveCorrections } from "./corrections.ts";
 import { searchInventory, deriveOfferCodes, type InventorySearchResult } from "./inventory-search.ts";
 import { getItemSpecs } from "./item-specs.ts";
 import { assembleOfferReply } from "./offer-reply.ts";
@@ -268,11 +271,26 @@ export async function generateAndSaveDraft(
     return { error: `unknown tool: ${name}` };
   };
 
+  // Retrieve curated staff corrections relevant to THIS message (semantic memory). Non-fatal.
+  let corrections: CorrectionExample[] = [];
+  try {
+    const lastCustomer = [...chatMessages].reverse().find((m) => m.role === 'customer');
+    const lastCustomerText = typeof lastCustomer?.content === 'string' ? lastCustomer.content : '';
+    corrections = await retrieveCorrections(
+      supabase as ReturnType<typeof createClient>,
+      lastCustomerText,
+      classifiedSpecialist?.slug ?? null,
+    );
+  } catch (e) {
+    console.error('corrections retrieval failed (non-fatal):', e);
+  }
+
   // Append the matched sub-intent's handling as a high-priority addendum so the reply follows it
   // (e.g. promo_raffle: "do NOT search inventory"). Falls back to the base prompt for category-default.
-  const replySystemPrompt = matchedSubIntent
+  const correctionsBlock = renderLearnedCorrections(corrections);
+  const replySystemPrompt = (matchedSubIntent
     ? `${fullSystemPrompt}\n\n# Active sub-intent: ${matchedSubIntent.name} (HIGHEST PRIORITY)\n${matchedSubIntent.handling_instructions}`
-    : fullSystemPrompt;
+    : fullSystemPrompt) + correctionsBlock;
 
   const aiResponse = await generateAIReply(
     provider as AIProvider,
