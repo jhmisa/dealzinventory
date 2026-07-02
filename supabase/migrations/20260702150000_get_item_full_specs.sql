@@ -118,11 +118,13 @@ BEGIN
       LIMIT 1
     ) rep ON true
     WHERE sg.sell_group_code = v_code
+      AND rep.id IS NOT NULL  -- guard: no row if group has zero AVAILABLE members
     LIMIT 1;
     RETURN;
   END IF;
 
   -- 3. Fuzzy model-name match → representative AVAILABLE unit; flag if more than one matches.
+  --    Haystack is intentionally narrower than search_available_inventory (spec lookup, not shop search).
   IF coalesce(btrim(p_query), '') <> '' THEN
     SELECT count(*) INTO v_match_count
     FROM items i
