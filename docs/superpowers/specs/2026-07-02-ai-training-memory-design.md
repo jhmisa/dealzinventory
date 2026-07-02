@@ -112,7 +112,7 @@ Data sources are already present: `items.battery_health_pct`, `product_models.ha
 | `specialist_slug` | text null | scoping tag (from draft `ai_context_summary`) |
 | `sub_intent_slug` | text null | scoping tag |
 | `status` | text | `PENDING` → `APPROVED` → `PROMOTED` / `REJECTED` |
-| `embedding` | `vector(1536)` | of `customer_message` (+ optionally `correct_reply`) |
+| `embedding` | `vector(384)` | of `customer_message` (+ optionally `correct_reply`); `gte-small` dims |
 | `source_conversation_id` | uuid null | provenance |
 | `source_message_id` | uuid null | provenance |
 | `promoted_knowledge_id` | uuid null | FK to `knowledge_base` when promoted |
@@ -124,7 +124,7 @@ RLS + grants follow the `knowledge_base` convention (staff-only writes via `auth
 ### Retrieval (hybrid: tags + semantic)
 
 At draft time, after classification:
-1. Embed the incoming customer message (`text-embedding-3-small`, 1536 dims).
+1. Embed the incoming customer message using Supabase's built-in `gte-small` model (384 dims) via `Supabase.ai.Session('gte-small')` — runs locally inside the edge function, no external API key or per-call cost.
 2. RPC `match_ai_corrections(query_embedding, specialist_slug, match_count, min_similarity)`:
    - Filter `status = 'APPROVED'`.
    - **Scope** by `specialist_slug`; if fewer than `match_count` hits, top up with an unscoped similarity search (fallback so a thinly-tagged domain still gets help).
@@ -137,9 +137,9 @@ At draft time, after classification:
 - **Promote** turns it into a **durable rule**: write a tagged entry into the *existing* `knowledge_base` (`entry_type='knowledge'`, `specialist_tags`), set the correction's `status='PROMOTED'` and `promoted_knowledge_id`. Promoted rules are always-injected via the existing machinery; the raw example remains available for semantic match.
 - Because rules live in `knowledge_base`, Claude (in a session) can write rules/corrections directly via SQL — the same memory staff use through the UI.
 
-### Embedding provider
+### Embedding generation
 
-Use an OpenAI-compatible embeddings endpoint (`text-embedding-3-small`). Confirm during planning whether the existing messaging provider key supports embeddings; if not, add a dedicated embeddings provider row/config. Embedding the incoming message adds one cheap call per draft — acceptable; no caching in v1.
+Use Supabase's built-in `gte-small` model via `Supabase.ai.Session('gte-small')` inside the edge function (OpenRouter has no embeddings endpoint, so it can't do this part). Runs locally in the Deno edge runtime — **no external API key, no new provider, no per-call cost**. Embeddings are generated both when a correction is saved/approved (stored in the `embedding` column) and for the incoming message at draft time. Vectors are 384-dim; no caching in v1.
 
 ---
 
@@ -167,6 +167,7 @@ Embeddings are (re)generated on save/approve.
 
 ## Testing strategy
 
+- **Embeddings:** confirm `Supabase.ai.Session('gte-small')` is available in the project's edge runtime and produces 384-dim vectors (guard the plan against a runtime-version surprise).
 - **Pillar 0:** regression test — approved-edit send persists edited `content` to the draft row; retry resends edited text.
 - **Prompt assembler:** extend `build-specialist-prompt.test.ts` — `# Learned Corrections` section renders matched examples in the right position and is omitted when none match.
 - **Retrieval:** test `match_ai_corrections` scoping + unscoped fallback + similarity floor.
@@ -177,6 +178,5 @@ Embeddings are (re)generated on save/approve.
 
 ## Open items to confirm during planning
 
-- Embedding provider/key (reuse messaging provider vs. add an embeddings provider row).
 - Exact placement of the Training UI (new tab in `messaging-settings.tsx` vs. its own route).
 - Whether to embed `customer_message` only, or `customer_message + correct_reply`, for best match quality.
