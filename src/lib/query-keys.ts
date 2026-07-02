@@ -236,6 +236,7 @@ export const queryKeys = {
     knowledgeBase: () => [...queryKeys.messaging.all, 'knowledge-base'] as const,
     companyFacts: () => [...queryKeys.messaging.all, 'company-facts'] as const,
     specialists: () => [...queryKeys.messaging.all, 'specialists'] as const,
+    corrections: () => [...queryKeys.messaging.all, 'corrections'] as const,
     systemSetting: (key: string) => [...queryKeys.messaging.all, 'system-setting', key] as const,
   },
 }

@@ -22,6 +22,9 @@ import type {
   MessagingSpecialistUpdate,
   TestAIMessage,
   TestAIResponse,
+  AiCorrection,
+  AiCorrectionInsert,
+  AiCorrectionUpdate,
 } from '@/lib/types'
 
 // ---------- Conversations ----------
@@ -723,4 +726,66 @@ export async function checkMissiveHealth(): Promise<{ connected: boolean; error?
   } catch {
     return { connected: false, error: 'Unable to reach messaging service' }
   }
+}
+
+// ---------- AI Corrections (Training) ----------
+
+export async function getAiCorrections() {
+  const { data, error } = await supabase
+    .from('ai_corrections')
+    .select('id, customer_message, wrong_reply, correct_reply, note, specialist_slug, sub_intent_slug, status, source_conversation_id, source_message_id, promoted_knowledge_id, created_by, created_at, updated_at')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return (data ?? []) as AiCorrection[]
+}
+
+export async function createAiCorrection(entry: AiCorrectionInsert) {
+  const { data, error } = await supabase
+    .from('ai_corrections')
+    .insert(entry)
+    .select()
+    .single()
+  if (error) throw error
+  return data as AiCorrection
+}
+
+export async function updateAiCorrection(id: string, updates: AiCorrectionUpdate) {
+  const { data, error } = await supabase
+    .from('ai_corrections')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data as AiCorrection
+}
+
+export async function deleteAiCorrection(id: string) {
+  const { error } = await supabase.from('ai_corrections').delete().eq('id', id)
+  if (error) throw error
+}
+
+// Approve a correction and generate its embedding so the backend can retrieve it.
+export async function approveAiCorrection(id: string) {
+  const { error } = await supabase.from('ai_corrections').update({ status: 'APPROVED' }).eq('id', id)
+  if (error) throw error
+  // Non-fatal if embedding is unavailable — it can be re-approved later to retry.
+  const { error: embedErr } = await supabase.functions.invoke('embed-correction', { body: { id } })
+  if (embedErr) throw new Error(`Approved, but embedding failed: ${embedErr.message}`)
+}
+
+// Promote an APPROVED correction into a durable, always-injected knowledge_base article,
+// then mark it PROMOTED and link it.
+export async function promoteAiCorrection(correction: AiCorrection) {
+  const title = `Correction: ${correction.customer_message.slice(0, 60)}`
+  const kb = await createKnowledgeBaseEntry({
+    entry_type: 'knowledge',
+    title,
+    content: correction.correct_reply,
+    category: 'Custom',
+    is_active: true,
+    specialist_tags: correction.specialist_slug ? [correction.specialist_slug] : [],
+  } as KnowledgeBaseEntryInsert)
+  await updateAiCorrection(correction.id, { status: 'PROMOTED', promoted_knowledge_id: kb.id })
+  return kb
 }
