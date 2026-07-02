@@ -46,6 +46,12 @@ export interface CompanyFact {
   category: string;
 }
 
+export interface CorrectionExample {
+  customer_message: string;
+  correct_reply: string;
+  note?: string | null;
+}
+
 export interface BuildSpecialistPromptArgs {
   guardrails: GuardrailEntry[];
   personaSystemPrompt: string;
@@ -96,6 +102,20 @@ export function specialistForIntent(
     .filter((s) => s.is_active && s.intents.includes(intent))
     .sort((a, b) => a.sort_order - b.sort_order);
   return matches[0] ?? null;
+}
+
+// Render retrieved staff corrections as a high-priority section appended to the reply prompt.
+// Returns '' when there are none. Kept separate from buildSpecialistSystemPrompt because
+// corrections are retrieved AFTER intent classification (see generate-draft.ts).
+export function renderLearnedCorrections(corrections: CorrectionExample[]): string {
+  if (!corrections || corrections.length === 0) return '';
+  const blocks = corrections
+    .map((c) => {
+      const note = c.note ? `\n  Why: ${c.note}` : '';
+      return `- When the customer says something like: "${c.customer_message}"\n  Respond like this: ${c.correct_reply}${note}`;
+    })
+    .join('\n');
+  return `\n\n# Learned Corrections (staff feedback for situations like this one -- follow these over general guidance when they apply)\n${blocks}`;
 }
 
 export function buildSpecialistSystemPrompt(args: BuildSpecialistPromptArgs): string {

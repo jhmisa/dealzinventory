@@ -1,6 +1,7 @@
 import { assert, assertEquals, assertStringIncludes } from 'jsr:@std/assert@1';
 import {
   buildSpecialistSystemPrompt,
+  renderLearnedCorrections,
   specialistForIntent,
   type CompanyFact,
   type SpecialistRow,
@@ -204,4 +205,26 @@ Deno.test('Company Facts block sits after persona and before Specialist Playbook
   const factsIdx = prompt.indexOf('# Company Facts');
   const playbookIdx = prompt.indexOf('# Specialist Playbooks');
   assert(personaIdx < factsIdx && factsIdx < playbookIdx);
+});
+
+Deno.test('renderLearnedCorrections renders each correction with its note', () => {
+  const out = renderLearnedCorrections([
+    { customer_message: 'battery percentage po?', correct_reply: 'Look it up and share the exact %.', note: 'we track battery %' },
+  ]);
+  assertStringIncludes(out, '# Learned Corrections');
+  assertStringIncludes(out, 'battery percentage po?');
+  assertStringIncludes(out, 'Look it up and share the exact %.');
+  assertStringIncludes(out, 'Why: we track battery %');
+});
+
+Deno.test('renderLearnedCorrections omits the Why line when note is empty', () => {
+  const out = renderLearnedCorrections([
+    { customer_message: 'q', correct_reply: 'a', note: null },
+  ]);
+  assertStringIncludes(out, 'q');
+  assertEquals(out.includes('Why:'), false);
+});
+
+Deno.test('renderLearnedCorrections returns empty string when there are none', () => {
+  assertEquals(renderLearnedCorrections([]), '');
 });
