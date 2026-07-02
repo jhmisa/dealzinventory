@@ -6,7 +6,9 @@ import {
   getRecentMessagesByCustomer,
 } from "../_shared/build-ai-context.ts";
 import { generateAIReply, type AIProvider } from "../_shared/ai-providers.ts";
-import { buildSpecialistSystemPrompt, type SpecialistRow } from "../_shared/build-specialist-prompt.ts";
+import { buildSpecialistSystemPrompt, renderLearnedCorrections, type SpecialistRow } from "../_shared/build-specialist-prompt.ts";
+import { getItemSpecs } from "../_shared/item-specs.ts";
+import { retrieveCorrections } from "../_shared/corrections.ts";
 import { modelSupportsVision, type VisionImage } from "../_shared/ai-vision.ts";
 import { searchInventory, deriveOfferCodes, type InventorySearchResult } from "../_shared/inventory-search.ts";
 import { assembleOfferReply } from "../_shared/offer-reply.ts";
@@ -136,6 +138,18 @@ Deno.serve(async (req) => {
       content: m.content,
     }));
 
+    // Parity with generate-draft: retrieve curated staff corrections (semantic memory) and append
+    // them to the prompt. The playground doesn't classify intent, so retrieve unscoped. Non-fatal.
+    let correctionsBlock = '';
+    try {
+      const lastCustomer = [...chatMessages].reverse().find((m) => m.role === 'customer');
+      const lastCustomerText = typeof lastCustomer?.content === 'string' ? lastCustomer.content : '';
+      const corrections = await retrieveCorrections(serviceClient, lastCustomerText, null);
+      correctionsBlock = renderLearnedCorrections(corrections);
+    } catch (e) {
+      console.error('test-ai-reply corrections retrieval failed (non-fatal):', e);
+    }
+
     // Vision: forward uploaded images only when the active model supports them
     // (keeps parity with generate-draft and avoids sending images to text-only models).
     const latestImages = modelSupportsVision(
@@ -156,8 +170,23 @@ Deno.serve(async (req) => {
     // whether/what it searched — an empty trace means the model answered WITHOUT searching.
     const toolCalls: { query: string; result_count: number; codes: string[] }[] = [];
     const executeTool = async (name: string, args: unknown): Promise<unknown> => {
-      if (name !== 'search_inventory') return { error: `unknown tool: ${name}` };
       const a = (args ?? {}) as Record<string, unknown>;
+      if (name === 'get_item_specs') {
+        try {
+          const specs = await getItemSpecs(serviceClient, {
+            code: a.code ? String(a.code) : undefined,
+            query: a.query ? String(a.query) : undefined,
+          });
+          toolCalls.push({ query: `specs:${a.code ?? a.query ?? ''}`, result_count: ('found' in specs && specs.found === false) ? 0 : 1, codes: ('code' in specs ? [specs.code as string] : []) });
+          return specs;
+        } catch (toolErr) {
+          const detail = toolErr instanceof Error ? toolErr.message : JSON.stringify(toolErr);
+          console.error('get_item_specs tool failed:', detail);
+          toolErrors.push(detail);
+          return { error: detail };
+        }
+      }
+      if (name !== 'search_inventory') return { error: `unknown tool: ${name}` };
       const query = String(a.query ?? '');
       try {
         const results = await searchInventory(serviceClient, {
@@ -186,7 +215,7 @@ Deno.serve(async (req) => {
 
     const aiResponse = await generateAIReply(
       provider as AIProvider,
-      fullSystemPrompt,
+      fullSystemPrompt + correctionsBlock,
       contextBlock,
       chatMessages,
       latestImages,
