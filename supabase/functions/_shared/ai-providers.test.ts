@@ -247,3 +247,18 @@ Deno.test("parseClassification coerces empty-string sub_intent_slug to null", ()
   const c = parseClassification('{"intent":"general","sub_intent_slug":"","confidence":0.5}');
   assertEquals(c.sub_intent_slug, null);
 });
+
+import { assert } from 'jsr:@std/assert@1';
+import { GET_ITEM_SPECS_TOOL } from './ai-providers.ts';
+
+Deno.test('buildEnhancedPrompt includes the spec-lookup rule', () => {
+  const p = buildEnhancedPrompt('BASE_PROMPT');
+  assert(p.includes('BASE_PROMPT'));
+  assert(p.includes('get_item_specs'));
+  assert(p.includes('has_cellular'));
+});
+
+Deno.test('GET_ITEM_SPECS_TOOL has the expected contract', () => {
+  assertEquals(GET_ITEM_SPECS_TOOL.function.name, 'get_item_specs');
+  assertEquals(GET_ITEM_SPECS_TOOL.function.parameters.required, []);
+});

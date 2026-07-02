@@ -172,10 +172,17 @@ const CLARIFY_BEFORE_ASSUMING_RULE = `
 6. If the latest message is a bare screenshot or a fragment with no clear ask, briefly say what you see and ask one specific question. Do NOT guess.
 7. NEVER invent facts (price, stock, order status, tracking) that are not present in the context above.`;
 
+const SPEC_LOOKUP_RULE = `
+# Specific factual questions about a listed item
+When the customer asks a specific factual question about an item they’re looking at (battery %, does it take a SIM / cellular, ports, exact CPU/RAM/storage, condition), you MUST call get_item_specs before answering — never say you don’t have the info and never tell them to check the manufacturer’s website.
+- If a product code (P/G/B) is in the conversation or the offer, pass it as \`code\` for the exact unit.
+- If there’s no code, pass the model name from the ad/offer as \`query\`. If units_may_vary is true (or you matched by model), give the best model-level answer AND ask the customer for the product code so you can confirm the exact battery % and price.
+- SIM/cellular: only models with has_cellular = true can use a SIM. If has_cellular is false or unknown, say it does not support a SIM (Wi-Fi only) — do NOT say yes by default.`;
+
 // Assemble the full system prompt sent to every messaging provider:
-// persona/guardrails + the inventory strategy + the clarify-don’t-guess rule.
+// persona/guardrails + the inventory strategy + the clarify-don’t-guess rule + the spec-lookup rule.
 export function buildEnhancedPrompt(systemPrompt: string): string {
-  return systemPrompt + "\n\n" + INVENTORY_RESPONSE_RULE + "\n\n" + CLARIFY_BEFORE_ASSUMING_RULE;
+  return systemPrompt + "\n\n" + INVENTORY_RESPONSE_RULE + "\n\n" + CLARIFY_BEFORE_ASSUMING_RULE + "\n\n" + SPEC_LOOKUP_RULE;
 }
 
 export async function generateAIReply(
@@ -337,6 +344,29 @@ export const SEARCH_INVENTORY_TOOL = {
   },
 };
 
+export const GET_ITEM_SPECS_TOOL = {
+  type: 'function' as const,
+  function: {
+    name: 'get_item_specs',
+    description:
+      'Look up the full structured specs of a SPECIFIC listed item to answer a factual question ' +
+      '(battery health %, cellular/SIM capability, ports, CPU/RAM/storage, condition notes, exact price). ' +
+      'PREFER a product code (P/G/B) from the conversation/offer — it returns the exact unit. ' +
+      'If no code is available, pass the model name read from the ad/offer as `query`; the result is a ' +
+      'representative unit and units_may_vary may be true — then answer at the model level and ASK the ' +
+      'customer for the product code to confirm the exact battery % and price. ' +
+      'Use this instead of ever telling the customer to check the manufacturer\'s website.',
+    parameters: {
+      type: 'object',
+      properties: {
+        code: { type: 'string', description: 'Exact P/G/B code if present, e.g. "P001443" or "G000022".' },
+        query: { type: 'string', description: 'Model name from the ad/offer if no code, e.g. "HP Elite Dragonfly G1".' },
+      },
+      required: [],
+    },
+  },
+};
+
 type ToolCall = { id: string; type: string; function: { name: string; arguments: string } };
 type LoopMessage = { role: string; content: string | unknown[] | null; tool_calls?: ToolCall[]; tool_call_id?: string };
 
@@ -375,7 +405,7 @@ export async function runChatCompletionWithTools(args: ToolLoopArgs): Promise<To
       // While tools are offered, do NOT force json_object — some OpenRouter models
       // suppress tool_calls when a response_format is pinned. The final round (below)
       // omits tools and enforces JSON for a clean, parseable answer.
-      body.tools = [SEARCH_INVENTORY_TOOL];
+      body.tools = [SEARCH_INVENTORY_TOOL, GET_ITEM_SPECS_TOOL];
     } else {
       body.response_format = { type: 'json_object' };
     }
@@ -468,7 +498,7 @@ async function callOpenRouter(
       model: provider.model_id,
       messages: openrouterMessages as LoopMessage[],
       executeTool,
-      maxToolRounds: 2,
+      maxToolRounds: 3,
     });
     return { ...parseAIResponse(finalText), usage };
   }
