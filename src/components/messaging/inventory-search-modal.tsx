@@ -1,5 +1,4 @@
-import { memo, useState, useCallback, useEffect } from 'react'
-import { Search, Plus, Loader2, ImageIcon } from 'lucide-react'
+import { memo, useState, useCallback } from 'react'
 import { toast } from 'sonner'
 import {
   Dialog,
@@ -7,22 +6,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { GradeBadge } from '@/components/shared/grade-badge'
+import { InventoryPicker } from '@/components/shared'
+import { formatLeadTime } from '@/lib/format-lead-time'
 import { formatPrice } from '@/lib/utils'
-import { useAvailableInventorySearch, useAvailableBrands } from '@/hooks/use-items'
-import { useCategories } from '@/hooks/use-categories'
 import { uploadAttachment } from '@/services/messaging'
-import type { MessageAttachment, ConditionGrade } from '@/lib/types'
-import type { AvailableInventoryResult, InventorySearchFilters } from '@/services/items'
+import type { MessageAttachment } from '@/lib/types'
+import type { AvailableInventoryResult } from '@/services/items'
 
 interface InventorySearchModalProps {
   open: boolean
@@ -30,77 +19,12 @@ interface InventorySearchModalProps {
   onInsertItem: (text: string, attachment?: MessageAttachment, thumbnailUrl?: string) => void
 }
 
-// Render a backorder lead time as a working-day range. Mirrors offer-reply.ts formatLeadTime
-// so manually-inserted pre-order offers read identically to the AI-generated ones.
-function formatLeadTime(min: number | null | undefined, max: number | null | undefined): string | null {
-  const lo = typeof min === 'number' && min > 0 ? min : null
-  const hi = typeof max === 'number' && max > 0 ? max : null
-  if (lo && hi) return lo === hi ? `${hi} working days` : `${lo}–${hi} working days`
-  if (hi) return `${hi} working days`
-  if (lo) return `${lo} working days`
-  return null
-}
-
 export const InventorySearchModal = memo(function InventorySearchModal({
   open,
   onClose,
   onInsertItem,
 }: InventorySearchModalProps) {
-  const [query, setQuery] = useState('')
-  const [debouncedQuery, setDebouncedQuery] = useState('')
   const [addingId, setAddingId] = useState<string | null>(null)
-
-  // Filters
-  const [brand, setBrand] = useState<string>('')
-  const [categoryId, setCategoryId] = useState<string>('')
-  const [priceMin, setPriceMin] = useState<string>('')
-  const [priceMax, setPriceMax] = useState<string>('')
-  const [debouncedPriceMin, setDebouncedPriceMin] = useState<string>('')
-  const [debouncedPriceMax, setDebouncedPriceMax] = useState<string>('')
-
-  // Debounce search query
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedQuery(query), 300)
-    return () => clearTimeout(timer)
-  }, [query])
-
-  // Debounce price inputs
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedPriceMin(priceMin)
-      setDebouncedPriceMax(priceMax)
-    }, 500)
-    return () => clearTimeout(timer)
-  }, [priceMin, priceMax])
-
-  const filters: InventorySearchFilters = {
-    ...(brand ? { brand } : {}),
-    ...(categoryId ? { categoryId } : {}),
-    ...(debouncedPriceMin ? { priceMin: Number(debouncedPriceMin) } : {}),
-    ...(debouncedPriceMax ? { priceMax: Number(debouncedPriceMax) } : {}),
-  }
-
-  const { data: results = [], isLoading } = useAvailableInventorySearch(debouncedQuery, filters)
-  const { data: brands = [] } = useAvailableBrands()
-  const { data: categories = [] } = useCategories()
-
-  // Reset on close
-  useEffect(() => {
-    if (!open) {
-      setQuery('')
-      setDebouncedQuery('')
-      setBrand('')
-      setCategoryId('')
-      setPriceMin('')
-      setPriceMax('')
-      setDebouncedPriceMin('')
-      setDebouncedPriceMax('')
-    }
-  }, [open])
-
-  const hasQuery = debouncedQuery.trim().length >= 2
-  const hasFilters = !!(brand || categoryId || debouncedPriceMin || debouncedPriceMax)
-  const hasInput = hasQuery || hasFilters
 
   const handleAdd = useCallback(
     async (item: AvailableInventoryResult) => {
@@ -119,7 +43,7 @@ export const InventorySearchModal = memo(function InventorySearchModal({
               const mimeToExt: Record<string, string> = {
                 'image/jpeg': 'jpg',
                 'image/png': 'png',
-                'image/webp': 'jpg',  // WebP → .jpg for better Messenger compatibility
+                'image/webp': 'jpg', // WebP → .jpg for better Messenger compatibility
                 'image/gif': 'gif',
               }
               const ext = mimeToExt[blob.type] ?? 'jpg'
@@ -186,157 +110,13 @@ export const InventorySearchModal = memo(function InventorySearchModal({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="!max-w-3xl !max-h-[80vh] !flex !flex-col !gap-0 !p-0 overflow-hidden">
-        <DialogHeader className="px-6 pt-5 pb-2">
+      <DialogContent className="!flex !max-h-[80vh] !max-w-3xl !flex-col !gap-0 !p-0 overflow-hidden">
+        <DialogHeader className="px-6 pb-2 pt-5">
           <DialogTitle className="text-base">Search Inventory</DialogTitle>
         </DialogHeader>
 
-        <div className="px-6 pb-2 space-y-2">
-          <div className="flex gap-2">
-            <Select value={categoryId} onValueChange={(v) => setCategoryId(v === 'all' ? '' : v)}>
-              <SelectTrigger className="h-8 text-xs flex-1">
-                <SelectValue placeholder="Category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {categories.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={brand} onValueChange={(v) => setBrand(v === 'all' ? '' : v)}>
-              <SelectTrigger className="h-8 text-xs flex-1">
-                <SelectValue placeholder="Brand" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Brands</SelectItem>
-                {brands.map((b) => (
-                  <SelectItem key={b} value={b}>{b}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Input
-              type="number"
-              value={priceMin}
-              onChange={(e) => setPriceMin(e.target.value)}
-              placeholder="¥ Min"
-              className="h-8 text-xs w-24"
-            />
-            <Input
-              type="number"
-              value={priceMax}
-              onChange={(e) => setPriceMax(e.target.value)}
-              placeholder="¥ Max"
-              className="h-8 text-xs w-24"
-            />
-          </div>
-
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by code or description..."
-              className="pl-9 h-9"
-              autoFocus
-            />
-          </div>
-        </div>
-
-        <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-4">
-          {isLoading && hasInput ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
-          ) : results.length === 0 && hasInput ? (
-            <p className="text-center text-sm text-muted-foreground py-8">
-              No available items found
-            </p>
-          ) : !hasInput ? (
-            <p className="text-center text-sm text-muted-foreground py-8">
-              Type at least 2 characters or select a filter
-            </p>
-          ) : (
-            <table className="w-full table-fixed text-sm">
-              <thead>
-                <tr className="border-b text-left text-xs text-muted-foreground">
-                  <th className="w-12 pb-2"></th>
-                  <th className="w-[88px] pb-2 pr-3">Code</th>
-                  <th className="w-14 pb-2">Grade</th>
-                  <th className="pb-2 pr-3">Description</th>
-                  <th className="w-20 pb-2 pr-3 text-right">Price</th>
-                  <th className="w-16 pb-2"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {results.map((item) => (
-                  <tr key={`${item.type}-${item.id}`} className="border-b last:border-0">
-                    <td className="py-2 pr-2">
-                      {item.thumbnail_url ? (
-                        <img
-                          src={item.thumbnail_url}
-                          alt=""
-                          className="h-10 w-10 rounded object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-10 w-10 items-center justify-center rounded bg-muted">
-                          <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                      )}
-                    </td>
-                    <td className="py-2 pr-3">
-                      <span className="font-mono text-xs">{item.code}</span>
-                      {item.type === 'backorder' && (
-                        <span className="mt-0.5 block w-fit rounded bg-amber-100 px-1 py-px text-[10px] font-medium text-amber-700">
-                          ⏳ Pre-order
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-2">
-                      {item.grade ? (
-                        <GradeBadge grade={item.grade as ConditionGrade} />
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
-                    </td>
-                    <td className="py-2 pr-3">
-                      <span className="text-xs line-clamp-2">{item.description}</span>
-                      {item.condition_notes && (
-                        <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">{item.condition_notes}</p>
-                      )}
-                      {item.type === 'backorder' && (() => {
-                        const lead = formatLeadTime(item.lead_time_min_days, item.lead_time_days)
-                        return lead ? (
-                          <p className="text-[11px] text-amber-700 mt-0.5">~{lead}</p>
-                        ) : null
-                      })()}
-                    </td>
-                    <td className="py-2 pr-3 text-right">
-                      <span className="text-xs font-medium">{formatPrice(item.price)}</span>
-                    </td>
-                    <td className="py-2 text-right">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 gap-1 text-xs"
-                        disabled={addingId === item.id}
-                        onClick={() => handleAdd(item)}
-                      >
-                        {addingId === item.id ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <Plus className="h-3 w-3" />
-                        )}
-                        Add
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+        <div className="flex min-h-0 flex-1 flex-col px-6 pb-4">
+          <InventoryPicker onAdd={handleAdd} addingId={addingId} autoFocus />
         </div>
       </DialogContent>
     </Dialog>

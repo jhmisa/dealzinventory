@@ -21,69 +21,126 @@ function yen(n: number): string {
   return '¥' + Math.round(n).toLocaleString('en-US')
 }
 
-/** Data-driven product card, drawn as a lower-third band. */
-export function drawOverlayCard(ctx: Ctx2D, card: RecorderCard, w: number, h: number): void {
-  const pad = Math.round(w * 0.045)
-  const bandH = Math.round(h * 0.22)
-  const y = h - bandH
+/** Truncate a single line to fit `maxW`, appending an ellipsis. */
+function fitLine(ctx: Ctx2D, text: string, maxW: number): string {
+  if (ctx.measureText(text).width <= maxW) return text
+  let t = text
+  while (t.length > 1 && ctx.measureText(t + '…').width > maxW) t = t.slice(0, -1)
+  return t + '…'
+}
 
-  // scrim gradient for legibility
-  const grad = ctx.createLinearGradient(0, y - bandH * 0.4, 0, h)
+/** Wrap `text` to at most `maxLines` lines within `maxW` (last line ellipsized). */
+function wrapLines(ctx: Ctx2D, text: string, maxW: number, maxLines: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean)
+  const lines: string[] = []
+  let line = ''
+  for (const word of words) {
+    const next = line ? `${line} ${word}` : word
+    if (ctx.measureText(next).width > maxW && line) {
+      lines.push(line)
+      line = word
+      if (lines.length === maxLines - 1) break
+    } else {
+      line = next
+    }
+  }
+  const rest = words.slice(lines.reduce((n, l) => n + l.split(' ').length, 0)).join(' ') || line
+  if (lines.length < maxLines) lines.push(fitLine(ctx, rest, maxW))
+  return lines.slice(0, maxLines)
+}
+
+/**
+ * Product info block, drawn straddling the lower portion of the media square
+ * (mirrors the customer-facing showcase page): code · rank · price on the left,
+ * title · spec line on the right, over a bottom-fading scrim.
+ */
+export function drawShowcaseInfo(ctx: Ctx2D, card: RecorderCard, x: number, y: number, w: number, h: number): void {
+  const pad = Math.round(w * 0.042)
+  const bandTop = y + Math.round(h * 0.56)
+
+  // Bottom-fading scrim for legibility over any photo.
+  const grad = ctx.createLinearGradient(0, bandTop, 0, y + h)
   grad.addColorStop(0, 'rgba(0,0,0,0)')
-  grad.addColorStop(1, 'rgba(0,0,0,0.82)')
+  grad.addColorStop(0.5, 'rgba(0,0,0,0.55)')
+  grad.addColorStop(1, 'rgba(0,0,0,0.92)')
   ctx.fillStyle = grad
-  ctx.fillRect(0, y - bandH * 0.4, w, bandH * 1.4)
+  ctx.fillRect(x, bandTop, w, y + h - bandTop)
 
-  // title
-  const titlePx = Math.round(w * 0.052)
-  ctx.font = `700 ${titlePx}px Inter, system-ui, sans-serif`
-  ctx.textBaseline = 'top'
-  ctx.fillStyle = '#fff'
-  ctx.fillText(card.title, pad, y + pad, w - pad * 2)
+  ctx.textBaseline = 'alphabetic'
+  const bottom = y + h - pad
 
-  // code chip (top-right of band)
-  const chipPx = Math.round(w * 0.032)
-  ctx.font = `600 ${chipPx}px ui-monospace, monospace`
-  const chipW = ctx.measureText(card.code).width + chipPx
-  ctx.fillStyle = 'rgba(255,255,255,0.16)'
-  roundRect(ctx, w - pad - chipW, y + pad, chipW, chipPx * 1.7, chipPx * 0.4)
-  ctx.fill()
-  ctx.fillStyle = '#fff'
-  ctx.fillText(card.code, w - pad - chipW + chipPx * 0.5, y + pad + chipPx * 0.35)
-
-  // price row
-  const priceY = y + pad + titlePx * 1.5
-  const pricePx = Math.round(w * 0.06)
+  // ---- LEFT column (bottom-up): price, strike original, code + rank ----
+  const pricePx = Math.round(w * 0.094)
   ctx.font = `800 ${pricePx}px Inter, system-ui, sans-serif`
+  const priceStr = yen(card.price)
+  const priceW = ctx.measureText(priceStr).width
   ctx.fillStyle = '#fff'
-  ctx.fillText(yen(card.price), pad, priceY)
-  const priceW = ctx.measureText(yen(card.price)).width
+  ctx.fillText(priceStr, pad, bottom)
+
+  let ly = bottom - pricePx * 1.02
 
   if (card.originalPrice && card.originalPrice > card.price) {
-    const oPx = Math.round(w * 0.036)
+    const oPx = Math.round(w * 0.04)
     ctx.font = `500 ${oPx}px Inter, system-ui, sans-serif`
+    const oStr = yen(card.originalPrice)
+    const oW = ctx.measureText(oStr).width
     ctx.fillStyle = 'rgba(255,255,255,0.6)'
-    const ox = pad + priceW + pricePx * 0.4
-    const ow = ctx.measureText(yen(card.originalPrice)).width
-    ctx.fillText(yen(card.originalPrice), ox, priceY + pricePx * 0.35)
+    ctx.fillText(oStr, pad, ly)
     ctx.strokeStyle = 'rgba(255,255,255,0.6)'
     ctx.lineWidth = Math.max(1, oPx * 0.06)
     ctx.beginPath()
-    ctx.moveTo(ox, priceY + pricePx * 0.35 + oPx * 0.55)
-    ctx.lineTo(ox + ow, priceY + pricePx * 0.35 + oPx * 0.55)
+    ctx.moveTo(pad, ly - oPx * 0.3)
+    ctx.lineTo(pad + oW, ly - oPx * 0.3)
     ctx.stroke()
+    ly -= oPx * 1.4
   }
 
-  // grade chip (bottom-right)
+  // code + rank chip on one line
+  const codePx = Math.round(w * 0.05)
+  ctx.font = `700 ${codePx}px ui-monospace, monospace`
+  ctx.fillStyle = '#fff'
+  ctx.fillText(card.code, pad, ly)
+  const codeW = ctx.measureText(card.code).width
+  let leftColW = Math.max(priceW, codeW)
+
   if (card.grade) {
-    const gPx = Math.round(w * 0.034)
+    const gPx = Math.round(w * 0.036)
     ctx.font = `700 ${gPx}px Inter, system-ui, sans-serif`
-    const label = `Grade ${card.grade}`
-    const gw = ctx.measureText(label).width + gPx
+    const label = `Rank ${card.grade}`
+    const gw = ctx.measureText(label).width + gPx * 0.8
+    const gx = pad + codeW + pad * 0.4
+    const gy = ly - codePx * 0.82
     ctx.fillStyle = 'rgba(255,255,255,0.22)'
-    roundRect(ctx, w - pad - gw, priceY + pricePx * 0.1, gw, gPx * 1.7, gPx * 0.4)
+    roundRect(ctx, gx, gy, gw, gPx * 1.5, gPx * 0.35)
     ctx.fill()
     ctx.fillStyle = '#fff'
-    ctx.fillText(label, w - pad - gw + gPx * 0.5, priceY + pricePx * 0.1 + gPx * 0.35)
+    ctx.fillText(label, gx + gPx * 0.4, gy + gPx * 1.05)
+    leftColW = Math.max(leftColW, codeW + pad * 0.4 + gw)
+  }
+
+  // ---- RIGHT column (bottom-up): spec line, then title above it ----
+  const rightX = Math.max(x + w * 0.46, x + pad + leftColW + w * 0.03)
+  const rightW = x + w - pad - rightX
+  if (rightW > w * 0.2) {
+    let ry = bottom
+    if (card.subtitle) {
+      const sPx = Math.round(w * 0.033)
+      ctx.font = `500 ${sPx}px Inter, system-ui, sans-serif`
+      ctx.fillStyle = 'rgba(255,255,255,0.85)'
+      ctx.textAlign = 'right'
+      ctx.fillText(fitLine(ctx, card.subtitle, rightW), x + w - pad, ry)
+      ctx.textAlign = 'left'
+      ry -= sPx * 1.5
+    }
+    const tPx = Math.round(w * 0.044)
+    ctx.font = `700 ${tPx}px Inter, system-ui, sans-serif`
+    ctx.fillStyle = '#fff'
+    ctx.textAlign = 'right'
+    const titleLines = wrapLines(ctx, card.title, rightW, 2)
+    for (let i = titleLines.length - 1; i >= 0; i--) {
+      ctx.fillText(titleLines[i], x + w - pad, ry)
+      ry -= tPx * 1.25
+    }
+    ctx.textAlign = 'left'
   }
 }

@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Film, Video } from 'lucide-react'
+import { Film, Video, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
-import { PageHeader } from '@/components/shared'
+import { PageHeader, InventoryPicker } from '@/components/shared'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { VideoEditor } from '@/components/video-editor'
 import { Recorder } from '@/components/video-recorder'
 import { createSocialMediaPost } from '@/services/social-media-posts'
 import { getShoot } from '@/services/shoots'
+import type { Orientation } from '@/lib/video-recorder'
 import { cn } from '@/lib/utils'
 
 type Mode = 'pick' | 'record' | 'edit'
@@ -26,19 +27,24 @@ export default function VideoEditorPage() {
   const [source, setSource] = useState<Blob | null>(null)
   const [itemBounds, setItemBounds] = useState<number[]>([])
   const [durationHint, setDurationHint] = useState<number | undefined>(undefined)
-  const [codes, setCodes] = useState<string[]>([])
+  const [codes, setCodes] = useState<string[]>([]) // staged items for the shoot
+  const [started, setStarted] = useState(false) // recorder is live
+  const [orientation, setOrientation] = useState<Orientation | undefined>(undefined)
+  const [firstCode, setFirstCode] = useState<string | null>(null)
   const [codesInput, setCodesInput] = useState('')
   const [dragOver, setDragOver] = useState(false)
 
-  // Preload codes from a Shoot and jump to record mode when arriving via ?shoot=/?mode=record.
+  // Preload codes from a Shoot and jump straight into recording when arriving via ?shoot=/?mode=record.
   useEffect(() => {
     const shootId = searchParams.get('shoot')
     const wantRecord = searchParams.get('mode') === 'record'
     if (shootId) {
       getShoot(shootId)
         .then((s) => {
+          if (s?.orientation === 'landscape' || s?.orientation === 'portrait') setOrientation(s.orientation)
           if (s?.item_codes?.length) {
             setCodes(s.item_codes)
+            setStarted(true)
             setMode('record')
           } else if (wantRecord) {
             setMode('record')
@@ -52,6 +58,14 @@ export default function VideoEditorPage() {
     }
   }, [searchParams])
 
+  const addCode = useCallback((code: string) => {
+    setCodes((prev) => (prev.includes(code) ? prev : [...prev, code]))
+  }, [])
+
+  const removeCode = useCallback((code: string) => {
+    setCodes((prev) => prev.filter((c) => c !== code))
+  }, [])
+
   const pickFile = useCallback((file: File | undefined | null) => {
     if (!file) return
     if (!file.type.startsWith('video/')) {
@@ -61,14 +75,16 @@ export default function VideoEditorPage() {
     setSource(file)
     setItemBounds([])
     setDurationHint(undefined)
+    setFirstCode(null)
     setMode('edit')
   }, [])
 
   const handleRecorderComplete = useCallback(
-    (blob: Blob, bounds: number[], durationSec: number) => {
+    (blob: Blob, bounds: number[], durationSec: number, first: string | null) => {
       setSource(blob)
       setItemBounds(bounds)
       setDurationHint(durationSec)
+      setFirstCode(first)
       setMode('edit')
     },
     [],
@@ -91,11 +107,13 @@ export default function VideoEditorPage() {
 
       try {
         // Draft only — the team sets the Facebook target + queues via the existing flow.
+        // Tag the featured item so the recorded-videos library can group by product.
         await createSocialMediaPost({
           media_urls: [pub.publicUrl],
           post_type: 'video',
           platform: 'facebook',
           status: 'draft',
+          ...(firstCode ? { item_code: firstCode } : {}),
         })
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Could not create the draft post.')
@@ -103,9 +121,9 @@ export default function VideoEditorPage() {
       }
 
       toast.success('Video exported — draft post created on Social Media.')
-      navigate('/admin/social-media')
+      navigate('/admin/recorded-videos')
     },
-    [navigate],
+    [navigate, firstCode],
   )
 
   return (
@@ -114,44 +132,96 @@ export default function VideoEditorPage() {
 
       {mode === 'edit' && source ? (
         <VideoEditor source={source} itemBounds={itemBounds} durationHint={durationHint} onExport={handleExport} />
-      ) : mode === 'record' && codes.length > 0 ? (
+      ) : mode === 'record' && started && codes.length > 0 ? (
         <Recorder
           codes={codes}
+          initialOrientation={orientation}
           onComplete={handleRecorderComplete}
           onCancel={() => {
-            setCodes([])
-            setMode('pick')
+            setStarted(false)
           }}
         />
       ) : mode === 'record' ? (
-        // Record mode without preset codes → collect them.
-        <div className="mx-auto max-w-md space-y-3 rounded-lg border border-border p-6">
-          <h3 className="text-sm font-medium">Which items are you recording?</h3>
-          <p className="text-xs text-muted-foreground">
-            Enter the item codes to feature (P / G / B), separated by spaces or commas. Press Space during recording to
-            advance to the next one.
-          </p>
-          <Input
-            value={codesInput}
-            onChange={(e) => setCodesInput(e.target.value)}
-            placeholder="P000840 P001892 G000123"
-            className="font-mono"
-          />
+        // Record mode: stage the items to feature via the canonical inventory picker.
+        <div className="mx-auto max-w-2xl space-y-3">
+          <div>
+            <h3 className="text-sm font-medium">Which items are you recording?</h3>
+            <p className="text-xs text-muted-foreground">
+              Search and add the items to feature. During recording, press <b>Space</b> to advance to the next one and
+              <b> T</b> to switch between an item&apos;s photos and video.
+            </p>
+          </div>
+
+          {codes.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {codes.map((c) => (
+                <span
+                  key={c}
+                  className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 font-mono text-xs"
+                >
+                  {c}
+                  <button
+                    type="button"
+                    onClick={() => removeCode(c)}
+                    className="rounded-full text-muted-foreground hover:text-foreground"
+                    aria-label={`Remove ${c}`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="flex h-[400px] flex-col rounded-lg border border-border p-3">
+            <InventoryPicker onAdd={(item) => addCode(item.code)} addedCodes={codes} autoFocus />
+          </div>
+
+          <div className="flex gap-2">
+            <Input
+              value={codesInput}
+              onChange={(e) => setCodesInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  parseCodes(codesInput).forEach(addCode)
+                  setCodesInput('')
+                }
+              }}
+              placeholder="…or type codes: P000840 G000123"
+              className="h-9 font-mono text-sm"
+            />
+            <Button
+              variant="outline"
+              onClick={() => {
+                parseCodes(codesInput).forEach(addCode)
+                setCodesInput('')
+              }}
+            >
+              Add
+            </Button>
+          </div>
+
           <div className="flex gap-2">
             <Button
+              disabled={codes.length === 0}
               onClick={() => {
-                const parsed = parseCodes(codesInput)
-                if (!parsed.length) {
-                  toast.error('Enter at least one item code.')
+                if (!codes.length) {
+                  toast.error('Add at least one item.')
                   return
                 }
-                setCodes(parsed)
+                setStarted(true)
               }}
             >
               <Video className="mr-2 h-4 w-4" />
-              Start
+              Start recording ({codes.length})
             </Button>
-            <Button variant="ghost" onClick={() => setMode('pick')}>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setCodes([])
+                setMode('pick')
+              }}
+            >
               Cancel
             </Button>
           </div>

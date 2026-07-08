@@ -12,7 +12,11 @@
 
 ## A. Requested improvements (Joey) — 2026-07-09
 
-### A1. Default vertical layout = showcase-square (top) + agent-camera-square (bottom)  ⭐ replaces the current default composite
+> **STATUS: A1–A4 all DONE (2026-07-09, v1.98.0, branch `feat/canned-responses-ai-consolidation`).** Playwright-verified with the dev-staff login; tsc + build clean. Committed locally — **not yet pushed/deployed** (awaiting Joey's OK). See `docs/PROJECT_STATE.md` → Now for the full shipped summary + file map.
+>
+> **A1 dims finalized (Joey 2026-07-09):** the protected product square is **720×720**; the seller camera fills the rest. Two orientations via an in-recorder toggle — **Vertical 9:16 (720×1280)** for Reels/Shorts/TikTok/IG/FB-Live (9:16 is the universal vertical standard, avoids per-platform crop) and **Landscape 16:9 (1280×720)** for regular YouTube (square left, camera right). Defaults to the shoot's `orientation`. Each take bakes ONE format; dual-format-from-one-take deferred.
+
+### A1. Default vertical layout = showcase-square (top) + agent-camera-square (bottom)  ⭐ replaces the current default composite  — ✅ DONE
 **What:** The default vertical-shot overlay should **reuse the existing product-showcase implementation** (`src/pages/admin/showcase.tsx`) for the **top square**, and put the **agent's camera in a matching square below it**.
 - **Top square = showcase media**, exactly like the showcase page: `mediaMode: 'photos' | 'videos'`, all of the product's photos/videos available, **photos auto-rotate** (per `showcase.tsx`'s `setInterval`/`currentIndex` cadence — ~a few seconds each), **videos play** (looped when single). The media viewer there is already **720×720 square** — copy it.
 - **Bottom square = the live seller's camera** (agent shooting the video), same square footprint (NOT the small corner PiP the recorder currently uses).
@@ -21,17 +25,17 @@
 **Why:** matches how the product is actually showcased to customers (real photos/videos rotating) with the seller presenting below — the authentic live-selling format. **This is the DEFAULT** for vertical; other layouts (see B: scene presets) come later for variety.
 **Implementation notes:** reuse `showcase.tsx` media logic + `getClaimableByCode`/showcase data (`currentItem.photos` / `.videos`); compositor draws top square (img or hidden `<video>` frame) + bottom square (camera `<video>`); canvas likely two stacked 720×720 squares (→ 720×1440) — finalize dims in planning. **Supersedes** the current hero-full-bleed + corner-PiP default and parts of C (overlay card / PiP-corner).
 
-### A2. In-shoot camera & microphone picker (Zoom/Streamyard-style)
+### A2. In-shoot camera & microphone picker (Zoom/Streamyard-style)  — ✅ DONE
 **What:** Let the presenter **select which camera and which microphone** to use, and **show which are currently selected** on screen during the shoot.
 **Why:** the machine's default cam/mic often isn't the good external gear set up for the shoot; quick switching + visible confirmation prevents recording with the wrong device.
 **Implementation notes:** `navigator.mediaDevices.enumerateDevices()` → dropdowns for `videoinput` + `audioinput` → re-acquire `getUserMedia({ deviceId })` on change → display selected device labels; persist the choice (localStorage) for next time. Model the UX on Zoom/Streamyard device pickers.
 
-### A3. One canonical, reusable product-selector component (adopt everywhere)
+### A3. One canonical, reusable product-selector component (adopt everywhere)  — ✅ DONE (picker built + adopted in recorder & messaging; other selectors not yet retrofitted)
 **What:** The recorder's item selection must use the **existing "Search Inventory" picker** (Image #3 = `src/components/messaging/inventory-search-modal.tsx` — Category/Brand/¥Min/¥Max + search + rows Code/Grade/Description/Price/+Add), **not** the plain text code box currently in the recorder. Broader rule: **standardize on ONE reusable product-selector component** so any future product-selection feature **calls that component** instead of reinventing it — update it once, updates everywhere.
 **Why:** avoid divergent dropdown/selector implementations across areas.
 **Implementation notes:** audit current selectors (`messaging/inventory-search-modal.tsx`, `social-media/item-search-input.tsx`, any in orders/create-order) → extract/standardize into one shared component (props for multi-select, filters, code prefixes) → adopt in the recorder, then retrofit the others.
 
-### A4. Searchable "recorded videos" library (find by who shot it, sortable)
+### A4. Searchable "recorded videos" library (find by who shot it, sortable)  — ✅ DONE
 **What:** A dedicated area to **browse recorded/shot videos** as **searchable cards**, each showing **who shot it** + key info (item(s), date, length, status). Must be **searchable/groupable by shooter** and **sortable** (by shooter, date, item, etc.) so users find a video fast. Per-card actions: **re-add to the schedule (re-post)** and **delete**.
 **Why:** finished recordings shouldn't be fire-and-forget drafts — provide a real place to review, re-schedule, or remove them; searching by shooter is the primary way people will locate their own work.
 **Implementation notes:** needs a **shooter identity per recording** (currently only `created_by` auth user → map to `staff_profiles` display name). Likely a filter bar (shooter dropdown, date range, item/text search) + sort + card grid over the recorded videos (draft/scheduled/published social video posts, or a dedicated recordings table). Re-schedule reuses the Social/Blotato path; delete removes row + storage object.

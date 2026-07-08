@@ -31,6 +31,7 @@ import {
   PackagePlus,
   Clapperboard,
   Scissors,
+  FileVideo,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { useNeedsReviewCount } from '@/hooks/use-messaging'
@@ -104,6 +105,7 @@ const navSections: NavSection[] = [
       { title: 'Social Media', href: '/admin/social-media', icon: Share2 },
       { title: 'Shoots', href: '/admin/shoots', icon: Clapperboard },
       { title: 'Video Editor', href: '/admin/video-editor', icon: Scissors },
+      { title: 'Recorded Videos', href: '/admin/recorded-videos', icon: FileVideo },
       { title: 'Feedback', href: '/admin/feedback', icon: MessageSquarePlus },
     ],
   },

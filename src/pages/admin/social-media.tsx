@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, RefreshCw, Send, Scissors } from 'lucide-react'
+import { Plus, RefreshCw, Send, Scissors, FileVideo } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { PageHeader, ConfirmDialog } from '@/components/shared'
@@ -122,6 +122,10 @@ export default function SocialMediaPage() {
           >
             <Send className={`h-4 w-4 mr-2 ${processMutation.isPending ? 'animate-pulse' : ''}`} />
             {processMutation.isPending ? 'Processing…' : `Process Queue${queuedCount > 0 ? ` (${queuedCount})` : ''}`}
+          </Button>
+          <Button variant="outline" onClick={() => navigate('/admin/recorded-videos')}>
+            <FileVideo className="h-4 w-4 mr-2" />
+            Recorded videos
           </Button>
           <Button variant="outline" onClick={() => navigate('/admin/video-editor')}>
             <Scissors className="h-4 w-4 mr-2" />

@@ -1,50 +1,134 @@
-import type { RecorderCard, RecorderLayout } from './types'
-import { drawOverlayCard, roundRect } from './overlay'
+import type { MediaMode, RecorderCard, Rect } from './types'
+import { drawShowcaseInfo, roundRect } from './overlay'
 
 type Ctx2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D
 
 export interface CompositeInput {
   ctx: Ctx2D
-  w: number
-  h: number
+  canvasW: number
+  canvasH: number
+  /** The protected product-showcase square. */
+  product: Rect
+  /** The remaining box the seller's camera fills. */
+  cameraBox: Rect
   card: RecorderCard
+  mode: MediaMode
+  photoIndex: number
+  videoIndex: number
   camera: HTMLVideoElement | null
-  layout: RecorderLayout
 }
 
-/** Draw one composited frame: hero full-bleed (cover) → camera PiP → overlay card. */
-export function compositeFrame({ ctx, w, h, card, camera, layout }: CompositeInput): void {
-  // Background: hero image (cover) or solid.
+/**
+ * Compose one frame: a protected product-showcase square (rotating photos or a
+ * playing video, with the info block over it) plus the live seller's camera in
+ * whatever space is left — stacked for vertical (9:16), side-by-side for
+ * landscape (16:9). The product square is always the same size in both.
+ */
+export function compositeFrame({
+  ctx, canvasW, canvasH, product, cameraBox, card, mode, photoIndex, videoIndex, camera,
+}: CompositeInput): void {
+  ctx.fillStyle = '#000'
+  ctx.fillRect(0, 0, canvasW, canvasH)
+
+  // ---- Product showcase square ----
+  const { x, y, w, h } = product
+  ctx.fillStyle = '#1a1a1a'
+  ctx.fillRect(x, y, w, h)
+
+  if (mode === 'photos' && card.photos.length) {
+    const img = card.photos[photoIndex % card.photos.length]
+    if (img && img.complete && img.naturalWidth > 0) {
+      drawContain(ctx, img, img.naturalWidth, img.naturalHeight, x, y, w, h)
+    }
+  } else if (mode === 'videos' && card.videos.length) {
+    const v = card.videos[videoIndex % card.videos.length]
+    if (v && v.readyState >= 2 && v.videoWidth > 0) {
+      drawContain(ctx, v, v.videoWidth, v.videoHeight, x, y, w, h)
+    }
+  }
+
+  // mode pill (top-left) + media counter (top-right), sized off the square
+  const count = mode === 'photos' ? card.photos.length : card.videos.length
+  const idx = (mode === 'photos' ? photoIndex : videoIndex) % Math.max(1, count)
+  const margin = Math.round(w * 0.03)
+  drawPill(ctx, mode === 'photos' ? 'PHOTOS' : 'VIDEO', x + margin, y + margin, w)
+  if (count > 1) drawCounter(ctx, `${idx + 1} / ${count}`, x + w - margin, y + margin, w)
+
+  drawShowcaseInfo(ctx, card, x, y, w, h)
+
+  // ---- Live camera box ----
   ctx.fillStyle = '#0a0a0a'
-  ctx.fillRect(0, 0, w, h)
-  if (card.hero && card.hero.complete && card.hero.naturalWidth > 0) {
-    drawCover(ctx, card.hero, card.hero.naturalWidth, card.hero.naturalHeight, w, h)
-  }
-
-  // Camera PiP.
+  ctx.fillRect(cameraBox.x, cameraBox.y, cameraBox.w, cameraBox.h)
   if (camera && camera.readyState >= 2 && camera.videoWidth > 0) {
-    const pipW = Math.round(w * layout.pipScale)
-    const pipH = Math.round(pipW * (camera.videoHeight / camera.videoWidth))
-    const m = Math.round(w * 0.03)
-    const x = layout.pipCorner.includes('r') ? w - pipW - m : m
-    const y = layout.pipCorner.includes('b') ? h - pipH - m * 4 : m
-    ctx.save()
-    roundRect(ctx, x, y, pipW, pipH, pipW * 0.06)
-    ctx.clip()
-    ctx.drawImage(camera, x, y, pipW, pipH)
-    ctx.restore()
-    ctx.strokeStyle = 'rgba(255,255,255,0.9)'
-    ctx.lineWidth = Math.max(2, w * 0.004)
-    roundRect(ctx, x, y, pipW, pipH, pipW * 0.06)
-    ctx.stroke()
+    drawCover(ctx, camera, camera.videoWidth, camera.videoHeight, cameraBox.x, cameraBox.y, cameraBox.w, cameraBox.h)
   }
 
-  drawOverlayCard(ctx, card, w, h)
+  // seam divider along the shared edge
+  ctx.strokeStyle = 'rgba(255,255,255,0.14)'
+  ctx.lineWidth = Math.max(1, w * 0.003)
+  ctx.beginPath()
+  if (cameraBox.x > product.x) {
+    // side-by-side (landscape): vertical seam
+    ctx.moveTo(cameraBox.x, 0)
+    ctx.lineTo(cameraBox.x, canvasH)
+  } else {
+    // stacked (portrait): horizontal seam
+    ctx.moveTo(0, cameraBox.y)
+    ctx.lineTo(canvasW, cameraBox.y)
+  }
+  ctx.stroke()
 }
 
-function drawCover(ctx: Ctx2D, img: CanvasImageSource, iw: number, ih: number, w: number, h: number): void {
-  const scale = Math.max(w / iw, h / ih)
+/** Fit an image/video inside a box, letterboxed (whole media visible). */
+function drawContain(
+  ctx: Ctx2D, src: CanvasImageSource, iw: number, ih: number, bx: number, by: number, bw: number, bh: number,
+): void {
+  const scale = Math.min(bw / iw, bh / ih)
   const dw = iw * scale
   const dh = ih * scale
-  ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh)
+  ctx.drawImage(src, bx + (bw - dw) / 2, by + (bh - dh) / 2, dw, dh)
+}
+
+/** Fill a box with an image/video, cropping the overflow (used for the camera). */
+function drawCover(
+  ctx: Ctx2D, src: CanvasImageSource, iw: number, ih: number, bx: number, by: number, bw: number, bh: number,
+): void {
+  const scale = Math.max(bw / iw, bh / ih)
+  const dw = iw * scale
+  const dh = ih * scale
+  ctx.save()
+  ctx.beginPath()
+  ctx.rect(bx, by, bw, bh)
+  ctx.clip()
+  ctx.drawImage(src, bx + (bw - dw) / 2, by + (bh - dh) / 2, dw, dh)
+  ctx.restore()
+}
+
+function drawPill(ctx: Ctx2D, text: string, x: number, y: number, w: number): void {
+  const px = Math.round(w * 0.026)
+  ctx.font = `700 ${px}px Inter, system-ui, sans-serif`
+  const bw = ctx.measureText(text).width + px * 1.4
+  const bh = px * 1.9
+  ctx.fillStyle = 'rgba(0,0,0,0.55)'
+  roundRect(ctx, x, y, bw, bh, bh / 2)
+  ctx.fill()
+  ctx.fillStyle = '#fff'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(text, x + px * 0.7, y + bh / 2 + px * 0.05)
+  ctx.textBaseline = 'alphabetic'
+}
+
+function drawCounter(ctx: Ctx2D, text: string, rightX: number, y: number, w: number): void {
+  const px = Math.round(w * 0.028)
+  ctx.font = `600 ${px}px ui-monospace, monospace`
+  const bw = ctx.measureText(text).width + px * 1.4
+  const bh = px * 1.9
+  const x = rightX - bw
+  ctx.fillStyle = 'rgba(0,0,0,0.55)'
+  roundRect(ctx, x, y, bw, bh, bh / 2)
+  ctx.fill()
+  ctx.fillStyle = '#fff'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(text, x + px * 0.7, y + bh / 2 + px * 0.05)
+  ctx.textBaseline = 'alphabetic'
 }
