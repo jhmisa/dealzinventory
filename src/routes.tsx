@@ -83,6 +83,7 @@ const SupplierReturnDetailPage = lazy(() => import('@/pages/admin/supplier-retur
 const InventoryRemovalDetailPage = lazy(() => import('@/pages/admin/inventory-removal-detail'))
 const SocialMediaPage = lazy(() => import('@/pages/admin/social-media'))
 const ShootsPage = lazy(() => import('@/pages/admin/shoots'))
+const VideoEditorPage = lazy(() => import('@/pages/admin/video-editor'))
 const SystemFeedbackPage = lazy(() => import('@/pages/admin/system-feedback'))
 const BackordersPage = lazy(() => import('@/pages/admin/backorders'))
 const BackorderDetailPage = lazy(() => import('@/pages/admin/backorder-detail'))
@@ -204,6 +205,7 @@ export const router = createBrowserRouter([
           { path: 'backorders/:id', element: lazyElement(BackorderDetailPage) },
           { path: 'social-media', element: lazyElement(SocialMediaPage) },
           { path: 'shoots', element: adminElement(ShootsPage) },
+          { path: 'video-editor', element: adminElement(VideoEditorPage) },
           { path: 'feedback', element: lazyElement(SystemFeedbackPage) },
           { path: 'messages', element: lazyElement(MessagesPage) },
           { path: 'suppliers', element: lazyElement(SupplierListPage) },
