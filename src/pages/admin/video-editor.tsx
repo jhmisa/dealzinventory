@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Film, Video, X } from 'lucide-react'
+import { Film, Video, X, ArrowRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { PageHeader, InventoryPicker } from '@/components/shared'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { VideoEditor } from '@/components/video-editor'
 import { Recorder } from '@/components/video-recorder'
 import { createSocialMediaPost } from '@/services/social-media-posts'
@@ -14,10 +13,6 @@ import type { Orientation } from '@/lib/video-recorder'
 import { cn } from '@/lib/utils'
 
 type Mode = 'pick' | 'record' | 'edit'
-
-function parseCodes(raw: string): string[] {
-  return [...new Set(raw.split(/[\s,]+/).map((c) => c.trim().toUpperCase()).filter(Boolean))]
-}
 
 export default function VideoEditorPage() {
   const navigate = useNavigate()
@@ -31,7 +26,6 @@ export default function VideoEditorPage() {
   const [started, setStarted] = useState(false) // recorder is live
   const [orientation, setOrientation] = useState<Orientation | undefined>(undefined)
   const [firstCode, setFirstCode] = useState<string | null>(null)
-  const [codesInput, setCodesInput] = useState('')
   const [dragOver, setDragOver] = useState(false)
 
   // Preload codes from a Shoot and jump straight into recording when arriving via ?shoot=/?mode=record.
@@ -178,30 +172,6 @@ export default function VideoEditorPage() {
           </div>
 
           <div className="flex gap-2">
-            <Input
-              value={codesInput}
-              onChange={(e) => setCodesInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  parseCodes(codesInput).forEach(addCode)
-                  setCodesInput('')
-                }
-              }}
-              placeholder="…or type codes: P000840 G000123"
-              className="h-9 font-mono text-sm"
-            />
-            <Button
-              variant="outline"
-              onClick={() => {
-                parseCodes(codesInput).forEach(addCode)
-                setCodesInput('')
-              }}
-            >
-              Add
-            </Button>
-          </div>
-
-          <div className="flex gap-2">
             <Button
               disabled={codes.length === 0}
               onClick={() => {
@@ -212,8 +182,8 @@ export default function VideoEditorPage() {
                 setStarted(true)
               }}
             >
-              <Video className="mr-2 h-4 w-4" />
-              Start recording ({codes.length})
+              Next ({codes.length})
+              <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
             <Button
               variant="ghost"

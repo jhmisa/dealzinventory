@@ -139,15 +139,34 @@ export function VideoEditor({ source, itemBounds, durationHint, onExport }: Vide
       stopLoop()
       return
     }
-    if (v.currentTime < state.trimStart || v.currentTime >= state.trimEnd) v.currentTime = state.trimStart
+    // Preview the FINAL edit: play only the kept ranges (trim window minus removed
+    // pieces), jumping over each cut without pausing. This is the exact export contract.
+    const keep = keepIntervals(state)
+    if (!keep.length) return
+    const inKeep = (t: number) => keep.some((r) => t >= r.start - 0.02 && t < r.end)
+    if (!inKeep(v.currentTime)) v.currentTime = keep[0].start
     void v.play()
     setPlaying(true)
     const tick = () => {
       const cur = v.currentTime
-      const s = state
-      const inRemoved = s.removed.find((r) => cur >= r.start && cur < r.end)
-      if (inRemoved) { v.currentTime = inRemoved.end }
-      else if (cur >= s.trimEnd) { v.currentTime = s.trimStart }
+      // First kept interval whose end is still ahead of the playhead.
+      const seg = keep.find((r) => cur < r.end - 0.02)
+      if (!seg) {
+        // Past the last kept range → stop cleanly at the end of the edit.
+        v.pause()
+        setPlaying(false)
+        setPlayhead(keep[keep.length - 1].end)
+        stopLoop()
+        return
+      }
+      // Inside a removed gap comfortably before this segment → skip to its start.
+      // The 0.15s tolerance keeps a seek that lands a few ms shy of the boundary
+      // from re-triggering the jump every frame (which would pin the decoder and
+      // freeze playback). Re-kick play() since a seek can briefly drop readyState.
+      if (cur < seg.start - 0.15) {
+        v.currentTime = seg.start
+        void v.play()
+      }
       setPlayhead(v.currentTime)
       rafRef.current = requestAnimationFrame(tick)
     }
@@ -187,7 +206,7 @@ export function VideoEditor({ source, itemBounds, durationHint, onExport }: Vide
             ref={videoRef}
             src={srcUrl}
             playsInline
-            className="max-h-[60vh] w-full bg-black"
+            className="mx-auto max-h-[60vh] w-full bg-black object-contain"
             onLoadedMetadata={handleLoadedMetadata}
             onClick={togglePlay}
           />

@@ -118,28 +118,42 @@ export function drawShowcaseInfo(ctx: Ctx2D, card: RecorderCard, x: number, y: n
     leftColW = Math.max(leftColW, codeW + pad * 0.4 + gw)
   }
 
-  // ---- RIGHT column (bottom-up): spec line, then title above it ----
+  // ---- RIGHT column (bottom-up): condition notes, then the spec-rich description ----
+  // Mirrors the customer showcase page: the description (storage/RAM/chip/color) is the
+  // primary text — NOT the brand+model title, which duplicated the code column above.
   const rightX = Math.max(x + w * 0.46, x + pad + leftColW + w * 0.03)
   const rightW = x + w - pad - rightX
   if (rightW > w * 0.2) {
-    let ry = bottom
-    if (card.subtitle) {
-      const sPx = Math.round(w * 0.033)
-      ctx.font = `500 ${sPx}px Inter, system-ui, sans-serif`
-      ctx.fillStyle = 'rgba(255,255,255,0.85)'
-      ctx.textAlign = 'right'
-      ctx.fillText(fitLine(ctx, card.subtitle, rightW), x + w - pad, ry)
-      ctx.textAlign = 'left'
-      ry -= sPx * 1.5
-    }
-    const tPx = Math.round(w * 0.044)
-    ctx.font = `700 ${tPx}px Inter, system-ui, sans-serif`
-    ctx.fillStyle = '#fff'
     ctx.textAlign = 'right'
-    const titleLines = wrapLines(ctx, card.title, rightW, 2)
-    for (let i = titleLines.length - 1; i >= 0; i--) {
-      ctx.fillText(titleLines[i], x + w - pad, ry)
-      ry -= tPx * 1.25
+    let ry = bottom
+
+    // Condition notes: a "CONDITION" label + up to 2 lines (showcase's Condition block).
+    if (card.conditionNotes) {
+      const nPx = Math.round(w * 0.019)
+      ctx.font = `500 ${nPx}px Inter, system-ui, sans-serif`
+      ctx.fillStyle = 'rgba(255,255,255,0.85)'
+      const noteLines = wrapLines(ctx, card.conditionNotes, rightW, 2)
+      for (let i = noteLines.length - 1; i >= 0; i--) {
+        ctx.fillText(noteLines[i], x + w - pad, ry)
+        ry -= nPx * 1.35
+      }
+      const lPx = Math.round(w * 0.015)
+      ctx.font = `700 ${lPx}px Inter, system-ui, sans-serif`
+      ctx.fillStyle = 'rgba(255,255,255,0.6)'
+      ctx.fillText('CONDITION', x + w - pad, ry)
+      ry -= lPx * 2.2
+    }
+
+    // Spec-rich description — same string the showcase page shows (line-clamp-3).
+    if (card.subtitle) {
+      const dPx = Math.round(w * 0.042)
+      ctx.font = `600 ${dPx}px Inter, system-ui, sans-serif`
+      ctx.fillStyle = 'rgba(255,255,255,0.96)'
+      const descLines = wrapLines(ctx, card.subtitle, rightW, 3)
+      for (let i = descLines.length - 1; i >= 0; i--) {
+        ctx.fillText(descLines[i], x + w - pad, ry)
+        ry -= dPx * 1.2
+      }
     }
     ctx.textAlign = 'left'
   }

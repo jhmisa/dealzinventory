@@ -74,8 +74,16 @@ async function getClaimableItem(code: string): Promise<ClaimableProduct | null> 
     } | null
 
     const title = pm ? `${pm.brand} ${pm.model_name}` : code
-    const specParts = [pm?.cpu, pm?.ram_gb, pm?.storage_gb, pm?.screen_size ? `${pm.screen_size}"` : null].filter(Boolean)
-    const subtitle = pm?.short_description || specParts.join(' / ') || ''
+    // Build the description the same way the customer showcase page does — item-level
+    // spec fields (with product-model fallback) resolved against the category's
+    // description_fields — so the recorder overlay shows the full spec-rich line
+    // (storage/RAM/chip/screen/color), not a thin fallback. See feedback_consistent_descriptions.
+    const category = (item.product_models as { categories?: { description_fields?: string[] | null } | null } | null)?.categories ?? null
+    const subtitle = getItemDescription(
+      item as unknown as Record<string, unknown>,
+      pm as unknown as Record<string, unknown> | null,
+      category?.description_fields ?? null,
+    )
 
     // Fetch photo group media (primary product shots)
     let photoGroupMedia: { id: string; file_url: string; media_type: string; sort_order: number }[] = []

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Loader2, Circle, Square, SkipForward, X, AlertCircle, Camera, Mic, Image as ImageIcon, Video, Smartphone, Monitor } from 'lucide-react'
+import { Loader2, Circle, Square, SkipForward, X, AlertCircle, Camera, Mic, Image as ImageIcon, Video, Smartphone, Monitor, Pause, Play } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { cn } from '@/lib/utils'
 import { getClaimableByCode } from '@/services/mine'
 import { VIDEO_CONSTRAINTS, pickSupportedMimeType } from '@/lib/media-recording'
 import {
@@ -32,6 +33,8 @@ interface RecorderProps {
 }
 
 type Phase = 'loading' | 'ready' | 'recording' | 'error'
+
+const COUNTDOWN_FROM = 5 // seconds shown over the live preview before capture begins
 
 function fmt(s: number): string {
   const v = Math.max(0, Math.floor(s))
@@ -82,6 +85,8 @@ export function Recorder({ codes, onComplete, onCancel, initialOrientation }: Re
   const [activeIndex, setActiveIndex] = useState(0)
   const [activeMode, setActiveMode] = useState<MediaMode>('photos')
   const [elapsed, setElapsed] = useState(0)
+  const [paused, setPaused] = useState(false)
+  const [countdown, setCountdown] = useState<number | null>(null)
   const [orientation, setOrientation] = useState<Orientation>(
     initialOrientation ?? (localStorage.getItem(LS_ORIENTATION) as Orientation | null) ?? 'portrait',
   )
@@ -100,6 +105,8 @@ export function Recorder({ codes, onComplete, onCancel, initialOrientation }: Re
   const mimeRef = useRef<{ mimeType: string; extension: string } | null>(null)
   const rafRef = useRef<number | null>(null)
   const startedAtRef = useRef(0)
+  const pausedTotalRef = useRef(0) // cumulative ms spent paused (excluded from the output clock)
+  const pauseStartedAtRef = useRef(0) // performance.now() when the current pause began (0 = not paused)
   const spaceTimesRef = useRef<number[]>([])
   const activeIndexRef = useRef(0)
   const cardsRef = useRef<RecorderCard[]>([])
@@ -185,10 +192,14 @@ export function Recorder({ codes, onComplete, onCancel, initialOrientation }: Re
     }
   }, [codes])
 
-  // Attach the camera stream to the hidden <video> for compositing.
+  // Attach the camera stream to the off-screen <video> for compositing.
+  // NOTE: the element must stay in the paint tree (not display:none) or the browser
+  // won't decode frames from a real camera track, so drawImage() paints black.
   useEffect(() => {
-    if ((phase === 'ready' || phase === 'recording') && cameraRef.current && streamRef.current) {
-      cameraRef.current.srcObject = streamRef.current
+    const cam = cameraRef.current
+    if ((phase === 'ready' || phase === 'recording') && cam && streamRef.current) {
+      if (cam.srcObject !== streamRef.current) cam.srcObject = streamRef.current
+      cam.play().catch(() => {})
     }
   }, [phase])
 
@@ -266,10 +277,19 @@ export function Recorder({ codes, onComplete, onCancel, initialOrientation }: Re
     }
   }, [])
 
+  // Recording clock in seconds, excluding time spent paused. SPACE boundaries,
+  // the elapsed timer, and the final duration all read from this so a paused take
+  // still lines up with the exported (paused-time-removed) video.
+  const clockSec = useCallback(() => {
+    const now = performance.now()
+    const extra = pauseStartedAtRef.current ? now - pauseStartedAtRef.current : 0
+    return Math.max(0, (now - startedAtRef.current - pausedTotalRef.current - extra) / 1000)
+  }, [])
+
   const advance = useCallback(() => {
     setActiveIndex((i) => {
       if (i >= cardsRef.current.length - 1) return i
-      spaceTimesRef.current.push((performance.now() - startedAtRef.current) / 1000)
+      spaceTimesRef.current.push(clockSec())
       const next = i + 1
       const rt = runtimeRef.current[next]
       if (rt) {
@@ -278,7 +298,7 @@ export function Recorder({ codes, onComplete, onCancel, initialOrientation }: Re
       }
       return next
     })
-  }, [])
+  }, [clockSec])
 
   const toggleMode = useCallback(() => {
     const idx = activeIndexRef.current
@@ -324,12 +344,12 @@ export function Recorder({ codes, onComplete, onCancel, initialOrientation }: Re
     return () => window.removeEventListener('keydown', onKey)
   }, [phase, advance, toggleMode])
 
-  // Elapsed timer.
+  // Elapsed timer. Reads the paused-adjusted clock, so it naturally freezes while paused.
   useEffect(() => {
     if (phase !== 'recording') return
-    const id = setInterval(() => setElapsed((performance.now() - startedAtRef.current) / 1000), 250)
+    const id = setInterval(() => setElapsed(clockSec()), 250)
     return () => clearInterval(id)
-  }, [phase])
+  }, [phase, clockSec])
 
   const changeOrientation = useCallback((o: Orientation) => {
     setOrientation(o)
@@ -341,7 +361,10 @@ export function Recorder({ codes, onComplete, onCancel, initialOrientation }: Re
       const next = await acquireStream(camId, micId)
       streamRef.current?.getTracks().forEach((t) => t.stop())
       streamRef.current = next
-      if (cameraRef.current) cameraRef.current.srcObject = next
+      if (cameraRef.current) {
+        cameraRef.current.srcObject = next
+        cameraRef.current.play().catch(() => {})
+      }
       const camActual = next.getVideoTracks()[0]?.getSettings().deviceId ?? camId
       const micActual = next.getAudioTracks()[0]?.getSettings().deviceId ?? micId
       setSelectedCam(camActual)
@@ -376,7 +399,7 @@ export function Recorder({ codes, onComplete, onCancel, initialOrientation }: Re
     }
     recorder.onstop = () => {
       const blob = new Blob(chunksRef.current, { type: mime.mimeType })
-      const durationSec = (performance.now() - startedAtRef.current) / 1000
+      const durationSec = clockSec()
       const itemBounds = computeItemBounds(spaceTimesRef.current, durationSec)
       streamRef.current?.getTracks().forEach((t) => t.stop())
       onComplete(blob, itemBounds, durationSec, cardsRef.current[0]?.code ?? null)
@@ -391,9 +414,49 @@ export function Recorder({ codes, onComplete, onCancel, initialOrientation }: Re
     if (rt0) setActiveMode(rt0.mode)
     recorder.start(1000)
     startedAtRef.current = performance.now()
+    pausedTotalRef.current = 0
+    pauseStartedAtRef.current = 0
+    setPaused(false)
     setElapsed(0)
     setPhase('recording')
-  }, [onComplete])
+  }, [onComplete, clockSec])
+
+  // "Start recording" runs a 5→1 countdown over the live preview first, then captures.
+  const beginCountdown = useCallback(() => {
+    if (!streamRef.current) return
+    setCountdown(COUNTDOWN_FROM)
+  }, [])
+
+  useEffect(() => {
+    if (countdown == null) return
+    // Last tick shows "1" for a full second, then clears the overlay and captures.
+    if (countdown <= 1) {
+      const id = setTimeout(() => {
+        setCountdown(null)
+        startRecording()
+      }, 1000)
+      return () => clearTimeout(id)
+    }
+    const id = setTimeout(() => setCountdown((c) => (c == null ? null : c - 1)), 1000)
+    return () => clearTimeout(id)
+  }, [countdown, startRecording])
+
+  const togglePause = useCallback(() => {
+    const r = recorderRef.current
+    if (!r) return
+    if (r.state === 'recording') {
+      r.pause()
+      pauseStartedAtRef.current = performance.now()
+      setPaused(true)
+    } else if (r.state === 'paused') {
+      if (pauseStartedAtRef.current) {
+        pausedTotalRef.current += performance.now() - pauseStartedAtRef.current
+        pauseStartedAtRef.current = 0
+      }
+      r.resume()
+      setPaused(false)
+    }
+  }, [])
 
   const stopRecording = useCallback(() => {
     if (recorderRef.current && recorderRef.current.state !== 'inactive') recorderRef.current.stop()
@@ -446,141 +509,180 @@ export function Recorder({ codes, onComplete, onCancel, initialOrientation }: Re
         )}
         {phase === 'recording' && (
           <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-black/60 px-2 py-0.5 text-xs text-white">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
-            REC {fmt(elapsed)}
+            <span className={cn('h-2 w-2 rounded-full', paused ? 'bg-white/70' : 'animate-pulse bg-red-500')} />
+            {paused ? 'PAUSED' : 'REC'} {fmt(elapsed)}
+          </div>
+        )}
+        {countdown != null && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/45">
+            <span className="text-7xl font-bold tabular-nums text-white drop-shadow-lg">{countdown}</span>
           </div>
         )}
       </div>
 
-      {/* Hidden camera source (composited onto the canvas) */}
-      <video ref={cameraRef} autoPlay muted playsInline className="hidden" />
+      {/* Off-screen camera source (composited onto the canvas). Must stay painted —
+          display:none stops frame decoding on a real camera track (paints black). */}
+      <video
+        ref={cameraRef}
+        autoPlay
+        muted
+        playsInline
+        className="pointer-events-none fixed left-[-9999px] top-0 h-[2px] w-[2px] opacity-0"
+      />
 
-      {/* Photo / Video toggle for the current item */}
-      {(phase === 'ready' || phase === 'recording') && activeCard && (
-        <div className="flex items-center justify-center gap-2">
-          <div className="inline-flex rounded-md border border-border p-0.5">
-            <Button
-              variant={activeMode === 'photos' ? 'secondary' : 'ghost'}
-              size="sm"
-              className="h-7 gap-1.5 text-xs"
-              disabled={!hasPhotos}
-              onClick={() => setMode('photos')}
-            >
-              <ImageIcon className="h-3.5 w-3.5" />
-              Photos{hasPhotos ? ` (${activeCard.photos.length})` : ''}
-            </Button>
-            <Button
-              variant={activeMode === 'videos' ? 'secondary' : 'ghost'}
-              size="sm"
-              className="h-7 gap-1.5 text-xs"
-              disabled={!hasVideos}
-              onClick={() => setMode('videos')}
-            >
-              <Video className="h-3.5 w-3.5" />
-              Video{hasVideos ? ` (${activeCard.videos.length})` : ''}
-            </Button>
-          </div>
-          <kbd className="rounded border border-border px-1 text-[10px] text-muted-foreground">T</kbd>
-        </div>
-      )}
-
-      {/* Orientation: vertical 9:16 (Reels/Shorts) vs landscape 16:9 (YouTube). Locked once recording. */}
+      {/* Ready: grouped setup panel (format + devices), then Start recording */}
       {phase === 'ready' && (
-        <div className="flex items-center justify-center gap-2">
-          <div className="inline-flex rounded-md border border-border p-0.5">
-            <Button
-              variant={orientation === 'portrait' ? 'secondary' : 'ghost'}
-              size="sm"
-              className="h-7 gap-1.5 text-xs"
-              onClick={() => changeOrientation('portrait')}
-            >
-              <Smartphone className="h-3.5 w-3.5" />
-              Vertical 9:16
-            </Button>
-            <Button
-              variant={orientation === 'landscape' ? 'secondary' : 'ghost'}
-              size="sm"
-              className="h-7 gap-1.5 text-xs"
-              onClick={() => changeOrientation('landscape')}
-            >
-              <Monitor className="h-3.5 w-3.5" />
-              Landscape 16:9
+        <div className="mx-auto max-w-md space-y-4">
+          <div className="space-y-3 rounded-lg border border-border bg-card p-4">
+            {/* Format */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-muted-foreground">Format</span>
+                <span className="text-[10px] text-muted-foreground">
+                  Press <kbd className="rounded border border-border px-1">T</kbd> to switch media
+                </span>
+              </div>
+              <div className="inline-flex w-full rounded-md border border-border p-0.5">
+                <Button
+                  variant={orientation === 'portrait' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-8 flex-1 gap-1.5 text-xs"
+                  onClick={() => changeOrientation('portrait')}
+                >
+                  <Smartphone className="h-3.5 w-3.5" />
+                  Vertical 9:16
+                </Button>
+                <Button
+                  variant={orientation === 'landscape' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-8 flex-1 gap-1.5 text-xs"
+                  onClick={() => changeOrientation('landscape')}
+                >
+                  <Monitor className="h-3.5 w-3.5" />
+                  Landscape 16:9
+                </Button>
+              </div>
+              {activeCard && (
+                <div className="inline-flex w-full rounded-md border border-border p-0.5">
+                  <Button
+                    variant={activeMode === 'photos' ? 'secondary' : 'ghost'}
+                    size="sm"
+                    className="h-8 flex-1 gap-1.5 text-xs"
+                    disabled={!hasPhotos}
+                    onClick={() => setMode('photos')}
+                  >
+                    <ImageIcon className="h-3.5 w-3.5" />
+                    Photos{hasPhotos ? ` (${activeCard.photos.length})` : ''}
+                  </Button>
+                  <Button
+                    variant={activeMode === 'videos' ? 'secondary' : 'ghost'}
+                    size="sm"
+                    className="h-8 flex-1 gap-1.5 text-xs"
+                    disabled={!hasVideos}
+                    onClick={() => setMode('videos')}
+                  >
+                    <Video className="h-3.5 w-3.5" />
+                    Video{hasVideos ? ` (${activeCard.videos.length})` : ''}
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {/* Devices */}
+            {(cameras.length > 0 || mics.length > 0) && (
+              <div className="space-y-2">
+                <span className="text-xs font-medium text-muted-foreground">Devices</span>
+                <div className="flex items-center gap-2">
+                  <Camera className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <Select value={selectedCam} onValueChange={(v) => applyDevices(v, selectedMic)}>
+                    <SelectTrigger className="h-8 flex-1 text-xs"><SelectValue placeholder="Camera" /></SelectTrigger>
+                    <SelectContent>
+                      {cameras.map((d, i) => (
+                        <SelectItem key={d.deviceId} value={d.deviceId}>{d.label || `Camera ${i + 1}`}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Mic className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <Select value={selectedMic} onValueChange={(v) => applyDevices(selectedCam, v)}>
+                    <SelectTrigger className="h-8 flex-1 text-xs"><SelectValue placeholder="Microphone" /></SelectTrigger>
+                    <SelectContent>
+                      {mics.map((d, i) => (
+                        <SelectItem key={d.deviceId} value={d.deviceId}>{d.label || `Microphone ${i + 1}`}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-center">
+            <Button size="lg" onClick={beginCountdown} disabled={countdown != null}>
+              <Circle className="mr-2 h-4 w-4 fill-red-500 text-red-500" />
+              Start recording
             </Button>
           </div>
         </div>
       )}
 
-      {/* Camera & mic device picker (Zoom/Streamyard-style) */}
-      {phase === 'ready' && (cameras.length > 0 || mics.length > 0) && (
-        <div className="mx-auto flex max-w-md flex-col gap-2">
-          <div className="flex items-center gap-2">
-            <Camera className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <Select value={selectedCam} onValueChange={(v) => applyDevices(v, selectedMic)}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue placeholder="Camera" />
-              </SelectTrigger>
-              <SelectContent>
-                {cameras.map((d, i) => (
-                  <SelectItem key={d.deviceId} value={d.deviceId}>
-                    {d.label || `Camera ${i + 1}`}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center gap-2">
-            <Mic className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <Select value={selectedMic} onValueChange={(v) => applyDevices(selectedCam, v)}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue placeholder="Microphone" />
-              </SelectTrigger>
-              <SelectContent>
-                {mics.map((d, i) => (
-                  <SelectItem key={d.deviceId} value={d.deviceId}>
-                    {d.label || `Microphone ${i + 1}`}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      )}
+      {/* Recording: media toggle + device label + transport controls */}
       {phase === 'recording' && (
-        <p className="text-center text-[11px] text-muted-foreground">
-          <Camera className="mr-1 inline h-3 w-3" />
-          {deviceLabel(cameras, selectedCam, 'Default camera')}
-          <span className="mx-1.5">·</span>
-          <Mic className="mr-1 inline h-3 w-3" />
-          {deviceLabel(mics, selectedMic, 'Default mic')}
-        </p>
-      )}
-
-      {/* Controls */}
-      <div className="flex items-center justify-center gap-2">
-        {phase === 'ready' && (
-          <Button onClick={startRecording}>
-            <Circle className="mr-2 h-4 w-4 fill-red-500 text-red-500" />
-            Start recording
-          </Button>
-        )}
-        {phase === 'recording' && (
-          <>
+        <>
+          {activeCard && (
+            <div className="flex items-center justify-center gap-2">
+              <div className="inline-flex rounded-md border border-border p-0.5">
+                <Button
+                  variant={activeMode === 'photos' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-7 gap-1.5 text-xs"
+                  disabled={!hasPhotos}
+                  onClick={() => setMode('photos')}
+                >
+                  <ImageIcon className="h-3.5 w-3.5" />
+                  Photos{hasPhotos ? ` (${activeCard.photos.length})` : ''}
+                </Button>
+                <Button
+                  variant={activeMode === 'videos' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-7 gap-1.5 text-xs"
+                  disabled={!hasVideos}
+                  onClick={() => setMode('videos')}
+                >
+                  <Video className="h-3.5 w-3.5" />
+                  Video{hasVideos ? ` (${activeCard.videos.length})` : ''}
+                </Button>
+              </div>
+              <kbd className="rounded border border-border px-1 text-[10px] text-muted-foreground">T</kbd>
+            </div>
+          )}
+          <p className="text-center text-[11px] text-muted-foreground">
+            <Camera className="mr-1 inline h-3 w-3" />
+            {deviceLabel(cameras, selectedCam, 'Default camera')}
+            <span className="mx-1.5">·</span>
+            <Mic className="mr-1 inline h-3 w-3" />
+            {deviceLabel(mics, selectedMic, 'Default mic')}
+          </p>
+          <div className="flex items-center justify-center gap-2">
             <Button variant="outline" onClick={advance} disabled={isLast}>
               <SkipForward className="mr-2 h-4 w-4" />
               Next item
               <kbd className="ml-2 rounded border border-border px-1 text-[10px]">Space</kbd>
             </Button>
+            <Button variant="outline" onClick={togglePause}>
+              {paused ? <Play className="mr-2 h-4 w-4" /> : <Pause className="mr-2 h-4 w-4" />}
+              {paused ? 'Resume' : 'Pause'}
+            </Button>
             <Button variant="destructive" onClick={stopRecording}>
               <Square className="mr-2 h-4 w-4 fill-current" />
               Stop
             </Button>
-          </>
-        )}
-      </div>
-      {phase === 'recording' && (
-        <p className="text-center text-xs text-muted-foreground">
-          Talk about the current item, then press <b>Space</b> to advance. Press <b>T</b> to switch between its photos and video. One continuous take.
-        </p>
+          </div>
+          <p className="text-center text-xs text-muted-foreground">
+            Talk about the current item, then press <b>Space</b> to advance. Press <b>T</b> to switch between its photos and video. One continuous take.
+          </p>
+        </>
       )}
     </div>
   )

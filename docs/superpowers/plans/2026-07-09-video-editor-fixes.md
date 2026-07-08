@@ -1,5 +1,12 @@
 # Video Editor / Recorder — Fixes from Joey (2026-07-09)
 
+> **STATUS (2026-07-09, v1.99.0, NOT pushed):** F1–F8 all implemented.
+> **Verified (Playwright + dev-staff login):** F1 playback-skip (plays 0→cut→jumps→end on one Play, no freeze — fixed a re-seek loop that pinned the decoder); F3 overlay (isolated canvas render + live recorder; also aligned `getClaimableItem` subtitle to `getItemDescription` so the recorder shows the same rich spec description as the showcase page, not a thin `2 / 32GB / 9.7"` fallback); F4 ready-state layout; F5 editor preview `object-contain`; F6 manual-code input removed; F7 5s countdown + Pause/Resume (elapsed freezes while paused, resumes correctly, record→edit handoff works) + F8 "Next" staging button.
+> **NOT verifiable in this environment (needs Joey's real camera):** F2 camera-black — implemented (off-screen *painted* `<video>` instead of `display:none` + explicit `.play()`), but the Playwright browser has no camera and a `canvas.captureStream` stub would FALSELY pass (see plan warning). A stub was used ONLY to reach the ready state for F4/F7 layout checks — it does NOT validate the camera paint. **Joey must confirm F2 with a real webcam.**
+
+---
+
+
 > **Context:** raised after A1–A4 shipped (v1.98.0, branch `feat/canned-responses-ai-consolidation`, committed-not-pushed). These are corrections Joey found while using the recorder + editor. Screenshots referenced were in the chat. Read `docs/PROJECT_STATE.md` → Now and memory `project_social_video_marketing_automation` for the shipped state + file map.
 >
 > **Key files:** recorder `src/components/video-recorder/recorder.tsx`; compositor/overlay `src/lib/video-recorder/{compositor,overlay,types}.ts`; editor `src/components/video-editor/*` + `src/lib/video-editor/{timeline,export-video}.ts`; showcase reference `src/pages/admin/showcase.tsx`; overlay data `src/services/mine.ts` (`getClaimableByCode`).
