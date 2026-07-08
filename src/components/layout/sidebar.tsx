@@ -29,6 +29,7 @@ import {
   ChevronRight,
   Undo2,
   PackagePlus,
+  Clapperboard,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { useNeedsReviewCount } from '@/hooks/use-messaging'
@@ -100,6 +101,7 @@ const navSections: NavSection[] = [
       { title: 'Messages', href: '/admin/messages', icon: MessageSquare },
       { title: 'Tickets', href: '/admin/tickets', icon: Ticket },
       { title: 'Social Media', href: '/admin/social-media', icon: Share2 },
+      { title: 'Shoots', href: '/admin/shoots', icon: Clapperboard },
       { title: 'Feedback', href: '/admin/feedback', icon: MessageSquarePlus },
     ],
   },
