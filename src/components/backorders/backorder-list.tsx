@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { listBackorderLines, type BackorderLineListItem } from '@/services/backorders'
 import { GradeBadge, StatusBadge, TableSkeleton, CodeDisplay, EmptyState } from '@/components/shared'
@@ -47,6 +48,7 @@ function formatLeadRange(min: number | null | undefined, max: number | null | un
 }
 
 export function BackorderList() {
+  const navigate = useNavigate()
   const [statusTab, setStatusTab] = useState<string>('all')
 
   const filters = { status: statusTab !== 'all' ? statusTab : undefined }
@@ -111,7 +113,11 @@ export function BackorderList() {
               {lines.map((line) => {
                 const desc = getBackorderDescription(line)
                 return (
-                  <tr key={line.id} className="border-b last:border-0 hover:bg-muted/30">
+                  <tr
+                    key={line.id}
+                    onClick={() => navigate(`/admin/backorders/${line.id}`)}
+                    className="border-b last:border-0 hover:bg-muted/30 cursor-pointer"
+                  >
                     <td className="px-3 py-2 align-top">
                       <CodeDisplay code={line.backorder_code} />
                     </td>
