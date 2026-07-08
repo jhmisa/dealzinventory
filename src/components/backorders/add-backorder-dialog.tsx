@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
-import { Loader2, Search, X } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -29,32 +29,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
 import { ProductPicker } from '@/components/intake/product-picker'
-import { useCreateProductModel } from '@/hooks/use-product-models'
 import { useSuppliers } from '@/hooks/use-suppliers'
 import {
   findMatchingProductModel,
   cleanModelName,
   enrichProductModelSpecs,
-  searchProductModels,
 } from '@/services/product-models'
 import {
   fetchSupplierProduct,
-  searchProductImages,
   createBackorderLine,
   findExistingBackorderLine,
-  saveBackorderPhotos,
 } from '@/services/backorders'
 import { backorderSchema, type BackorderFormValues } from '@/validators/backorder'
 import { cn, normalizeStorageGb } from '@/lib/utils'
-import type { ProductModel, ProductModelInsert, ProductModelWithHeroImage } from '@/lib/types'
-import type { ProductModelFormValues } from '@/validators/product-model'
+import type { ProductModelWithHeroImage } from '@/lib/types'
 
 const GRADES = ['S', 'A', 'B', 'C', 'D', 'J'] as const
 
@@ -87,37 +76,6 @@ interface AddBackorderDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
-// iosys (and similar) galleries often list size-variants of the SAME image,
-// e.g. `.../384323_1_L.jpg` and `.../384323_1_S.jpg`. We group candidates by the
-// trailing `_<index>_<size>.jpg`, keep the `_L` (large) variant per index, and
-// fall back to whatever exists. Non-matching URLs pass through untouched.
-function dedupeSupplierImages(urls: string[]): string[] {
-  const SIZE_RANK: Record<string, number> = { L: 3, M: 2, S: 1 }
-  const byIndex = new Map<string, { url: string; rank: number }>()
-  const passthrough: string[] = []
-
-  for (const url of urls) {
-    const match = url.match(/_(\d+)_([LMS])\.jpe?g(?:\?.*)?$/i)
-    if (!match) {
-      if (!passthrough.includes(url)) passthrough.push(url)
-      continue
-    }
-    const index = match[1]
-    const size = match[2].toUpperCase()
-    const rank = SIZE_RANK[size] ?? 0
-    const existing = byIndex.get(index)
-    if (!existing || rank > existing.rank) {
-      byIndex.set(index, { url, rank })
-    }
-  }
-
-  const grouped = [...byIndex.entries()]
-    .sort(([a], [b]) => Number(a) - Number(b))
-    .map(([, v]) => v.url)
-
-  return [...grouped, ...passthrough]
-}
-
 const defaultValues: BackorderFormValues = {
   product_id: '',
   supplier_id: '',
@@ -148,7 +106,6 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
   // base list is a stable empty array so the productList memo doesn't churn each render.
   const products = useMemo<ProductModelWithHeroImage[]>(() => [], [])
   const { data: suppliers } = useSuppliers()
-  const createProductModel = useCreateProductModel()
 
   const [url, setUrl] = useState('')
   const [fetching, setFetching] = useState(false)
@@ -163,14 +120,8 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
   // the >1000-row fetch cap) still displays + drives the spec auto-fill and mismatch checks.
   const [matchedModel, setMatchedModel] = useState<ProductModelWithHeroImage | null>(null)
 
-  // Photo curation. Candidates are seeded from the fetched listing (after the
-  // dedupe-by-index/prefer-_L normalization). `kept` tracks which survive.
-  const [photos, setPhotos] = useState<string[]>([])
-  const [kept, setKept] = useState<Set<string>>(new Set())
-
-  // Web image search availability. Probed lazily; `false` disables the button.
-  const [imageSearchConfigured, setImageSearchConfigured] = useState<boolean | null>(null)
-  const [searching, setSearching] = useState(false)
+  // Set when a fetch finds no catalog match and nothing is manually selected → hard-block create.
+  const [noCatalogMatch, setNoCatalogMatch] = useState(false)
 
   const form = useForm<BackorderFormValues>({
     resolver: zodResolver(backorderSchema),
@@ -208,8 +159,7 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
     setPickerSearch('')
     setParsed(null)
     setMatchedModel(null)
-    setPhotos([])
-    setKept(new Set())
+    setNoCatalogMatch(false)
     setFetching(false)
     setSaving(false)
   }
@@ -298,6 +248,7 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
         })
         if (match) {
           setMatchedModel(match)
+          setNoCatalogMatch(false)
           form.setValue('product_id', match.id)
           // Confident match = Apple part# exact OR Android model_number exact. Enrich NULL specs
           // silently; fuzzy/manual selections defer enrichment (handled by staff confirming).
@@ -336,9 +287,13 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
               // enrichment is best-effort; never block the flow
             }
           }
+        } else {
+          // No catalog match and nothing manually selected yet → hard-block create.
+          setNoCatalogMatch(true)
         }
       } catch {
-        // ignore — manual picker selection remains available
+        // match failed → treat as no catalog match; manual picker selection can clear it
+        setNoCatalogMatch(true)
       }
 
       // Auto-match the iosys SOURCING supplier. Prefer the reference-only listing
@@ -352,13 +307,6 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
         form.setValue('supplier_id', matchSupplier.id)
       }
 
-      // Seed photos after dedupe; everything starts kept.
-      const seeded = dedupeSupplierImages(
-        Array.isArray(product.imageUrls) ? product.imageUrls : [],
-      )
-      setPhotos(seeded)
-      setKept(new Set(seeded))
-
       toast.success('Fetched supplier product')
     } catch (err) {
       toast.error(
@@ -369,37 +317,14 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
     }
   }
 
-  // Probe image-search availability once when the dialog opens.
-  useEffect(() => {
-    if (!open || imageSearchConfigured !== null) return
-    let cancelled = false
-    void searchProductImages('probe', 1)
-      .then((res) => {
-        if (!cancelled) setImageSearchConfigured(res.configured)
-      })
-      .catch(() => {
-        if (!cancelled) setImageSearchConfigured(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [open, imageSearchConfigured])
-
-  function togglePhoto(photoUrl: string) {
-    setKept((prev) => {
-      const next = new Set(prev)
-      if (next.has(photoUrl)) next.delete(photoUrl)
-      else next.add(photoUrl)
-      return next
-    })
-  }
-
-  // Build the web-image-search query from the currently selected product model
-  // (falling back to the parsed hint) plus the color field. Cheap, so computed
-  // inline each render rather than memoized over RHF's watch().
   const watchedProductId = form.watch('product_id')
-  const watchedColor = form.watch('color')
   const selectedModel = productList.find((p) => p.id === watchedProductId)
+
+  // Any chosen product model clears the no-catalog-match block.
+  useEffect(() => {
+    if (form.getValues('product_id')) setNoCatalogMatch(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedProductId])
 
   // When a product model is selected, fill the INTRINSIC specs the supplier listing doesn't
   // carry (RAM, chip, screen) from the model's absolute catalog values. Storage + color stay
@@ -443,15 +368,6 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
     }
   }
 
-  const searchQuery = [
-    selectedModel?.brand ?? parsedHint.split(' ')[0] ?? '',
-    selectedModel?.model_name ?? parsedHint,
-    watchedColor ?? '',
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .trim()
-
   // Live pricing breakdown for the summary panel: Selling = Supplier + Markup. Computed each
   // render from RHF's watch(). `overridden` flags when the (editable) selling price no longer
   // equals supplier + markup, so the panel can show the auto value for reference.
@@ -466,81 +382,6 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
   const pricingProfit = pricingEffective - pricingSupplier
   const pricingOverridden = pricingSelling !== pricingComputed
   const yen = (n: number) => `¥${n.toLocaleString('en-US')}`
-
-  async function handleSearchWeb() {
-    if (!searchQuery) {
-      toast.error('Select a product or fetch a listing first')
-      return
-    }
-    setSearching(true)
-    try {
-      const res = await searchProductImages(searchQuery, 8)
-      setImageSearchConfigured(res.configured)
-      if (!res.configured) {
-        toast.error('Web image search is not configured')
-        return
-      }
-      if (res.images.length === 0) {
-        toast.info('No additional images found')
-        return
-      }
-      setPhotos((prev) => {
-        const merged = [...prev]
-        for (const u of res.images) if (!merged.includes(u)) merged.push(u)
-        return merged
-      })
-      setKept((prev) => {
-        const next = new Set(prev)
-        for (const u of res.images) next.add(u)
-        return next
-      })
-      toast.success(`Added ${res.images.length} image(s)`)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Image search failed')
-    } finally {
-      setSearching(false)
-    }
-  }
-
-  // Guided "Create Product" with a dedup preview. Before inserting, re-run the search RPC on
-  // brand + model name + model number; if near-matches exist, require an explicit confirm so a
-  // model that merely failed to surface isn't duplicated.
-  async function handleCreateProduct(values: ProductModelFormValues): Promise<string> {
-    const probe = [values.brand, values.model_name, values.model_number]
-      .filter(Boolean)
-      .join(' ')
-      .trim()
-    if (probe) {
-      try {
-        const near = await searchProductModels(probe, undefined, 5)
-        if (near.length > 0) {
-          const list = near
-            .map((m) => `• ${m.brand} ${m.model_name}${m.model_number ? ` (${m.model_number})` : ''} — ${m.color}`)
-            .join('\n')
-          const proceed = window.confirm(
-            `Possible existing matches found:\n\n${list}\n\nCreate a NEW product model anyway?`,
-          )
-          if (!proceed) {
-            // Adopt the closest existing row instead of creating a duplicate.
-            setMatchedModel(near[0])
-            form.setValue('product_id', near[0].id)
-            throw new Error('cancelled-create-adopted-existing')
-          }
-        }
-      } catch (err) {
-        if (err instanceof Error && err.message === 'cancelled-create-adopted-existing') throw err
-        // search failure is non-fatal; fall through to create
-      }
-    }
-    const created = await createProductModel.mutateAsync(values as unknown as ProductModelInsert)
-    setMatchedModel({
-      ...(created as ProductModel),
-      hero_image_url: null,
-      media_count: 0,
-      categories: null,
-    } as ProductModelWithHeroImage)
-    return created.id
-  }
 
   async function handleSubmit(values: BackorderFormValues) {
     setSaving(true)
@@ -584,23 +425,6 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
         lead_time_days: values.lead_time_days,
       })
 
-      // Persist curated photos. Partial failure here must NOT undo the line.
-      const keptUrls = photos.filter((p) => kept.has(p))
-      if (keptUrls.length > 0) {
-        try {
-          await saveBackorderPhotos(line.id, keptUrls)
-        } catch (photoErr) {
-          toast.warning(
-            `Backorder ${line.backorder_code} created, but saving photos failed: ${
-              photoErr instanceof Error ? photoErr.message : 'unknown error'
-            }. You can retry photos from the line.`,
-          )
-          await queryClient.invalidateQueries({ queryKey: ['backorder-lines'] })
-          handleOpenChange(false)
-          return
-        }
-      }
-
       await queryClient.invalidateQueries({ queryKey: ['backorder-lines'] })
       toast.success(`Backorder ${line.backorder_code} created`)
       handleOpenChange(false)
@@ -620,7 +444,8 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
           <DialogTitle>Add Backorder</DialogTitle>
           <DialogDescription>
             Paste a supplier listing URL to prefill specs, map it to a product
-            model and supplier, curate photos, and create a backorder line.
+            model and supplier, and create a backorder line. Photos are inherited
+            from the product model gallery.
           </DialogDescription>
         </DialogHeader>
 
@@ -678,10 +503,16 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
                           products={productList}
                           initialSearch={pickerSearch || parsedHint || undefined}
                           categoryId={matchedModel?.category_id ?? undefined}
-                          onCreate={handleCreateProduct}
                         />
                       </FormControl>
                       <FormMessage />
+                      {noCatalogMatch && (
+                        <p className="mt-1.5 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-800">
+                          <strong>No matching product model.</strong> This item isn&apos;t in the catalog
+                          yet. Add the model first — harvest it so its photos come with it — then create
+                          the backorder.
+                        </p>
+                      )}
                       {modelMismatches.length > 0 && (
                         <p className="mt-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                           ⚠ This model doesn&apos;t match the fetched listing: {modelMismatches.join('; ')}.
@@ -1062,89 +893,6 @@ export function AddBackorderDialog({ open, onOpenChange }: AddBackorderDialogPro
                 </section>
               </div>
             </div>
-
-            {/* PHOTOS — full width */}
-            <section className="space-y-2 rounded-lg border bg-card p-3">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium">
-                  Photos{' '}
-                  <span className="text-muted-foreground font-normal">
-                    ({photos.filter((p) => kept.has(p)).length} kept)
-                  </span>
-                </label>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span tabIndex={imageSearchConfigured === false ? 0 : -1}>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={handleSearchWeb}
-                          disabled={
-                            imageSearchConfigured === false || searching
-                          }
-                        >
-                          {searching ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-                          ) : (
-                            <Search className="h-3.5 w-3.5 mr-1.5" />
-                          )}
-                          Search web for more
-                        </Button>
-                      </span>
-                    </TooltipTrigger>
-                    {imageSearchConfigured === false && (
-                      <TooltipContent>
-                        Set IMAGE_SEARCH_API_KEY to enable
-                      </TooltipContent>
-                    )}
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-
-              {photos.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  No photos yet. Fetch a listing or search the web.
-                </p>
-              ) : (
-                <div className="grid grid-cols-8 gap-2">
-                  {photos.map((photoUrl) => {
-                    const isKept = kept.has(photoUrl)
-                    return (
-                      <div
-                        key={photoUrl}
-                        className={cn(
-                          'relative aspect-square overflow-hidden rounded-md border',
-                          !isKept && 'opacity-40',
-                        )}
-                      >
-                        <img
-                          src={photoUrl}
-                          alt=""
-                          className="h-full w-full object-cover"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => togglePhoto(photoUrl)}
-                          aria-label={isKept ? 'Remove photo' : 'Restore photo'}
-                          className={cn(
-                            'absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full text-white shadow',
-                            isKept ? 'bg-black/60' : 'bg-primary',
-                          )}
-                        >
-                          {isKept ? (
-                            <X className="h-3 w-3" />
-                          ) : (
-                            <span className="text-[10px] leading-none">+</span>
-                          )}
-                        </button>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </section>
 
             <DialogFooter className="sticky bottom-0 z-10 -mx-6 -mb-6 border-t bg-background px-6 pb-6 pt-3 mt-2">
               <Button

@@ -1,8 +1,8 @@
 import { z } from 'zod'
 
-// Schema for the "Add Backorder" paste-to-add dialog. Photos are curated and
-// persisted separately via saveBackorderPhotos, so they are NOT part of this
-// schema. selling_price is REQUIRED here even though the column is nullable.
+// Schema for the "Add Backorder" paste-to-add dialog. Photos are inherited from
+// the product model gallery — there is no per-line photo step. selling_price is
+// REQUIRED here even though the column is nullable.
 export const backorderSchema = z
   .object({
     product_id: z.string().uuid('Select a product model'),
