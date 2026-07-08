@@ -117,6 +117,11 @@ export function BackorderList() {
                     </td>
                     <td className="px-3 py-2 align-top">
                       <span className="text-muted-foreground">{desc || '—'}</span>
+                      {line.included_accessories?.trim() && (
+                        <span className="block text-xs text-muted-foreground/80">
+                          Included: {line.included_accessories.trim()}
+                        </span>
+                      )}
                     </td>
                     <td className="px-3 py-2 align-top">
                       <GradeBadge grade={line.condition_grade as ConditionGrade} />

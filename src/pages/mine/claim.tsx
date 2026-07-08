@@ -714,6 +714,10 @@ function MineClaimInner() {
                 <p className="text-sm text-muted-foreground">{product.subtitle}</p>
               )}
 
+              {product.accessories && (
+                <p className="text-sm text-muted-foreground">Included: {product.accessories}</p>
+              )}
+
               {/* Pre-order lead-time note */}
               {product.type === 'backorder' && (
                 <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">

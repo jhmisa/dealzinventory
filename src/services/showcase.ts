@@ -13,6 +13,8 @@ export interface ShowcaseItem {
   description: string
   photos: { id: string; url: string }[]
   videos: { id: string; url: string }[]
+  // Backorder only: English included-accessories string (other builders omit it).
+  accessories?: string | null
 }
 
 export async function getShowcaseItem(itemCode: string): Promise<ShowcaseItem | null> {
@@ -233,5 +235,6 @@ export async function getShowcaseBackorder(bCode: string): Promise<ShowcaseItem 
     description,
     photos,
     videos,
+    accessories: (data.included_accessories as string | null)?.trim() || null,
   }
 }

@@ -19,6 +19,8 @@ export interface ClaimableProduct {
   available: boolean
   stockCount?: number
   conditionNotes?: string | null
+  // Backorder only: English included-accessories string, rendered as a separate line under the subtitle.
+  accessories?: string | null
   // Backorder (pre-order) only: estimated working-day lead-time range shown on the product page.
   leadTimeMinDays?: number | null
   leadTimeMaxDays?: number | null
@@ -271,6 +273,7 @@ async function getClaimableBackorder(code: string): Promise<ClaimableProduct | n
       media,
       available,
       stockCount: line.available ?? 0,
+      accessories: (line.included_accessories as string | null)?.trim() || null,
       leadTimeMinDays: line.lead_time_min_days ?? null,
       leadTimeMaxDays: line.lead_time_days ?? null,
       raw: { backorderLineId: line.id, productId: line.product_id ?? undefined },
