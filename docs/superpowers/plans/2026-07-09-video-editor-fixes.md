@@ -50,6 +50,26 @@ Priority order: **F2 (camera black) and F1 (playback skip) are functional blocke
 
 ---
 
+## F6. Remove the redundant "…or type codes" manual input
+**Symptom (Img 10):** the staging step has a search picker AND a "…or type codes: P000840 G000123" text box + Add button — the text box is redundant.
+**Want:** remove the manual code input entirely; keep only the `<InventoryPicker>` search + the selected-code chips.
+**Fix approach (in `src/pages/admin/video-editor.tsx`):** delete the `codesInput` state + the manual `<Input>`/Add row + `parseCodes` manual path (the picker's `onAdd` already stages codes). Keep chips + remove-chip.
+
+## F7. 5-second countdown before recording + a Pause/Resume button
+**Symptom (Img 11):** clicking record starts capture immediately; during recording there is only "Next item" + "Stop" — no Pause.
+**Want:** (a) clicking "Start recording" on the setup screen runs a **5→1 countdown overlay** on the preview first (so the presenter can get ready) THEN capture begins; (b) a **Pause/Resume** control during recording.
+**Fix approach (in `src/components/video-recorder/recorder.tsx`):**
+- Countdown: add a `'countdown'` phase (or an overlay state). On Start, show a big centered 5..4..3..2..1 over the live preview (camera already running), then call the real `startRecording()`. Keep the camera compositing during the countdown.
+- Pause: `MediaRecorder.pause()`/`.resume()`. IMPORTANT — pausing removes wall-clock from the OUTPUT video, so the SPACE-advance timestamps (currently `performance.now() - startedAtRef`) will drift. Track cumulative paused ms and compute the recording clock as `now - startedAt - pausedTotal`; use that same adjusted clock for `spaceTimesRef` pushes and the elapsed timer. Add a Pause/Resume button next to Next item + Stop; the RAF compositing loop keeps running (preview stays live) but the recorder is paused.
+**Verify:** Start → see 5s countdown → records; Pause freezes elapsed + REC dot state, Resume continues; SPACE boundaries land at the right spots in the exported (paused-time-excluded) video.
+
+## F8. Staging button should say "Next", not "Start recording"
+**Symptom (Img 13):** on the item-staging step the primary button reads "Start recording (N)" but it only advances to the setup/preview screen (device + orientation + preview) — it does not start recording.
+**Want:** rename that staging button to **"Next"** (it advances to setup). The real **"Start recording"** button stays on the setup screen and now triggers the F7 countdown.
+**Fix approach (in `src/pages/admin/video-editor.tsx`):** change the staging button label/icon from "Start recording (N)" to "Next" (keep the count, e.g. "Next (1)"), and let the recorder's own ready-state "Start recording" (→ countdown → capture) be the sole record trigger.
+
+---
+
 ## Verification harness reminder
 - F1/F3/F4/F5: Playwright with the dev-staff login (`.env.local` `DEV_STAFF_EMAIL`/`DEV_STAFF_PASSWORD`) is sufficient.
 - **F2 MUST NOT be verified with a `canvas.captureStream` getUserMedia stub** — it hides the exact bug. Use a real camera or the Chromium fake-device launch flags.
