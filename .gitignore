@@ -58,3 +58,6 @@ backups/
 *.tar.zst
 *.age
 *.enc
+
+# Superpowers brainstorming mockups (local, throwaway)
+.superpowers/
