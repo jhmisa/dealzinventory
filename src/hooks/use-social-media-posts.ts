@@ -60,6 +60,28 @@ export function useSyncSocialMediaStatuses() {
   })
 }
 
+// Server-side processor: generate captions + publish queued posts to Blotato (button-triggered).
+export function useProcessSocialQueue() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => socialMediaPostService.processSocialQueue(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.socialMediaPosts.all })
+    },
+  })
+}
+
+// Generate + persist a caption for one post (no publish).
+export function useGeneratePostCaption() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (postId: string) => socialMediaPostService.generatePostCaption(postId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.socialMediaPosts.all })
+    },
+  })
+}
+
 export function useSourceMedia(
   sourceType: socialMediaPostService.MediaSourceType | undefined,
   sourceId: string | undefined,

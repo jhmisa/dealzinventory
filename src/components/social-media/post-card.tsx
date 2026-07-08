@@ -1,4 +1,4 @@
-import { Clock, ExternalLink, Facebook, AlertCircle, Trash2, Play, ArrowRight } from 'lucide-react'
+import { Clock, ExternalLink, Facebook, AlertCircle, Trash2, Play, ArrowRight, Sparkles } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -9,18 +9,20 @@ interface PostCardProps {
   onQueue?: () => void
   onDelete?: () => void
   onRetry?: () => void
+  onGenerateCaption?: () => void
+  generatingCaption?: boolean
 }
 
 const statusActions: Record<SocialPostStatus, string[]> = {
-  draft: ['queue', 'delete'],
-  queued: ['delete'],
+  draft: ['caption', 'queue', 'delete'],
+  queued: ['caption', 'delete'],
   processing: [],
   scheduled: [],
   published: [],
   failed: ['retry', 'delete'],
 }
 
-export function PostCard({ post, onQueue, onDelete, onRetry }: PostCardProps) {
+export function PostCard({ post, onQueue, onDelete, onRetry, onGenerateCaption, generatingCaption }: PostCardProps) {
   const item = post.items
   const modelName = item?.product_models
     ? `${item.product_models.brand} ${item.product_models.model_name}`
@@ -94,6 +96,19 @@ export function PostCard({ post, onQueue, onDelete, onRetry }: PostCardProps) {
 
         {actions.length > 0 && (
           <div className="flex gap-1.5 pt-1">
+            {actions.includes('caption') && onGenerateCaption && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs"
+                onClick={onGenerateCaption}
+                disabled={generatingCaption}
+                title="Generate a caption with AI"
+              >
+                <Sparkles className={`h-3 w-3 mr-1 ${generatingCaption ? 'animate-pulse' : ''}`} />
+                {post.caption ? 'Regenerate' : 'Caption'}
+              </Button>
+            )}
             {actions.includes('queue') && (
               <Button size="sm" variant="default" className="h-7 text-xs" onClick={onQueue}>
                 <ArrowRight className="h-3 w-3 mr-1" />

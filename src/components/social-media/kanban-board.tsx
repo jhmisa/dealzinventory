@@ -9,9 +9,11 @@ interface KanbanBoardProps {
   onQueue: (id: string) => void
   onDelete: (id: string) => void
   onRetry: (id: string) => void
+  onGenerateCaption?: (id: string) => void
+  generatingCaptionId?: string | null
 }
 
-export function KanbanBoard({ posts, onQueue, onDelete, onRetry }: KanbanBoardProps) {
+export function KanbanBoard({ posts, onQueue, onDelete, onRetry, onGenerateCaption, generatingCaptionId }: KanbanBoardProps) {
   const grouped = useMemo(() => {
     const map: Record<SocialPostStatus, SocialMediaPostWithItem[]> = {
       draft: [],
@@ -39,6 +41,8 @@ export function KanbanBoard({ posts, onQueue, onDelete, onRetry }: KanbanBoardPr
           onQueue={status === 'draft' ? onQueue : undefined}
           onDelete={['draft', 'queued', 'failed'].includes(status) ? onDelete : undefined}
           onRetry={status === 'failed' ? onRetry : undefined}
+          onGenerateCaption={['draft', 'queued'].includes(status) ? onGenerateCaption : undefined}
+          generatingCaptionId={generatingCaptionId}
         />
       ))}
     </div>

@@ -16,9 +16,11 @@ interface KanbanColumnProps {
   onQueue?: (id: string) => void
   onDelete?: (id: string) => void
   onRetry?: (id: string) => void
+  onGenerateCaption?: (id: string) => void
+  generatingCaptionId?: string | null
 }
 
-export function KanbanColumn({ status, posts, onQueue, onDelete, onRetry }: KanbanColumnProps) {
+export function KanbanColumn({ status, posts, onQueue, onDelete, onRetry, onGenerateCaption, generatingCaptionId }: KanbanColumnProps) {
   const config = statusConfig[status]
 
   return (
@@ -38,6 +40,8 @@ export function KanbanColumn({ status, posts, onQueue, onDelete, onRetry }: Kanb
               onQueue={onQueue ? () => onQueue(post.id) : undefined}
               onDelete={onDelete ? () => onDelete(post.id) : undefined}
               onRetry={onRetry ? () => onRetry(post.id) : undefined}
+              onGenerateCaption={onGenerateCaption ? () => onGenerateCaption(post.id) : undefined}
+              generatingCaption={generatingCaptionId === post.id}
             />
           ))
         )}

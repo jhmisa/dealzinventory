@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, RefreshCw } from 'lucide-react'
+import { Plus, RefreshCw, Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { PageHeader, ConfirmDialog } from '@/components/shared'
@@ -9,17 +9,25 @@ import {
   useUpdateSocialMediaPost,
   useDeleteSocialMediaPost,
   useSyncSocialMediaStatuses,
+  useProcessSocialQueue,
+  useGeneratePostCaption,
 } from '@/hooks/use-social-media-posts'
 
 export default function SocialMediaPage() {
   const [formOpen, setFormOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [processConfirm, setProcessConfirm] = useState(false)
+  const [captionId, setCaptionId] = useState<string | null>(null)
 
   const { data: posts = [], isLoading } = useSocialMediaPosts()
   const updateMutation = useUpdateSocialMediaPost()
   const deleteMutation = useDeleteSocialMediaPost()
   const syncMutation = useSyncSocialMediaStatuses()
+  const processMutation = useProcessSocialQueue()
+  const captionMutation = useGeneratePostCaption()
   const hasSynced = useRef(false)
+
+  const queuedCount = posts.filter((p) => p.status === 'queued').length
 
   useEffect(() => {
     if (hasSynced.current) return
@@ -51,6 +59,26 @@ export default function SocialMediaPage() {
         onError: (err) => toast.error(`Failed: ${err.message}`),
       }
     )
+  }
+
+  function handleProcessQueue() {
+    setProcessConfirm(false)
+    processMutation.mutate(undefined, {
+      onSuccess: (data) =>
+        toast.success(
+          `Processed ${data.processed}: ${data.published} published, ${data.scheduled} scheduled, ${data.failed} failed`,
+        ),
+      onError: (err) => toast.error(`Process failed: ${err.message}`),
+    })
+  }
+
+  function handleGenerateCaption(id: string) {
+    setCaptionId(id)
+    captionMutation.mutate(id, {
+      onSuccess: () => toast.success('Caption generated'),
+      onError: (err) => toast.error(`Caption failed: ${err.message}`),
+      onSettled: () => setCaptionId(null),
+    })
   }
 
   function handleDelete() {
@@ -85,6 +113,14 @@ export default function SocialMediaPage() {
           >
             <RefreshCw className={`h-4 w-4 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
           </Button>
+          <Button
+            variant="outline"
+            onClick={() => setProcessConfirm(true)}
+            disabled={processMutation.isPending || queuedCount === 0}
+          >
+            <Send className={`h-4 w-4 mr-2 ${processMutation.isPending ? 'animate-pulse' : ''}`} />
+            {processMutation.isPending ? 'Processing…' : `Process Queue${queuedCount > 0 ? ` (${queuedCount})` : ''}`}
+          </Button>
           <Button onClick={() => setFormOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             New Post
@@ -100,6 +136,8 @@ export default function SocialMediaPage() {
           onQueue={handleQueue}
           onDelete={setDeleteId}
           onRetry={handleRetry}
+          onGenerateCaption={handleGenerateCaption}
+          generatingCaptionId={captionId}
         />
       )}
 
@@ -114,6 +152,16 @@ export default function SocialMediaPage() {
         variant="destructive"
         onConfirm={handleDelete}
         loading={deleteMutation.isPending}
+      />
+
+      <ConfirmDialog
+        open={processConfirm}
+        onOpenChange={setProcessConfirm}
+        title="Process the queue?"
+        description={`This generates captions for any blank ones and PUBLISHES ${queuedCount} queued post(s) to Blotato (real social accounts). Continue?`}
+        confirmLabel="Publish to Blotato"
+        onConfirm={handleProcessQueue}
+        loading={processMutation.isPending}
       />
     </div>
   )

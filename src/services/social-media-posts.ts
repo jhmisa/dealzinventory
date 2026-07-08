@@ -147,6 +147,25 @@ export async function syncSocialMediaStatuses() {
   return data as { synced: number; published: number; failed: number; unchanged: number }
 }
 
+// Server-side processor: generates captions (if blank) + publishes queued posts to Blotato.
+// Replaces the Claude-CLI /post + process-social-queue flow. Human-in-the-loop (button-triggered).
+export async function processSocialQueue() {
+  const { data, error } = await supabase.functions.invoke('process-social-queue', { body: {} })
+  if (error) throw error
+  if (data?.error) throw new Error(data.error)
+  return data as { processed: number; published: number; scheduled: number; failed: number }
+}
+
+// Generate (and persist) a caption for one post without publishing — the "Generate caption" button.
+export async function generatePostCaption(postId: string): Promise<string> {
+  const { data, error } = await supabase.functions.invoke('process-social-queue', {
+    body: { mode: 'caption_only', post_id: postId },
+  })
+  if (error) throw error
+  if (data?.error) throw new Error(data.error)
+  return data.caption as string
+}
+
 export interface MediaItem {
   url: string
   thumbnail_url: string | null
