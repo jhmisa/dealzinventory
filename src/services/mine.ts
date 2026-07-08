@@ -246,13 +246,9 @@ async function getClaimableBackorder(code: string): Promise<ClaimableProduct | n
       pm?.categories?.description_fields,
     )
 
-    // Media: curated backorder photos first (these are the real-unit / chosen shots), then the
-    // product model's catalog photos as a fallback so the page is never image-less.
+    // Media: the product model's catalog gallery (photos + videos), ordered by sort_order.
+    // B-codes inherit their model's full gallery — there is no per-line curated layer.
     const media: GalleryImage[] = []
-    const curated = (line.backorder_line_media ?? []) as { id: string; file_url: string; sort_order: number }[]
-    for (const m of [...curated].sort((a, b) => a.sort_order - b.sort_order)) {
-      media.push({ id: m.id, url: m.file_url, mediaType: 'image' })
-    }
     const productMedia = (pm?.product_media ?? []).slice().sort((a, b) => a.sort_order - b.sort_order)
     for (const m of productMedia) {
       media.push({ id: m.id, url: m.file_url, mediaType: m.media_type === 'video' ? 'video' : 'image' })

@@ -42,15 +42,15 @@ export async function listBackorderLines(filters: BackorderLineFilters = {}) {
 
 export type BackorderLineListItem = Awaited<ReturnType<typeof listBackorderLines>>[number]
 
-// Single backorder line with joins + its photos.
+// Single backorder line with joins. Photos are inherited from the product model's
+// gallery (product_media) — there is no per-line curated media layer.
 export async function getBackorderLine(id: string) {
   const { data, error } = await supabase
     .from('backorder_lines')
     .select(`
       *,
       product_models(*, categories(name, description_fields), product_media(id, file_url, media_type, role, sort_order)),
-      suppliers(id, supplier_name),
-      backorder_line_media(id, file_url, source, sort_order)
+      suppliers(id, supplier_name)
     `)
     .eq('id', id)
     .single()
@@ -143,7 +143,7 @@ export async function updateBackorderLine(
 }
 
 // ---------------------------------------------------------------------------
-// Supplier product fetch + photo curation (edge functions)
+// Supplier product fetch (edge function)
 // ---------------------------------------------------------------------------
 
 export async function fetchSupplierProduct(url: string) {
@@ -154,61 +154,6 @@ export async function fetchSupplierProduct(url: string) {
   if (error) throw error
   if (data?.error) throw new Error(data.error)
   return data?.product ?? null
-}
-
-export interface ProductImageSearchResult {
-  configured: boolean
-  images: string[]
-}
-
-export async function searchProductImages(
-  query: string,
-  limit = 8,
-): Promise<ProductImageSearchResult> {
-  const { data, error } = await supabase.functions.invoke('search-product-images', {
-    body: { query, limit },
-  })
-
-  if (error) throw error
-  if (data?.error) throw new Error(data.error)
-  return {
-    configured: Boolean(data?.configured),
-    images: Array.isArray(data?.images) ? (data.images as string[]) : [],
-  }
-}
-
-export async function saveBackorderPhotos(backorderLineId: string, imageUrls: string[]) {
-  const { data, error } = await supabase.functions.invoke('save-backorder-photos', {
-    body: { backorder_line_id: backorderLineId, image_urls: imageUrls },
-  })
-
-  if (error) throw error
-  if (data?.error) throw new Error(data.error)
-  return data
-}
-
-// ---------------------------------------------------------------------------
-// Backorder line media
-// ---------------------------------------------------------------------------
-
-export async function listBackorderMedia(backorderLineId: string) {
-  const { data, error } = await supabase
-    .from('backorder_line_media')
-    .select('id, backorder_line_id, file_url, source, sort_order, created_at')
-    .eq('backorder_line_id', backorderLineId)
-    .order('sort_order', { ascending: true })
-
-  if (error) throw error
-  return data ?? []
-}
-
-export async function deleteBackorderMedia(mediaId: string) {
-  const { error } = await supabase
-    .from('backorder_line_media')
-    .delete()
-    .eq('id', mediaId)
-
-  if (error) throw error
 }
 
 // ---------------------------------------------------------------------------
