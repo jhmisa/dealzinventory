@@ -1,15 +1,16 @@
 import { useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { PageHeader, ConfirmDialog } from '@/components/shared'
-import { ShootKanban, ShootFormDialog } from '@/components/shoots'
+import { ShootKanban, ShootFormDialog, ShootPlannerDialog } from '@/components/shoots'
 import { useShoots, useUpdateShootStatus, useDeleteShoot } from '@/hooks/use-shoots'
 import type { ShootStatus } from '@/lib/types'
 import type { ShootWithAssignee } from '@/services/shoots'
 
 export default function ShootsPage() {
   const [formOpen, setFormOpen] = useState(false)
+  const [plannerOpen, setPlannerOpen] = useState(false)
   const [editingShoot, setEditingShoot] = useState<ShootWithAssignee | undefined>(undefined)
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
@@ -53,7 +54,10 @@ export default function ShootsPage() {
       <div className="flex items-center justify-between">
         <PageHeader title="Shoots" description="Plan live-selling & product video shoots." />
         <div className="flex items-center gap-2">
-          {/* Reserved slot for a future "Plan with AI" action (owned by another workstream). */}
+          <Button variant="outline" onClick={() => setPlannerOpen(true)}>
+            <Sparkles className="mr-2 h-4 w-4" />
+            Plan with AI
+          </Button>
           <Button onClick={handleNew}>
             <Plus className="mr-2 h-4 w-4" />
             New Shoot
@@ -73,6 +77,8 @@ export default function ShootsPage() {
       )}
 
       <ShootFormDialog open={formOpen} onOpenChange={setFormOpen} shoot={editingShoot} />
+
+      <ShootPlannerDialog open={plannerOpen} onOpenChange={setPlannerOpen} />
 
       <ConfirmDialog
         open={!!deleteId}
