@@ -1,4 +1,5 @@
-import { ArrowLeft, ArrowRight, Pencil, Trash2, MonitorSmartphone, Smartphone, Monitor } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Pencil, Trash2, MonitorSmartphone, Smartphone, Monitor, Video } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -24,6 +25,7 @@ const statusTransitions: Record<ShootStatus, { next?: ShootStatus; prev?: ShootS
 const MAX_VISIBLE_CODES = 4
 
 export function ShootCard({ shoot, onEdit, onDelete, onStatusChange }: ShootCardProps) {
+  const navigate = useNavigate()
   const { next, prev } = statusTransitions[shoot.status]
   const codes = shoot.item_codes ?? []
   const visibleCodes = codes.slice(0, MAX_VISIBLE_CODES)
@@ -97,6 +99,16 @@ export function ShootCard({ shoot, onEdit, onDelete, onStatusChange }: ShootCard
             </Button>
           )}
           <div className="ml-auto flex items-center gap-1">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-6 w-6"
+              aria-label="Record video"
+              title="Record a live-selling video"
+              onClick={() => navigate(`/admin/video-editor?shoot=${shoot.id}&mode=record`)}
+            >
+              <Video className="h-3.5 w-3.5" />
+            </Button>
             <Button
               size="icon"
               variant="ghost"

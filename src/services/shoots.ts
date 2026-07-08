@@ -15,6 +15,12 @@ export async function getShoots(): Promise<ShootWithAssignee[]> {
   return (data ?? []) as ShootWithAssignee[]
 }
 
+export async function getShoot(id: string): Promise<Shoot | null> {
+  const { data, error } = await supabase.from('shoots').select('*').eq('id', id).maybeSingle()
+  if (error) throw error
+  return (data as Shoot | null) ?? null
+}
+
 export async function createShoot(input: ShootInsert): Promise<Shoot> {
   const { data, error } = await supabase.from('shoots').insert(input).select().single()
   if (error) throw error
