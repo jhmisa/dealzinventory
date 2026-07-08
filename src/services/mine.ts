@@ -225,7 +225,7 @@ async function getClaimableAccessory(code: string): Promise<ClaimableProduct | n
 async function getClaimableBackorder(code: string): Promise<ClaimableProduct | null> {
   try {
     // Resolve the B-code -> id, then reuse the joined fetch (product_models + categories +
-    // product_media + curated backorder_line_media).
+    // product_media). B-codes inherit their model's gallery as the single photo source.
     const { data: ref } = await supabase
       .from('backorder_lines')
       .select('id')

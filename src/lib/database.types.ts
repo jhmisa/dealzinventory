@@ -1,4 +1,3 @@
-Initialising login role...
 export type Json =
   | string
   | number
@@ -288,6 +287,68 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_corrections: {
+        Row: {
+          correct_reply: string
+          created_at: string
+          created_by: string | null
+          customer_message: string
+          embedding: string | null
+          id: string
+          note: string | null
+          promoted_knowledge_id: string | null
+          source_conversation_id: string | null
+          source_message_id: string | null
+          specialist_slug: string | null
+          status: string
+          sub_intent_slug: string | null
+          updated_at: string
+          wrong_reply: string | null
+        }
+        Insert: {
+          correct_reply: string
+          created_at?: string
+          created_by?: string | null
+          customer_message: string
+          embedding?: string | null
+          id?: string
+          note?: string | null
+          promoted_knowledge_id?: string | null
+          source_conversation_id?: string | null
+          source_message_id?: string | null
+          specialist_slug?: string | null
+          status?: string
+          sub_intent_slug?: string | null
+          updated_at?: string
+          wrong_reply?: string | null
+        }
+        Update: {
+          correct_reply?: string
+          created_at?: string
+          created_by?: string | null
+          customer_message?: string
+          embedding?: string | null
+          id?: string
+          note?: string | null
+          promoted_knowledge_id?: string | null
+          source_conversation_id?: string | null
+          source_message_id?: string | null
+          specialist_slug?: string | null
+          status?: string
+          sub_intent_slug?: string | null
+          updated_at?: string
+          wrong_reply?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_corrections_promoted_knowledge_id_fkey"
+            columns: ["promoted_knowledge_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_base"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_prompts: {
         Row: {
           created_at: string
@@ -477,41 +538,6 @@ export type Database = {
             columns: ["template_id"]
             isOneToOne: false
             referencedRelation: "messaging_templates"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      backorder_line_media: {
-        Row: {
-          backorder_line_id: string
-          created_at: string
-          file_url: string
-          id: string
-          sort_order: number
-          source: Database["public"]["Enums"]["backorder_media_source"]
-        }
-        Insert: {
-          backorder_line_id: string
-          created_at?: string
-          file_url: string
-          id?: string
-          sort_order?: number
-          source?: Database["public"]["Enums"]["backorder_media_source"]
-        }
-        Update: {
-          backorder_line_id?: string
-          created_at?: string
-          file_url?: string
-          id?: string
-          sort_order?: number
-          source?: Database["public"]["Enums"]["backorder_media_source"]
-        }
-        Relationships: [
-          {
-            foreignKeyName: "backorder_line_media_backorder_line_id_fkey"
-            columns: ["backorder_line_id"]
-            isOneToOne: false
-            referencedRelation: "backorder_lines"
             referencedColumns: ["id"]
           },
         ]
@@ -4209,6 +4235,36 @@ export type Database = {
           folder_id: string
         }[]
       }
+      get_item_full_specs: {
+        Args: { p_code?: string; p_query?: string }
+        Returns: {
+          battery_health_pct: number
+          brand: string
+          carrier: string
+          chipset: string
+          code: string
+          color: string
+          condition_grade: string
+          condition_notes: string
+          cpu: string
+          gpu: string
+          has_cellular: boolean
+          has_touchscreen: boolean
+          is_unlocked: boolean
+          model_name: string
+          model_number: string
+          os_family: string
+          ports: string
+          price: number
+          ram_gb: string
+          resolved_by: string
+          screen_size: number
+          storage_gb: string
+          supports_stylus: boolean
+          units_may_vary: boolean
+          year: number
+        }[]
+      }
       increment_accessory_stock: {
         Args: { p_accessory_id: string; p_quantity: number }
         Returns: number
@@ -4235,6 +4291,22 @@ export type Database = {
       mark_backorder_ordered: {
         Args: { p_order_item_id: string }
         Returns: undefined
+      }
+      match_ai_corrections: {
+        Args: {
+          filter_specialist?: string
+          match_count?: number
+          min_similarity?: number
+          query_embedding: string
+        }
+        Returns: {
+          correct_reply: string
+          customer_message: string
+          id: string
+          note: string
+          similarity: number
+          specialist_slug: string
+        }[]
       }
       match_product_model: { Args: { p_description: string }; Returns: string }
       merge_customers: {
@@ -4459,7 +4531,6 @@ export type Database = {
         | "READY"
         | "FULFILLED"
       backorder_line_status: "ACTIVE" | "PAUSED" | "CLOSED"
-      backorder_media_source: "iosys" | "web" | "manual"
       battery_condition: "GOOD" | "FAIR" | "POOR"
       body_condition: "GOOD" | "FAIR" | "POOR" | "DAMAGED"
       condition_grade: "S" | "A" | "B" | "C" | "D" | "J"
@@ -4694,7 +4765,6 @@ export const Constants = {
         "FULFILLED",
       ],
       backorder_line_status: ["ACTIVE", "PAUSED", "CLOSED"],
-      backorder_media_source: ["iosys", "web", "manual"],
       battery_condition: ["GOOD", "FAIR", "POOR"],
       body_condition: ["GOOD", "FAIR", "POOR", "DAMAGED"],
       condition_grade: ["S", "A", "B", "C", "D", "J"],
@@ -4789,5 +4859,3 @@ export const Constants = {
     },
   },
 } as const
-A new version of Supabase CLI is available: v2.109.0 (currently installed v2.90.0)
-We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli

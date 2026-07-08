@@ -32,8 +32,6 @@ export type BackorderLine = Tables['backorder_lines']['Row']
 export type BackorderLineInsert = Tables['backorder_lines']['Insert']
 export type BackorderLineUpdate = Tables['backorder_lines']['Update']
 
-export type BackorderLineMedia = Tables['backorder_line_media']['Row']
-
 export type Customer = Tables['customers']['Row']
 export type CustomerInsert = Tables['customers']['Insert']
 export type CustomerUpdate = Tables['customers']['Update']
