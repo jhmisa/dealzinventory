@@ -1,4 +1,11 @@
 export const queryKeys = {
+  shoots: {
+    all: ['shoots'] as const,
+    lists: () => [...queryKeys.shoots.all, 'list'] as const,
+    list: (filters: Record<string, unknown>) => [...queryKeys.shoots.lists(), filters] as const,
+    details: () => [...queryKeys.shoots.all, 'detail'] as const,
+    detail: (id: string) => [...queryKeys.shoots.details(), id] as const,
+  },
   items: {
     all: ['items'] as const,
     lists: () => [...queryKeys.items.all, 'list'] as const,

@@ -32,6 +32,11 @@ export type BackorderLine = Tables['backorder_lines']['Row']
 export type BackorderLineInsert = Tables['backorder_lines']['Insert']
 export type BackorderLineUpdate = Tables['backorder_lines']['Update']
 
+export type Shoot = Tables['shoots']['Row']
+export type ShootInsert = Tables['shoots']['Insert']
+export type ShootUpdate = Tables['shoots']['Update']
+export type ShootStatus = Enums['shoot_status']
+
 export type Customer = Tables['customers']['Row']
 export type CustomerInsert = Tables['customers']['Insert']
 export type CustomerUpdate = Tables['customers']['Update']

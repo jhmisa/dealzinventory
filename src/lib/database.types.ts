@@ -3508,6 +3508,53 @@ export type Database = {
           },
         ]
       }
+      shoots: {
+        Row: {
+          assignee_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          item_codes: string[]
+          notes: string | null
+          orientation: string | null
+          status: Database["public"]["Enums"]["shoot_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assignee_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          item_codes?: string[]
+          notes?: string | null
+          orientation?: string | null
+          status?: Database["public"]["Enums"]["shoot_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assignee_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          item_codes?: string[]
+          notes?: string | null
+          orientation?: string | null
+          status?: Database["public"]["Enums"]["shoot_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shoots_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "staff_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       social_media_posts: {
         Row: {
           account_id: string | null
@@ -4594,6 +4641,7 @@ export type Database = {
       queue_status: "PENDING" | "PROCESSING" | "SENT" | "FAILED"
       refund_payment_method: "BANK_TRANSFER" | "CASH"
       screen_condition: "GOOD" | "FAIR" | "POOR" | "CRACKED"
+      shoot_status: "PLANNED" | "ASSIGNED" | "SHOOTING" | "PUBLISHED"
       social_post_status:
         | "draft"
         | "queued"
@@ -4833,6 +4881,7 @@ export const Constants = {
       queue_status: ["PENDING", "PROCESSING", "SENT", "FAILED"],
       refund_payment_method: ["BANK_TRANSFER", "CASH"],
       screen_condition: ["GOOD", "FAIR", "POOR", "CRACKED"],
+      shoot_status: ["PLANNED", "ASSIGNED", "SHOOTING", "PUBLISHED"],
       social_post_status: [
         "draft",
         "queued",
