@@ -17,6 +17,8 @@ interface VideoEditorProps {
   source: Blob
   /** Optional recorder-provided item boundaries (seconds). Phase 1b passes these; uploads pass []. */
   itemBounds?: number[]
+  /** Fallback duration (seconds) for sources whose <video>.duration isn't finite (MediaRecorder webm blobs). */
+  durationHint?: number
   /** Called with the finished MP4 to hand off to the page (upload + draft post). */
   onExport: (mp4: Blob) => Promise<void> | void
 }
@@ -28,7 +30,7 @@ const CORNER_CLASS: Record<LogoCorner, string> = {
   br: 'bottom-2 right-2',
 }
 
-export function VideoEditor({ source, itemBounds, onExport }: VideoEditorProps) {
+export function VideoEditor({ source, itemBounds, durationHint, onExport }: VideoEditorProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const rafRef = useRef<number | null>(null)
   const [srcUrl, setSrcUrl] = useState<string | null>(null)
@@ -58,9 +60,13 @@ export function VideoEditor({ source, itemBounds, onExport }: VideoEditorProps) 
   // Build the timeline once the video's duration is known.
   const handleLoadedMetadata = useCallback(() => {
     const v = videoRef.current
-    if (!v || !Number.isFinite(v.duration)) return
-    setState(makeTimeline(v.duration, itemBounds ?? []))
-  }, [itemBounds])
+    if (!v) return
+    // MediaRecorder-webm blobs report duration = Infinity until fully seeked (spike-confirmed);
+    // fall back to the recorder's measured durationHint in that case.
+    const dur = Number.isFinite(v.duration) && v.duration > 0 ? v.duration : (durationHint ?? 0)
+    if (dur <= 0) return
+    setState(makeTimeline(dur, itemBounds ?? []))
+  }, [itemBounds, durationHint])
 
   // Snapshot + mutate helper (undo history, cap 50).
   const mutate = useCallback((fn: (s: TimelineState) => TimelineState) => {
