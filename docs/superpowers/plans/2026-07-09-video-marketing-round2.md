@@ -18,11 +18,14 @@ Suggested order: **R4 (data-loss bug) first**, then R2 + R3 (layout/library poli
 
 ## R2. Recorder overlay: give the product image more room, dedicated specs band, smaller price  ⚠️ Joey flagged — CONFIRM understanding
 **Symptom (Img #14–16):** the info block (code/rank/price/description) is drawn OVER the lower ~44% of the product square, covering part of the product photo/video. Description truncates ("Apple M1 chi…"). Price ¥105,500 is huge.
-**Want (as I understand it — to confirm with Joey):**
-1. **Shrink the live-seller camera** (portrait) so there's a **dedicated specs band** between the product square and the camera. The **product photo/video is no longer covered** by the code/price/specs — it shows in full. The camera still fills **whatever vertical space is left** (smaller than today).
-2. **Black gradient** over the specs band that **fades top→bottom** (transparent at the product edge → solid black), exactly like the current scrim, so the product image blends into the specs area (continuity — Joey circled this seam in Img #14).
-3. **Description font:** make it **not bold and slightly smaller** so **more spec text fits** (less truncation). (Img #15)
-4. **Price:** make it **smaller so it lines up on the same row height as "Rank A"**, freeing horizontal room for the specs column. (Img #16)
+**Want (CONFIRMED with Joey 2026-07-09 — refined from a hard 3-band to a "straddle the seam" layout):**
+The specs block is NOT a fully separate band that leaves the product 100% clear. Instead it **straddles the old product/camera seam**:
+1. **Reduce product coverage to ~50% of today's.** Today the specs overlay covers the lower ~44% of the product square; halve that so the product shows more. The specs still overlap the product's bottom (with the gradient), just less.
+2. **Grow the specs DOWNWARD into a strip reclaimed from the top of the camera.** The specs block spans (reduced product-overlap) + (a strip taken off the camera's top), so it gets MORE total vertical room for text without eating more product. **Camera shrinks from the top**, still fills whatever's left.
+3. **Black gradient fades top→bottom across the whole specs region** (transparent where it starts on the product → solid black in the reclaimed strip) — same scrim feel as now, just starting lower (continuity; Joey circled this seam in Img #14).
+4. **Description font:** **not bold + slightly smaller** so **more spec text fits** (less truncation). (Img #15)
+5. **Price:** **smaller, aligned to the same row height as "Rank A"**, freeing horizontal room for the specs column. (Img #16)
+Exact percentages (product-overlap %, reclaimed-camera-strip height, font sizes) to be dialed in against a real recording screenshot with Joey's eyes during the build.
 **Files:** layout heights in `ORIENTATION_DIMS` (`src/lib/video-recorder/types.ts`) — introduce a `specs` band Rect (portrait: product 720 + specs band H + camera `1280-720-H`); `compositeFrame` (`compositor.ts`) draws product in its square untouched, then the specs band with its own top→bottom gradient, then camera in the remaining box; `drawShowcaseInfo` (`overlay.ts`) re-targets to the specs band, lighter/smaller description weight, smaller price aligned to the code+rank row. Landscape (16:9) equivalent: specs band likely under the product on the left column, camera on the right — decide during build.
 **Verify:** portrait recording shows the full product image un-obscured, a specs band below it with a top→bottom black gradient, and a (smaller) camera below that; description fits more text; price aligns with Rank A.
 
