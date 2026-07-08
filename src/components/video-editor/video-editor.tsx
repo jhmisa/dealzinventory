@@ -1,0 +1,279 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Play, Pause, Scissors, Trash2, Undo2, ZoomIn, ZoomOut, Loader2, ArrowRight, AlertTriangle } from 'lucide-react'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
+import { Progress } from '@/components/ui/progress'
+import { cn } from '@/lib/utils'
+import {
+  makeTimeline, addSplit, removePiece, restorePiece, setTrim, keepIntervals,
+  type TimelineState, type Range,
+} from '@/lib/video-editor/timeline'
+import { canExportVideo, exportEditedVideo } from '@/lib/video-editor/export-video'
+import type { LogoConfig, LogoCorner } from '@/lib/video-editor/logo'
+import { ReviewTrimTimeline } from './review-trim-timeline'
+import { LogoControls } from './logo-controls'
+
+interface VideoEditorProps {
+  source: Blob
+  /** Optional recorder-provided item boundaries (seconds). Phase 1b passes these; uploads pass []. */
+  itemBounds?: number[]
+  /** Called with the finished MP4 to hand off to the page (upload + draft post). */
+  onExport: (mp4: Blob) => Promise<void> | void
+}
+
+const CORNER_CLASS: Record<LogoCorner, string> = {
+  tl: 'top-2 left-2',
+  tr: 'top-2 right-2',
+  bl: 'bottom-2 left-2',
+  br: 'bottom-2 right-2',
+}
+
+export function VideoEditor({ source, itemBounds, onExport }: VideoEditorProps) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const rafRef = useRef<number | null>(null)
+  const [srcUrl, setSrcUrl] = useState<string | null>(null)
+
+  const [state, setState] = useState<TimelineState | null>(null)
+  const historyRef = useRef<TimelineState[]>([])
+  const [canUndo, setCanUndo] = useState(false)
+
+  const [playhead, setPlayhead] = useState(0)
+  const [zoom, setZoom] = useState(1)
+  const [selected, setSelected] = useState<Range | null>(null)
+  const [playing, setPlaying] = useState(false)
+  const [logo, setLogo] = useState<LogoConfig>({ enabled: true, corner: 'br' })
+
+  const [exporting, setExporting] = useState(false)
+  const [progress, setProgress] = useState(0)
+
+  const exportable = canExportVideo()
+
+  // Object URL for the preview.
+  useEffect(() => {
+    const url = URL.createObjectURL(source)
+    setSrcUrl(url)
+    return () => URL.revokeObjectURL(url)
+  }, [source])
+
+  // Build the timeline once the video's duration is known.
+  const handleLoadedMetadata = useCallback(() => {
+    const v = videoRef.current
+    if (!v || !Number.isFinite(v.duration)) return
+    setState(makeTimeline(v.duration, itemBounds ?? []))
+  }, [itemBounds])
+
+  // Snapshot + mutate helper (undo history, cap 50).
+  const mutate = useCallback((fn: (s: TimelineState) => TimelineState) => {
+    setState((prev) => {
+      if (!prev) return prev
+      historyRef.current = [...historyRef.current, prev].slice(-50)
+      setCanUndo(true)
+      return fn(prev)
+    })
+  }, [])
+
+  const undo = useCallback(() => {
+    const h = historyRef.current
+    if (!h.length) return
+    const prev = h[h.length - 1]
+    historyRef.current = h.slice(0, -1)
+    setCanUndo(historyRef.current.length > 0)
+    setSelected(null)
+    setState(prev)
+  }, [])
+
+  const seekTo = useCallback((t: number) => {
+    const v = videoRef.current
+    if (v) v.currentTime = t
+    setPlayhead(t)
+  }, [])
+
+  const doSplit = useCallback(() => {
+    mutate((s) => addSplit(s, playhead))
+  }, [mutate, playhead])
+
+  const doRemove = useCallback(() => {
+    if (!selected) return
+    mutate((s) => removePiece(s, selected))
+    setSelected(null)
+  }, [mutate, selected])
+
+  const doRestore = useCallback((p: Range) => {
+    mutate((s) => restorePiece(s, p))
+  }, [mutate])
+
+  const doSetTrim = useCallback((start: number, end: number) => {
+    mutate((s) => setTrim(s, start, end))
+  }, [mutate])
+
+  // Keyboard: S = split, Backspace/Delete = remove. Ignore when typing in a field.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return
+      if (e.key === 's' || e.key === 'S') { e.preventDefault(); doSplit() }
+      else if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); doRemove() }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [doSplit, doRemove])
+
+  // Playback loop: native play + skip removed ranges + loop within trim window.
+  const stopLoop = useCallback(() => {
+    if (rafRef.current != null) cancelAnimationFrame(rafRef.current)
+    rafRef.current = null
+  }, [])
+
+  const togglePlay = useCallback(() => {
+    const v = videoRef.current
+    if (!v || !state) return
+    if (playing) {
+      v.pause()
+      setPlaying(false)
+      stopLoop()
+      return
+    }
+    if (v.currentTime < state.trimStart || v.currentTime >= state.trimEnd) v.currentTime = state.trimStart
+    void v.play()
+    setPlaying(true)
+    const tick = () => {
+      const cur = v.currentTime
+      const s = state
+      const inRemoved = s.removed.find((r) => cur >= r.start && cur < r.end)
+      if (inRemoved) { v.currentTime = inRemoved.end }
+      else if (cur >= s.trimEnd) { v.currentTime = s.trimStart }
+      setPlayhead(v.currentTime)
+      rafRef.current = requestAnimationFrame(tick)
+    }
+    rafRef.current = requestAnimationFrame(tick)
+  }, [playing, state, stopLoop])
+
+  useEffect(() => stopLoop, [stopLoop])
+
+  const changeZoom = useCallback((factor: number) => {
+    setZoom((z) => Math.min(16, Math.max(1, factor > 1 ? z * 2 : z / 2)))
+  }, [])
+
+  const runExport = useCallback(async () => {
+    if (!state) return
+    const keep = keepIntervals(state)
+    if (!keep.length) { toast.error('Nothing to export — the whole clip is trimmed or cut.'); return }
+    setExporting(true)
+    setProgress(0)
+    if (playing) togglePlay()
+    try {
+      const mp4 = await exportEditedVideo({ source, keep, logo, onProgress: setProgress })
+      await onExport(mp4)
+    } catch (err) {
+      console.error('[video-editor] export failed', err)
+      toast.error(err instanceof Error ? err.message : 'Export failed.')
+    } finally {
+      setExporting(false)
+    }
+  }, [state, source, logo, onExport, playing, togglePlay])
+
+  return (
+    <div className="space-y-4">
+      {/* Preview */}
+      <div className="relative mx-auto w-full max-w-md overflow-hidden rounded-lg border border-border bg-black">
+        {srcUrl && (
+          <video
+            ref={videoRef}
+            src={srcUrl}
+            playsInline
+            className="max-h-[60vh] w-full bg-black"
+            onLoadedMetadata={handleLoadedMetadata}
+            onClick={togglePlay}
+          />
+        )}
+        {logo.enabled && (
+          <div
+            className={cn(
+              'pointer-events-none absolute rounded-md bg-black/45 px-2 py-1 text-sm font-bold text-white',
+              CORNER_CLASS[logo.corner],
+            )}
+          >
+            {logo.text ?? 'Dealz'}
+          </div>
+        )}
+      </div>
+
+      {/* Controls */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button variant="outline" size="sm" onClick={togglePlay} disabled={!state || exporting}>
+          {playing ? <Pause className="mr-1.5 h-4 w-4" /> : <Play className="mr-1.5 h-4 w-4" />}
+          {playing ? 'Pause' : 'Play'}
+        </Button>
+        <Button variant="outline" size="sm" onClick={doSplit} disabled={!state || exporting}>
+          <Scissors className="mr-1.5 h-4 w-4" />
+          Split <kbd className="ml-1.5 rounded border border-border px-1 text-[10px]">S</kbd>
+        </Button>
+        <Button variant="outline" size="sm" onClick={doRemove} disabled={!selected || exporting}>
+          <Trash2 className="mr-1.5 h-4 w-4" />
+          Remove <kbd className="ml-1.5 rounded border border-border px-1 text-[10px]">⌫</kbd>
+        </Button>
+        <Button variant="outline" size="sm" onClick={undo} disabled={!canUndo || exporting}>
+          <Undo2 className="mr-1.5 h-4 w-4" />
+          Undo
+        </Button>
+        <div className="ml-auto flex items-center gap-1">
+          <span className="text-xs text-muted-foreground">Zoom</span>
+          <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => changeZoom(0.5)} disabled={zoom <= 1}>
+            <ZoomOut className="h-3.5 w-3.5" />
+          </Button>
+          <span className="w-8 text-center text-xs tabular-nums text-muted-foreground">{zoom}×</span>
+          <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => changeZoom(2)} disabled={zoom >= 16}>
+            <ZoomIn className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Timeline */}
+      {state ? (
+        <ReviewTrimTimeline
+          state={state}
+          playhead={playhead}
+          zoom={zoom}
+          selected={selected}
+          onScrub={seekTo}
+          onSelectPiece={setSelected}
+          onRestorePiece={doRestore}
+          onSetTrim={doSetTrim}
+        />
+      ) : (
+        <div className="text-sm text-muted-foreground">Loading video…</div>
+      )}
+
+      {/* Finishing + export */}
+      <div className="flex flex-wrap items-center gap-4 border-t border-border pt-4">
+        <LogoControls value={logo} onChange={setLogo} />
+        <div className="ml-auto flex items-center gap-3">
+          {exporting && <Progress value={Math.round(progress * 100)} className="w-40" />}
+          {!exportable ? (
+            <span className="flex items-center gap-1.5 text-xs text-amber-500">
+              <AlertTriangle className="h-4 w-4" />
+              Use Chrome or Edge to export
+            </span>
+          ) : (
+            <Button onClick={runExport} disabled={!state || exporting}>
+              {exporting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Exporting… {Math.round(progress * 100)}%
+                </>
+              ) : (
+                <>
+                  Export &amp; continue
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </>
+              )}
+            </Button>
+          )}
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Renders with cuts skipped (WebCodecs). Logo burned in. Audio preserved. Music bed coming soon.
+      </p>
+    </div>
+  )
+}
