@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Loader2, Circle, Square, SkipForward, X, AlertCircle, Camera, Mic, Image as ImageIcon, Video, Smartphone, Monitor, Pause, Play } from 'lucide-react'
+import { Loader2, Circle, Square, SkipForward, X, AlertCircle, Camera, Mic, Image as ImageIcon, Video, Smartphone, Monitor, Pause, Play, Wand2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
@@ -14,7 +14,9 @@ import { getClaimableByCode } from '@/services/mine'
 import { VIDEO_CONSTRAINTS, pickSupportedMimeType } from '@/lib/media-recording'
 import {
   compositeFrame, computeItemBounds, ORIENTATION_DIMS,
+  CameraEffectProcessor, DEFAULT_EFFECT_SETTINGS,
   type RecorderCard, type CardRuntime, type MediaMode, type Orientation,
+  type CameraEffectMode, type CameraEffectSettings,
 } from '@/lib/video-recorder'
 import type { GalleryImage } from '@/components/shared/image-gallery'
 import { CodeStrip } from './code-strip'
@@ -23,6 +25,11 @@ const PHOTO_MS = 3000 // matches the showcase page's photo auto-rotation cadence
 const LS_CAM = 'recorder.cameraId'
 const LS_MIC = 'recorder.micId'
 const LS_ORIENTATION = 'recorder.orientation'
+const LS_BG_MODE = 'recorder.bgMode'
+const LS_BG_COLOR = 'recorder.bgColor'
+
+// Preset greenscreen backdrops (solid colors). Uploaded images are per-session (not persisted).
+const BG_PRESETS = ['#101828', '#0b3d2e', '#1e3a8a', '#7c2d12', '#3b0764', '#f8fafc']
 
 interface RecorderProps {
   codes: string[]
@@ -97,6 +104,15 @@ export function Recorder({ codes, onComplete, onCancel, initialOrientation }: Re
   const [selectedCam, setSelectedCam] = useState('')
   const [selectedMic, setSelectedMic] = useState('')
 
+  // Camera background effect (R1). Phase 1 = greenscreen chroma-key over a solid or uploaded backdrop.
+  const [bgMode, setBgMode] = useState<CameraEffectMode>(
+    () => (localStorage.getItem(LS_BG_MODE) as CameraEffectMode | null) ?? 'none',
+  )
+  const [bgColor, setBgColor] = useState(() => localStorage.getItem(LS_BG_COLOR) ?? BG_PRESETS[0])
+  const [bgImage, setBgImage] = useState<HTMLImageElement | null>(null)
+  const effectRef = useRef<CameraEffectProcessor | null>(null)
+  const effectSettingsRef = useRef<CameraEffectSettings>(DEFAULT_EFFECT_SETTINGS)
+
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const cameraRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -115,6 +131,28 @@ export function Recorder({ codes, onComplete, onCancel, initialOrientation }: Re
 
   useEffect(() => { activeIndexRef.current = activeIndex }, [activeIndex])
   useEffect(() => { cardsRef.current = cards }, [cards])
+
+  // Keep the RAF loop's effect settings in sync with the UI + persist the choice.
+  useEffect(() => {
+    effectSettingsRef.current = {
+      ...DEFAULT_EFFECT_SETTINGS,
+      mode: bgMode,
+      background: bgImage
+        ? { type: 'image', color: bgColor, image: bgImage }
+        : { type: 'color', color: bgColor, image: null },
+    }
+    localStorage.setItem(LS_BG_MODE, bgMode)
+    localStorage.setItem(LS_BG_COLOR, bgColor)
+  }, [bgMode, bgColor, bgImage])
+
+  const handleBgUpload = useCallback((file: File | null | undefined) => {
+    if (!file) return
+    if (!file.type.startsWith('image/')) { toast.error('Please choose an image file.'); return }
+    const img = new Image()
+    img.onload = () => setBgImage(img)
+    img.onerror = () => toast.error('Could not load that image.')
+    img.src = URL.createObjectURL(file)
+  }, [])
 
   // 1. Load overlay cards for each code, then acquire camera + mic.
   useEffect(() => {
@@ -240,17 +278,26 @@ export function Recorder({ codes, onComplete, onCancel, initialOrientation }: Re
         }
         currentVideoRef.current = desired
 
+        // Apply the camera background effect (chroma-key) before compositing, if enabled.
+        let cameraSource: HTMLVideoElement | HTMLCanvasElement | null = cameraRef.current
+        const fx = effectSettingsRef.current
+        if (cameraSource && fx.mode !== 'none') {
+          if (!effectRef.current) effectRef.current = new CameraEffectProcessor()
+          cameraSource = effectRef.current.process(cameraSource, fx)
+        }
+
         compositeFrame({
           ctx,
           canvasW: dims.canvasW,
           canvasH: dims.canvasH,
           product: dims.product,
+          specs: dims.specs,
           cameraBox: dims.camera,
           card,
           mode: rt.mode,
           photoIndex: rt.photoIndex,
           videoIndex: rt.videoIndex,
-          camera: cameraRef.current,
+          camera: cameraSource,
         })
       }
       raf = requestAnimationFrame(draw)
@@ -616,6 +663,69 @@ export function Recorder({ codes, onComplete, onCancel, initialOrientation }: Re
                 </div>
               </div>
             )}
+
+            {/* Background (greenscreen chroma-key) */}
+            <div className="space-y-2">
+              <span className="text-xs font-medium text-muted-foreground">Background</span>
+              <div className="inline-flex w-full rounded-md border border-border p-0.5">
+                <Button
+                  variant={bgMode === 'none' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-8 flex-1 text-xs"
+                  onClick={() => setBgMode('none')}
+                >
+                  None
+                </Button>
+                <Button
+                  variant={bgMode === 'greenscreen' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-8 flex-1 gap-1.5 text-xs"
+                  onClick={() => setBgMode('greenscreen')}
+                >
+                  <Wand2 className="h-3.5 w-3.5" />
+                  Greenscreen
+                </Button>
+              </div>
+              {bgMode === 'greenscreen' && (
+                <div className="space-y-2">
+                  <p className="text-[10px] text-muted-foreground">
+                    Removes a green backdrop behind you and replaces it with the chosen background.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {BG_PRESETS.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => { setBgColor(c); setBgImage(null) }}
+                        className={cn(
+                          'h-7 w-7 rounded-md border',
+                          !bgImage && bgColor === c ? 'ring-2 ring-primary ring-offset-1' : 'border-border',
+                        )}
+                        style={{ background: c }}
+                        aria-label={`Background ${c}`}
+                      />
+                    ))}
+                    <label className="flex h-7 cursor-pointer items-center gap-1 rounded-md border border-border px-2 text-xs">
+                      <Upload className="h-3.5 w-3.5" />
+                      Image
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => handleBgUpload(e.target.files?.[0])}
+                      />
+                    </label>
+                  </div>
+                  {bgImage && (
+                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                      <img src={bgImage.src} alt="" className="h-7 w-10 rounded object-cover" />
+                      Custom background
+                      <button type="button" className="underline" onClick={() => setBgImage(null)}>remove</button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex justify-center">

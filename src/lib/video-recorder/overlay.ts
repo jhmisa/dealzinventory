@@ -1,4 +1,4 @@
-import type { RecorderCard } from './types'
+import type { RecorderCard, Rect } from './types'
 
 type Ctx2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D
 
@@ -50,111 +50,108 @@ function wrapLines(ctx: Ctx2D, text: string, maxW: number, maxLines: number): st
 }
 
 /**
- * Product info block, drawn straddling the lower portion of the media square
- * (mirrors the customer-facing showcase page): code · rank · price on the left,
- * title · spec line on the right, over a bottom-fading scrim.
+ * Product info band (R2). Drawn into the `specs` Rect that STRADDLES the product↔camera
+ * seam: its top overlaps the product's bottom over a top→bottom black gradient, and (portrait)
+ * it extends down into a strip reclaimed off the camera's top. Layout, bottom-up:
+ *   • a compact meta row — code · Rank chip · price (smaller than before, all on one line)
+ *   • above it, the spec-rich description — lighter (500) + slightly smaller so MORE text fits,
+ *     full-width and left-aligned, wrapping to as many lines as the band allows
+ *   • an optional dim condition-notes line above that, only if a line is spare
+ * `w` (band width) drives every font size, so both orientations scale identically.
  */
-export function drawShowcaseInfo(ctx: Ctx2D, card: RecorderCard, x: number, y: number, w: number, h: number): void {
-  const pad = Math.round(w * 0.042)
-  const bandTop = y + Math.round(h * 0.56)
+export function drawShowcaseInfo(ctx: Ctx2D, card: RecorderCard, band: Rect): void {
+  const { x, y, w, h } = band
+  const pad = Math.round(w * 0.04)
 
-  // Bottom-fading scrim for legibility over any photo.
-  const grad = ctx.createLinearGradient(0, bandTop, 0, y + h)
+  // Top→bottom black gradient across the whole band: transparent where it starts on the product,
+  // solid in the reclaimed strip — one continuous scrim across the seam.
+  const grad = ctx.createLinearGradient(0, y, 0, y + h)
   grad.addColorStop(0, 'rgba(0,0,0,0)')
-  grad.addColorStop(0.5, 'rgba(0,0,0,0.55)')
+  grad.addColorStop(0.4, 'rgba(0,0,0,0.5)')
   grad.addColorStop(1, 'rgba(0,0,0,0.92)')
   ctx.fillStyle = grad
-  ctx.fillRect(x, bandTop, w, y + h - bandTop)
+  ctx.fillRect(x, y, w, h)
 
+  ctx.textAlign = 'left'
   ctx.textBaseline = 'alphabetic'
   const bottom = y + h - pad
 
-  // ---- LEFT column (bottom-up): price, strike original, code + rank ----
-  const pricePx = Math.round(w * 0.094)
-  ctx.font = `800 ${pricePx}px Inter, system-ui, sans-serif`
-  const priceStr = yen(card.price)
-  const priceW = ctx.measureText(priceStr).width
-  ctx.fillStyle = '#fff'
-  ctx.fillText(priceStr, pad, bottom)
-
-  let ly = bottom - pricePx * 1.02
-
-  if (card.originalPrice && card.originalPrice > card.price) {
-    const oPx = Math.round(w * 0.04)
-    ctx.font = `500 ${oPx}px Inter, system-ui, sans-serif`
-    const oStr = yen(card.originalPrice)
-    const oW = ctx.measureText(oStr).width
-    ctx.fillStyle = 'rgba(255,255,255,0.6)'
-    ctx.fillText(oStr, pad, ly)
-    ctx.strokeStyle = 'rgba(255,255,255,0.6)'
-    ctx.lineWidth = Math.max(1, oPx * 0.06)
-    ctx.beginPath()
-    ctx.moveTo(pad, ly - oPx * 0.3)
-    ctx.lineTo(pad + oW, ly - oPx * 0.3)
-    ctx.stroke()
-    ly -= oPx * 1.4
-  }
-
-  // code + rank chip on one line
+  // ---- Meta row (bottom): code · Rank chip · price, all bottom-aligned on one line ----
   const codePx = Math.round(w * 0.05)
+  const pricePx = Math.round(w * 0.056) // was ~0.094 — smaller, aligned to the code+rank row
+  const rowH = Math.max(codePx, pricePx)
+  let mx = x + pad
+
   ctx.font = `700 ${codePx}px ui-monospace, monospace`
   ctx.fillStyle = '#fff'
-  ctx.fillText(card.code, pad, ly)
-  const codeW = ctx.measureText(card.code).width
-  let leftColW = Math.max(priceW, codeW)
+  ctx.fillText(card.code, mx, bottom)
+  mx += ctx.measureText(card.code).width + pad * 0.55
 
   if (card.grade) {
     const gPx = Math.round(w * 0.036)
     ctx.font = `700 ${gPx}px Inter, system-ui, sans-serif`
     const label = `Rank ${card.grade}`
     const gw = ctx.measureText(label).width + gPx * 0.8
-    const gx = pad + codeW + pad * 0.4
-    const gy = ly - codePx * 0.82
+    const chipH = gPx * 1.5
+    const gy = bottom - chipH + gPx * 0.16 // sit the chip on the baseline row
     ctx.fillStyle = 'rgba(255,255,255,0.22)'
-    roundRect(ctx, gx, gy, gw, gPx * 1.5, gPx * 0.35)
+    roundRect(ctx, mx, gy, gw, chipH, gPx * 0.35)
     ctx.fill()
     ctx.fillStyle = '#fff'
-    ctx.fillText(label, gx + gPx * 0.4, gy + gPx * 1.05)
-    leftColW = Math.max(leftColW, codeW + pad * 0.4 + gw)
+    ctx.fillText(label, mx + gPx * 0.4, gy + gPx * 1.05)
+    mx += gw + pad * 0.6
   }
 
-  // ---- RIGHT column (bottom-up): condition notes, then the spec-rich description ----
-  // Mirrors the customer showcase page: the description (storage/RAM/chip/color) is the
-  // primary text — NOT the brand+model title, which duplicated the code column above.
-  const rightX = Math.max(x + w * 0.46, x + pad + leftColW + w * 0.03)
-  const rightW = x + w - pad - rightX
-  if (rightW > w * 0.2) {
-    ctx.textAlign = 'right'
-    let ry = bottom
+  ctx.font = `800 ${pricePx}px Inter, system-ui, sans-serif`
+  ctx.fillStyle = '#fff'
+  const priceStr = yen(card.price)
+  ctx.fillText(priceStr, mx, bottom)
+  mx += ctx.measureText(priceStr).width
 
-    // Condition notes: a "CONDITION" label + up to 2 lines (showcase's Condition block).
-    if (card.conditionNotes) {
-      const nPx = Math.round(w * 0.019)
-      ctx.font = `500 ${nPx}px Inter, system-ui, sans-serif`
-      ctx.fillStyle = 'rgba(255,255,255,0.85)'
-      const noteLines = wrapLines(ctx, card.conditionNotes, rightW, 2)
-      for (let i = noteLines.length - 1; i >= 0; i--) {
-        ctx.fillText(noteLines[i], x + w - pad, ry)
-        ry -= nPx * 1.35
-      }
-      const lPx = Math.round(w * 0.015)
-      ctx.font = `700 ${lPx}px Inter, system-ui, sans-serif`
-      ctx.fillStyle = 'rgba(255,255,255,0.6)'
-      ctx.fillText('CONDITION', x + w - pad, ry)
-      ry -= lPx * 2.2
-    }
+  if (card.originalPrice && card.originalPrice > card.price) {
+    const oPx = Math.round(w * 0.032)
+    ctx.font = `500 ${oPx}px Inter, system-ui, sans-serif`
+    const oStr = yen(card.originalPrice)
+    const ox = mx + pad * 0.4
+    ctx.fillStyle = 'rgba(255,255,255,0.6)'
+    ctx.fillText(oStr, ox, bottom)
+    const oW = ctx.measureText(oStr).width
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)'
+    ctx.lineWidth = Math.max(1, oPx * 0.06)
+    ctx.beginPath()
+    ctx.moveTo(ox, bottom - oPx * 0.32)
+    ctx.lineTo(ox + oW, bottom - oPx * 0.32)
+    ctx.stroke()
+  }
 
-    // Spec-rich description — same string the showcase page shows (line-clamp-3).
-    if (card.subtitle) {
-      const dPx = Math.round(w * 0.042)
-      ctx.font = `600 ${dPx}px Inter, system-ui, sans-serif`
-      ctx.fillStyle = 'rgba(255,255,255,0.96)'
-      const descLines = wrapLines(ctx, card.subtitle, rightW, 3)
-      for (let i = descLines.length - 1; i >= 0; i--) {
-        ctx.fillText(descLines[i], x + w - pad, ry)
-        ry -= dPx * 1.2
-      }
+  // ---- Description (above the meta row), lighter + smaller, wrapping to fill the band ----
+  const maxW = w - pad * 2
+  const topLimit = y + pad
+  let descBottom = bottom - rowH * 1.2
+
+  const dPx = Math.round(w * 0.04)
+  const dLineH = dPx * 1.22
+  // How many description lines physically fit between the band top and the meta row.
+  let capacity = Math.max(1, Math.floor((descBottom - topLimit) / dLineH))
+
+  // Reserve one line for condition notes if present and there's room to spare.
+  const showNotes = !!card.conditionNotes && capacity > 2
+  if (showNotes) capacity -= 1
+
+  if (card.subtitle) {
+    ctx.font = `500 ${dPx}px Inter, system-ui, sans-serif`
+    ctx.fillStyle = 'rgba(255,255,255,0.96)'
+    const descLines = wrapLines(ctx, card.subtitle, maxW, Math.min(capacity, 4))
+    for (let i = descLines.length - 1; i >= 0; i--) {
+      ctx.fillText(descLines[i], x + pad, descBottom)
+      descBottom -= dLineH
     }
-    ctx.textAlign = 'left'
+  }
+
+  if (showNotes && card.conditionNotes) {
+    const nPx = Math.round(w * 0.03)
+    ctx.font = `500 ${nPx}px Inter, system-ui, sans-serif`
+    ctx.fillStyle = 'rgba(255,255,255,0.72)'
+    ctx.fillText(fitLine(ctx, card.conditionNotes, maxW), x + pad, descBottom)
   }
 }

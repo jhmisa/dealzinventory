@@ -9,13 +9,16 @@ export interface CompositeInput {
   canvasH: number
   /** The protected product-showcase square. */
   product: Rect
+  /** The info band straddling the product↔camera seam (code · rank · price · specs). */
+  specs: Rect
   /** The remaining box the seller's camera fills. */
   cameraBox: Rect
   card: RecorderCard
   mode: MediaMode
   photoIndex: number
   videoIndex: number
-  camera: HTMLVideoElement | null
+  /** The seller camera — a raw <video>, or a pre-processed effect <canvas> (chroma-key / blur). */
+  camera: HTMLVideoElement | HTMLCanvasElement | null
 }
 
 /**
@@ -25,7 +28,7 @@ export interface CompositeInput {
  * landscape (16:9). The product square is always the same size in both.
  */
 export function compositeFrame({
-  ctx, canvasW, canvasH, product, cameraBox, card, mode, photoIndex, videoIndex, camera,
+  ctx, canvasW, canvasH, product, specs, cameraBox, card, mode, photoIndex, videoIndex, camera,
 }: CompositeInput): void {
   ctx.fillStyle = '#000'
   ctx.fillRect(0, 0, canvasW, canvasH)
@@ -54,13 +57,20 @@ export function compositeFrame({
   drawPill(ctx, mode === 'photos' ? 'PHOTOS' : 'VIDEO', x + margin, y + margin, w)
   if (count > 1) drawCounter(ctx, `${idx + 1} / ${count}`, x + w - margin, y + margin, w)
 
-  drawShowcaseInfo(ctx, card, x, y, w, h)
+  // ---- Specs band (straddles the seam: overlaps the product bottom + reclaimed strip) ----
+  drawShowcaseInfo(ctx, card, specs)
 
-  // ---- Live camera box ----
+  // ---- Live camera box (raw <video> or a pre-processed effect <canvas>) ----
   ctx.fillStyle = '#0a0a0a'
   ctx.fillRect(cameraBox.x, cameraBox.y, cameraBox.w, cameraBox.h)
-  if (camera && camera.readyState >= 2 && camera.videoWidth > 0) {
-    drawCover(ctx, camera, camera.videoWidth, camera.videoHeight, cameraBox.x, cameraBox.y, cameraBox.w, cameraBox.h)
+  if (camera) {
+    const isVideo = 'videoWidth' in camera
+    const cw = isVideo ? camera.videoWidth : camera.width
+    const ch = isVideo ? camera.videoHeight : camera.height
+    const ready = isVideo ? camera.readyState >= 2 : true
+    if (ready && cw > 0) {
+      drawCover(ctx, camera, cw, ch, cameraBox.x, cameraBox.y, cameraBox.w, cameraBox.h)
+    }
   }
 
   // seam divider along the shared edge
