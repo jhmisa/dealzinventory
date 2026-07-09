@@ -182,9 +182,11 @@ export async function exportEditedVideo(opts: ExportOptions): Promise<Blob> {
 }
 
 /**
- * Assemble one AudioBuffer covering the full video timeline. Each segment's decoded audio is
- * resampled to AUDIO_RATE and written at the segment's running offset; segments with no audio (or
- * audio shorter than their video) leave silence — so audio never drifts out of sync with the frames.
+ * Assemble one AudioBuffer covering the full video timeline. Each KEPT RANGE's audio is trimmed to
+ * exactly its [start,end] window, resampled to AUDIO_RATE, and written at the same running output
+ * offset the video loop uses for that range — so audio stays aligned with the frames across every
+ * cut (the decoder returns a block that starts just before each cut; without trimming that overhang
+ * the audio slides progressively ahead of the video). Ranges with no audio leave silence.
  * An optional `music` bed (already at AUDIO_RATE) is then mixed UNDER everything at `musicVolume`%,
  * looped to fill the timeline and clamped to avoid clipping.
  * Returns null only when there is no segment audio AND no music (→ silent video, no audio track).
@@ -195,32 +197,35 @@ async function buildMasterAudio(
   music: AudioBuffer | null,
   musicVolume: number,
 ): Promise<AudioBuffer | null> {
-  // Decode each segment's (kept) audio into a single buffer at AUDIO_RATE, or null if it has none.
-  const perSegment: (AudioBuffer | null)[] = []
-  let any = false
+  // Collect each kept range's trimmed audio paired with the output offset (seconds) it belongs at —
+  // the offset advances by each range's length, mirroring the video loop's outCursor exactly.
+  const placed: { buf: AudioBuffer; offsetSec: number }[] = []
+  let outCursor = 0
   for (const seg of segments) {
-    const buf = await collectSegmentAudio(seg)
-    perSegment.push(buf)
-    if (buf) any = true
+    const track = await seg.input.getPrimaryAudioTrack()
+    const sink = track ? new AudioBufferSink(track) : null
+    for (const range of seg.ranges) {
+      if (sink) {
+        const buf = await collectRangeAudio(sink, range)
+        if (buf) placed.push({ buf, offsetSec: outCursor })
+      }
+      outCursor += range.end - range.start
+    }
   }
-  if (!any && !music) return null
+  if (placed.length === 0 && !music) return null
 
-  const channels = Math.max(1, music?.numberOfChannels ?? 1, ...perSegment.map((b) => b?.numberOfChannels ?? 1))
+  const channels = Math.max(1, music?.numberOfChannels ?? 1, ...placed.map((p) => p.buf.numberOfChannels))
   const totalLen = Math.max(1, Math.ceil(totalVideoDuration * AUDIO_RATE))
   const master = new AudioBuffer({ length: totalLen, numberOfChannels: channels, sampleRate: AUDIO_RATE })
 
-  let offsetSec = 0
-  for (let i = 0; i < segments.length; i++) {
-    const buf = perSegment[i]
-    if (buf) {
-      const startSample = Math.round(offsetSec * AUDIO_RATE)
-      const copyLen = Math.min(buf.length, totalLen - startSample)
-      for (let ch = 0; ch < channels; ch++) {
-        const src = buf.getChannelData(Math.min(ch, buf.numberOfChannels - 1))
-        master.getChannelData(ch).set(src.subarray(0, Math.max(0, copyLen)), startSample)
-      }
+  for (const { buf, offsetSec } of placed) {
+    const startSample = Math.round(offsetSec * AUDIO_RATE)
+    const copyLen = Math.min(buf.length, totalLen - startSample)
+    if (copyLen <= 0) continue
+    for (let ch = 0; ch < channels; ch++) {
+      const src = buf.getChannelData(Math.min(ch, buf.numberOfChannels - 1))
+      master.getChannelData(ch).set(src.subarray(0, copyLen), startSample)
     }
-    offsetSec += segments[i].videoDuration
   }
 
   // Mix the music bed under the voice.
@@ -274,16 +279,39 @@ async function decodeAudio(blob: Blob, rate: number): Promise<AudioBuffer> {
   }
 }
 
-/** Concatenate a segment's kept audio into one buffer at AUDIO_RATE (resampling if needed). */
-async function collectSegmentAudio(seg: Segment): Promise<AudioBuffer | null> {
-  const track = await seg.input.getPrimaryAudioTrack()
-  if (!track) return null
-  const sink = new AudioBufferSink(track)
+/**
+ * Compute how to trim one range's concatenated source audio down to exactly [rangeStart, rangeEnd].
+ * `firstTs` is the source timestamp of the first decoded block, which the sink returns starting at
+ * or just before rangeStart. Returns the leading samples to drop (the pre-cut overhang) and the
+ * sample count to keep (capped at what's available). Pure so the alignment math is unit-testable.
+ */
+export function audioTrimWindow(
+  rangeStart: number,
+  rangeEnd: number,
+  firstTs: number,
+  srcRate: number,
+  mergedLen: number,
+): { skip: number; keepLen: number } {
+  const skip = Math.max(0, Math.round((rangeStart - firstTs) * srcRate))
+  const want = Math.round((rangeEnd - rangeStart) * srcRate)
+  const keepLen = Math.max(0, Math.min(mergedLen - skip, want))
+  return { skip, keepLen }
+}
+
+/**
+ * Decode one kept range's audio, trimmed to exactly [range.start, range.end] and resampled to
+ * AUDIO_RATE. The sink hands back a leading block whose timestamp precedes range.start (the block
+ * containing the cut); audioTrimWindow drops that overhang so the range's audio lines up with its
+ * video frames. Returns null if the range has no audio.
+ */
+async function collectRangeAudio(sink: AudioBufferSink, range: Range): Promise<AudioBuffer | null> {
   const chunks: AudioBuffer[] = []
-  for (const range of seg.ranges) {
-    for await (const wrapped of sink.buffers(range.start, range.end)) chunks.push(wrapped.buffer)
+  let firstTs: number | null = null
+  for await (const wrapped of sink.buffers(range.start, range.end)) {
+    if (firstTs === null) firstTs = wrapped.timestamp
+    chunks.push(wrapped.buffer)
   }
-  if (!chunks.length) return null
+  if (!chunks.length || firstTs === null) return null
 
   const srcRate = chunks[0].sampleRate
   const channels = chunks[0].numberOfChannels
@@ -294,8 +322,14 @@ async function collectSegmentAudio(seg: Segment): Promise<AudioBuffer | null> {
     for (let ch = 0; ch < channels; ch++) merged.getChannelData(ch).set(c.getChannelData(ch), at)
     at += c.length
   }
-  if (srcRate === AUDIO_RATE) return merged
-  return resample(merged, AUDIO_RATE)
+
+  const { skip, keepLen } = audioTrimWindow(range.start, range.end, firstTs, srcRate, merged.length)
+  if (keepLen <= 0) return null
+  const trimmed = new AudioBuffer({ length: keepLen, numberOfChannels: channels, sampleRate: srcRate })
+  for (let ch = 0; ch < channels; ch++) {
+    trimmed.getChannelData(ch).set(merged.getChannelData(ch).subarray(skip, skip + keepLen), 0)
+  }
+  return srcRate === AUDIO_RATE ? trimmed : resample(trimmed, AUDIO_RATE)
 }
 
 /** Resample an AudioBuffer to `rate` via an OfflineAudioContext. */
