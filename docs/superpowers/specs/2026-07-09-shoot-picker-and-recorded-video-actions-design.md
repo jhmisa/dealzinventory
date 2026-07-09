@@ -1,7 +1,8 @@
 # Shoot inventory picker + Recorded-Video posting actions (Joey, 2026-07-09)
 
-> **Status: design LOCKED (approved in conversation 2026-07-09).** Two independent improvements to
-> the video-marketing flow. No DB migrations required — both wire over existing machinery.
+> **Status: ✅ SHIPPED v1.105.0 (2026-07-09).** Both improvements built via subagent-driven
+> development, spec+quality reviewed, and E2E-verified in real Chromium (Part 2's live Blotato push
+> deferred to Joey). No DB migrations. Plan: `docs/superpowers/plans/2026-07-09-shoot-picker-and-recorded-video-actions.md`.
 
 ## Motivation
 
