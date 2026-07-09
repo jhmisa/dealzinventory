@@ -30,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { InventoryPicker } from '@/components/shared/inventory-picker'
 import { useCreateShoot, useUpdateShoot } from '@/hooks/use-shoots'
 import { useStaffProfiles } from '@/hooks/use-staff-profiles'
 import { shootSchema, type ShootFormValues } from '@/validators/shoot'
@@ -93,13 +94,17 @@ export function ShootFormDialog({ open, onOpenChange, shoot }: ShootFormDialogPr
   const activeStaff = staff.filter((s) => s.is_active)
   const codes = form.watch('item_codes')
 
-  function addCode() {
-    const value = codeInput.trim()
-    if (!value) return
+  function addCodeValue(value: string) {
+    const v = value.trim()
+    if (!v) return
     const current = form.getValues('item_codes')
-    if (!current.includes(value)) {
-      form.setValue('item_codes', [...current, value], { shouldValidate: true })
+    if (!current.includes(v)) {
+      form.setValue('item_codes', [...current, v], { shouldValidate: true })
     }
+  }
+
+  function addCode() {
+    addCodeValue(codeInput)
     setCodeInput('')
   }
 
@@ -156,7 +161,7 @@ export function ShootFormDialog({ open, onOpenChange, shoot }: ShootFormDialogPr
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[520px]">
+      <DialogContent className="sm:max-w-[640px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Edit Shoot' : 'New Shoot'}</DialogTitle>
           <DialogDescription>
@@ -245,6 +250,11 @@ export function ShootFormDialog({ open, onOpenChange, shoot }: ShootFormDialogPr
               render={() => (
                 <FormItem>
                   <FormLabel>Item Codes</FormLabel>
+                  <InventoryPicker
+                    onAdd={(item) => addCodeValue(item.code)}
+                    addedCodes={codes}
+                    resultsClassName="max-h-56"
+                  />
                   <div className="rounded-md border p-2">
                     {codes.length > 0 && (
                       <div className="mb-2 flex flex-wrap gap-1.5">
