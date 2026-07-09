@@ -1,6 +1,9 @@
-// Client-side video export via MediaBunny (WebCodecs). Keeps only `keepIntervals`
-// (re-timestamped continuously so there are no gaps), draws each frame + logo onto a
-// canvas, re-encodes H.264/AAC, muxes MP4. Chromium-only (WebCodecs VideoEncoder).
+// Client-side video export via MediaBunny (WebCodecs). Concatenates optional intro + the trimmed
+// recording + optional outro into one MP4: every frame is drawn (cover-fit) onto a single output
+// canvas at the recording's resolution and re-encoded H.264, with a continuously re-timestamped
+// timeline. Audio stays in sync by building ONE master AudioBuffer the exact length of the video
+// timeline — each segment's audio is resampled to a common rate and written at its offset; gaps
+// (a segment with no/shorter audio) stay silent. Chromium-only (WebCodecs VideoEncoder).
 //
 // MediaBunny 1.50.x API (pinned from node_modules/mediabunny/dist/mediabunny.d.ts):
 //   new Input({ formats: ALL_FORMATS, source: new BlobSource(blob) })
@@ -25,32 +28,62 @@ export interface ExportOptions {
   /** Ordered source-time ranges to keep (from keepIntervals()). */
   keep: Range[]
   logo: LogoConfig
+  /** Optional branded clips stitched before / after the recording (played whole, no logo). */
+  intro?: Blob | null
+  outro?: Blob | null
   onProgress?: (fraction: number) => void
   signal?: AbortSignal
 }
+
+const AUDIO_RATE = 48000 // common master rate → mixed-rate clips resample to this before muxing
 
 export function canExportVideo(): boolean {
   return typeof globalThis !== 'undefined' && 'VideoEncoder' in globalThis
 }
 
-function keptDuration(keep: Range[]): number {
+export function keptDuration(keep: Range[]): number {
   return keep.reduce((a, r) => a + (r.end - r.start), 0)
 }
 
-export async function exportEditedVideo(opts: ExportOptions): Promise<Blob> {
-  const { source, keep, logo, onProgress, signal } = opts
-  if (!canExportVideo()) {
-    throw new Error('This browser cannot export video. Please use Chrome or Edge.')
-  }
-  if (keep.length === 0) throw new Error('Nothing to export — the whole clip is trimmed/cut.')
+/** One clip in the output timeline: its decoded input, the ranges to keep, and whether to burn the logo. */
+interface Segment {
+  input: Input
+  ranges: Range[]
+  videoDuration: number
+  applyLogo: boolean
+}
 
+async function openSegment(source: Blob, keep: Range[] | null, applyLogo: boolean): Promise<Segment> {
   const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(source) })
   const videoTrack = await input.getPrimaryVideoTrack()
-  if (!videoTrack) throw new Error('No video track found in the source file.')
-  const audioTrack = await input.getPrimaryAudioTrack()
+  if (!videoTrack) throw new Error('A clip has no video track.')
+  const ranges = keep ?? [{ start: 0, end: await input.computeDuration() }]
+  return { input, ranges, videoDuration: keptDuration(ranges), applyLogo }
+}
 
-  const width = videoTrack.displayWidth || videoTrack.codedWidth
-  const height = videoTrack.displayHeight || videoTrack.codedHeight
+/** Cover-fit source frame dims into the output box (fill, crop overflow), centered. Returns draw rect. */
+function coverRect(iw: number, ih: number, ow: number, oh: number): [number, number, number, number] {
+  const scale = Math.max(ow / iw, oh / ih)
+  const dw = iw * scale
+  const dh = ih * scale
+  return [(ow - dw) / 2, (oh - dh) / 2, dw, dh]
+}
+
+export async function exportEditedVideo(opts: ExportOptions): Promise<Blob> {
+  const { source, keep, logo, intro, outro, onProgress, signal } = opts
+  if (!canExportVideo()) throw new Error('This browser cannot export video. Please use Chrome or Edge.')
+  if (keep.length === 0) throw new Error('Nothing to export — the whole clip is trimmed/cut.')
+
+  // Segments in play order. The main recording defines the output resolution.
+  const segments: Segment[] = []
+  if (intro) segments.push(await openSegment(intro, null, false))
+  const main = await openSegment(source, keep, true)
+  segments.push(main)
+  if (outro) segments.push(await openSegment(outro, null, false))
+
+  const mainVideo = await main.input.getPrimaryVideoTrack()
+  const width = mainVideo!.displayWidth || mainVideo!.codedWidth
+  const height = mainVideo!.displayHeight || mainVideo!.codedHeight
 
   const canvas = new OffscreenCanvas(width, height)
   const ctx = canvas.getContext('2d')
@@ -60,48 +93,50 @@ export async function exportEditedVideo(opts: ExportOptions): Promise<Blob> {
   const videoSource = new CanvasSource(canvas, { codec: 'avc', bitrate: QUALITY_HIGH })
   output.addVideoTrack(videoSource)
 
+  const totalVideoDuration = segments.reduce((a, s) => a + s.videoDuration, 0) || 1
+
+  // Build the master audio timeline up front (so silent gaps line up with the video) — only if any
+  // segment actually has an audio track.
+  const master = await buildMasterAudio(segments, totalVideoDuration)
   let audioSource: AudioBufferSource | null = null
-  if (audioTrack) {
+  if (master) {
     audioSource = new AudioBufferSource({ codec: 'aac', bitrate: QUALITY_MEDIUM })
     output.addAudioTrack(audioSource)
   }
 
   await output.start()
 
-  const total = keptDuration(keep) || 1
-  const videoWeight = audioTrack ? 0.5 : 1
-
-  // ---- VIDEO: keep-loop, continuous re-timestamping, per-frame logo burn ----
-  const videoSink = new VideoSampleSink(videoTrack)
+  // ---- VIDEO: draw every segment's frames (cover-fit) with a continuous output clock ----
+  const videoWeight = master ? 0.85 : 1
   let outCursor = 0
-  for (const range of keep) {
-    for await (const sample of videoSink.samples(range.start, range.end)) {
-      if (signal?.aborted) { sample.close(); throw new DOMException('Export cancelled', 'AbortError') }
-      const outTs = outCursor + (sample.timestamp - range.start)
-      ctx.clearRect(0, 0, width, height)
-      sample.draw(ctx, 0, 0, width, height)
-      drawLogo(ctx, logo, width, height)
-      await videoSource.add(outTs, sample.duration)
-      sample.close()
-      onProgress?.(Math.min(0.98, (outTs / total) * videoWeight))
+  for (const seg of segments) {
+    const vTrack = await seg.input.getPrimaryVideoTrack()
+    if (!vTrack) continue
+    const iw = vTrack.displayWidth || vTrack.codedWidth
+    const ih = vTrack.displayHeight || vTrack.codedHeight
+    const [dx, dy, dw, dh] = coverRect(iw, ih, width, height)
+    const sink = new VideoSampleSink(vTrack)
+    for (const range of seg.ranges) {
+      for await (const sample of sink.samples(range.start, range.end)) {
+        if (signal?.aborted) { sample.close(); throw new DOMException('Export cancelled', 'AbortError') }
+        const outTs = outCursor + (sample.timestamp - range.start)
+        ctx.clearRect(0, 0, width, height)
+        sample.draw(ctx, dx, dy, dw, dh)
+        if (seg.applyLogo) drawLogo(ctx, logo, width, height)
+        await videoSource.add(outTs, sample.duration)
+        sample.close()
+        onProgress?.(Math.min(0.98, (outTs / totalVideoDuration) * videoWeight))
+      }
+      outCursor += range.end - range.start
     }
-    outCursor += range.end - range.start
   }
   videoSource.close()
 
-  // ---- AUDIO: sequential append of kept buffers (MediaBunny lays them end-to-end) ----
-  if (audioTrack && audioSource) {
-    const audioSink = new AudioBufferSink(audioTrack)
-    let played = 0
-    for (const range of keep) {
-      for await (const wrapped of audioSink.buffers(range.start, range.end)) {
-        if (signal?.aborted) throw new DOMException('Export cancelled', 'AbortError')
-        await audioSource.add(wrapped.buffer)
-        played += wrapped.duration
-        onProgress?.(Math.min(0.98, 0.5 + (played / total) * 0.5))
-      }
-    }
+  // ---- AUDIO: one master buffer already sized to the whole video timeline ----
+  if (master && audioSource) {
+    await audioSource.add(master)
     audioSource.close()
+    onProgress?.(0.99)
   }
 
   await output.finalize()
@@ -109,4 +144,76 @@ export async function exportEditedVideo(opts: ExportOptions): Promise<Blob> {
   const bytes = (output.target as BufferTarget).buffer
   if (!bytes) throw new Error('Export produced no data.')
   return new Blob([bytes], { type: 'video/mp4' })
+}
+
+/**
+ * Assemble one AudioBuffer covering the full video timeline. Each segment's decoded audio is
+ * resampled to AUDIO_RATE and written at the segment's running offset; segments with no audio (or
+ * audio shorter than their video) leave silence — so audio never drifts out of sync with the frames.
+ * Returns null when no segment has any audio (→ silent video, no audio track).
+ */
+async function buildMasterAudio(segments: Segment[], totalVideoDuration: number): Promise<AudioBuffer | null> {
+  // Decode each segment's (kept) audio into a single buffer at AUDIO_RATE, or null if it has none.
+  const perSegment: (AudioBuffer | null)[] = []
+  let any = false
+  for (const seg of segments) {
+    const buf = await collectSegmentAudio(seg)
+    perSegment.push(buf)
+    if (buf) any = true
+  }
+  if (!any) return null
+
+  const channels = Math.max(1, ...perSegment.map((b) => b?.numberOfChannels ?? 1))
+  const totalLen = Math.max(1, Math.ceil(totalVideoDuration * AUDIO_RATE))
+  const master = new AudioBuffer({ length: totalLen, numberOfChannels: channels, sampleRate: AUDIO_RATE })
+
+  let offsetSec = 0
+  for (let i = 0; i < segments.length; i++) {
+    const buf = perSegment[i]
+    if (buf) {
+      const startSample = Math.round(offsetSec * AUDIO_RATE)
+      const copyLen = Math.min(buf.length, totalLen - startSample)
+      for (let ch = 0; ch < channels; ch++) {
+        const src = buf.getChannelData(Math.min(ch, buf.numberOfChannels - 1))
+        master.getChannelData(ch).set(src.subarray(0, Math.max(0, copyLen)), startSample)
+      }
+    }
+    offsetSec += segments[i].videoDuration
+  }
+  return master
+}
+
+/** Concatenate a segment's kept audio into one buffer at AUDIO_RATE (resampling if needed). */
+async function collectSegmentAudio(seg: Segment): Promise<AudioBuffer | null> {
+  const track = await seg.input.getPrimaryAudioTrack()
+  if (!track) return null
+  const sink = new AudioBufferSink(track)
+  const chunks: AudioBuffer[] = []
+  for (const range of seg.ranges) {
+    for await (const wrapped of sink.buffers(range.start, range.end)) chunks.push(wrapped.buffer)
+  }
+  if (!chunks.length) return null
+
+  const srcRate = chunks[0].sampleRate
+  const channels = chunks[0].numberOfChannels
+  const totalLen = chunks.reduce((a, b) => a + b.length, 0)
+  const merged = new AudioBuffer({ length: totalLen, numberOfChannels: channels, sampleRate: srcRate })
+  let at = 0
+  for (const c of chunks) {
+    for (let ch = 0; ch < channels; ch++) merged.getChannelData(ch).set(c.getChannelData(ch), at)
+    at += c.length
+  }
+  if (srcRate === AUDIO_RATE) return merged
+  return resample(merged, AUDIO_RATE)
+}
+
+/** Resample an AudioBuffer to `rate` via an OfflineAudioContext. */
+async function resample(buffer: AudioBuffer, rate: number): Promise<AudioBuffer> {
+  const frames = Math.ceil(buffer.duration * rate)
+  const oac = new OfflineAudioContext(buffer.numberOfChannels, Math.max(1, frames), rate)
+  const src = oac.createBufferSource()
+  src.buffer = buffer
+  src.connect(oac.destination)
+  src.start()
+  return oac.startRendering()
 }

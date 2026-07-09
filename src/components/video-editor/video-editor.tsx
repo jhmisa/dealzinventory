@@ -12,6 +12,9 @@ import { canExportVideo, exportEditedVideo } from '@/lib/video-editor/export-vid
 import type { LogoConfig, LogoCorner } from '@/lib/video-editor/logo'
 import { ReviewTrimTimeline } from './review-trim-timeline'
 import { LogoControls } from './logo-controls'
+import { IntroOutroControls, type ClipSelection } from './intro-outro-controls'
+import { useVideoAssets } from '@/hooks/use-video-assets'
+import { fetchAssetBlob } from '@/services/video-assets'
 
 interface VideoEditorProps {
   source: Blob
@@ -44,6 +47,9 @@ export function VideoEditor({ source, itemBounds, durationHint, onExport }: Vide
   const [selected, setSelected] = useState<Range | null>(null)
   const [playing, setPlaying] = useState(false)
   const [logo, setLogo] = useState<LogoConfig>({ enabled: true, corner: 'br' })
+  const [intro, setIntro] = useState<ClipSelection>({ enabled: false, id: null })
+  const [outro, setOutro] = useState<ClipSelection>({ enabled: false, id: null })
+  const { data: videoAssets = [] } = useVideoAssets()
 
   const [exporting, setExporting] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -187,7 +193,16 @@ export function VideoEditor({ source, itemBounds, durationHint, onExport }: Vide
     setProgress(0)
     if (playing) togglePlay()
     try {
-      const mp4 = await exportEditedVideo({ source, keep, logo, onProgress: setProgress })
+      // Resolve the selected intro/outro clips (if enabled) to blobs for stitching.
+      const urlFor = (sel: ClipSelection) =>
+        sel.enabled ? videoAssets.find((a) => a.id === (sel.id ?? ''))?.file_url ?? null : null
+      const introUrl = urlFor(intro)
+      const outroUrl = urlFor(outro)
+      const [introBlob, outroBlob] = await Promise.all([
+        introUrl ? fetchAssetBlob(introUrl) : Promise.resolve(null),
+        outroUrl ? fetchAssetBlob(outroUrl) : Promise.resolve(null),
+      ])
+      const mp4 = await exportEditedVideo({ source, keep, logo, intro: introBlob, outro: outroBlob, onProgress: setProgress })
       await onExport(mp4)
     } catch (err) {
       console.error('[video-editor] export failed', err)
@@ -195,7 +210,7 @@ export function VideoEditor({ source, itemBounds, durationHint, onExport }: Vide
     } finally {
       setExporting(false)
     }
-  }, [state, source, logo, onExport, playing, togglePlay])
+  }, [state, source, logo, intro, outro, videoAssets, onExport, playing, togglePlay])
 
   return (
     <div className="space-y-4">
@@ -270,7 +285,16 @@ export function VideoEditor({ source, itemBounds, durationHint, onExport }: Vide
       )}
 
       {/* Finishing + export */}
-      <div className="flex flex-wrap items-center gap-4 border-t border-border pt-4">
+      <div className="border-t border-border pt-4">
+        <IntroOutroControls
+          intro={intro}
+          outro={outro}
+          onIntroChange={setIntro}
+          onOutroChange={setOutro}
+          disabled={exporting}
+        />
+      </div>
+      <div className="flex flex-wrap items-center gap-4">
         <LogoControls value={logo} onChange={setLogo} />
         <div className="ml-auto flex items-center gap-3">
           {exporting && <Progress value={Math.round(progress * 100)} className="w-40" />}
@@ -297,7 +321,7 @@ export function VideoEditor({ source, itemBounds, durationHint, onExport }: Vide
         </div>
       </div>
       <p className="text-xs text-muted-foreground">
-        Renders with cuts skipped (WebCodecs). Logo burned in. Audio preserved. Music bed coming soon.
+        Renders with cuts skipped (WebCodecs). Logo burned in. Audio preserved. Intro/outro stitched when enabled. Music bed coming soon.
       </p>
     </div>
   )
