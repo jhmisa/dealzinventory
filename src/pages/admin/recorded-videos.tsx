@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Loader2, Trash2, CalendarPlus, Film, Search, User } from 'lucide-react'
+import { Loader2, Trash2, CalendarPlus, CalendarClock, Send, Film, Search, User } from 'lucide-react'
 import { toast } from 'sonner'
 import { PageHeader, ConfirmDialog } from '@/components/shared'
 import { Button } from '@/components/ui/button'
@@ -13,9 +13,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   getRecordedVideos,
-  requeueRecordedVideo,
+  queueRecordedVideo,
+  scheduleRecordedVideo,
+  postRecordedVideoNow,
   deleteRecordedVideo,
   type RecordedVideo,
 } from '@/services/recorded-videos'
@@ -46,16 +49,22 @@ function fmtDuration(sec: number): string {
 
 function VideoCard({
   video,
-  onRequeue,
+  onQueue,
+  onSchedule,
+  onPostNow,
   onDelete,
   busy,
 }: {
   video: RecordedVideo
-  onRequeue: (v: RecordedVideo) => void
+  onQueue: (v: RecordedVideo) => void
+  onSchedule: (v: RecordedVideo, whenISO: string) => void
+  onPostNow: (v: RecordedVideo) => void
   onDelete: (v: RecordedVideo) => void
   busy: boolean
 }) {
   const [duration, setDuration] = useState<number | null>(null)
+  const [schedOpen, setSchedOpen] = useState(false)
+  const [when, setWhen] = useState('')
   return (
     <div className="flex flex-col overflow-hidden rounded-lg border border-border bg-card">
       <div className="relative flex h-64 items-center justify-center bg-black">
@@ -112,10 +121,62 @@ function VideoCard({
         {video.caption && <p className="line-clamp-2 text-xs text-muted-foreground">{video.caption}</p>}
 
         <div className="mt-auto flex gap-2 pt-1">
-          <Button variant="outline" size="sm" className="flex-1 gap-1.5 text-xs" disabled={busy} onClick={() => onRequeue(video)}>
-            <CalendarPlus className="h-3.5 w-3.5" />
-            Re-queue
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1 gap-1.5 text-xs"
+            disabled={busy}
+            onClick={() => onQueue(video)}
+          >
+            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CalendarClock className="h-3.5 w-3.5" />}
+            Queue
           </Button>
+
+          <Popover open={schedOpen} onOpenChange={setSchedOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1.5 text-xs" disabled={busy}>
+                <CalendarPlus className="h-3.5 w-3.5" />
+                Schedule
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-64 space-y-2">
+              <p className="text-xs font-medium">Schedule for</p>
+              <input
+                type="datetime-local"
+                value={when}
+                onChange={(e) => setWhen(e.target.value)}
+                className="block w-full rounded-md border border-border bg-background px-2 py-1 text-xs"
+              />
+              <div className="flex gap-2 pt-1">
+                <Button
+                  size="sm"
+                  className="flex-1 gap-1.5 text-xs"
+                  disabled={busy || !when}
+                  onClick={() => {
+                    onSchedule(video, new Date(when).toISOString())
+                    setSchedOpen(false)
+                  }}
+                >
+                  <CalendarPlus className="h-3.5 w-3.5" />
+                  Schedule
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="flex-1 gap-1.5 text-xs"
+                  disabled={busy}
+                  onClick={() => {
+                    onPostNow(video)
+                    setSchedOpen(false)
+                  }}
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  Post Now
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
+
           <Button
             variant="ghost"
             size="sm"
@@ -142,14 +203,29 @@ export default function RecordedVideosPage() {
   const [deleteTarget, setDeleteTarget] = useState<RecordedVideo | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
 
-  const requeueMutation = useMutation({
-    mutationFn: (id: string) => requeueRecordedVideo(id),
-    onSuccess: () => {
-      toast.success('Re-queued for posting — publish it from Social Media → Process Queue.')
+  type PostAction =
+    | { id: string; kind: 'queue' | 'now' }
+    | { id: string; kind: 'schedule'; whenISO: string }
+
+  const postMutation = useMutation({
+    mutationFn: (a: PostAction) =>
+      a.kind === 'queue'
+        ? queueRecordedVideo(a.id)
+        : a.kind === 'now'
+          ? postRecordedVideoNow(a.id)
+          : scheduleRecordedVideo(a.id, a.whenISO),
+    onSuccess: (_data, a) => {
+      toast.success(
+        a.kind === 'schedule'
+          ? 'Scheduled — pushed to Blotato.'
+          : a.kind === 'now'
+            ? 'Posting now via Blotato.'
+            : 'Queued — Blotato will post at the next free slot.',
+      )
       queryClient.invalidateQueries({ queryKey: QK })
       queryClient.invalidateQueries({ queryKey: ['social-media-posts'] })
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : 'Failed to re-queue'),
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Failed to post'),
     onSettled: () => setBusyId(null),
   })
 
@@ -204,7 +280,7 @@ export default function RecordedVideosPage() {
     <div className="space-y-6">
       <PageHeader
         title="Recorded Videos"
-        description="Browse shot videos — search by who shot them, re-queue for posting, or delete."
+        description="Browse shot videos — search by who shot them, then Queue, Schedule, or Post Now to Blotato."
       />
 
       <div className="flex flex-wrap items-center gap-2">
@@ -273,9 +349,17 @@ export default function RecordedVideosPage() {
               key={v.id}
               video={v}
               busy={busyId === v.id}
-              onRequeue={(video) => {
+              onQueue={(video) => {
                 setBusyId(video.id)
-                requeueMutation.mutate(video.id)
+                postMutation.mutate({ id: video.id, kind: 'queue' })
+              }}
+              onSchedule={(video, whenISO) => {
+                setBusyId(video.id)
+                postMutation.mutate({ id: video.id, kind: 'schedule', whenISO })
+              }}
+              onPostNow={(video) => {
+                setBusyId(video.id)
+                postMutation.mutate({ id: video.id, kind: 'now' })
               }}
               onDelete={(video) => setDeleteTarget(video)}
             />
