@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { getClaimableByCode } from '@/services/mine'
+import { processSocialQueue } from '@/services/social-media-posts'
 import type { SocialPostStatus } from '@/lib/types'
 
 // A recorded/shot marketing video = a social_media_posts row of post_type 'video'.
@@ -93,14 +94,38 @@ export async function getRecordedVideos(): Promise<RecordedVideo[]> {
   })
 }
 
-// Re-add a recorded video to the posting queue. Publishing still happens behind the
-// human "Process Queue" button on the Social Media page (Blotato). Clears any prior error.
-export async function requeueRecordedVideo(id: string): Promise<void> {
+// Stage a recorded video for posting (set schedule fields + status='queued', clear any prior error),
+// then push THIS post to Blotato via the single-post processor. Shared by all three card actions.
+async function stageAndPush(
+  id: string,
+  fields: { schedule_type: 'now' | 'next_slot' | 'scheduled'; scheduled_at?: string | null },
+): Promise<void> {
   const { error } = await supabase
     .from('social_media_posts')
-    .update({ status: 'queued', error_message: null })
+    .update({
+      status: 'queued',
+      error_message: null,
+      schedule_type: fields.schedule_type,
+      scheduled_at: fields.scheduled_at ?? null,
+    })
     .eq('id', id)
   if (error) throw error
+  await processSocialQueue(id)
+}
+
+// Queue for posting at Blotato's next free slot (auto-spaced). Pushes immediately — no Process Queue.
+export async function queueRecordedVideo(id: string): Promise<void> {
+  await stageAndPush(id, { schedule_type: 'next_slot' })
+}
+
+// Schedule for an exact time (ISO 8601). Pushes to Blotato immediately with that scheduledTime.
+export async function scheduleRecordedVideo(id: string, whenISO: string): Promise<void> {
+  await stageAndPush(id, { schedule_type: 'scheduled', scheduled_at: whenISO })
+}
+
+// Publish right now via Blotato.
+export async function postRecordedVideoNow(id: string): Promise<void> {
+  await stageAndPush(id, { schedule_type: 'now' })
 }
 
 // Delete a recorded video: remove the storage object (best-effort) then the post row.
