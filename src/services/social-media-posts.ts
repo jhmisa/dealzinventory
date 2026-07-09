@@ -148,9 +148,11 @@ export async function syncSocialMediaStatuses() {
 }
 
 // Server-side processor: generates captions (if blank) + publishes queued posts to Blotato.
-// Replaces the Claude-CLI /post + process-social-queue flow. Human-in-the-loop (button-triggered).
-export async function processSocialQueue() {
-  const { data, error } = await supabase.functions.invoke('process-social-queue', { body: {} })
+// Pass a postId to process just that one post (used by the Recorded Videos card actions).
+export async function processSocialQueue(postId?: string) {
+  const { data, error } = await supabase.functions.invoke('process-social-queue', {
+    body: postId ? { post_id: postId } : {},
+  })
   if (error) throw error
   if (data?.error) throw new Error(data.error)
   return data as { processed: number; published: number; scheduled: number; failed: number }
