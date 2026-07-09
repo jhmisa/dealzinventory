@@ -39,6 +39,31 @@ export interface ExportOptions {
 
 const AUDIO_RATE = 48000 // common master rate → mixed-rate clips resample to this before muxing
 
+// Smallest gap (seconds) forced between consecutive output frame timestamps. Above the encoder's
+// microsecond resolution so two frames never collide, but negligible for playback. Only ever applied
+// at a range boundary / leading frame (never in steady state), so it introduces no visible drift.
+const MIN_TS_STEP = 1e-4
+
+/**
+ * Map a decoded frame's source timestamp to its output-timeline timestamp.
+ *
+ * MediaBunny's `VideoSampleSink.samples(start, end)` yields a LEADING frame whose timestamp is <=
+ * `rangeStart` (the frame visible AT the cut). Feeding `outCursor + (sampleTs - rangeStart)` straight
+ * to the encoder then breaks two ways when a trim/split lands mid-frame: it goes NEGATIVE for a
+ * trimmed start (`CanvasSource.add` rejects negative timestamps) and goes BACKWARDS at a split
+ * boundary (WebCodecs requires monotonically-increasing timestamps). So we clamp the in-range offset
+ * to >= 0 and force each output timestamp strictly above the previous one.
+ */
+export function mapOutputTimestamp(
+  sampleTs: number,
+  rangeStart: number,
+  outCursor: number,
+  lastOutTs: number,
+): number {
+  const raw = outCursor + Math.max(0, sampleTs - rangeStart)
+  return Math.max(raw, lastOutTs + MIN_TS_STEP)
+}
+
 export function canExportVideo(): boolean {
   return typeof globalThis !== 'undefined' && 'VideoEncoder' in globalThis
 }
@@ -113,8 +138,11 @@ export async function exportEditedVideo(opts: ExportOptions): Promise<Blob> {
   await output.start()
 
   // ---- VIDEO: draw every segment's frames (cover-fit) with a continuous output clock ----
+  // `outCursor` is the running base for each kept range; `lastOutTs` guards the encoder contract
+  // (non-negative + strictly increasing) since the sink hands us a leading frame before each cut.
   const videoWeight = master ? 0.85 : 1
   let outCursor = 0
+  let lastOutTs = -Infinity
   for (const seg of segments) {
     const vTrack = await seg.input.getPrimaryVideoTrack()
     if (!vTrack) continue
@@ -125,7 +153,8 @@ export async function exportEditedVideo(opts: ExportOptions): Promise<Blob> {
     for (const range of seg.ranges) {
       for await (const sample of sink.samples(range.start, range.end)) {
         if (signal?.aborted) { sample.close(); throw new DOMException('Export cancelled', 'AbortError') }
-        const outTs = outCursor + (sample.timestamp - range.start)
+        const outTs = mapOutputTimestamp(sample.timestamp, range.start, outCursor, lastOutTs)
+        lastOutTs = outTs
         ctx.clearRect(0, 0, width, height)
         sample.draw(ctx, dx, dy, dw, dh)
         if (seg.applyLogo) drawLogo(ctx, logo, width, height)
