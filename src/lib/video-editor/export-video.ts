@@ -31,6 +31,8 @@ export interface ExportOptions {
   /** Optional branded clips stitched before / after the recording (played whole, no logo). */
   intro?: Blob | null
   outro?: Blob | null
+  /** Optional background-music bed mixed UNDER all audio for the whole timeline. volume is 0–100. */
+  music?: { blob: Blob; volume: number } | null
   onProgress?: (fraction: number) => void
   signal?: AbortSignal
 }
@@ -70,7 +72,7 @@ function coverRect(iw: number, ih: number, ow: number, oh: number): [number, num
 }
 
 export async function exportEditedVideo(opts: ExportOptions): Promise<Blob> {
-  const { source, keep, logo, intro, outro, onProgress, signal } = opts
+  const { source, keep, logo, intro, outro, music, onProgress, signal } = opts
   if (!canExportVideo()) throw new Error('This browser cannot export video. Please use Chrome or Edge.')
   if (keep.length === 0) throw new Error('Nothing to export — the whole clip is trimmed/cut.')
 
@@ -95,9 +97,13 @@ export async function exportEditedVideo(opts: ExportOptions): Promise<Blob> {
 
   const totalVideoDuration = segments.reduce((a, s) => a + s.videoDuration, 0) || 1
 
+  // Decode the optional music bed up front (resampled to the master rate) so it can be mixed under
+  // whatever segment audio exists — or stand alone if the video is otherwise silent.
+  const musicBuf = music?.blob ? await decodeAudio(music.blob, AUDIO_RATE) : null
+
   // Build the master audio timeline up front (so silent gaps line up with the video) — only if any
-  // segment actually has an audio track.
-  const master = await buildMasterAudio(segments, totalVideoDuration)
+  // segment has an audio track OR a music bed is present.
+  const master = await buildMasterAudio(segments, totalVideoDuration, musicBuf, music?.volume ?? 0)
   let audioSource: AudioBufferSource | null = null
   if (master) {
     audioSource = new AudioBufferSource({ codec: 'aac', bitrate: QUALITY_MEDIUM })
@@ -150,9 +156,16 @@ export async function exportEditedVideo(opts: ExportOptions): Promise<Blob> {
  * Assemble one AudioBuffer covering the full video timeline. Each segment's decoded audio is
  * resampled to AUDIO_RATE and written at the segment's running offset; segments with no audio (or
  * audio shorter than their video) leave silence — so audio never drifts out of sync with the frames.
- * Returns null when no segment has any audio (→ silent video, no audio track).
+ * An optional `music` bed (already at AUDIO_RATE) is then mixed UNDER everything at `musicVolume`%,
+ * looped to fill the timeline and clamped to avoid clipping.
+ * Returns null only when there is no segment audio AND no music (→ silent video, no audio track).
  */
-async function buildMasterAudio(segments: Segment[], totalVideoDuration: number): Promise<AudioBuffer | null> {
+async function buildMasterAudio(
+  segments: Segment[],
+  totalVideoDuration: number,
+  music: AudioBuffer | null,
+  musicVolume: number,
+): Promise<AudioBuffer | null> {
   // Decode each segment's (kept) audio into a single buffer at AUDIO_RATE, or null if it has none.
   const perSegment: (AudioBuffer | null)[] = []
   let any = false
@@ -161,9 +174,9 @@ async function buildMasterAudio(segments: Segment[], totalVideoDuration: number)
     perSegment.push(buf)
     if (buf) any = true
   }
-  if (!any) return null
+  if (!any && !music) return null
 
-  const channels = Math.max(1, ...perSegment.map((b) => b?.numberOfChannels ?? 1))
+  const channels = Math.max(1, music?.numberOfChannels ?? 1, ...perSegment.map((b) => b?.numberOfChannels ?? 1))
   const totalLen = Math.max(1, Math.ceil(totalVideoDuration * AUDIO_RATE))
   const master = new AudioBuffer({ length: totalLen, numberOfChannels: channels, sampleRate: AUDIO_RATE })
 
@@ -180,7 +193,56 @@ async function buildMasterAudio(segments: Segment[], totalVideoDuration: number)
     }
     offsetSec += segments[i].videoDuration
   }
+
+  // Mix the music bed under the voice.
+  if (music && music.length > 0 && musicVolume > 0) {
+    const masterChannels = Array.from({ length: channels }, (_, ch) => master.getChannelData(ch))
+    const musicChannels = Array.from({ length: music.numberOfChannels }, (_, ch) => music.getChannelData(ch))
+    mixMusicBed(masterChannels, musicChannels, musicVolume)
+  }
   return master
+}
+
+/**
+ * Mix a music bed (per-channel Float32 data) UNDER an already-assembled master (per-channel Float32
+ * data), in place. The music is looped to fill the master's full length (and thereby trimmed if
+ * longer), scaled by `volume`% gain, summed into the master, and each summed sample is clamped to
+ * [-1, 1] to prevent clipping. Mono music fans out to every master channel. Pure + browser-free so
+ * the core mixing math is unit-testable.
+ */
+export function mixMusicBed(master: Float32Array[], music: Float32Array[], volume: number): void {
+  if (!master.length || !music.length || volume <= 0) return
+  const gain = volume / 100
+  for (let ch = 0; ch < master.length; ch++) {
+    const out = master[ch]
+    const src = music[Math.min(ch, music.length - 1)]
+    const mlen = src.length
+    if (mlen === 0) continue
+    for (let i = 0; i < out.length; i++) {
+      let s = out[i] + src[i % mlen] * gain
+      if (s > 1) s = 1
+      else if (s < -1) s = -1
+      out[i] = s
+    }
+  }
+}
+
+/** Decode an audio (or video) Blob into a single AudioBuffer at `rate`, resampling if needed. */
+async function decodeAudio(blob: Blob, rate: number): Promise<AudioBuffer> {
+  const bytes = await blob.arrayBuffer()
+  // A short-lived AudioContext just for decoding; decodeAudioData resamples to the context rate,
+  // but that isn't guaranteed to be `rate`, so normalise below.
+  const AC: typeof AudioContext =
+    (globalThis as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext })
+      .AudioContext
+    ?? (globalThis as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+  const ac = new AC()
+  try {
+    const decoded = await ac.decodeAudioData(bytes)
+    return decoded.sampleRate === rate ? decoded : await resample(decoded, rate)
+  } finally {
+    void ac.close()
+  }
 }
 
 /** Concatenate a segment's kept audio into one buffer at AUDIO_RATE (resampling if needed). */

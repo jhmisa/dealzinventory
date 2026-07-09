@@ -12,7 +12,7 @@ import { canExportVideo, exportEditedVideo } from '@/lib/video-editor/export-vid
 import type { LogoConfig, LogoCorner } from '@/lib/video-editor/logo'
 import { ReviewTrimTimeline } from './review-trim-timeline'
 import { LogoControls } from './logo-controls'
-import { IntroOutroControls, type ClipSelection } from './intro-outro-controls'
+import { IntroOutroControls, type ClipSelection, type MusicSelection } from './intro-outro-controls'
 import { useVideoAssets } from '@/hooks/use-video-assets'
 import { fetchAssetBlob } from '@/services/video-assets'
 
@@ -49,6 +49,7 @@ export function VideoEditor({ source, itemBounds, durationHint, onExport }: Vide
   const [logo, setLogo] = useState<LogoConfig>({ enabled: true, corner: 'br' })
   const [intro, setIntro] = useState<ClipSelection>({ enabled: false, id: null })
   const [outro, setOutro] = useState<ClipSelection>({ enabled: false, id: null })
+  const [music, setMusic] = useState<MusicSelection>({ enabled: false, id: null, volume: 15 })
   const { data: videoAssets = [] } = useVideoAssets()
 
   const [exporting, setExporting] = useState(false)
@@ -198,11 +199,17 @@ export function VideoEditor({ source, itemBounds, durationHint, onExport }: Vide
         sel.enabled ? videoAssets.find((a) => a.id === (sel.id ?? ''))?.file_url ?? null : null
       const introUrl = urlFor(intro)
       const outroUrl = urlFor(outro)
-      const [introBlob, outroBlob] = await Promise.all([
+      const musicUrl = urlFor(music)
+      const [introBlob, outroBlob, musicBlob] = await Promise.all([
         introUrl ? fetchAssetBlob(introUrl) : Promise.resolve(null),
         outroUrl ? fetchAssetBlob(outroUrl) : Promise.resolve(null),
+        musicUrl ? fetchAssetBlob(musicUrl) : Promise.resolve(null),
       ])
-      const mp4 = await exportEditedVideo({ source, keep, logo, intro: introBlob, outro: outroBlob, onProgress: setProgress })
+      const mp4 = await exportEditedVideo({
+        source, keep, logo, intro: introBlob, outro: outroBlob,
+        music: musicBlob ? { blob: musicBlob, volume: music.volume } : null,
+        onProgress: setProgress,
+      })
       await onExport(mp4)
     } catch (err) {
       console.error('[video-editor] export failed', err)
@@ -210,7 +217,7 @@ export function VideoEditor({ source, itemBounds, durationHint, onExport }: Vide
     } finally {
       setExporting(false)
     }
-  }, [state, source, logo, intro, outro, videoAssets, onExport, playing, togglePlay])
+  }, [state, source, logo, intro, outro, music, videoAssets, onExport, playing, togglePlay])
 
   return (
     <div className="space-y-4">
@@ -289,8 +296,10 @@ export function VideoEditor({ source, itemBounds, durationHint, onExport }: Vide
         <IntroOutroControls
           intro={intro}
           outro={outro}
+          music={music}
           onIntroChange={setIntro}
           onOutroChange={setOutro}
+          onMusicChange={setMusic}
           disabled={exporting}
         />
       </div>
@@ -321,7 +330,7 @@ export function VideoEditor({ source, itemBounds, durationHint, onExport }: Vide
         </div>
       </div>
       <p className="text-xs text-muted-foreground">
-        Renders with cuts skipped (WebCodecs). Logo burned in. Audio preserved. Intro/outro stitched when enabled. Music bed coming soon.
+        Renders with cuts skipped (WebCodecs). Logo burned in. Audio preserved. Intro/outro stitched and music bed mixed under the voice when enabled.
       </p>
     </div>
   )

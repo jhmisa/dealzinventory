@@ -1,10 +1,13 @@
 import { supabase } from '@/lib/supabase'
 
-// Branded intro/outro clips the team uploads once and stitches onto exported marketing videos.
+export type VideoAssetKind = 'intro' | 'outro' | 'music'
+
+// Branded intro/outro clips (and background-music tracks) the team uploads once and stitches onto /
+// mixes into exported marketing videos.
 export interface VideoAsset {
   id: string
   name: string
-  kind: 'intro' | 'outro'
+  kind: VideoAssetKind
   file_url: string
   created_by: string | null
   created_at: string
@@ -21,16 +24,17 @@ export async function getVideoAssets(): Promise<VideoAsset[]> {
 
 export async function createVideoAsset(input: {
   name: string
-  kind: 'intro' | 'outro'
+  kind: VideoAssetKind
   file: File
 }): Promise<VideoAsset> {
   const { data: { user } } = await supabase.auth.getUser()
-  const ext = input.file.name.split('.').pop()?.toLowerCase() || 'mp4'
+  const isMusic = input.kind === 'music'
+  const ext = input.file.name.split('.').pop()?.toLowerCase() || (isMusic ? 'mp3' : 'mp4')
   const path = `${input.kind}/${crypto.randomUUID()}.${ext}`
 
   const up = await supabase.storage
     .from('video-assets')
-    .upload(path, input.file, { contentType: input.file.type || 'video/mp4', upsert: false })
+    .upload(path, input.file, { contentType: input.file.type || (isMusic ? 'audio/mpeg' : 'video/mp4'), upsert: false })
   if (up.error) throw up.error
 
   const { data: pub } = supabase.storage.from('video-assets').getPublicUrl(path)

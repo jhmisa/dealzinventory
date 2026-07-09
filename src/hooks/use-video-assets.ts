@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as svc from '@/services/video-assets'
+import type { VideoAssetKind } from '@/services/video-assets'
 
 const QK = ['video-assets']
 
@@ -10,7 +11,7 @@ export function useVideoAssets() {
 export function useCreateVideoAsset() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (input: { name: string; kind: 'intro' | 'outro'; file: File }) => svc.createVideoAsset(input),
+    mutationFn: (input: { name: string; kind: VideoAssetKind; file: File }) => svc.createVideoAsset(input),
     onSuccess: () => qc.invalidateQueries({ queryKey: QK }),
   })
 }
