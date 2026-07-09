@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Loader2, Circle, Square, SkipForward, X, AlertCircle, Camera, Mic, Image as ImageIcon, Video, Smartphone, Monitor, Pause, Play, Wand2, Upload } from 'lucide-react'
+import { Loader2, Circle, Square, SkipForward, X, AlertCircle, Camera, Mic, Image as ImageIcon, Video, Smartphone, Monitor, Pause, Play, Wand2, Aperture, ImagePlus, Ban } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
@@ -14,9 +14,9 @@ import { getClaimableByCode } from '@/services/mine'
 import { VIDEO_CONSTRAINTS, pickSupportedMimeType } from '@/lib/media-recording'
 import {
   compositeFrame, computeItemBounds, ORIENTATION_DIMS,
-  CameraEffectProcessor, DEFAULT_EFFECT_SETTINGS,
+  CameraEffectProcessor, DEFAULT_EFFECT_SETTINGS, usesSegmentation,
   type RecorderCard, type CardRuntime, type MediaMode, type Orientation,
-  type CameraEffectMode, type CameraEffectSettings,
+  type CameraEffectMode, type CameraEffectSettings, type SegmenterStatus,
 } from '@/lib/video-recorder'
 import type { GalleryImage } from '@/components/shared/image-gallery'
 import { CodeStrip } from './code-strip'
@@ -110,6 +110,7 @@ export function Recorder({ codes, onComplete, onCancel, initialOrientation }: Re
   )
   const [bgColor, setBgColor] = useState(() => localStorage.getItem(LS_BG_COLOR) ?? BG_PRESETS[0])
   const [bgImage, setBgImage] = useState<HTMLImageElement | null>(null)
+  const [effectStatus, setEffectStatus] = useState<{ status: SegmenterStatus; fps: number }>({ status: 'idle', fps: 0 })
   const effectRef = useRef<CameraEffectProcessor | null>(null)
   const effectSettingsRef = useRef<CameraEffectSettings>(DEFAULT_EFFECT_SETTINGS)
 
@@ -153,6 +154,30 @@ export function Recorder({ codes, onComplete, onCancel, initialOrientation }: Re
     img.onerror = () => toast.error('Could not load that image.')
     img.src = URL.createObjectURL(file)
   }, [])
+
+  // While a segmentation effect is active, poll the processor for load status + throughput, and
+  // auto-downgrade to no-effect if the device can't sustain a smooth frame rate or the model fails.
+  useEffect(() => {
+    // The status line only renders for segmentation modes, so a stale value here is never shown.
+    if (!usesSegmentation(bgMode)) return
+    let done = false
+    const id = window.setInterval(() => {
+      const p = effectRef.current
+      if (!p || done) return
+      setEffectStatus({ status: p.status, fps: p.fps })
+      if (p.degraded) {
+        done = true; setBgMode('none')
+        toast.warning("Background effect turned off — your device couldn't keep it smooth. Try Greenscreen instead.")
+      } else if (p.status === 'error') {
+        done = true; setBgMode('none')
+        toast.error('Could not load the background segmentation model.')
+      }
+    }, 600)
+    return () => window.clearInterval(id)
+  }, [bgMode])
+
+  // Release the ML model when the recorder unmounts.
+  useEffect(() => () => { effectRef.current?.dispose() }, [])
 
   // 1. Load overlay cards for each code, then acquire camera + mic.
   useEffect(() => {
@@ -664,32 +689,52 @@ export function Recorder({ codes, onComplete, onCancel, initialOrientation }: Re
               </div>
             )}
 
-            {/* Background (greenscreen chroma-key) */}
+            {/* Background effect */}
             <div className="space-y-2">
-              <span className="text-xs font-medium text-muted-foreground">Background</span>
-              <div className="inline-flex w-full rounded-md border border-border p-0.5">
-                <Button
-                  variant={bgMode === 'none' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  className="h-8 flex-1 text-xs"
-                  onClick={() => setBgMode('none')}
-                >
-                  None
-                </Button>
-                <Button
-                  variant={bgMode === 'greenscreen' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  className="h-8 flex-1 gap-1.5 text-xs"
-                  onClick={() => setBgMode('greenscreen')}
-                >
-                  <Wand2 className="h-3.5 w-3.5" />
-                  Greenscreen
-                </Button>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-muted-foreground">Background</span>
+                {usesSegmentation(bgMode) && (
+                  <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                    {effectStatus.status === 'loading' ? (
+                      <><Loader2 className="h-3 w-3 animate-spin" /> Loading model…</>
+                    ) : effectStatus.status === 'ready' && effectStatus.fps > 0 ? (
+                      <>~{effectStatus.fps} fps</>
+                    ) : null}
+                  </span>
+                )}
               </div>
-              {bgMode === 'greenscreen' && (
+              <div className="grid grid-cols-2 gap-1 rounded-md border border-border p-1">
+                {([
+                  { m: 'none', label: 'None', Icon: Ban },
+                  { m: 'blur', label: 'Blur', Icon: Aperture },
+                  { m: 'virtual', label: 'Virtual BG', Icon: ImagePlus },
+                  { m: 'greenscreen', label: 'Greenscreen', Icon: Wand2 },
+                ] as const).map(({ m, label, Icon }) => (
+                  <Button
+                    key={m}
+                    variant={bgMode === m ? 'secondary' : 'ghost'}
+                    size="sm"
+                    className="h-8 gap-1.5 text-xs"
+                    onClick={() => setBgMode(m)}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {label}
+                  </Button>
+                ))}
+              </div>
+
+              {bgMode === 'blur' && (
+                <p className="text-[10px] text-muted-foreground">
+                  Blurs whatever&apos;s behind you — no greenscreen needed.
+                </p>
+              )}
+
+              {(bgMode === 'virtual' || bgMode === 'greenscreen') && (
                 <div className="space-y-2">
                   <p className="text-[10px] text-muted-foreground">
-                    Removes a green backdrop behind you and replaces it with the chosen background.
+                    {bgMode === 'greenscreen'
+                      ? 'Removes a green backdrop behind you and replaces it with the chosen background.'
+                      : 'Replaces whatever’s behind you with the chosen background — no greenscreen needed.'}
                   </p>
                   <div className="flex flex-wrap items-center gap-1.5">
                     {BG_PRESETS.map((c) => (
@@ -706,7 +751,7 @@ export function Recorder({ codes, onComplete, onCancel, initialOrientation }: Re
                       />
                     ))}
                     <label className="flex h-7 cursor-pointer items-center gap-1 rounded-md border border-border px-2 text-xs">
-                      <Upload className="h-3.5 w-3.5" />
+                      <ImagePlus className="h-3.5 w-3.5" />
                       Image
                       <input
                         type="file"
