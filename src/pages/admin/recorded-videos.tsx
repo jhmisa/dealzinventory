@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { PageHeader, ConfirmDialog } from '@/components/shared'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { formatPrice } from '@/lib/utils'
 import {
   Select,
   SelectContent,
@@ -87,6 +88,23 @@ function VideoCard({
           <span className="font-mono text-sm font-medium">{video.item_code ?? 'Untagged'}</span>
           <span className="text-xs text-muted-foreground">{fmtDate(video.created_at)}</span>
         </div>
+
+        {(video.product_title || video.product_description || video.product_price != null) && (
+          <div className="rounded-md bg-muted/50 px-2 py-1.5">
+            {video.product_title && (
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate text-sm font-medium">{video.product_title}</span>
+                {video.product_price != null && (
+                  <span className="shrink-0 text-sm font-semibold">{formatPrice(video.product_price)}</span>
+                )}
+              </div>
+            )}
+            {video.product_description && (
+              <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{video.product_description}</p>
+            )}
+          </div>
+        )}
+
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <User className="h-3.5 w-3.5" />
           {video.shooter_name ?? 'Unknown'}
@@ -159,7 +177,7 @@ export default function RecordedVideosPage() {
       if (shooter !== 'all' && v.shooter_id !== shooter) return false
       if (status !== 'all' && v.status !== status) return false
       if (q) {
-        const hay = `${v.item_code ?? ''} ${v.caption ?? ''} ${v.shooter_name ?? ''}`.toLowerCase()
+        const hay = `${v.item_code ?? ''} ${v.caption ?? ''} ${v.shooter_name ?? ''} ${v.product_title ?? ''} ${v.product_description ?? ''} ${v.product_price ?? ''}`.toLowerCase()
         if (!hay.includes(q)) return false
       }
       return true
@@ -195,7 +213,7 @@ export default function RecordedVideosPage() {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search item, shooter, or caption…"
+            placeholder="Search product, item, shooter, or caption…"
             className="h-9 pl-9"
           />
         </div>

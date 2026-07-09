@@ -4,7 +4,7 @@ import { Plus, RefreshCw, Send, Scissors, FileVideo } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { PageHeader, ConfirmDialog } from '@/components/shared'
-import { KanbanBoard, PostFormDialog } from '@/components/social-media'
+import { KanbanBoard, PostFormDialog, PostEditDialog } from '@/components/social-media'
 import {
   useSocialMediaPosts,
   useUpdateSocialMediaPost,
@@ -17,6 +17,7 @@ import {
 export default function SocialMediaPage() {
   const [formOpen, setFormOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [editId, setEditId] = useState<string | null>(null)
   const [processConfirm, setProcessConfirm] = useState(false)
   const [captionId, setCaptionId] = useState<string | null>(null)
 
@@ -83,8 +84,26 @@ export default function SocialMediaPage() {
     })
   }
 
+  function handleUnqueue(id: string) {
+    updateMutation.mutate(
+      { id, updates: { status: 'draft', scheduled_at: null, error_message: null } },
+      {
+        onSuccess: () => toast.success('Removed from queue — the video stays in Recorded Videos'),
+        onError: (err) => toast.error(`Failed: ${err.message}`),
+      }
+    )
+  }
+
   function handleDelete() {
     if (!deleteId) return
+    // Safety net: a video post is a Recorded Video (same row) — never hard-delete it here,
+    // only un-queue. True deletion lives in Recorded Videos' trash.
+    const post = posts.find((p) => p.id === deleteId)
+    if (post?.post_type === 'video') {
+      handleUnqueue(deleteId)
+      setDeleteId(null)
+      return
+    }
     deleteMutation.mutate(deleteId, {
       onSuccess: () => {
         toast.success('Post deleted')
@@ -145,13 +164,21 @@ export default function SocialMediaPage() {
           posts={posts}
           onQueue={handleQueue}
           onDelete={setDeleteId}
+          onUnqueue={handleUnqueue}
           onRetry={handleRetry}
+          onEdit={setEditId}
           onGenerateCaption={handleGenerateCaption}
           generatingCaptionId={captionId}
         />
       )}
 
       <PostFormDialog open={formOpen} onOpenChange={setFormOpen} />
+
+      <PostEditDialog
+        key={editId ?? 'none'}
+        post={posts.find((p) => p.id === editId) ?? null}
+        onOpenChange={(open) => !open && setEditId(null)}
+      />
 
       <ConfirmDialog
         open={!!deleteId}

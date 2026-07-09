@@ -1,4 +1,4 @@
-import { Clock, ExternalLink, Facebook, AlertCircle, Trash2, Play, ArrowRight, Sparkles } from 'lucide-react'
+import { Clock, ExternalLink, Facebook, AlertCircle, Trash2, Play, ArrowRight, Sparkles, Undo2, Pencil } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -8,21 +8,23 @@ interface PostCardProps {
   post: SocialMediaPostWithItem
   onQueue?: () => void
   onDelete?: () => void
+  onUnqueue?: () => void
   onRetry?: () => void
+  onEdit?: () => void
   onGenerateCaption?: () => void
   generatingCaption?: boolean
 }
 
 const statusActions: Record<SocialPostStatus, string[]> = {
-  draft: ['caption', 'queue', 'delete'],
-  queued: ['caption', 'delete'],
+  draft: ['edit', 'caption', 'queue', 'delete'],
+  queued: ['edit', 'caption', 'delete'],
   processing: [],
-  scheduled: [],
+  scheduled: ['edit'],
   published: [],
   failed: ['retry', 'delete'],
 }
 
-export function PostCard({ post, onQueue, onDelete, onRetry, onGenerateCaption, generatingCaption }: PostCardProps) {
+export function PostCard({ post, onQueue, onDelete, onUnqueue, onRetry, onEdit, onGenerateCaption, generatingCaption }: PostCardProps) {
   const item = post.items
   const modelName = item?.product_models
     ? `${item.product_models.brand} ${item.product_models.model_name}`
@@ -30,6 +32,14 @@ export function PostCard({ post, onQueue, onDelete, onRetry, onGenerateCaption, 
   const actions = statusActions[post.status]
   const mediaUrls = post.media_urls ?? []
   const firstMedia = mediaUrls[0]
+
+  // A video post IS a Recorded Video (same row). Never hard-delete it from the queue —
+  // that would erase the library entry. Queued/failed → un-queue back to draft; draft → no
+  // destructive action here (true delete lives in Recorded Videos). Non-video posts (New Post)
+  // keep their hard-delete since the kanban is their only home.
+  const isVideo = post.post_type === 'video'
+  const showUnqueue = isVideo && (post.status === 'queued' || post.status === 'failed')
+  const showDelete = !isVideo && actions.includes('delete')
 
   return (
     <Card className="overflow-hidden">
@@ -95,7 +105,19 @@ export function PostCard({ post, onQueue, onDelete, onRetry, onGenerateCaption, 
         )}
 
         {actions.length > 0 && (
-          <div className="flex gap-1.5 pt-1">
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {actions.includes('edit') && onEdit && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs"
+                onClick={onEdit}
+                title="View, edit, and generate the caption"
+              >
+                <Pencil className="h-3 w-3 mr-1" />
+                Edit
+              </Button>
+            )}
             {actions.includes('caption') && onGenerateCaption && (
               <Button
                 size="sm"
@@ -121,7 +143,19 @@ export function PostCard({ post, onQueue, onDelete, onRetry, onGenerateCaption, 
                 Retry
               </Button>
             )}
-            {actions.includes('delete') && (
+            {showUnqueue && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs"
+                onClick={onUnqueue}
+                title="Remove from queue (the video stays in Recorded Videos)"
+              >
+                <Undo2 className="h-3 w-3 mr-1" />
+                Remove from queue
+              </Button>
+            )}
+            {showDelete && (
               <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive" onClick={onDelete}>
                 <Trash2 className="h-3 w-3" />
               </Button>

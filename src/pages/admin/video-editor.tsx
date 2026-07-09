@@ -101,13 +101,16 @@ export default function VideoEditorPage() {
 
       try {
         // Draft only — the team sets the Facebook target + queues via the existing flow.
-        // Tag the featured item so the recorded-videos library can group by product.
+        // Tag the featured item (item_code, for thumbnail + Recorded Videos grouping) plus the full
+        // ordered list of featured codes (item_codes) so the caption engine can build one block per
+        // product for multi-product videos (R6).
         await createSocialMediaPost({
           media_urls: [pub.publicUrl],
           post_type: 'video',
           platform: 'facebook',
           status: 'draft',
           ...(firstCode ? { item_code: firstCode } : {}),
+          ...(codes.length ? { item_codes: codes } : {}),
         })
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Could not create the draft post.')
@@ -117,7 +120,7 @@ export default function VideoEditorPage() {
       toast.success('Video exported — draft post created on Social Media.')
       navigate('/admin/recorded-videos')
     },
-    [navigate, firstCode],
+    [navigate, firstCode, codes],
   )
 
   return (

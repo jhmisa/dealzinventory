@@ -1,7 +1,42 @@
-// Builds the caption-generation prompt for a social post from a post's denormalized
-// item_specs (see services/social-media-posts.ts). Dealz customers are Filipino, so
-// captions are ENGLISH + emojis (Taglish-friendly), never Japanese — see the
-// user_target_audience memory. Pure function → unit-testable, no network.
+// Builds social-post captions. Dealz customers are Filipino, so captions are ENGLISH + emojis
+// (Taglish-friendly), never Japanese — see the user_target_audience memory. Pure functions →
+// unit-testable, no network.
+//
+// The caption is assembled DETERMINISTICALLY (R6): the model writes ONLY an engaging intro, and we
+// splice a per-product emoji block (code · spec description · rank · price · /mine link) built in
+// code — the same block the messaging AI uses for offers (formatOfferBlock). This guarantees every
+// generation has the full specs, price, and product link, with no placeholder drift like the old
+// "[Product Name]". buildCaptionPrompt below is the legacy single-shot fallback used only when no
+// product could be resolved from the post's item codes.
+import type { InventorySearchResult } from "./inventory-search.ts";
+import { formatOfferBlock } from "./offer-reply.ts";
+
+// Prompt the model for ONLY the intro (no specs/price/code/link — those are appended in code).
+export function buildIntroPrompt(products: InventorySearchResult[]): string {
+  const multi = products.length > 1;
+  const summary = products
+    .map((r) => `- ${r.description}${r.price != null ? ` (¥${r.price.toLocaleString("en-US")})` : ""}`)
+    .join("\n");
+
+  return [
+    "Write ONLY a short, scroll-stopping intro for a Facebook post, in ENGLISH with a few emojis, for a Filipino resale audience.",
+    multi
+      ? `The post features ${products.length} products (listed below). Write a punchy 1–2 sentence intro that teases the whole lineup.`
+      : "Write a punchy 1–2 sentence intro for this product.",
+    "Do NOT include specs, prices, condition grades, codes, links, or a product list — those are added automatically AFTER your intro. Do NOT invent details.",
+    `Product${multi ? "s" : ""} (context only, don't restate specs):\n${summary || "(see specs)"}`,
+    "Rules: friendly + a little urgent; at most 2 hashtags; NO markdown; end with a soft CTA to order/message us.",
+    "Return ONLY the intro text — no preamble, no quotes.",
+  ].join("\n");
+}
+
+// Final caption = model intro + one emoji block per featured product. Blocks are separated by a
+// blank line. Reuses formatOfferBlock so the block format stays identical to the messaging offers.
+export function assembleSocialCaption(intro: string, products: InventorySearchResult[]): string {
+  const blocks = products.map(formatOfferBlock);
+  return [(intro ?? "").trim(), ...blocks].filter(Boolean).join("\n\n").trim();
+}
+
 export interface CaptionSpecs {
   brand?: string | null;
   model_name?: string | null;

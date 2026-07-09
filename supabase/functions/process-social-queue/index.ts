@@ -5,7 +5,13 @@
 //   default (publish)               -> process status='queued' posts (or a single post_id)
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { buildCaptionPrompt, type CaptionSpecs } from "../_shared/social-caption.ts";
+import {
+  assembleSocialCaption,
+  buildCaptionPrompt,
+  buildIntroPrompt,
+  type CaptionSpecs,
+} from "../_shared/social-caption.ts";
+import { searchInventory, type InventorySearchResult } from "../_shared/inventory-search.ts";
 import { publishPost } from "../_shared/blotato.ts";
 
 const corsHeaders = {
@@ -36,6 +42,54 @@ function isVideoUrl(u: string): boolean {
   return /\.(mp4|mov|webm|m4v)(\?|$)/i.test(u);
 }
 
+// deno-lint-ignore no-explicit-any
+type PostRow = { item_code?: string | null; item_codes?: string[] | null; item_specs?: any };
+
+// Resolve each featured code to its live inventory result (rich description + price + /mine link),
+// preserving order and dropping duplicates / codes that are no longer available.
+async function resolveProducts(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  codes: string[],
+): Promise<InventorySearchResult[]> {
+  const out: InventorySearchResult[] = [];
+  const seen = new Set<string>();
+  for (const raw of codes) {
+    const code = (raw ?? "").trim().toUpperCase();
+    if (!code || seen.has(code)) continue;
+    try {
+      const results = await searchInventory(supabase, { query: code });
+      const match = results.find((r) => r.code.toUpperCase() === code) ?? null;
+      if (match) {
+        out.push(match);
+        seen.add(code);
+      }
+    } catch {
+      // skip unresolvable code
+    }
+  }
+  return out;
+}
+
+// Build a post's caption the R6 way: deterministic emoji block(s) per product + a model-written
+// intro. Falls back to the legacy single-shot prompt only when no product resolves (all sold/gone).
+// deno-lint-ignore no-explicit-any
+async function buildPostCaption(supabase: any, apiKey: string, model: string, post: PostRow): Promise<string> {
+  const codes = Array.isArray(post.item_codes) && post.item_codes.length
+    ? post.item_codes
+    : (post.item_code ? [post.item_code] : []);
+  const products = await resolveProducts(supabase, codes);
+  if (products.length > 0) {
+    const intro = await generateCaption(apiKey, model, buildIntroPrompt(products));
+    return assembleSocialCaption(intro, products);
+  }
+  return await generateCaption(
+    apiKey,
+    model,
+    buildCaptionPrompt((post.item_specs ?? {}) as CaptionSpecs, post.item_code ?? ""),
+  );
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
@@ -60,14 +114,15 @@ Deno.serve(async (req) => {
       if (!singleId) return json({ error: "post_id required for caption_only" }, 400);
       const { data: post } = await supabase
         .from("social_media_posts")
-        .select("id, item_code, item_specs")
+        .select("id, item_code, item_codes, item_specs")
         .eq("id", singleId)
         .maybeSingle();
       if (!post) return json({ error: "post not found" }, 404);
-      const caption = await generateCaption(
+      const caption = await buildPostCaption(
+        supabase,
         provider.api_key_encrypted,
         provider.model_id,
-        buildCaptionPrompt((post.item_specs ?? {}) as CaptionSpecs, post.item_code ?? ""),
+        post as PostRow,
       );
       await supabase.from("social_media_posts").update({ caption }).eq("id", singleId);
       return json({ ok: true, caption });
@@ -77,7 +132,7 @@ Deno.serve(async (req) => {
     let q = supabase
       .from("social_media_posts")
       .select(
-        "id, item_code, caption, media_urls, account_id, page_id, platform, schedule_type, scheduled_at, item_specs",
+        "id, item_code, item_codes, caption, media_urls, account_id, page_id, platform, schedule_type, scheduled_at, item_specs",
       )
       .eq("status", "queued");
     if (singleId) q = q.eq("id", singleId);
@@ -94,10 +149,11 @@ Deno.serve(async (req) => {
       try {
         let caption = (post.caption ?? "").trim();
         if (!caption) {
-          caption = await generateCaption(
+          caption = await buildPostCaption(
+            supabase,
             provider.api_key_encrypted,
             provider.model_id,
-            buildCaptionPrompt((post.item_specs ?? {}) as CaptionSpecs, post.item_code ?? ""),
+            post as PostRow,
           );
         }
         const media: string[] = Array.isArray(post.media_urls) ? post.media_urls : [];

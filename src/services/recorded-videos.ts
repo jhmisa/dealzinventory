@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { getClaimableByCode } from '@/services/mine'
 import type { SocialPostStatus } from '@/lib/types'
 
 // A recorded/shot marketing video = a social_media_posts row of post_type 'video'.
@@ -14,6 +15,13 @@ export interface RecordedVideo {
   item_code: string | null
   shooter_id: string | null
   shooter_name: string | null
+  // Enriched from the tagged product (item_code → getClaimableByCode), so the card shows the
+  // same spec-rich line + price as the recorder overlay / showcase. Null when the code can't
+  // be resolved. See feedback_consistent_descriptions.
+  product_title: string | null
+  product_description: string | null
+  product_price: number | null
+  product_grade: string | null
 }
 
 export async function getRecordedVideos(): Promise<RecordedVideo[]> {
@@ -48,18 +56,41 @@ export async function getRecordedVideos(): Promise<RecordedVideo[]> {
     for (const s of staff ?? []) nameById.set(s.id, s.display_name)
   }
 
-  return rows.map((r) => ({
-    id: r.id,
-    url: r.media_urls?.[0] ?? '',
-    caption: r.caption,
-    status: r.status,
-    scheduled_at: r.scheduled_at,
-    published_at: r.published_at,
-    created_at: r.created_at,
-    item_code: r.item_code,
-    shooter_id: r.created_by,
-    shooter_name: r.created_by ? nameById.get(r.created_by) ?? 'Unknown' : null,
-  }))
+  // Enrich each video with its tagged product's title/spec-line/price (deduped by code so a code
+  // shared across videos resolves once). Reuses getClaimableByCode — the same source the recorder
+  // overlay uses — for a consistent description. Resolution failures degrade gracefully to nulls.
+  const codes = [...new Set(rows.map((r) => r.item_code).filter((v): v is string => !!v))]
+  const productByCode = new Map<string, { title: string; subtitle: string; price: number; grade: string | null }>()
+  await Promise.all(
+    codes.map(async (code) => {
+      try {
+        const p = await getClaimableByCode(code)
+        if (p) productByCode.set(code, { title: p.title, subtitle: p.subtitle, price: p.price, grade: p.grade })
+      } catch {
+        // leave unresolved → nulls on the card
+      }
+    }),
+  )
+
+  return rows.map((r) => {
+    const product = r.item_code ? productByCode.get(r.item_code) ?? null : null
+    return {
+      id: r.id,
+      url: r.media_urls?.[0] ?? '',
+      caption: r.caption,
+      status: r.status,
+      scheduled_at: r.scheduled_at,
+      published_at: r.published_at,
+      created_at: r.created_at,
+      item_code: r.item_code,
+      shooter_id: r.created_by,
+      shooter_name: r.created_by ? nameById.get(r.created_by) ?? 'Unknown' : null,
+      product_title: product?.title ?? null,
+      product_description: product?.subtitle ?? null,
+      product_price: product?.price ?? null,
+      product_grade: product?.grade ?? null,
+    }
+  })
 }
 
 // Re-add a recorded video to the posting queue. Publishing still happens behind the

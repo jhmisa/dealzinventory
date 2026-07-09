@@ -267,6 +267,7 @@ export interface SocialMediaPost {
   id: string
   item_id: string | null
   item_code: string | null
+  item_codes: string[] | null
   post_type: string
   platform: string
   caption: string | null
@@ -289,6 +290,7 @@ export interface SocialMediaPost {
 export interface SocialMediaPostInsert {
   item_id?: string | null
   item_code?: string | null
+  item_codes?: string[] | null
   post_type?: string
   platform?: string
   caption?: string | null
