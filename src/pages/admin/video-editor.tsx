@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { VideoEditor } from '@/components/video-editor'
 import { Recorder } from '@/components/video-recorder'
 import { createSocialMediaPost } from '@/services/social-media-posts'
+import { createContentItem } from '@/services/content-items'
 import { getShoot } from '@/services/shoots'
 import type { Orientation } from '@/lib/video-recorder'
 import { cn } from '@/lib/utils'
@@ -26,14 +27,16 @@ export default function VideoEditorPage() {
   const [started, setStarted] = useState(false) // recorder is live
   const [orientation, setOrientation] = useState<Orientation | undefined>(undefined)
   const [firstCode, setFirstCode] = useState<string | null>(null)
+  const [shootId, setShootId] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
 
   // Preload codes from a Shoot and jump straight into recording when arriving via ?shoot=/?mode=record.
   useEffect(() => {
-    const shootId = searchParams.get('shoot')
+    const shootParam = searchParams.get('shoot')
     const wantRecord = searchParams.get('mode') === 'record'
-    if (shootId) {
-      getShoot(shootId)
+    setShootId(shootParam)
+    if (shootParam) {
+      getShoot(shootParam)
         .then((s) => {
           if (s?.orientation === 'landscape' || s?.orientation === 'portrait') setOrientation(s.orientation)
           if (s?.item_codes?.length) {
@@ -117,10 +120,27 @@ export default function VideoEditorPage() {
         return
       }
 
-      toast.success('Video exported — draft post created on Social Media.')
-      navigate('/admin/recorded-videos')
+      // Also add the video to the Content Studio Library as a reusable content_item.
+      // Non-fatal: a failure here shouldn't lose the exported video / draft post.
+      try {
+        await createContentItem({
+          kind: 'video',
+          title: firstCode ? `${firstCode} video` : `Recorded ${new Date().toLocaleDateString()}`,
+          media_urls: [pub.publicUrl],
+          item_codes: codes.length ? codes : null,
+          orientation: orientation ?? null,
+          duration_sec: durationHint ?? null,
+          source: 'recorder',
+          shoot_id: shootId,
+        })
+      } catch {
+        // library insert is best-effort
+      }
+
+      toast.success('Video exported — added to your Library.')
+      navigate('/admin/content-studio?tab=library')
     },
-    [navigate, firstCode, codes],
+    [navigate, firstCode, codes, orientation, durationHint, shootId],
   )
 
   return (
