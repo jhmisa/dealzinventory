@@ -49,6 +49,15 @@ export type ContentItem = Tables['content_items']['Row']
 export type ContentItemInsert = Tables['content_items']['Insert']
 export type ContentItemUpdate = Tables['content_items']['Update']
 
+export type ContentRulePickStrategy = 'lru' | 'random' | 'newest'
+export interface RuleCadence {
+  days: number[] // 0-6, Sun..Sat (JST)
+  time: string // 'HH:MM'
+}
+export type ContentRule = Tables['content_rules']['Row']
+export type ContentRuleInsert = Tables['content_rules']['Insert']
+export type ContentRuleUpdate = Tables['content_rules']['Update']
+
 export type Customer = Tables['customers']['Row']
 export type CustomerInsert = Tables['customers']['Insert']
 export type CustomerUpdate = Tables['customers']['Update']

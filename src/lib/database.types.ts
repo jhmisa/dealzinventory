@@ -853,6 +853,68 @@ export type Database = {
           },
         ]
       }
+      content_rules: {
+        Row: {
+          account_id: string | null
+          active: boolean
+          active_from: string | null
+          active_to: string | null
+          cadence: Json
+          category_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          materialize_horizon_days: number
+          name: string
+          page_id: string | null
+          pick_strategy: string
+          platform: string
+          updated_at: string
+        }
+        Insert: {
+          account_id?: string | null
+          active?: boolean
+          active_from?: string | null
+          active_to?: string | null
+          cadence?: Json
+          category_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          materialize_horizon_days?: number
+          name: string
+          page_id?: string | null
+          pick_strategy?: string
+          platform?: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string | null
+          active?: boolean
+          active_from?: string | null
+          active_to?: string | null
+          cadence?: Json
+          category_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          materialize_horizon_days?: number
+          name?: string
+          page_id?: string | null
+          pick_strategy?: string
+          platform?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_rules_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "content_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversation_customer_audit: {
         Row: {
           changed_by: string | null
@@ -3766,6 +3828,13 @@ export type Database = {
             referencedRelation: "items"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "social_media_posts_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "content_rules"
+            referencedColumns: ["id"]
+          },
         ]
       }
       staff_profiles: {
@@ -4726,6 +4795,7 @@ export type Database = {
       trigger_contact_name_backfill: { Args: never; Returns: undefined }
       trigger_message_sync_fast: { Args: never; Returns: undefined }
       trigger_message_sync_full: { Args: never; Returns: undefined }
+      trigger_publish_due: { Args: never; Returns: undefined }
     }
     Enums: {
       ac_adapter_status: "CORRECT" | "INCORRECT" | "MISSING"
