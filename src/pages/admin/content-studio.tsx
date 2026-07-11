@@ -15,15 +15,9 @@ const LibraryTab = lazy(() =>
 const CalendarTab = lazy(() =>
   import('@/components/content-studio/calendar/calendar-tab').then((m) => ({ default: m.CalendarTab })),
 )
-
-function StudioPlaceholder({ title, note }: { title: string; note: string }) {
-  return (
-    <div className="rounded-lg border border-dashed p-10 text-center">
-      <h2 className="text-lg font-semibold">{title}</h2>
-      <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">{note}</p>
-    </div>
-  )
-}
+const RulesTab = lazy(() =>
+  import('@/components/content-studio/rules/rules-tab').then((m) => ({ default: m.RulesTab })),
+)
 
 const CREATE_MAKERS = [
   {
@@ -106,12 +100,7 @@ export default function ContentStudioPage() {
           {tab === 'create' && <CreateHub />}
           {tab === 'library' && <LibraryTab />}
           {tab === 'calendar' && <CalendarTab />}
-          {tab === 'rules' && (
-            <StudioPlaceholder
-              title="Rules"
-              note="Automations that fill the calendar arrive in Phase 2 — pick a pool, a cadence, and a pick strategy, and posts materialise onto the calendar automatically."
-            />
-          )}
+          {tab === 'rules' && <RulesTab />}
           {tab === 'posted' && <SocialMediaPage />}
         </Suspense>
       </div>

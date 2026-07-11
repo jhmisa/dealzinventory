@@ -10,6 +10,13 @@ export function useContentRules() {
   })
 }
 
+export function useRuleMaterializedCounts() {
+  return useQuery({
+    queryKey: [...queryKeys.contentRules.all, 'materialized-counts'] as const,
+    queryFn: () => ruleService.getRuleMaterializedCounts(),
+  })
+}
+
 // After a rule changes, re-materialise ghosts and refresh the calendar + rotation status.
 function useRuleMutation<TArgs>(fn: (args: TArgs) => Promise<unknown>, materialize = true) {
   const queryClient = useQueryClient()

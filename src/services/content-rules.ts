@@ -46,3 +46,20 @@ export async function materializeRules(): Promise<{ materialized: number }> {
   if (error) throw error
   return (data as { materialized: number }) ?? { materialized: 0 }
 }
+
+/** rule_id → count of upcoming materialised ghost posts (for the Rules tab card). */
+export async function getRuleMaterializedCounts(): Promise<Map<string, number>> {
+  const { data, error } = await supabase
+    .from('social_media_posts')
+    .select('rule_id')
+    .eq('origin', 'rule')
+    .eq('status', 'scheduled')
+    .gte('scheduled_at', new Date().toISOString())
+  if (error) throw error
+  const map = new Map<string, number>()
+  for (const row of data ?? []) {
+    const rid = (row as { rule_id: string | null }).rule_id
+    if (rid) map.set(rid, (map.get(rid) ?? 0) + 1)
+  }
+  return map
+}
