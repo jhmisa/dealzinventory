@@ -3,6 +3,7 @@ import {
   pieces, isRemoved, cutTotal, finalLength,
   type TimelineState, type Range,
 } from '@/lib/video-editor/timeline'
+import { sceneFill } from '@/lib/video-editor/scene-colors'
 import { cn } from '@/lib/utils'
 
 interface ReviewTrimTimelineProps {
@@ -16,8 +17,6 @@ interface ReviewTrimTimelineProps {
   onSetTrim: (start: number, end: number) => void
 }
 
-// Neutral segment fills — differentiate by lightness, not hue (mirrors the mockup --seg1..4).
-const SEG_FILLS = ['oklch(0.40 0 0)', 'oklch(0.50 0 0)', 'oklch(0.34 0 0)', 'oklch(0.45 0 0)']
 const REMOVED_HATCH =
   'repeating-linear-gradient(45deg,oklch(0.42 0.10 25),oklch(0.42 0.10 25) 6px,oklch(0.30 0.07 25) 6px,oklch(0.30 0.07 25) 12px)'
 
@@ -146,7 +145,7 @@ export function ReviewTrimTimeline({
           {/* Track */}
           <div className="absolute left-0 right-0 top-[26px] h-[92px]">
             {/* Pieces */}
-            {ps.map((p, i) => {
+            {ps.map((p) => {
               const removed = isRemoved(state, p)
               return (
                 <div
@@ -159,7 +158,7 @@ export function ReviewTrimTimeline({
                   style={{
                     left: t2x(p.start),
                     width: Math.max(1, t2x(p.end) - t2x(p.start)),
-                    background: removed ? REMOVED_HATCH : SEG_FILLS[i % SEG_FILLS.length],
+                    background: removed ? REMOVED_HATCH : sceneFill(p.start, state.itemBounds),
                     borderColor: removed ? 'transparent' : undefined,
                   }}
                   onClick={(e) => {
