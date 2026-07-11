@@ -81,10 +81,8 @@ const InventoryReportPage = lazy(() => import('@/pages/admin/inventory-report'))
 const InventoryReturnsPage = lazy(() => import('@/pages/admin/inventory-returns'))
 const SupplierReturnDetailPage = lazy(() => import('@/pages/admin/supplier-return-detail'))
 const InventoryRemovalDetailPage = lazy(() => import('@/pages/admin/inventory-removal-detail'))
-const SocialMediaPage = lazy(() => import('@/pages/admin/social-media'))
-const ShootsPage = lazy(() => import('@/pages/admin/shoots'))
+const ContentStudioPage = lazy(() => import('@/pages/admin/content-studio'))
 const VideoEditorPage = lazy(() => import('@/pages/admin/video-editor'))
-const RecordedVideosPage = lazy(() => import('@/pages/admin/recorded-videos'))
 const SystemFeedbackPage = lazy(() => import('@/pages/admin/system-feedback'))
 const BackordersPage = lazy(() => import('@/pages/admin/backorders'))
 const BackorderDetailPage = lazy(() => import('@/pages/admin/backorder-detail'))
@@ -204,10 +202,12 @@ export const router = createBrowserRouter([
           { path: 'tickets/:id', element: lazyElement(TicketDetailPage) },
           { path: 'backorders', element: lazyElement(BackordersPage) },
           { path: 'backorders/:id', element: lazyElement(BackorderDetailPage) },
-          { path: 'social-media', element: lazyElement(SocialMediaPage) },
-          { path: 'shoots', element: lazyElement(ShootsPage) },
+          { path: 'content-studio', element: lazyElement(ContentStudioPage) },
           { path: 'video-editor', element: lazyElement(VideoEditorPage) },
-          { path: 'recorded-videos', element: lazyElement(RecordedVideosPage) },
+          // Old standalone pages now live as Content Studio tabs — redirect deep links.
+          { path: 'social-media', element: <Navigate to="/admin/content-studio?tab=posted" replace /> },
+          { path: 'shoots', element: <Navigate to="/admin/content-studio?tab=plan" replace /> },
+          { path: 'recorded-videos', element: <Navigate to="/admin/content-studio?tab=library" replace /> },
           { path: 'feedback', element: lazyElement(SystemFeedbackPage) },
           { path: 'messages', element: lazyElement(MessagesPage) },
           { path: 'suppliers', element: lazyElement(SupplierListPage) },

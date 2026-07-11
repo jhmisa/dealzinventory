@@ -21,7 +21,6 @@ import {
   MapPin,
   RotateCcw,
   Ticket,
-  Share2,
   Columns3,
   Settings,
   MessageSquare,
@@ -30,8 +29,6 @@ import {
   Undo2,
   PackagePlus,
   Clapperboard,
-  Scissors,
-  FileVideo,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { useNeedsReviewCount } from '@/hooks/use-messaging'
@@ -102,10 +99,7 @@ const navSections: NavSection[] = [
     items: [
       { title: 'Messages', href: '/admin/messages', icon: MessageSquare },
       { title: 'Tickets', href: '/admin/tickets', icon: Ticket },
-      { title: 'Social Media', href: '/admin/social-media', icon: Share2 },
-      { title: 'Shoots', href: '/admin/shoots', icon: Clapperboard },
-      { title: 'Video Editor', href: '/admin/video-editor', icon: Scissors },
-      { title: 'Recorded Videos', href: '/admin/recorded-videos', icon: FileVideo },
+      { title: 'Content Studio', href: '/admin/content-studio', icon: Clapperboard },
       { title: 'Feedback', href: '/admin/feedback', icon: MessageSquarePlus },
     ],
   },
