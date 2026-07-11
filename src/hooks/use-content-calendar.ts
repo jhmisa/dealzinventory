@@ -10,6 +10,13 @@ export function useScheduledPosts(startISO: string, endISO: string) {
   })
 }
 
+export function useUpcomingRulePosts() {
+  return useQuery({
+    queryKey: queryKeys.contentCalendar.upcomingRulePosts(),
+    queryFn: () => calendarService.getUpcomingRulePostsByItem(),
+  })
+}
+
 export function usePinContentToSlot() {
   const queryClient = useQueryClient()
   return useMutation({

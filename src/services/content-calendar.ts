@@ -56,3 +56,25 @@ export async function unpinPost(id: string): Promise<void> {
   const { error } = await supabase.from('social_media_posts').delete().eq('id', id)
   if (error) throw error
 }
+
+/**
+ * Map each content_item to the earliest upcoming rule-materialised post date (ISO).
+ * An item appearing here is "in rotation" — drives the Library rotation-status chip.
+ */
+export async function getUpcomingRulePostsByItem(): Promise<Map<string, string>> {
+  const { data, error } = await supabase
+    .from('social_media_posts')
+    .select('content_item_id, scheduled_at')
+    .eq('origin', 'rule')
+    .eq('status', 'scheduled')
+    .gte('scheduled_at', new Date().toISOString())
+    .order('scheduled_at', { ascending: true })
+  if (error) throw error
+  const map = new Map<string, string>()
+  for (const row of data ?? []) {
+    const id = (row as { content_item_id: string | null }).content_item_id
+    const at = (row as { scheduled_at: string | null }).scheduled_at
+    if (id && at && !map.has(id)) map.set(id, at)
+  }
+  return map
+}

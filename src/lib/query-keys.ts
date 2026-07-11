@@ -219,6 +219,12 @@ export const queryKeys = {
   contentCalendar: {
     all: ['content-calendar'] as const,
     range: (startISO: string, endISO: string) => [...queryKeys.contentCalendar.all, startISO, endISO] as const,
+    upcomingRulePosts: () => [...queryKeys.contentCalendar.all, 'upcoming-rule-posts'] as const,
+  },
+  contentRules: {
+    all: ['content-rules'] as const,
+    list: () => [...queryKeys.contentRules.all, 'list'] as const,
+    detail: (id: string) => [...queryKeys.contentRules.all, 'detail', id] as const,
   },
   tickets: {
     all: ['tickets'] as const,
