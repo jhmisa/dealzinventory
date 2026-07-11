@@ -1178,8 +1178,11 @@ export type Database = {
           customer_quote: string
           generated_caption: string | null
           id: string
+          imported_from: string
           item_code: string | null
           item_id: string | null
+          rating: number | null
+          review_card_content_item_id: string | null
           updated_at: string
         }
         Insert: {
@@ -1188,8 +1191,11 @@ export type Database = {
           customer_quote: string
           generated_caption?: string | null
           id?: string
+          imported_from?: string
           item_code?: string | null
           item_id?: string | null
+          rating?: number | null
+          review_card_content_item_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -1198,8 +1204,11 @@ export type Database = {
           customer_quote?: string
           generated_caption?: string | null
           id?: string
+          imported_from?: string
           item_code?: string | null
           item_id?: string | null
+          rating?: number | null
+          review_card_content_item_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1208,6 +1217,13 @@ export type Database = {
             columns: ["item_id"]
             isOneToOne: false
             referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_reviews_review_card_content_item_id_fkey"
+            columns: ["review_card_content_item_id"]
+            isOneToOne: false
+            referencedRelation: "content_items"
             referencedColumns: ["id"]
           },
         ]
@@ -4793,6 +4809,7 @@ export type Database = {
         }[]
       }
       trigger_contact_name_backfill: { Args: never; Returns: undefined }
+      trigger_materialize_rules: { Args: never; Returns: undefined }
       trigger_message_sync_fast: { Args: never; Returns: undefined }
       trigger_message_sync_full: { Args: never; Returns: undefined }
       trigger_publish_due: { Args: never; Returns: undefined }
