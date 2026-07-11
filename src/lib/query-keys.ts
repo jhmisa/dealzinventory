@@ -206,6 +206,20 @@ export const queryKeys = {
     detail: (id: string) => [...queryKeys.socialMediaPosts.details(), id] as const,
     itemMedia: (itemId: string, productId?: string) => [...queryKeys.socialMediaPosts.all, 'item-media', itemId, productId] as const,
   },
+  contentCategories: {
+    all: ['content-categories'] as const,
+    list: () => [...queryKeys.contentCategories.all, 'list'] as const,
+  },
+  contentItems: {
+    all: ['content-items'] as const,
+    lists: () => [...queryKeys.contentItems.all, 'list'] as const,
+    list: (filters: Record<string, unknown>) => [...queryKeys.contentItems.lists(), filters] as const,
+    detail: (id: string) => [...queryKeys.contentItems.all, 'detail', id] as const,
+  },
+  contentCalendar: {
+    all: ['content-calendar'] as const,
+    range: (startISO: string, endISO: string) => [...queryKeys.contentCalendar.all, startISO, endISO] as const,
+  },
   tickets: {
     all: ['tickets'] as const,
     types: () => [...queryKeys.tickets.all, 'types'] as const,

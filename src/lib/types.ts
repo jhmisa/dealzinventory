@@ -37,6 +37,18 @@ export type ShootInsert = Tables['shoots']['Insert']
 export type ShootUpdate = Tables['shoots']['Update']
 export type ShootStatus = Enums['shoot_status']
 
+// Content Studio
+export type ContentCategory = Tables['content_categories']['Row']
+export type ContentCategoryInsert = Tables['content_categories']['Insert']
+
+export type ContentItemKind = 'video' | 'carousel' | 'review_card' | 'quote' | 'photo'
+export type ContentItemSource = 'recorder' | 'editor' | 'carousel' | 'review' | 'import'
+export type ContentItemOrientation = 'portrait' | 'landscape' | 'square'
+export type PostOrigin = 'manual' | 'rule'
+export type ContentItem = Tables['content_items']['Row']
+export type ContentItemInsert = Tables['content_items']['Insert']
+export type ContentItemUpdate = Tables['content_items']['Update']
+
 export type Customer = Tables['customers']['Row']
 export type CustomerInsert = Tables['customers']['Insert']
 export type CustomerUpdate = Tables['customers']['Update']
@@ -285,6 +297,11 @@ export interface SocialMediaPost {
   updated_at: string
   published_at: string | null
   item_specs: SocialMediaPostItemSpecs
+  // Content Studio calendar-entry columns
+  content_item_id: string | null
+  rule_id: string | null
+  origin: PostOrigin
+  category_id: string | null
 }
 
 export interface SocialMediaPostInsert {
@@ -300,6 +317,10 @@ export interface SocialMediaPostInsert {
   schedule_type?: SocialScheduleType
   scheduled_at?: string | null
   status?: SocialPostStatus
+  content_item_id?: string | null
+  rule_id?: string | null
+  origin?: PostOrigin
+  category_id?: string | null
 }
 
 export interface SocialMediaPostUpdate {
@@ -312,6 +333,9 @@ export interface SocialMediaPostUpdate {
   blotato_post_url?: string | null
   error_message?: string | null
   published_at?: string | null
+  content_item_id?: string | null
+  origin?: PostOrigin
+  category_id?: string | null
 }
 
 export interface SocialMediaPostWithItem extends SocialMediaPost {
