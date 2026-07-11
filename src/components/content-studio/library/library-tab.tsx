@@ -3,6 +3,9 @@ import { toast } from 'sonner'
 import type { ContentItem, ContentItemKind } from '@/lib/types'
 import { useContentItems, useUpdateContentItem, useRetireContentItem } from '@/hooks/use-content-items'
 import { useContentCategories } from '@/hooks/use-content-categories'
+import { useUpcomingRulePosts } from '@/hooks/use-content-calendar'
+import { formatDate } from '@/lib/datetime'
+import type { SchedulePatch } from './library-card'
 import {
   Select,
   SelectContent,
@@ -50,6 +53,7 @@ export function LibraryTab() {
   // over the computed rotation label stays in one place.
   const { data: items = [], isLoading } = useContentItems({ includeRetired: true })
   const { data: categories = [] } = useContentCategories()
+  const { data: upcomingByItem } = useUpcomingRulePosts()
   const updateItem = useUpdateContentItem()
   const retireItem = useRetireContentItem()
 
@@ -74,6 +78,16 @@ export function LibraryTab() {
       {
         onSuccess: () => toast.success(retired ? 'Retired from rotation' : 'Restored to library'),
         onError: (e) => toast.error(`Couldn't update: ${(e as Error).message}`),
+      },
+    )
+  }
+
+  function handleUpdateSchedule(item: ContentItem, patch: SchedulePatch) {
+    updateItem.mutate(
+      { id: item.id, updates: patch },
+      {
+        onSuccess: () => toast.success('Schedule settings saved'),
+        onError: (e) => toast.error(`Couldn't save: ${(e as Error).message}`),
       },
     )
   }
@@ -125,15 +139,20 @@ export function LibraryTab() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filtered.map((item) => (
-            <LibraryCard
-              key={item.id}
-              item={item}
-              categories={categories}
-              onToggleEvergreen={handleToggleEvergreen}
-              onRetire={handleRetire}
-            />
-          ))}
+          {filtered.map((item) => {
+            const nextISO = upcomingByItem?.get(item.id)
+            return (
+              <LibraryCard
+                key={item.id}
+                item={item}
+                categories={categories}
+                rotation={{ hasRule: Boolean(nextISO), nextDate: nextISO ? formatDate(nextISO) : null }}
+                onToggleEvergreen={handleToggleEvergreen}
+                onRetire={handleRetire}
+                onUpdateSchedule={handleUpdateSchedule}
+              />
+            )
+          })}
         </div>
       )}
     </div>
