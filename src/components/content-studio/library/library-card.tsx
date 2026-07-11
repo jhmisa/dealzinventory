@@ -17,8 +17,17 @@ import { Switch } from '@/components/ui/switch'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { rotationStatus, type RotationTone } from './rotation-status'
+
+const NO_CATEGORY = '__none__'
 
 const KIND_META: Record<ContentItemKind, { label: string; icon: typeof Video }> = {
   video: { label: 'Video', icon: Video },
@@ -35,6 +44,7 @@ const TONE_CLASSES: Record<RotationTone, string> = {
 }
 
 export interface SchedulePatch {
+  category_id: string | null
   active_from: string | null
   active_to: string | null
   cooldown_days: number
@@ -64,6 +74,7 @@ export function LibraryCard({
   const isRetired = Boolean(item.retired_at)
   const firstMedia = item.media_urls?.[0]
 
+  const [catId, setCatId] = useState(item.category_id ?? NO_CATEGORY)
   const [from, setFrom] = useState(item.active_from ?? '')
   const [to, setTo] = useState(item.active_to ?? '')
   const [cooldown, setCooldown] = useState(String(item.cooldown_days ?? 0))
@@ -119,6 +130,25 @@ export function LibraryCard({
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-64 space-y-3" align="end">
+                <div className="space-y-1">
+                  <Label className="text-[11px]">Category (pool)</Label>
+                  <Select value={catId} onValueChange={setCatId}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="No category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_CATEGORY}>No category</SelectItem>
+                      {categories.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          <span className="inline-flex items-center gap-2">
+                            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: c.color }} />
+                            {c.name}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="text-xs font-medium text-muted-foreground">Rotation window</div>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
@@ -145,6 +175,7 @@ export function LibraryCard({
                   className="h-7 w-full text-xs"
                   onClick={() =>
                     onUpdateSchedule(item, {
+                      category_id: catId === NO_CATEGORY ? null : catId,
                       active_from: from || null,
                       active_to: to || null,
                       cooldown_days: Math.max(0, Number(cooldown) || 0),
