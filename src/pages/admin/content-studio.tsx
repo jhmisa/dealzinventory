@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Video, UserSquare2, LayoutGrid, MessageSquareQuote } from 'lucide-react'
 import { StudioTabs, useStudioTab } from '@/components/content-studio'
@@ -18,6 +18,14 @@ const CalendarTab = lazy(() =>
 const RulesTab = lazy(() =>
   import('@/components/content-studio/rules/rules-tab').then((m) => ({ default: m.RulesTab })),
 )
+const ReviewCardMaker = lazy(() =>
+  import('@/components/content-studio/create/review-card-maker').then((m) => ({ default: m.ReviewCardMaker })),
+)
+const CarouselBuilder = lazy(() =>
+  import('@/components/content-studio/create/carousel-builder').then((m) => ({ default: m.CarouselBuilder })),
+)
+
+type MakerModal = 'review' | 'carousel' | null
 
 const CREATE_MAKERS = [
   {
@@ -25,47 +33,50 @@ const CREATE_MAKERS = [
     title: 'Record product video',
     desc: 'Film items from a shoot — product square over live camera.',
     icon: Video,
-    to: '/admin/video-editor',
-    enabled: true,
-  },
-  {
-    key: 'talking-head',
-    title: 'Record talking-head',
-    desc: 'Presenter with an image + corner layout. (Phase 3)',
-    icon: UserSquare2,
-    to: '/admin/video-editor',
-    enabled: false,
-  },
-  {
-    key: 'carousel',
-    title: 'Build carousel',
-    desc: 'Ordered slides for a multi-image post. (Phase 4)',
-    icon: LayoutGrid,
-    to: '#',
-    enabled: false,
+    to: '/admin/video-editor' as const,
+    modal: null as MakerModal,
   },
   {
     key: 'review-card',
     title: 'Make review card',
-    desc: 'Turn a customer review into a branded quote card. (Phase 4)',
+    desc: 'Turn a customer review into a branded quote card.',
     icon: MessageSquareQuote,
-    to: '#',
-    enabled: false,
+    to: null,
+    modal: 'review' as MakerModal,
+  },
+  {
+    key: 'carousel',
+    title: 'Build carousel',
+    desc: 'Ordered slides for a multi-image post.',
+    icon: LayoutGrid,
+    to: null,
+    modal: 'carousel' as MakerModal,
+  },
+  {
+    key: 'talking-head',
+    title: 'Record talking-head',
+    desc: 'Presenter with an image + corner layout. (Phase 3b)',
+    icon: UserSquare2,
+    to: null,
+    modal: null as MakerModal,
+    disabled: true,
   },
 ] as const
 
 function CreateHub() {
+  const [modal, setModal] = useState<MakerModal>(null)
   return (
     <div className="space-y-4">
       <div>
         <h2 className="text-lg font-semibold">Create</h2>
-        <p className="text-sm text-muted-foreground">Make a new piece of content. Video makers hand off to the editor.</p>
+        <p className="text-sm text-muted-foreground">Make a new piece of content — it lands in your Library.</p>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {CREATE_MAKERS.map((maker) => {
           const Icon = maker.icon
+          const disabled = 'disabled' in maker && maker.disabled
           const inner = (
-            <Card className={maker.enabled ? 'h-full transition-colors hover:border-primary' : 'h-full opacity-60'}>
+            <Card className={disabled ? 'h-full opacity-60' : 'h-full transition-colors hover:border-primary'}>
               <CardContent className="flex h-full flex-col gap-2 p-4">
                 <Icon className="h-6 w-6 text-primary" />
                 <div className="font-medium">{maker.title}</div>
@@ -73,17 +84,20 @@ function CreateHub() {
               </CardContent>
             </Card>
           )
-          return maker.enabled ? (
-            <Link key={maker.key} to={maker.to} className="block">
+          if (disabled) return <div key={maker.key} className="cursor-not-allowed">{inner}</div>
+          if (maker.to) return <Link key={maker.key} to={maker.to} className="block">{inner}</Link>
+          return (
+            <button key={maker.key} type="button" onClick={() => setModal(maker.modal)} className="block text-left">
               {inner}
-            </Link>
-          ) : (
-            <div key={maker.key} className="cursor-not-allowed">
-              {inner}
-            </div>
+            </button>
           )
         })}
       </div>
+
+      <Suspense fallback={null}>
+        {modal === 'review' && <ReviewCardMaker open onOpenChange={(o) => !o && setModal(null)} />}
+        {modal === 'carousel' && <CarouselBuilder open onOpenChange={(o) => !o && setModal(null)} />}
+      </Suspense>
     </div>
   )
 }
