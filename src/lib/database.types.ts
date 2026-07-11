@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       accessories: {
@@ -468,6 +443,24 @@ export type Database = {
           },
         ]
       }
+      app_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: []
+      }
       automated_message_queue: {
         Row: {
           content: string | null
@@ -745,6 +738,120 @@ export type Database = {
           value_ja?: string | null
         }
         Relationships: []
+      }
+      content_categories: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          name: string
+          slug: string
+          sort_order: number
+        }
+        Insert: {
+          color: string
+          created_at?: string
+          id?: string
+          name: string
+          slug: string
+          sort_order?: number
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
+          slug?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      content_items: {
+        Row: {
+          active_from: string | null
+          active_to: string | null
+          category_id: string | null
+          cooldown_days: number
+          created_at: string
+          created_by: string | null
+          duration_sec: number | null
+          id: string
+          is_evergreen: boolean
+          item_codes: string[] | null
+          kind: string
+          last_posted_at: string | null
+          media_urls: string[]
+          orientation: string | null
+          retired_at: string | null
+          shoot_id: string | null
+          source: string
+          thumbnail_url: string | null
+          times_posted: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          active_from?: string | null
+          active_to?: string | null
+          category_id?: string | null
+          cooldown_days?: number
+          created_at?: string
+          created_by?: string | null
+          duration_sec?: number | null
+          id?: string
+          is_evergreen?: boolean
+          item_codes?: string[] | null
+          kind: string
+          last_posted_at?: string | null
+          media_urls?: string[]
+          orientation?: string | null
+          retired_at?: string | null
+          shoot_id?: string | null
+          source: string
+          thumbnail_url?: string | null
+          times_posted?: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          active_from?: string | null
+          active_to?: string | null
+          category_id?: string | null
+          cooldown_days?: number
+          created_at?: string
+          created_by?: string | null
+          duration_sec?: number | null
+          id?: string
+          is_evergreen?: boolean
+          item_codes?: string[] | null
+          kind?: string
+          last_posted_at?: string | null
+          media_urls?: string[]
+          orientation?: string | null
+          retired_at?: string | null
+          shoot_id?: string | null
+          source?: string
+          thumbnail_url?: string | null
+          times_posted?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_items_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "content_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_items_shoot_id_fkey"
+            columns: ["shoot_id"]
+            isOneToOne: false
+            referencedRelation: "shoots"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       conversation_customer_audit: {
         Row: {
@@ -3561,18 +3668,23 @@ export type Database = {
           blotato_post_url: string | null
           blotato_submission_id: string | null
           caption: string | null
+          category_id: string | null
+          content_item_id: string | null
           created_at: string
           created_by: string | null
           error_message: string | null
           id: string
           item_code: string | null
+          item_codes: string[] | null
           item_id: string | null
           item_specs: Json | null
           media_urls: string[]
+          origin: string
           page_id: string | null
           platform: string
           post_type: string
           published_at: string | null
+          rule_id: string | null
           schedule_type: Database["public"]["Enums"]["social_schedule_type"]
           scheduled_at: string | null
           status: Database["public"]["Enums"]["social_post_status"]
@@ -3583,18 +3695,23 @@ export type Database = {
           blotato_post_url?: string | null
           blotato_submission_id?: string | null
           caption?: string | null
+          category_id?: string | null
+          content_item_id?: string | null
           created_at?: string
           created_by?: string | null
           error_message?: string | null
           id?: string
           item_code?: string | null
+          item_codes?: string[] | null
           item_id?: string | null
           item_specs?: Json | null
           media_urls?: string[]
+          origin?: string
           page_id?: string | null
           platform?: string
           post_type?: string
           published_at?: string | null
+          rule_id?: string | null
           schedule_type?: Database["public"]["Enums"]["social_schedule_type"]
           scheduled_at?: string | null
           status?: Database["public"]["Enums"]["social_post_status"]
@@ -3605,24 +3722,43 @@ export type Database = {
           blotato_post_url?: string | null
           blotato_submission_id?: string | null
           caption?: string | null
+          category_id?: string | null
+          content_item_id?: string | null
           created_at?: string
           created_by?: string | null
           error_message?: string | null
           id?: string
           item_code?: string | null
+          item_codes?: string[] | null
           item_id?: string | null
           item_specs?: Json | null
           media_urls?: string[]
+          origin?: string
           page_id?: string | null
           platform?: string
           post_type?: string
           published_at?: string | null
+          rule_id?: string | null
           schedule_type?: Database["public"]["Enums"]["social_schedule_type"]
           scheduled_at?: string | null
           status?: Database["public"]["Enums"]["social_post_status"]
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "social_media_posts_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "content_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_media_posts_content_item_id_fkey"
+            columns: ["content_item_id"]
+            isOneToOne: false
+            referencedRelation: "content_items"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "social_media_posts_item_id_fkey"
             columns: ["item_id"]
@@ -4117,6 +4253,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      video_assets: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          file_url: string
+          id: string
+          kind: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          file_url: string
+          id?: string
+          kind: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          file_url?: string
+          id?: string
+          kind?: string
+          name?: string
+        }
+        Relationships: []
       }
       webhook_delivery_log: {
         Row: {
@@ -4793,9 +4956,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       ac_adapter_status: ["CORRECT", "INCORRECT", "MISSING"],
