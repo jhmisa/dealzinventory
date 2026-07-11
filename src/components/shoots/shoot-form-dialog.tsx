@@ -282,6 +282,11 @@ export function ShootFormDialog({ open, onOpenChange, shoot }: ShootFormDialogPr
                       className="border-0 p-0 shadow-none focus-visible:ring-0"
                     />
                   </div>
+                  {codes.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {codes.length} item{codes.length === 1 ? '' : 's'} · they travel into Record in this order.
+                    </p>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
