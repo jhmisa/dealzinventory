@@ -19,6 +19,8 @@ export interface CompositeInput {
   videoIndex: number
   /** The seller camera — a raw <video>, or a pre-processed effect <canvas> (chroma-key / blur). */
   camera: HTMLVideoElement | HTMLCanvasElement | null
+  /** Talking-head preset: draw the camera BEHIND the product chip + specs (default false). */
+  cameraBehind?: boolean
 }
 
 /**
@@ -28,10 +30,13 @@ export interface CompositeInput {
  * landscape (16:9). The product square is always the same size in both.
  */
 export function compositeFrame({
-  ctx, canvasW, canvasH, product, specs, cameraBox, card, mode, photoIndex, videoIndex, camera,
+  ctx, canvasW, canvasH, product, specs, cameraBox, card, mode, photoIndex, videoIndex, camera, cameraBehind = false,
 }: CompositeInput): void {
   ctx.fillStyle = '#000'
   ctx.fillRect(0, 0, canvasW, canvasH)
+
+  // Talking-head: camera is the backdrop, drawn first; product chip + specs land on top.
+  if (cameraBehind) drawCamera(ctx, cameraBox, camera)
 
   // ---- Product showcase square ----
   const { x, y, w, h } = product
@@ -60,33 +65,39 @@ export function compositeFrame({
   // ---- Specs band (straddles the seam: overlaps the product bottom + reclaimed strip) ----
   drawShowcaseInfo(ctx, card, specs)
 
-  // ---- Live camera box (raw <video> or a pre-processed effect <canvas>) ----
-  ctx.fillStyle = '#0a0a0a'
-  ctx.fillRect(cameraBox.x, cameraBox.y, cameraBox.w, cameraBox.h)
-  if (camera) {
-    const isVideo = 'videoWidth' in camera
-    const cw = isVideo ? camera.videoWidth : camera.width
-    const ch = isVideo ? camera.videoHeight : camera.height
-    const ready = isVideo ? camera.readyState >= 2 : true
-    if (ready && cw > 0) {
-      drawCover(ctx, camera, cw, ch, cameraBox.x, cameraBox.y, cameraBox.w, cameraBox.h)
-    }
-  }
+  // ---- Live camera box (default order: camera fills its own box, on top) ----
+  if (!cameraBehind) {
+    drawCamera(ctx, cameraBox, camera)
 
-  // seam divider along the shared edge
-  ctx.strokeStyle = 'rgba(255,255,255,0.14)'
-  ctx.lineWidth = Math.max(1, w * 0.003)
-  ctx.beginPath()
-  if (cameraBox.x > product.x) {
-    // side-by-side (landscape): vertical seam
-    ctx.moveTo(cameraBox.x, 0)
-    ctx.lineTo(cameraBox.x, canvasH)
-  } else {
-    // stacked (portrait): horizontal seam
-    ctx.moveTo(0, cameraBox.y)
-    ctx.lineTo(canvasW, cameraBox.y)
+    // seam divider along the shared edge (only meaningful when camera has its own box)
+    ctx.strokeStyle = 'rgba(255,255,255,0.14)'
+    ctx.lineWidth = Math.max(1, w * 0.003)
+    ctx.beginPath()
+    if (cameraBox.x > product.x) {
+      // side-by-side (landscape): vertical seam
+      ctx.moveTo(cameraBox.x, 0)
+      ctx.lineTo(cameraBox.x, canvasH)
+    } else {
+      // stacked (portrait): horizontal seam
+      ctx.moveTo(0, cameraBox.y)
+      ctx.lineTo(canvasW, cameraBox.y)
+    }
+    ctx.stroke()
   }
-  ctx.stroke()
+}
+
+/** Fill a camera box (raw <video> or a pre-processed effect <canvas>), cover-fit. */
+function drawCamera(ctx: Ctx2D, box: Rect, camera: HTMLVideoElement | HTMLCanvasElement | null): void {
+  ctx.fillStyle = '#0a0a0a'
+  ctx.fillRect(box.x, box.y, box.w, box.h)
+  if (!camera) return
+  const isVideo = 'videoWidth' in camera
+  const cw = isVideo ? camera.videoWidth : camera.width
+  const ch = isVideo ? camera.videoHeight : camera.height
+  const ready = isVideo ? camera.readyState >= 2 : true
+  if (ready && cw > 0) {
+    drawCover(ctx, camera, cw, ch, box.x, box.y, box.w, box.h)
+  }
 }
 
 /** Fit an image/video inside a box, letterboxed (whole media visible). */

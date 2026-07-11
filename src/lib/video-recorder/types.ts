@@ -2,6 +2,15 @@ export type MediaMode = 'photos' | 'videos'
 
 export type Orientation = 'portrait' | 'landscape'
 
+/**
+ * Live composition preset, switchable mid-take (keys 1/2/3). Baked into the recording —
+ * NOT a separate timeline scene (see content-studio spec §8/§12).
+ *  1 talking-head    — seller camera full-frame, product a small chip, specs a bottom band
+ *  2 specs-inset     — product large, specs prominent band, camera smaller
+ *  3 product-showcase — product square dominant, camera fills the rest (the default)
+ */
+export type LayoutPreset = 'talking-head' | 'specs-inset' | 'product-showcase'
+
 export interface Rect {
   x: number
   y: number
@@ -80,4 +89,6 @@ export interface CardRuntime {
   videoIndex: number
   /** performance.now() when the current photo started showing (drives auto-rotation). */
   photoStart: number
+  /** Live composition preset for this card's segment (default product-showcase). */
+  layout: LayoutPreset
 }

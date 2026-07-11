@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Loader2, Circle, Square, SkipForward, X, AlertCircle, Camera, Mic, Image as ImageIcon, Video, Smartphone, Monitor, Pause, Play, Wand2, Aperture, ImagePlus, Ban } from 'lucide-react'
+import { Loader2, Circle, Square, SkipForward, X, AlertCircle, Camera, Mic, Image as ImageIcon, Video, Smartphone, Monitor, Pause, Play, Wand2, Aperture, ImagePlus, Ban, RotateCcw, UserSquare, PanelBottom, SquareStack } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
@@ -13,11 +13,18 @@ import { cn } from '@/lib/utils'
 import { getClaimableByCode } from '@/services/mine'
 import { VIDEO_CONSTRAINTS, pickSupportedMimeType } from '@/lib/media-recording'
 import {
-  compositeFrame, computeItemBounds, ORIENTATION_DIMS,
+  compositeFrame, computeItemBounds, ORIENTATION_DIMS, regionsFor, retakeBounds,
   CameraEffectProcessor, DEFAULT_EFFECT_SETTINGS, usesSegmentation,
-  type RecorderCard, type CardRuntime, type MediaMode, type Orientation,
+  type RecorderCard, type CardRuntime, type MediaMode, type Orientation, type LayoutPreset,
   type CameraEffectMode, type CameraEffectSettings, type SegmenterStatus,
 } from '@/lib/video-recorder'
+
+// The three live composition presets + their shortcut keys (locked map).
+const LAYOUT_PRESETS: { preset: LayoutPreset; key: string; label: string; Icon: typeof UserSquare }[] = [
+  { preset: 'talking-head', key: '1', label: 'Talking', Icon: UserSquare },
+  { preset: 'specs-inset', key: '2', label: 'Specs', Icon: PanelBottom },
+  { preset: 'product-showcase', key: '3', label: 'Showcase', Icon: SquareStack },
+]
 import type { GalleryImage } from '@/components/shared/image-gallery'
 import { CodeStrip } from './code-strip'
 
@@ -91,6 +98,7 @@ export function Recorder({ codes, onComplete, onCancel, initialOrientation }: Re
   const [cards, setCards] = useState<RecorderCard[]>([])
   const [activeIndex, setActiveIndex] = useState(0)
   const [activeMode, setActiveMode] = useState<MediaMode>('photos')
+  const [activeLayout, setActiveLayout] = useState<LayoutPreset>('product-showcase')
   const [elapsed, setElapsed] = useState(0)
   const [paused, setPaused] = useState(false)
   const [countdown, setCountdown] = useState<number | null>(null)
@@ -125,6 +133,7 @@ export function Recorder({ codes, onComplete, onCancel, initialOrientation }: Re
   const pausedTotalRef = useRef(0) // cumulative ms spent paused (excluded from the output clock)
   const pauseStartedAtRef = useRef(0) // performance.now() when the current pause began (0 = not paused)
   const spaceTimesRef = useRef<number[]>([])
+  const discardingRef = useRef(false) // set when Esc-discarding so onstop skips onComplete
   const activeIndexRef = useRef(0)
   const cardsRef = useRef<RecorderCard[]>([])
   const runtimeRef = useRef<CardRuntime[]>([])
@@ -215,6 +224,7 @@ export function Recorder({ codes, onComplete, onCancel, initialOrientation }: Re
         photoIndex: 0,
         videoIndex: 0,
         photoStart: performance.now(),
+        layout: 'product-showcase',
       }))
       setCards(loaded)
       setActiveMode(runtimeRef.current[0]?.mode ?? 'photos')
@@ -311,13 +321,17 @@ export function Recorder({ codes, onComplete, onCancel, initialOrientation }: Re
           cameraSource = effectRef.current.process(cameraSource, fx)
         }
 
+        // Region rects come from the active card's live layout preset (default = showcase,
+        // which reproduces the protected geometry exactly).
+        const regions = regionsFor(orientation, rt.layout)
         compositeFrame({
           ctx,
           canvasW: dims.canvasW,
           canvasH: dims.canvasH,
-          product: dims.product,
-          specs: dims.specs,
-          cameraBox: dims.camera,
+          product: regions.product,
+          specs: regions.specs,
+          cameraBox: regions.cameraBox,
+          cameraBehind: regions.cameraBehind,
           card,
           mode: rt.mode,
           photoIndex: rt.photoIndex,
@@ -330,7 +344,7 @@ export function Recorder({ codes, onComplete, onCancel, initialOrientation }: Re
     raf = requestAnimationFrame(draw)
     rafRef.current = raf
     return () => cancelAnimationFrame(raf)
-  }, [phase, dims])
+  }, [phase, dims, orientation])
 
   // Teardown.
   useEffect(() => {
@@ -367,10 +381,44 @@ export function Recorder({ codes, onComplete, onCancel, initialOrientation }: Re
       if (rt) {
         rt.photoStart = performance.now()
         setActiveMode(rt.mode)
+        setActiveLayout(rt.layout)
       }
       return next
     })
   }, [clockSec])
+
+  // Switch the CURRENT item's live layout preset. Baked into the take from this frame on
+  // (not a separate timeline scene). The RAF loop reads runtime.layout each frame.
+  const setLayoutPreset = useCallback((preset: LayoutPreset) => {
+    const rt = runtimeRef.current[activeIndexRef.current]
+    if (!rt) return
+    rt.layout = preset
+    setActiveLayout(preset)
+  }, [])
+
+  // Retake the current item: reset its on-screen media to the top and keep earlier items.
+  // NOTE (documented limitation): MediaRecorder yields one continuous blob, so the flubbed
+  // footage can't be discarded from the take here — the item's scene boundary is preserved so
+  // the redo lands in the same scene, and the flub is trimmed in the editor. True frame-discard
+  // (per-scene segments) is Phase 3b.
+  const handleRetake = useCallback(() => {
+    if (phase !== 'recording') return
+    const idx = activeIndexRef.current
+    spaceTimesRef.current = retakeBounds(spaceTimesRef.current, idx).keepBounds
+    const rt = runtimeRef.current[idx]
+    if (rt) { rt.photoIndex = 0; rt.videoIndex = 0; rt.photoStart = performance.now() }
+    toast.info('Retaking this item — trim the earlier attempt in the editor.')
+  }, [phase])
+
+  // Discard the whole take (Esc): stop the recorder WITHOUT handing off to the editor.
+  const handleDiscard = useCallback(() => {
+    if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+      discardingRef.current = true
+      recorderRef.current.stop()
+    } else {
+      onCancel()
+    }
+  }, [onCancel])
 
   const toggleMode = useCallback(() => {
     const idx = activeIndexRef.current
@@ -396,25 +444,6 @@ export function Recorder({ codes, onComplete, onCancel, initialOrientation }: Re
     rt.photoStart = performance.now()
     setActiveMode(m)
   }, [])
-
-  // Keyboard: SPACE advances (while recording); T toggles photo/video for the current item.
-  useEffect(() => {
-    if (phase !== 'ready' && phase !== 'recording') return
-    const onKey = (e: KeyboardEvent) => {
-      const el = e.target as HTMLElement | null
-      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) return
-      if (e.code === 'Space' || e.key === ' ') {
-        if (phase !== 'recording') return
-        e.preventDefault()
-        advance()
-      } else if (e.code === 'KeyT') {
-        e.preventDefault()
-        toggleMode()
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [phase, advance, toggleMode])
 
   // Elapsed timer. Reads the paused-adjusted clock, so it naturally freezes while paused.
   useEffect(() => {
@@ -470,10 +499,17 @@ export function Recorder({ codes, onComplete, onCancel, initialOrientation }: Re
       if (e.data.size) chunksRef.current.push(e.data)
     }
     recorder.onstop = () => {
+      streamRef.current?.getTracks().forEach((t) => t.stop())
+      if (discardingRef.current) {
+        // Esc-discard: throw the take away, don't hand off to the editor.
+        discardingRef.current = false
+        chunksRef.current = []
+        onCancel()
+        return
+      }
       const blob = new Blob(chunksRef.current, { type: mime.mimeType })
       const durationSec = clockSec()
       const itemBounds = computeItemBounds(spaceTimesRef.current, durationSec)
-      streamRef.current?.getTracks().forEach((t) => t.stop())
       onComplete(blob, itemBounds, durationSec, cardsRef.current[0]?.code ?? null)
     }
     recorderRef.current = recorder
@@ -491,7 +527,7 @@ export function Recorder({ codes, onComplete, onCancel, initialOrientation }: Re
     setPaused(false)
     setElapsed(0)
     setPhase('recording')
-  }, [onComplete, clockSec])
+  }, [onComplete, onCancel, clockSec])
 
   // "Start recording" runs a 5→1 countdown over the live preview first, then captures.
   const beginCountdown = useCallback(() => {
@@ -534,6 +570,47 @@ export function Recorder({ codes, onComplete, onCancel, initialOrientation }: Re
     if (recorderRef.current && recorderRef.current.state !== 'inactive') recorderRef.current.stop()
   }, [])
 
+  // Locked keyboard map: SPACE/→ next · ← prev · 1/2/3 layout · T photos/videos ·
+  // R retake · P pause · Enter stop · Esc discard.
+  useEffect(() => {
+    if (phase !== 'ready' && phase !== 'recording') return
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) return
+      const recording = phase === 'recording'
+      if (e.code === 'Space' || e.key === ' ' || e.code === 'ArrowRight') {
+        if (!recording) return
+        e.preventDefault(); advance()
+      } else if (e.code === 'ArrowLeft') {
+        if (!recording) return
+        e.preventDefault()
+        setActiveIndex((i) => Math.max(0, i - 1)) // re-show previous item (no blob rewind)
+      } else if (e.code === 'KeyT') {
+        e.preventDefault(); toggleMode()
+      } else if (e.code === 'Digit1' || e.code === 'Numpad1') {
+        e.preventDefault(); setLayoutPreset('talking-head')
+      } else if (e.code === 'Digit2' || e.code === 'Numpad2') {
+        e.preventDefault(); setLayoutPreset('specs-inset')
+      } else if (e.code === 'Digit3' || e.code === 'Numpad3') {
+        e.preventDefault(); setLayoutPreset('product-showcase')
+      } else if (e.code === 'KeyR') {
+        if (!recording) return
+        e.preventDefault(); handleRetake()
+      } else if (e.code === 'KeyP') {
+        if (!recording) return
+        e.preventDefault(); togglePause()
+      } else if (e.code === 'Enter') {
+        if (!recording) return
+        e.preventDefault(); stopRecording()
+      } else if (e.code === 'Escape') {
+        if (!recording) return
+        e.preventDefault(); handleDiscard()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [phase, advance, toggleMode, setLayoutPreset, handleRetake, togglePause, stopRecording, handleDiscard])
+
   const titles = Object.fromEntries(cards.map((c) => [c.code, c.title]))
   const isLast = activeIndex >= cards.length - 1
   const activeCard = cards[activeIndex]
@@ -544,6 +621,30 @@ export function Recorder({ codes, onComplete, onCancel, initialOrientation }: Re
     const d = list.find((x) => x.deviceId === id)
     return d?.label || fallback
   }
+
+  const renderLayoutSwitcher = () => (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-muted-foreground">Layout</span>
+        <span className="text-[10px] text-muted-foreground">Switch live · 1 · 2 · 3</span>
+      </div>
+      <div className="grid grid-cols-3 gap-1 rounded-md border border-border p-1">
+        {LAYOUT_PRESETS.map(({ preset, key, label, Icon }) => (
+          <Button
+            key={preset}
+            variant={activeLayout === preset ? 'secondary' : 'ghost'}
+            size="sm"
+            className="h-8 gap-1 text-[11px]"
+            onClick={() => setLayoutPreset(preset)}
+            title={`${label} (press ${key})`}
+          >
+            <Icon className="h-3.5 w-3.5" />
+            {label}
+          </Button>
+        ))}
+      </div>
+    </div>
+  )
 
   if (phase === 'error') {
     return (
@@ -659,6 +760,9 @@ export function Recorder({ codes, onComplete, onCancel, initialOrientation }: Re
                 </div>
               )}
             </div>
+
+            {/* Layout preset */}
+            {renderLayoutSwitcher()}
 
             {/* Devices */}
             {(cameras.length > 0 || mics.length > 0) && (
@@ -819,23 +923,31 @@ export function Recorder({ codes, onComplete, onCancel, initialOrientation }: Re
             <Mic className="mr-1 inline h-3 w-3" />
             {deviceLabel(mics, selectedMic, 'Default mic')}
           </p>
-          <div className="flex items-center justify-center gap-2">
+          <div className="mx-auto max-w-md">{renderLayoutSwitcher()}</div>
+          <div className="flex flex-wrap items-center justify-center gap-2">
             <Button variant="outline" onClick={advance} disabled={isLast}>
               <SkipForward className="mr-2 h-4 w-4" />
               Next item
               <kbd className="ml-2 rounded border border-border px-1 text-[10px]">Space</kbd>
             </Button>
+            <Button variant="outline" onClick={handleRetake}>
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Retake
+              <kbd className="ml-2 rounded border border-border px-1 text-[10px]">R</kbd>
+            </Button>
             <Button variant="outline" onClick={togglePause}>
               {paused ? <Play className="mr-2 h-4 w-4" /> : <Pause className="mr-2 h-4 w-4" />}
               {paused ? 'Resume' : 'Pause'}
+              <kbd className="ml-2 rounded border border-border px-1 text-[10px]">P</kbd>
             </Button>
             <Button variant="destructive" onClick={stopRecording}>
               <Square className="mr-2 h-4 w-4 fill-current" />
               Stop
+              <kbd className="ml-2 rounded border border-white/40 px-1 text-[10px]">⏎</kbd>
             </Button>
           </div>
           <p className="text-center text-xs text-muted-foreground">
-            Talk about the current item, then press <b>Space</b> to advance. Press <b>T</b> to switch between its photos and video. One continuous take.
+            Talk about the item, <b>Space</b> for the next · <b>1/2/3</b> switch layout · <b>T</b> photos/videos · <b>R</b> retake · <b>Enter</b> stop. One continuous take.
           </p>
         </>
       )}
