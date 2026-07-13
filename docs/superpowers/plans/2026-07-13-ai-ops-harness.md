@@ -551,7 +551,7 @@ You never send anything to a customer directly.
 
 **Files:** Create `supabase/functions/ai-ops-execute/index.ts`
 
-- [ ] **Step 6.1: Implement** (always-200 JSON pattern like `send-message`; reuses `sendViaMissive`):
+- [x] **Step 6.1: Implement** (always-200 JSON pattern like `send-message`; reuses `sendViaMissive`):
 
 ```ts
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -638,9 +638,9 @@ Deno.serve(async (req) => {
 });
 ```
 
-- [ ] **Step 6.2:** `deno check supabase/functions/ai-ops-execute/index.ts` → clean. Deploy: `supabase functions deploy ai-ops-execute`.
-- [ ] **Step 6.3: Verify inert paths live** (no customer contact): invoke with `{}` → `{error: 'proposal_id is required'}`; invoke with a random uuid → "Proposal not found"; flip `ai_ops_enabled` to `'false'`, invoke with a real pending smoke proposal → "disabled (kill-switch)", flip back to `'true'`, delete the smoke proposal. NEVER execute a real send in verification (that messages a real customer — same rule as Blotato).
-- [ ] **Step 6.4: Commit** — `git commit -m "feat(ai-ops): ai-ops-execute edge fn — single execution path via sendViaMissive"`
+- [x] **Step 6.2:** `deno check supabase/functions/ai-ops-execute/index.ts` → clean. Deploy: `supabase functions deploy ai-ops-execute`.
+- [x] **Step 6.3: Verify inert paths live** (no customer contact): invoke with `{}` → `{error: 'proposal_id is required'}`; invoke with a random uuid → "Proposal not found"; flip `ai_ops_enabled` to `'false'`, invoke with a real pending smoke proposal → "disabled (kill-switch)", flip back to `'true'`, delete the smoke proposal. NEVER execute a real send in verification (that messages a real customer — same rule as Blotato).
+- [x] **Step 6.4: Commit** — `git commit -m "feat(ai-ops): ai-ops-execute edge fn — single execution path via sendViaMissive"`
 
 ---
 
