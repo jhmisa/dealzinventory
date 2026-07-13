@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash",
+      "Edit",
+      "NotebookEdit",
+      "WebFetch",
+      "WebSearch",
+      "Read(./server/**)",
+      "Read(../.env*)",
+      "Read(//Users/joeymisa/Documents/Projects/inventory-claude/.env*)"
+    ],
+    "allow": [
+      "Write(./notes/**)"
+    ]
+  }
+}

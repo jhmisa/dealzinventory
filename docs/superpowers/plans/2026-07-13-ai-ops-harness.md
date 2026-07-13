@@ -467,7 +467,7 @@ console.log('cleaned up. SMOKE PASSED')
 
 **Files:** Create `ops/CLAUDE.md`, `ops/.mcp.json`, `ops/.claude/settings.json`, `ops/notes/.gitkeep`, `ops/playbooks/README.md`; modify root `.gitignore`
 
-- [ ] **Step 5.1:** `ops/.mcp.json`:
+- [x] **Step 5.1:** `ops/.mcp.json`:
 
 ```json
 {
@@ -480,7 +480,7 @@ console.log('cleaned up. SMOKE PASSED')
 }
 ```
 
-- [ ] **Step 5.2:** `ops/.claude/settings.json` — deny native power; allow scratch notes:
+- [x] **Step 5.2:** `ops/.claude/settings.json` — deny native power; allow scratch notes:
 
 ```json
 {
@@ -504,7 +504,7 @@ console.log('cleaned up. SMOKE PASSED')
 
 (Deny wins over allow in Claude Code permission rules; writes outside `notes/` fall back to ask-mode prompts Joey will see. `Read` denies keep the service key and server internals out of the operator's context.)
 
-- [ ] **Step 5.3:** `ops/CLAUDE.md` — the charter. Full text (agent-facing; written for a Claude Code session whose ONLY tools are the dealz-ops MCP tools + notes):
+- [x] **Step 5.3:** `ops/CLAUDE.md` — the charter. Full text (agent-facing; written for a Claude Code session whose ONLY tools are the dealz-ops MCP tools + notes):
 
 ```markdown
 # Dealz Senior Operator — Charter
@@ -541,9 +541,9 @@ You never send anything to a customer directly.
 - Your only writable space is `notes/`. Everything else is off-limits by design.
 ```
 
-- [ ] **Step 5.4:** `ops/playbooks/README.md` — one paragraph: playbooks live in the DB (`messaging_specialists.playbook`); the correction examples tool surfaces the operational ground truth; this folder is reserved for future static playbooks. `ops/notes/.gitkeep` empty; root `.gitignore` gains `ops/notes/*` + `!ops/notes/.gitkeep` + `ops/server/node_modules/` (if root ignore lacks a global `node_modules` rule — check first).
-- [ ] **Step 5.5: Verify the harness bites:** run `claude --print` (or manual check) is NOT required — instead verify statically: `.mcp.json` valid JSON, settings valid JSON, and `npx tsx ./server/src/index.ts` starts from `ops/` without crashing (Ctrl-C after "running on stdio" style output; test with an `echo … |` initialize message if needed).
-- [ ] **Step 5.6: Commit** — `git commit -m "feat(ai-ops): ops/ operator workspace — charter, locked permissions, MCP wiring"`
+- [x] **Step 5.4:** `ops/playbooks/README.md` — one paragraph: playbooks live in the DB (`messaging_specialists.playbook`); the correction examples tool surfaces the operational ground truth; this folder is reserved for future static playbooks. `ops/notes/.gitkeep` empty; root `.gitignore` gains `ops/notes/*` + `!ops/notes/.gitkeep` + `ops/server/node_modules/` (if root ignore lacks a global `node_modules` rule — check first).
+- [x] **Step 5.5: Verify the harness bites:** run `claude --print` (or manual check) is NOT required — instead verify statically: `.mcp.json` valid JSON, settings valid JSON, and `npx tsx ./server/src/index.ts` starts from `ops/` without crashing (Ctrl-C after "running on stdio" style output; test with an `echo … |` initialize message if needed).
+- [x] **Step 5.6: Commit** — `git commit -m "feat(ai-ops): ops/ operator workspace — charter, locked permissions, MCP wiring"`
 
 ---
 

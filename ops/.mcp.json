@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "dealz-ops": {
+      "command": "npx",
+      "args": ["tsx", "./server/src/index.ts"]
+    }
+  }
+}

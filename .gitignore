@@ -24,7 +24,7 @@ dist-ssr
 *.sw?
 
 # Secrets and local config
-.mcp.json
+/.mcp.json
 # Ignore most of .claude/ (personal config, local secrets) but allow
 # project-committed hooks and settings.
 .claude/*
@@ -61,3 +61,7 @@ backups/
 
 # Superpowers brainstorming mockups (local, throwaway)
 .superpowers/
+
+# AI Ops operator scratch space (session artifacts, not source)
+ops/notes/*
+!ops/notes/.gitkeep
