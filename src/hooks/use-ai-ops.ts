@@ -48,6 +48,16 @@ export function useRejectAiOpsProposal() {
   })
 }
 
+export function useAcknowledgeAiOpsProposal() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => aiOpsService.acknowledgeAiOpsProposal(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.aiOps.all })
+    },
+  })
+}
+
 export function useSetAiOpsEnabled() {
   const queryClient = useQueryClient()
   return useMutation({

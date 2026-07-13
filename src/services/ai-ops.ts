@@ -39,6 +39,21 @@ export async function rejectAiOpsProposal(id: string, note?: string) {
   if (error) throw error
 }
 
+/** Dismiss an informational briefing — nothing executes, it just leaves the queue. */
+export async function acknowledgeAiOpsProposal(id: string) {
+  const { data: userData } = await supabase.auth.getUser()
+  const { error } = await supabase
+    .from('ai_ops_proposals')
+    .update({
+      status: 'ACKNOWLEDGED',
+      reviewed_by: userData?.user?.id ?? null,
+      reviewed_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .eq('status', 'PENDING')
+  if (error) throw error
+}
+
 /** Approve = execute through the single audited path (ai-ops-execute). Optional edited content. */
 export async function approveAiOpsProposal(id: string, content?: string) {
   const { data, error } = await supabase.functions.invoke('ai-ops-execute', {

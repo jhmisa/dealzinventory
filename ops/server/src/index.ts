@@ -101,6 +101,34 @@ server.tool(
 )
 
 server.tool(
+  'scan_attention',
+  'Business-wide sweep of what needs follow-up: unanswered customers, stale AI drafts, failed sends, open tickets, stuck orders, sold backorder units not yet ordered from the supplier, kaitori needing action, uninspected intake. Use for "what needs attention?" asks and morning scans.',
+  {},
+  async () => {
+    try {
+      return ok(await runTool('scan_attention', {}, {}, () => db.scanAttention()))
+    } catch (err) { return fail(err) }
+  },
+)
+
+server.tool(
+  'propose_briefing',
+  'File an attention BRIEFING in the AI Operations page — an informational report staff acknowledge (never executed, never sent to customers). Use after scan_attention to leave a reviewable record. One live briefing at a time; re-filing replaces it. Plain text content.',
+  {
+    title: z.string().min(1).max(200).describe('One-line headline, e.g. "Morning scan: 12 items need attention"'),
+    content: z.string().min(1).max(8000).describe('The briefing body: grouped findings with codes and ages, plain text'),
+  },
+  async ({ title, content }) => {
+    try {
+      // Informational write — kill-switch gated + audited, but NOT gated by reply autonomy
+      // (it cannot reach a customer).
+      return ok(await runTool('propose_briefing', { title, content_chars: content.length }, {}, () =>
+        db.proposeBriefing({ title, content })))
+    } catch (err) { return fail(err) }
+  },
+)
+
+server.tool(
   'list_proposals',
   'List your recent proposals and their review status (PENDING/APPROVED/REJECTED/EXECUTED/FAILED).',
   { status: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'EXECUTED', 'FAILED']).optional() },

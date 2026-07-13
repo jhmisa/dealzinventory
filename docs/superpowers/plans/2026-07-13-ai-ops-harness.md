@@ -765,3 +765,15 @@ export async function setAiOpsReplyAutonomy(level: AiOpsSettings['replyAutonomy'
 - **Spec coverage:** workspace (T5), MCP server + guardrails (T3–4), tables/settings (T1), execute fn (T6), cockpit (T7–8), safety verification (T9), restore tag (done pre-plan). ✔
 - **Types:** `AiOpsProposal.payload.content`/`conversation_id` used consistently in db.ts, edge fn, service, card. `OpsBlockedError` only in server. ✔
 - **No real sends anywhere in verification** — approve path is verified only through its error branches; the happy-path send is Joey's first live approval. ✔
+
+---
+
+## Slice 1.5 addendum — attention scan + briefings (built same day, all done)
+
+- [x] Migration `20260713010000_ai_ops_briefing.sql` — type CHECK += `briefing`, status CHECK += `ACKNOWLEDGED` (applied remotely)
+- [x] `db.ts scanAttention()` — 8 fixed read-only categories: unanswered customers (>4h, last msg = customer), stale drafts (>24h), failed sends (7d), open tickets, stuck orders (PENDING>2d / CONFIRMED>5d), backorder units AWAITING_ORDER, kaitori follow-ups (RECEIVED/INSPECTING>2d, PRICE_REVISED>3d, APPROVED unpaid>2d), intake backlog (>3d)
+- [x] `db.ts proposeBriefing()` — one live briefing, replace-on-refile; never executable (ai-ops-execute only handles `reply`)
+- [x] `index.ts` — `scan_attention` + `propose_briefing` tools registered (10 total), kill-switch gated + audited; briefing NOT gated by reply autonomy (can't reach a customer)
+- [x] Cockpit — briefing card (ClipboardList icon, content, single Acknowledge), `acknowledgeAiOpsProposal` service + hook, ACKNOWLEDGED badge
+- [x] Charter — "Ad-hoc asks" + "Morning scan" sections
+- [x] E2E verified — live scan (43 real findings) → briefing card → Acknowledge → History; 0 console errors; artifacts cleaned; tsc/build/server tests green

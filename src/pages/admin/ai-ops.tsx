@@ -11,6 +11,7 @@ import {
   useAiOpsSettings,
   useApproveAiOpsProposal,
   useRejectAiOpsProposal,
+  useAcknowledgeAiOpsProposal,
   useSetAiOpsEnabled,
   useSetAiOpsReplyAutonomy,
 } from '@/hooks/use-ai-ops'
@@ -24,10 +25,11 @@ export default function AiOpsPage() {
 
   const approve = useApproveAiOpsProposal()
   const reject = useRejectAiOpsProposal()
+  const acknowledge = useAcknowledgeAiOpsProposal()
   const setEnabled = useSetAiOpsEnabled()
   const setAutonomy = useSetAiOpsReplyAutonomy()
 
-  const busy = approve.isPending || reject.isPending
+  const busy = approve.isPending || reject.isPending || acknowledge.isPending
   const history = (all ?? []).filter((p) => p.status !== 'PENDING')
 
   const handleApprove = (id: string, content?: string) => {
@@ -38,6 +40,13 @@ export default function AiOpsPage() {
         onError: (err) => toast.error(`Send failed: ${err.message}`),
       },
     )
+  }
+
+  const handleAcknowledge = (id: string) => {
+    acknowledge.mutate(id, {
+      onSuccess: () => toast.success('Briefing acknowledged'),
+      onError: (err) => toast.error(`Acknowledge failed: ${err.message}`),
+    })
   }
 
   const handleReject = (id: string, note?: string) => {
@@ -106,6 +115,7 @@ export default function AiOpsPage() {
                 proposal={p}
                 onApprove={handleApprove}
                 onReject={handleReject}
+                onAcknowledge={handleAcknowledge}
                 busy={busy}
               />
             ))

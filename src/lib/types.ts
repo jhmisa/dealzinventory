@@ -738,12 +738,12 @@ export interface TestAIResponse {
 }
 
 // ---- AI Ops (harness) ----
-export type AiOpsProposalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXECUTED' | 'FAILED'
+export type AiOpsProposalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXECUTED' | 'FAILED' | 'ACKNOWLEDGED'
 export type AiOpsAutonomy = 'OFF' | 'PROPOSE' | 'AUTO'
 
 export interface AiOpsProposal {
   id: string
-  type: 'reply'
+  type: 'reply' | 'briefing'
   status: AiOpsProposalStatus
   summary: string
   rationale: string | null

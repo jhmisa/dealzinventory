@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { formatDistanceToNow } from 'date-fns'
-import { Bot, Check, X, ExternalLink } from 'lucide-react'
+import { Bot, Check, X, ExternalLink, ClipboardList } from 'lucide-react'
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -25,27 +25,33 @@ const STATUS_VARIANT: Record<AiOpsProposal['status'], 'default' | 'secondary' | 
   REJECTED: 'outline',
   EXECUTED: 'secondary',
   FAILED: 'destructive',
+  ACKNOWLEDGED: 'secondary',
 }
 
 interface ProposalCardProps {
   proposal: AiOpsProposal
   onApprove?: (id: string, content?: string) => void
   onReject?: (id: string, note?: string) => void
+  onAcknowledge?: (id: string) => void
   busy?: boolean
 }
 
-export function ProposalCard({ proposal, onApprove, onReject, busy }: ProposalCardProps) {
+export function ProposalCard({ proposal, onApprove, onReject, onAcknowledge, busy }: ProposalCardProps) {
   const original = proposal.payload.content ?? ''
   const [content, setContent] = useState(original)
   const [note, setNote] = useState('')
   const edited = content !== original
-  const reviewable = proposal.status === 'PENDING' && onApprove && onReject
+  const isBriefing = proposal.type === 'briefing'
+  const reviewable = proposal.status === 'PENDING' && !isBriefing && onApprove && onReject
+  const acknowledgeable = proposal.status === 'PENDING' && isBriefing && onAcknowledge
 
   return (
     <Card>
       <CardHeader className="pb-2">
         <div className="flex flex-wrap items-center gap-2">
-          <Bot className="h-4 w-4 text-muted-foreground" />
+          {isBriefing
+            ? <ClipboardList className="h-4 w-4 text-muted-foreground" />
+            : <Bot className="h-4 w-4 text-muted-foreground" />}
           <Badge variant="outline" className="uppercase">{proposal.type}</Badge>
           <Badge variant={STATUS_VARIANT[proposal.status]}>{proposal.status}</Badge>
           {proposal.confidence != null && (
@@ -89,6 +95,14 @@ export function ProposalCard({ proposal, onApprove, onReject, busy }: ProposalCa
           <p className="text-xs text-muted-foreground">Review note: {proposal.review_note}</p>
         )}
       </CardContent>
+      {acknowledgeable && (
+        <CardFooter>
+          <Button size="sm" variant="outline" disabled={busy} onClick={() => onAcknowledge(proposal.id)}>
+            <Check className="mr-1 h-4 w-4" />
+            Acknowledge
+          </Button>
+        </CardFooter>
+      )}
       {reviewable && (
         <CardFooter className="flex flex-wrap items-center gap-2">
           <AlertDialog>
