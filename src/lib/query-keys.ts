@@ -266,4 +266,10 @@ export const queryKeys = {
     corrections: () => [...queryKeys.messaging.all, 'corrections'] as const,
     systemSetting: (key: string) => [...queryKeys.messaging.all, 'system-setting', key] as const,
   },
+  aiOps: {
+    all: ['ai-ops'] as const,
+    proposals: (status?: string) => [...queryKeys.aiOps.all, 'proposals', status ?? 'all'] as const,
+    activity: () => [...queryKeys.aiOps.all, 'activity'] as const,
+    settings: () => [...queryKeys.aiOps.all, 'settings'] as const,
+  },
 }

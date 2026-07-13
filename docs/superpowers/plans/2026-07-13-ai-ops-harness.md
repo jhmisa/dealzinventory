@@ -648,7 +648,7 @@ Deno.serve(async (req) => {
 
 **Files:** Modify `src/lib/query-keys.ts`; create `src/services/ai-ops.ts`, `src/hooks/use-ai-ops.ts`
 
-- [ ] **Step 7.1:** query-keys — add (mirroring existing style):
+- [x] **Step 7.1:** query-keys — add (mirroring existing style):
 
 ```ts
 aiOps: {
@@ -659,7 +659,7 @@ aiOps: {
 },
 ```
 
-- [ ] **Step 7.2:** `src/services/ai-ops.ts`:
+- [x] **Step 7.2:** `src/services/ai-ops.ts`:
 
 ```ts
 import { supabase } from '@/lib/supabase'
@@ -724,8 +724,8 @@ export async function setAiOpsReplyAutonomy(level: AiOpsSettings['replyAutonomy'
 }
 ```
 
-- [ ] **Step 7.3:** `src/hooks/use-ai-ops.ts` — standard TanStack pattern (mirror `use-messaging.ts`): `useAiOpsProposals(status?)` with `refetchInterval: 10_000`, `useAiOpsActivity()`, `useAiOpsSettings()`, and mutations `useApproveAiOpsProposal` / `useRejectAiOpsProposal` / `useSetAiOpsEnabled` / `useSetAiOpsReplyAutonomy` — each invalidating `queryKeys.aiOps.all`, with toast error handling matching the codebase convention.
-- [ ] **Step 7.4:** `npx tsc --noEmit` → clean. Commit: `git commit -m "feat(ai-ops): frontend service + hooks for proposals, activity, settings"`
+- [x] **Step 7.3:** `src/hooks/use-ai-ops.ts` — standard TanStack pattern (mirror `use-messaging.ts`): `useAiOpsProposals(status?)` with `refetchInterval: 10_000`, `useAiOpsActivity()`, `useAiOpsSettings()`, and mutations `useApproveAiOpsProposal` / `useRejectAiOpsProposal` / `useSetAiOpsEnabled` / `useSetAiOpsReplyAutonomy` — each invalidating `queryKeys.aiOps.all`, with toast error handling matching the codebase convention.
+- [x] **Step 7.4:** `npx tsc --noEmit` → clean. Commit: `git commit -m "feat(ai-ops): frontend service + hooks for proposals, activity, settings"`
 
 ---
 
