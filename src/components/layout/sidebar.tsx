@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import {
+  Bot,
   LayoutDashboard,
   Package,
   ClipboardCheck,
@@ -98,6 +99,7 @@ const navSections: NavSection[] = [
     label: 'Messaging',
     items: [
       { title: 'Messages', href: '/admin/messages', icon: MessageSquare },
+      { title: 'AI Operations', href: '/admin/ai-ops', icon: Bot },
       { title: 'Tickets', href: '/admin/tickets', icon: Ticket },
       { title: 'Content Studio', href: '/admin/content-studio', icon: Clapperboard },
       { title: 'Feedback', href: '/admin/feedback', icon: MessageSquarePlus },

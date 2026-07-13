@@ -75,6 +75,7 @@ const ForgotPasswordPage = lazy(() => import('@/pages/admin/forgot-password'))
 const AuthCallbackPage = lazy(() => import('@/pages/admin/auth-callback'))
 const SetPasswordPage = lazy(() => import('@/pages/admin/set-password'))
 const MessagesPage = lazy(() => import('@/pages/admin/messages'))
+const AiOpsPage = lazy(() => import('@/pages/admin/ai-ops'))
 const MessagingSettingsPage = lazy(() => import('@/pages/admin/messaging-settings'))
 const AccessoryDetailPage = lazy(() => import('@/pages/admin/accessory-detail'))
 const InventoryReportPage = lazy(() => import('@/pages/admin/inventory-report'))
@@ -210,6 +211,7 @@ export const router = createBrowserRouter([
           { path: 'recorded-videos', element: <Navigate to="/admin/content-studio?tab=library" replace /> },
           { path: 'feedback', element: lazyElement(SystemFeedbackPage) },
           { path: 'messages', element: lazyElement(MessagesPage) },
+          { path: 'ai-ops', element: lazyElement(AiOpsPage) },
           { path: 'suppliers', element: lazyElement(SupplierListPage) },
           { path: 'settings/messaging', element: adminElement(MessagingSettingsPage) },
           { path: 'settings/general', element: adminElement(GeneralSettingsPage) },
