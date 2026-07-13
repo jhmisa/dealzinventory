@@ -736,3 +736,34 @@ export interface TestAIResponse {
   // Trace of each inventory search the AI ran (empty = it answered without searching).
   tool_calls?: { query: string; result_count: number; codes: string[] }[]
 }
+
+// ---- AI Ops (harness) ----
+export type AiOpsProposalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXECUTED' | 'FAILED'
+export type AiOpsAutonomy = 'OFF' | 'PROPOSE' | 'AUTO'
+
+export interface AiOpsProposal {
+  id: string
+  type: 'reply'
+  status: AiOpsProposalStatus
+  summary: string
+  rationale: string | null
+  confidence: number | null
+  payload: { conversation_id?: string; content?: string } & Record<string, unknown>
+  target_ref: string | null
+  error: string | null
+  created_by: string
+  reviewed_by: string | null
+  review_note: string | null
+  reviewed_at: string | null
+  executed_at: string | null
+  created_at: string
+}
+
+export interface AiOpsActivity {
+  id: number
+  tool: string
+  args: Record<string, unknown>
+  result_summary: string | null
+  proposal_id: string | null
+  created_at: string
+}

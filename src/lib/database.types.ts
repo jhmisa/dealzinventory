@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       accessories: {
@@ -323,6 +348,95 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ai_ops_activity: {
+        Row: {
+          args: Json
+          created_at: string
+          id: number
+          proposal_id: string | null
+          result_summary: string | null
+          tool: string
+        }
+        Insert: {
+          args?: Json
+          created_at?: string
+          id?: never
+          proposal_id?: string | null
+          result_summary?: string | null
+          tool: string
+        }
+        Update: {
+          args?: Json
+          created_at?: string
+          id?: never
+          proposal_id?: string | null
+          result_summary?: string | null
+          tool?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_ops_activity_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "ai_ops_proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_ops_proposals: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          created_by: string
+          error: string | null
+          executed_at: string | null
+          id: string
+          payload: Json
+          rationale: string | null
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          summary: string
+          target_ref: string | null
+          type: string
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          created_by?: string
+          error?: string | null
+          executed_at?: string | null
+          id?: string
+          payload?: Json
+          rationale?: string | null
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          summary: string
+          target_ref?: string | null
+          type: string
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          created_by?: string
+          error?: string | null
+          executed_at?: string | null
+          id?: string
+          payload?: Json
+          rationale?: string | null
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          summary?: string
+          target_ref?: string | null
+          type?: string
+        }
+        Relationships: []
       }
       ai_prompts: {
         Row: {
@@ -5043,6 +5157,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       ac_adapter_status: ["CORRECT", "INCORRECT", "MISSING"],
