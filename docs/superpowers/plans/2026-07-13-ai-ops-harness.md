@@ -43,7 +43,7 @@
 
 **Files:** Create `supabase/migrations/20260713000000_ai_ops.sql`
 
-- [ ] **Step 1.1: Write the migration**
+- [x] **Step 1.1: Write the migration**
 
 ```sql
 -- AI Ops Harness (slice 1): proposals queue + activity audit + settings.
@@ -106,10 +106,10 @@ INSERT INTO system_settings (key, value) VALUES
 ON CONFLICT (key) DO NOTHING;
 ```
 
-- [ ] **Step 1.2: Apply via CLI** — `supabase db push` (auto-apply per CLAUDE.md). Expected: migration applied, no errors.
-- [ ] **Step 1.3: Verify remotely** — `supabase migration list | tail -3` shows `20260713000000` on remote; quick `execute_sql`-equivalent check via `psql`/CLI that both tables exist and the two settings rows are seeded.
-- [ ] **Step 1.4: Regenerate `database.types.ts` ONLY** (`supabase gen types typescript --linked > src/lib/database.types.ts`). NEVER regenerate `src/lib/types.ts` (hand-maintained — memory `project_types_file_structure`).
-- [ ] **Step 1.5: Add hand aliases to `src/lib/types.ts`** (match file style — no semicolons, single quotes):
+- [x] **Step 1.2: Apply via CLI** — `supabase db push` (auto-apply per CLAUDE.md). Expected: migration applied, no errors.
+- [x] **Step 1.3: Verify remotely** — `supabase migration list | tail -3` shows `20260713000000` on remote; quick `execute_sql`-equivalent check via `psql`/CLI that both tables exist and the two settings rows are seeded.
+- [x] **Step 1.4: Regenerate `database.types.ts` ONLY** (`supabase gen types typescript --linked > src/lib/database.types.ts`). NEVER regenerate `src/lib/types.ts` (hand-maintained — memory `project_types_file_structure`).
+- [x] **Step 1.5: Add hand aliases to `src/lib/types.ts`** (match file style — no semicolons, single quotes):
 
 ```ts
 // ---- AI Ops (harness) ----
@@ -144,7 +144,7 @@ export interface AiOpsActivity {
 }
 ```
 
-- [ ] **Step 1.6: Commit** — `git add supabase/migrations/20260713000000_ai_ops.sql src/lib/database.types.ts src/lib/types.ts && git commit -m "feat(ai-ops): proposals + activity tables, kill-switch + autonomy settings"`
+- [x] **Step 1.6: Commit** — `git add supabase/migrations/20260713000000_ai_ops.sql src/lib/database.types.ts src/lib/types.ts && git commit -m "feat(ai-ops): proposals + activity tables, kill-switch + autonomy settings"`
 
 ---
 
@@ -152,8 +152,8 @@ export interface AiOpsActivity {
 
 `.env.local` currently has no `SUPABASE_SERVICE_ROLE_KEY`.
 
-- [ ] **Step 2.1:** Get the key: `supabase projects api-keys --project-ref <ref from supabase/config.toml or .temp/project-ref>` and append `SUPABASE_SERVICE_ROLE_KEY=<key>` to `.env.local` (gitignored — verify with `git check-ignore .env.local`).
-- [ ] **Step 2.2:** Confirm `.env.local` is NOT staged/committed. No commit for this task.
+- [x] **Step 2.1:** Get the key: `supabase projects api-keys --project-ref <ref from supabase/config.toml or .temp/project-ref>` and append `SUPABASE_SERVICE_ROLE_KEY=<key>` to `.env.local` (gitignored — verify with `git check-ignore .env.local`).
+- [x] **Step 2.2:** Confirm `.env.local` is NOT staged/committed. No commit for this task.
 
 ---
 
@@ -161,7 +161,7 @@ export interface AiOpsActivity {
 
 **Files:** Create `ops/server/package.json`, `ops/server/tsconfig.json`, `ops/server/src/lib.ts`, `ops/server/src/lib.test.ts`
 
-- [ ] **Step 3.1: package scaffold**
+- [x] **Step 3.1: package scaffold**
 
 `ops/server/package.json`:
 ```json
@@ -205,7 +205,7 @@ export interface AiOpsActivity {
 }
 ```
 
-- [ ] **Step 3.2: Failing test** — `ops/server/src/lib.test.ts` (node:assert style, mirrors repo tests):
+- [x] **Step 3.2: Failing test** — `ops/server/src/lib.test.ts` (node:assert style, mirrors repo tests):
 
 ```ts
 import assert from 'node:assert/strict'
@@ -224,8 +224,8 @@ assert.equal(ageLabel('2026-07-10T12:00:00Z', now), '3d')
 console.log('lib tests passed')
 ```
 
-- [ ] **Step 3.3:** `cd ops/server && npm install && npm test` → FAIL (lib.ts missing).
-- [ ] **Step 3.4: Implement** `ops/server/src/lib.ts`:
+- [x] **Step 3.3:** `cd ops/server && npm install && npm test` → FAIL (lib.ts missing).
+- [x] **Step 3.4: Implement** `ops/server/src/lib.ts`:
 
 ```ts
 /** Clamp a string for audit logs / snippets; appends an ellipsis when cut. */
@@ -245,8 +245,8 @@ export function ageLabel(iso: string | null, now: Date = new Date()): string {
 }
 ```
 
-- [ ] **Step 3.5:** `npm test` → PASS. `npm run typecheck` → clean.
-- [ ] **Step 3.6: Commit** — `git add ops/server && git commit -m "feat(ai-ops): dealz-ops server scaffold + pure helpers (tested)"` (verify `ops/server/node_modules` is gitignored; add `ops/server/node_modules/` to root `.gitignore` if not covered).
+- [x] **Step 3.5:** `npm test` → PASS. `npm run typecheck` → clean.
+- [x] **Step 3.6: Commit** — `git add ops/server && git commit -m "feat(ai-ops): dealz-ops server scaffold + pure helpers (tested)"` (verify `ops/server/node_modules` is gitignored; add `ops/server/node_modules/` to root `.gitignore` if not covered).
 
 ---
 
@@ -254,7 +254,7 @@ export function ageLabel(iso: string | null, now: Date = new Date()): string {
 
 **Files:** Create `ops/server/src/env.ts`, `ops/server/src/db.ts`, `ops/server/src/guardrails.ts`, `ops/server/src/index.ts`, `ops/server/src/smoke.ts`
 
-- [ ] **Step 4.1:** `ops/server/src/env.ts`:
+- [x] **Step 4.1:** `ops/server/src/env.ts`:
 
 ```ts
 import { config } from 'dotenv'
@@ -274,7 +274,7 @@ if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
 }
 ```
 
-- [ ] **Step 4.2:** `ops/server/src/db.ts` — the ONLY database surface. Every query the agent can trigger is enumerated here; nothing generic, nothing destructive. Key functions (full implementations, not sketches):
+- [x] **Step 4.2:** `ops/server/src/db.ts` — the ONLY database surface. Every query the agent can trigger is enumerated here; nothing generic, nothing destructive. Key functions (full implementations, not sketches):
 
 ```ts
 import { createClient } from '@supabase/supabase-js'
@@ -367,7 +367,7 @@ export async function logActivity(tool: string, args: Record<string, unknown>, r
 
 (The `/* ... */` bodies above are shorthand for THIS PLAN ONLY because they are straightforward selects fully specified by the comment — implement them as described, mirroring the `_shared` sources named in each comment.)
 
-- [ ] **Step 4.3:** `ops/server/src/guardrails.ts`:
+- [x] **Step 4.3:** `ops/server/src/guardrails.ts`:
 
 ```ts
 import { getSetting, logActivity } from './db.js'
@@ -418,7 +418,7 @@ function extractProposalId(result: unknown): string | undefined {
 }
 ```
 
-- [ ] **Step 4.4:** `ops/server/src/index.ts` — register the 8 tools on `McpServer` (name `dealz-ops`), each handler = `runTool(name, args, {write}, () => db.fn(...))`, result returned as `{ content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }`; errors returned as `{ content: [{type:'text', text: 'ERROR: …'}], isError: true }`. Tools + descriptions (descriptions are agent-facing — make them operational):
+- [x] **Step 4.4:** `ops/server/src/index.ts` — register the 8 tools on `McpServer` (name `dealz-ops`), each handler = `runTool(name, args, {write}, () => db.fn(...))`, result returned as `{ content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }`; errors returned as `{ content: [{type:'text', text: 'ERROR: …'}], isError: true }`. Tools + descriptions (descriptions are agent-facing — make them operational):
   - `survey_worklist` — "List escalated customer conversations awaiting the senior operator, oldest first. Start here."
   - `get_conversation` — `{ conversation_id, limit? }`
   - `get_customer_context` — `{ conversation_id }`
@@ -429,7 +429,7 @@ function extractProposalId(result: unknown): string | undefined {
   - `propose_reply` (write) — `{ conversation_id, content, summary, rationale?, confidence? }` — "Submit a reply PROPOSAL for staff review. Plain text only (no Markdown — Messenger renders it literally). English + light emojis. This does NOT send anything."
   - **AUTO mode:** after a successful propose, if `getSetting('ai_ops_autonomy_reply') === 'AUTO'`, POST `${SUPABASE_URL}/functions/v1/ai-ops-execute` with headers `Authorization: Bearer ${SERVICE_ROLE_KEY}`, `apikey: ${SERVICE_ROLE_KEY}` and body `{ proposal_id }`; append the execute result to the tool output. In PROPOSE mode, skip.
   - Transport: `StdioServerTransport`; wrap `logActivity` failures in try/catch so audit hiccups never crash the server.
-- [ ] **Step 4.5:** `ops/server/src/smoke.ts` — live smoke (reads are harmless; the write is inert and cleaned up):
+- [x] **Step 4.5:** `ops/server/src/smoke.ts` — live smoke (reads are harmless; the write is inert and cleaned up):
 
 ```ts
 import { surveyWorklist, getConversation, searchInventory, proposeReply, listProposals, supabase } from './db.js'
@@ -458,8 +458,8 @@ await supabase.from('ai_ops_proposals').delete().eq('id', res.proposal_id)
 console.log('cleaned up. SMOKE PASSED')
 ```
 
-- [ ] **Step 4.6:** Run `npm run smoke` (in `ops/server`) → `SMOKE PASSED`; `npm run typecheck` → clean.
-- [ ] **Step 4.7: Commit** — `git commit -m "feat(ai-ops): dealz-ops MCP server — 7 read tools + propose_reply behind guardrails"`
+- [x] **Step 4.6:** Run `npm run smoke` (in `ops/server`) → `SMOKE PASSED`; `npm run typecheck` → clean.
+- [x] **Step 4.7: Commit** — `git commit -m "feat(ai-ops): dealz-ops MCP server — 7 read tools + propose_reply behind guardrails"`
 
 ---
 
