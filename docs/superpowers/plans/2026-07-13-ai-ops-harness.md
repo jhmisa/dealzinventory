@@ -744,19 +744,19 @@ export async function setAiOpsReplyAutonomy(level: AiOpsSettings['replyAutonomy'
 
 ### Task 9: E2E verification (safe — no customer contact)
 
-- [ ] **Step 9.1:** Re-run `ops/server`: `npm test` + `npm run smoke` but SKIP the cleanup delete for one proposal (temporarily comment or add `--keep` handling): leave ONE pending smoke proposal in the DB.
-- [ ] **Step 9.2:** Playwright (dev-staff login from `.env.local`): open `/admin/ai-ops` → controls render (enabled=true, autonomy=PROPOSE); Pending tab shows the smoke proposal card with summary/confidence; edit the textarea → "edited" chip appears; click **Reject** with note → toast, card leaves Pending, appears in History as REJECTED with the note. 0 console errors.
-- [ ] **Step 9.3:** Kill-switch UX: toggle AI Ops OFF in the UI → run a `survey_worklist` via the server (one-liner script) → expect `OpsBlockedError` text; check Activity tab shows the `BLOCKED: kill-switch off` row; toggle back ON.
-- [ ] **Step 9.4:** Clean up all smoke artifacts (proposals + their activity rows can stay — they ARE the audit trail; delete only the REJECTED smoke proposal row and its activity rows to leave Joey a clean slate).
-- [ ] **Step 9.5:** Full gates: `npx tsc --noEmit`, `npm run build`, `cd ops/server && npm run typecheck && npm test`, `deno check supabase/functions/ai-ops-execute/index.ts`.
+- [x] **Step 9.1:** Re-run `ops/server`: `npm test` + `npm run smoke` but SKIP the cleanup delete for one proposal (temporarily comment or add `--keep` handling): leave ONE pending smoke proposal in the DB.
+- [x] **Step 9.2:** Playwright (dev-staff login from `.env.local`): open `/admin/ai-ops` → controls render (enabled=true, autonomy=PROPOSE); Pending tab shows the smoke proposal card with summary/confidence; edit the textarea → "edited" chip appears; click **Reject** with note → toast, card leaves Pending, appears in History as REJECTED with the note. 0 console errors.
+- [x] **Step 9.3:** Kill-switch UX: toggle AI Ops OFF in the UI → run a `survey_worklist` via the server (one-liner script) → expect `OpsBlockedError` text; check Activity tab shows the `BLOCKED: kill-switch off` row; toggle back ON.
+- [x] **Step 9.4:** Clean up all smoke artifacts (proposals + their activity rows can stay — they ARE the audit trail; delete only the REJECTED smoke proposal row and its activity rows to leave Joey a clean slate).
+- [x] **Step 9.5:** Full gates: `npx tsc --noEmit`, `npm run build`, `cd ops/server && npm run typecheck && npm test`, `deno check supabase/functions/ai-ops-execute/index.ts`.
 
 ---
 
 ### Task 10: Finalize
 
-- [ ] **Step 10.1:** Update `docs/PROJECT_STATE.md` Now-entry: what shipped, what's verified, what's gated on Joey (first real approve→send; flipping AUTO).
-- [ ] **Step 10.2:** Bump `package.json` → `1.107.0` (one bump this session).
-- [ ] **Step 10.3:** Final commit on `feat/ai-ops`. Do NOT push to main — outward-facing deploy stays gated on Joey (matches Content Studio precedent). Push the branch to origin for backup: `git push -u origin feat/ai-ops`.
+- [x] **Step 10.1:** Update `docs/PROJECT_STATE.md` Now-entry: what shipped, what's verified, what's gated on Joey (first real approve→send; flipping AUTO).
+- [x] **Step 10.2:** Bump `package.json` → `1.107.0` (one bump this session).
+- [x] **Step 10.3:** Final commit on `feat/ai-ops`. Do NOT push to main — outward-facing deploy stays gated on Joey (matches Content Studio precedent). Push the branch to origin for backup: `git push -u origin feat/ai-ops`.
 
 ---
 
