@@ -71,10 +71,29 @@ export function CreateTicketDialog({
     },
   })
 
-  // Update form values when props change
-  if (customerId && form.getValues('customer_id') !== customerId) {
-    form.setValue('customer_id', customerId)
-  }
+  // Re-seed the form from the CURRENT props every time the dialog opens.
+  // This dialog stays mounted while staff switch conversations in the Messages
+  // page, so mount-time defaultValues go stale — tickets were being created
+  // with the wrong conversation_id/customer_id pairing (see
+  // docs/investigations/incorrect-ticket-linking.md).
+  useEffect(() => {
+    if (open) {
+      form.reset({
+        subject: '',
+        description: '',
+        ticket_type_id: defaultType?.id ?? '',
+        priority: 'NORMAL',
+        customer_id: customerId ?? '',
+        order_id: orderId ?? '',
+        conversation_id: conversationId ?? '',
+      })
+      setSelectedItemIds(new Set())
+      setReturnReason('')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  // Ticket types load async — fill in the default type once available
   if (defaultType && !form.getValues('ticket_type_id')) {
     form.setValue('ticket_type_id', defaultType.id)
   }

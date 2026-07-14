@@ -1,7 +1,59 @@
 # Investigation: Tickets pinned to a customer their conversation no longer points to
 
-> **Status:** ✅ Resolved — 2026-06-03.
+> **Status:** ✅ Resolved (2nd pass) — 2026-07-15. See "Recurrence" section below.
 > **Reported:** 2026-05-06
+
+## Recurrence & final resolution (2026-07-15)
+
+The 2026-06-03 fix (reverse-cascade trigger + backfill) did not stop the bug: **8 new
+drifted tickets** appeared between 2026-06-15 and 2026-07-07 (TK000089, TK000093,
+TK000097, TK000099, TK000125, TK000126, TK000135, TK000142), all staff-created.
+
+### Root cause #2 — tickets were being BORN incoherent (stale dialog state)
+
+The June trigger only reacts to `conversations.customer_id` *changes*; it can never
+correct a ticket that is inserted with a mismatched pair. That is exactly what was
+happening:
+
+- `CustomerPanel` (Messages page, pane 4) renders `CreateTicketDialog` **permanently
+  mounted**, un-keyed, while staff switch conversations.
+- React Hook Form captures `conversation_id` in `defaultValues` **once at mount** and
+  the dialog never re-synced it; `customer_id` was re-synced on render, but **only when
+  truthy** (skipped for unlinked conversations).
+- Net effect: create a ticket after switching conversations → ticket gets the
+  **currently-viewed customer** + the **first-selected conversation** (TK000097: customer
+  Rence C001283, conversation Darwin's). Create from an *unlinked* conversation → ticket
+  gets the correct conversation + a **stale customer** from a previously-viewed
+  conversation (TK000093: 山下's conversation, customer LEIZEL C001278).
+
+Evidence per ticket (message-content matching) confirmed 7 of 8 had the RIGHT customer
+and a stale conversation; TK000093 was the inverse.
+
+**Important correction to the 2026-06-03 assumption:** that backfill assumed
+`conversations.customer_id` is always the truth and overwrote `tickets.customer_id`.
+For stale-conversation tickets the truth is the other way around. The 7 tickets it
+"fixed" back then were resolved under that assumption and may deserve a skim
+(TK000013/17/20/22/24 et al.), but they were individually reviewed at the time.
+
+### Fix (three layers)
+
+1. **Frontend root cause** — `create-ticket-dialog.tsx` now `form.reset(...)`s ALL
+   identity fields (`customer_id`, `conversation_id`, `order_id`, type) from the
+   CURRENT props every time the dialog opens. Covers all four mount sites.
+2. **DB invariant at the tickets side** — migration
+   `20260715000000_ticket_conversation_coherence.sql` adds
+   `trg_sync_ticket_customer_with_conversation` (BEFORE INSERT OR UPDATE OF
+   `conversation_id`): any conversation-linked ticket is snapped to that
+   conversation's current customer. A buggy client can no longer create an
+   incoherent ticket (verified live with a deliberately mismatched insert).
+3. **Data remediation** — same migration repointed the 7 stale-conversation tickets to
+   their customer's own (single) conversation and cleared TK000093's stale customer.
+   Post-migration drift count: **0**.
+
+E2E verified 2026-07-15 (local dev + Playwright): mount dialog on conversation A,
+switch to conversation B, create ticket → row has B's conversation AND B's customer.
+Messaging (Missive webhook/send/receive) untouched — no changes to
+conversations/messages code or triggers.
 > **Triggering case:** Customer C000560 (Joanna Marie Bernabe) had three tickets that all showed as linked to her in the admin tickets list, but two of them lived inside conversations whose Missive contact was a different person ("Ra Chel", "Cathy-Lyn Gutierrez Santos").
 
 ## Resolution (2026-06-03)
