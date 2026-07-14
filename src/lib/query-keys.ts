@@ -229,6 +229,7 @@ export const queryKeys = {
   tickets: {
     all: ['tickets'] as const,
     types: () => [...queryKeys.tickets.all, 'types'] as const,
+    queue: () => [...queryKeys.tickets.all, 'queue'] as const,
     lists: () => [...queryKeys.tickets.all, 'list'] as const,
     list: (filters: Record<string, unknown>) => [...queryKeys.tickets.lists(), filters] as const,
     details: () => [...queryKeys.tickets.all, 'detail'] as const,

@@ -8,10 +8,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { TicketTypeBadge } from '@/components/tickets'
-import { useTickets, useTicketTypes } from '@/hooks/use-tickets'
+import { TicketTypeBadge, TicketQueue } from '@/components/tickets'
+import { useTickets, useTicketTypes, useTicketQueue } from '@/hooks/use-tickets'
 import { usePersistedFilters } from '@/hooks/use-persisted-filters'
 import { TICKET_STATUSES, TICKET_PRIORITIES } from '@/lib/constants'
+import { attentionCount, todayJst } from '@/lib/ticket-followups'
 import { formatDateTime, cn, formatCustomerName } from '@/lib/utils'
 
 type TicketRow = {
@@ -21,11 +22,13 @@ type TicketRow = {
   priority: string
   subject: string
   created_at: string
+  follow_up_at: string | null
   assigned_staff_id: string | null
   ticket_types: {
     name: string
     label: string
     icon: string
+    kind?: 'problem' | 'followup'
   } | null
   customers: {
     customer_code: string
@@ -42,6 +45,7 @@ type TicketRow = {
 }
 
 const STATUS_TABS = [
+  { value: 'queue', label: 'Queue' },
   { value: 'all', label: 'All' },
   ...TICKET_STATUSES.map((s) => ({ value: s.value, label: s.label })),
 ]
@@ -110,6 +114,30 @@ const columns: ColumnDef<TicketRow>[] = [
     ),
   },
   {
+    accessorKey: 'follow_up_at',
+    header: 'Follow-up',
+    cell: ({ row }) => {
+      const due = row.original.follow_up_at
+      if (!due) return <span className="text-xs text-muted-foreground">—</span>
+      const isOpen = row.original.ticket_status === 'OPEN' || row.original.ticket_status === 'IN_PROGRESS'
+      const today = todayJst()
+      return (
+        <span
+          className={cn(
+            'text-xs',
+            isOpen && due < today && 'font-medium text-red-600',
+            isOpen && due === today && 'font-medium text-amber-600',
+            (!isOpen || due > today) && 'text-muted-foreground',
+          )}
+        >
+          {due}
+          {isOpen && due < today && ' ⚠'}
+          {isOpen && due === today && ' · today'}
+        </span>
+      )
+    },
+  },
+  {
     accessorKey: 'created_at',
     header: 'Created',
     cell: ({ row }) => (
@@ -122,7 +150,7 @@ export default function TicketListPage() {
   const navigate = useNavigate()
   const { getParam, setParam } = usePersistedFilters('tickets-filters')
   const search = getParam('q')
-  const statusTab = getParam('status', 'all')
+  const statusTab = getParam('status', 'queue')
   const typeFilter = getParam('type', 'all')
   const priorityFilter = getParam('priority', 'all')
   const setSearch = (v: string) => setParam('q', v)
@@ -132,22 +160,42 @@ export default function TicketListPage() {
 
   const { data: ticketTypes = [] } = useTicketTypes()
 
+  const isQueue = statusTab === 'queue'
+
   const { data: allTickets, isLoading } = useTickets({
     search: search || undefined,
     type: typeFilter === 'all' ? undefined : typeFilter,
     priority: priorityFilter === 'all' ? undefined : priorityFilter,
   })
 
+  const { data: queueTickets = [], isLoading: queueLoading } = useTicketQueue()
+
   const tickets = (allTickets ?? []) as TicketRow[]
 
+  // Queue respects the same search/type/priority filters, applied client-side
+  const q = search.trim().toLowerCase()
+  const filteredQueue = queueTickets.filter((t) =>
+    (!q || t.ticket_code.toLowerCase().includes(q) || t.subject.toLowerCase().includes(q)) &&
+    (typeFilter === 'all' || t.ticket_types?.id === typeFilter) &&
+    (priorityFilter === 'all' || t.priority === priorityFilter),
+  )
+
   // Compute counts per status
-  const statusCounts: Record<string, number> = { all: tickets.length }
+  const statusCounts: Record<string, number> = {
+    all: tickets.length,
+    queue: attentionCount(queueTickets.map((t) => ({
+      priority: t.priority,
+      created_at: t.created_at,
+      follow_up_at: t.follow_up_at,
+      kind: t.ticket_types?.kind ?? 'problem',
+    }))),
+  }
   for (const t of tickets) {
     statusCounts[t.ticket_status] = (statusCounts[t.ticket_status] ?? 0) + 1
   }
 
   // Filter by active tab
-  const filteredTickets = statusTab === 'all'
+  const filteredTickets = statusTab === 'all' || isQueue
     ? tickets
     : tickets.filter((t) => t.ticket_status === statusTab)
 
@@ -180,9 +228,11 @@ export default function TicketListPage() {
                 <span
                   className={cn(
                     'ml-1.5 inline-flex items-center justify-center rounded-full px-2 py-0.5 text-xs',
-                    isActive
-                      ? 'bg-primary/10 text-primary'
-                      : 'bg-muted text-muted-foreground',
+                    tab.value === 'queue' && count > 0
+                      ? 'bg-destructive text-white'
+                      : isActive
+                        ? 'bg-primary/10 text-primary'
+                        : 'bg-muted text-muted-foreground',
                   )}
                 >
                   {count}
@@ -225,7 +275,13 @@ export default function TicketListPage() {
         </Select>
       </div>
 
-      {isLoading ? (
+      {isQueue ? (
+        queueLoading ? (
+          <TableSkeleton rows={8} columns={5} />
+        ) : (
+          <TicketQueue tickets={filteredQueue} />
+        )
+      ) : isLoading ? (
         <TableSkeleton rows={8} columns={8} />
       ) : (
         <DataTable

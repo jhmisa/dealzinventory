@@ -12,6 +12,16 @@ export function useTicketTypes() {
   })
 }
 
+// Open/in-progress tickets for the queue view AND the sidebar attention badge.
+// One shared cache entry; 60s refetch keeps the badge alive like the Messages one.
+export function useTicketQueue() {
+  return useQuery({
+    queryKey: queryKeys.tickets.queue(),
+    queryFn: ticketsService.getTicketQueue,
+    refetchInterval: 60_000,
+  })
+}
+
 export function useTickets(filters: ticketsService.TicketFilters = {}) {
   return useQuery({
     queryKey: queryKeys.tickets.list(filters),
@@ -92,7 +102,7 @@ export function useCreateTicket() {
 export function useUpdateTicket() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, ...updates }: { id: string; subject?: string; description?: string; priority?: TicketPriority; assigned_staff_id?: string | null; order_id?: string | null }) =>
+    mutationFn: ({ id, ...updates }: { id: string; subject?: string; description?: string; priority?: TicketPriority; assigned_staff_id?: string | null; order_id?: string | null; follow_up_at?: string | null; item_label?: string | null }) =>
       ticketsService.updateTicket(id, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.tickets.all })

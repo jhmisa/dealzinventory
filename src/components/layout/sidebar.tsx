@@ -33,6 +33,8 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { useNeedsReviewCount } from '@/hooks/use-messaging'
+import { useTicketQueue } from '@/hooks/use-tickets'
+import { attentionCount } from '@/lib/ticket-followups'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import {
   Sidebar,
@@ -136,6 +138,15 @@ export function AppSidebar() {
   const location = useLocation()
   const { isAdmin } = useAuth()
   const { data: needsReviewCount } = useNeedsReviewCount()
+  const { data: queueTickets } = useTicketQueue()
+  const ticketAttention = attentionCount(
+    (queueTickets ?? []).map((t) => ({
+      priority: t.priority,
+      created_at: t.created_at,
+      follow_up_at: t.follow_up_at,
+      kind: t.ticket_types?.kind ?? 'problem',
+    })),
+  )
   const settingsActive = location.pathname.startsWith('/admin/settings') || location.pathname.startsWith('/admin/reports')
   const [settingsOpen, setSettingsOpen] = useState(settingsActive)
 
@@ -163,7 +174,10 @@ export function AppSidebar() {
               <SidebarMenu>
                 {section.items.map((item) => {
                   const isActive = location.pathname === item.href || location.pathname.startsWith(item.href + '/')
-                  const showBadge = item.href === '/admin/messages' && (needsReviewCount ?? 0) > 0
+                  const badgeCount =
+                    item.href === '/admin/messages' ? (needsReviewCount ?? 0)
+                    : item.href === '/admin/tickets' ? ticketAttention
+                    : 0
                   return (
                     <SidebarMenuItem key={item.href}>
                       <SidebarMenuButton asChild isActive={isActive}>
@@ -172,9 +186,9 @@ export function AppSidebar() {
                           <span>{item.title}</span>
                         </Link>
                       </SidebarMenuButton>
-                      {showBadge && (
+                      {badgeCount > 0 && (
                         <SidebarMenuBadge className="bg-destructive text-white">
-                          {needsReviewCount}
+                          {badgeCount}
                         </SidebarMenuBadge>
                       )}
                     </SidebarMenuItem>

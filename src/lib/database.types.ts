@@ -4331,6 +4331,7 @@ export type Database = {
           icon: string
           id: string
           is_active: boolean
+          kind: string
           label: string
           name: string
           slug: string
@@ -4341,6 +4342,7 @@ export type Database = {
           icon?: string
           id?: string
           is_active?: boolean
+          kind?: string
           label: string
           name: string
           slug: string
@@ -4351,6 +4353,7 @@ export type Database = {
           icon?: string
           id?: string
           is_active?: boolean
+          kind?: string
           label?: string
           name?: string
           slug?: string
@@ -4368,7 +4371,10 @@ export type Database = {
           created_by_role: string
           customer_id: string | null
           description: string
+          follow_up_at: string | null
           id: string
+          item_code: string | null
+          item_label: string | null
           order_id: string | null
           priority: Database["public"]["Enums"]["ticket_priority"]
           resolution_notes: string | null
@@ -4389,7 +4395,10 @@ export type Database = {
           created_by_role?: string
           customer_id?: string | null
           description: string
+          follow_up_at?: string | null
           id?: string
+          item_code?: string | null
+          item_label?: string | null
           order_id?: string | null
           priority?: Database["public"]["Enums"]["ticket_priority"]
           resolution_notes?: string | null
@@ -4410,7 +4419,10 @@ export type Database = {
           created_by_role?: string
           customer_id?: string | null
           description?: string
+          follow_up_at?: string | null
           id?: string
+          item_code?: string | null
+          item_label?: string | null
           order_id?: string | null
           priority?: Database["public"]["Enums"]["ticket_priority"]
           resolution_notes?: string | null
