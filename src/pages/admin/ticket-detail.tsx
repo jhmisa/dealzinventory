@@ -28,6 +28,7 @@ import {
 import { useTicket, useResolveTicket, useUpdateTicket } from '@/hooks/use-tickets'
 import { useCustomerOrders } from '@/hooks/use-customers'
 import { TICKET_STATUSES, RETURN_REASONS, RESOLUTION_TYPES } from '@/lib/constants'
+import { todayJst, addDaysJst } from '@/lib/ticket-followups'
 import { formatDate, formatDateTime, formatPrice, formatCustomerName } from '@/lib/utils'
 import type { TicketStatus } from '@/lib/types'
 import type { ReturnData } from '@/services/tickets'
@@ -66,6 +67,16 @@ export default function TicketDetailPage() {
           toast.success(orderId ? 'Order linked' : 'Order unlinked')
           setLinkingOrder(false)
         },
+        onError: (err) => toast.error(`Failed: ${err.message}`),
+      },
+    )
+  }
+
+  function handleSetFollowUp(date: string | null) {
+    updateTicket.mutate(
+      { id: ticket!.id, follow_up_at: date },
+      {
+        onSuccess: () => toast.success(date ? `Follow-up set for ${date}` : 'Follow-up date cleared'),
         onError: (err) => toast.error(`Failed: ${err.message}`),
       },
     )
@@ -300,6 +311,77 @@ export default function TicketDetailPage() {
 
         {/* Right Column (1/3) */}
         <div className="space-y-6">
+          {/* Follow-up */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Follow-up</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {ticket.item_label && (
+                <div className="text-sm">
+                  <span className="text-muted-foreground">About: </span>
+                  <span className="font-medium">{ticket.item_label}</span>
+                  {ticket.item_code && (
+                    <span className="ml-1.5 font-mono text-xs text-muted-foreground">{ticket.item_code}</span>
+                  )}
+                </div>
+              )}
+              <div className="text-sm">
+                {ticket.follow_up_at ? (
+                  <span className={
+                    (ticket.ticket_status === 'OPEN' || ticket.ticket_status === 'IN_PROGRESS') && ticket.follow_up_at < todayJst()
+                      ? 'font-medium text-red-600'
+                      : ticket.follow_up_at === todayJst()
+                        ? 'font-medium text-amber-600'
+                        : 'font-medium'
+                  }>
+                    {ticket.follow_up_at}
+                    {ticket.follow_up_at < todayJst() && ' — overdue'}
+                    {ticket.follow_up_at === todayJst() && ' — today'}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground italic">No follow-up date set</span>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {[
+                  { label: 'Today', value: todayJst() },
+                  { label: 'Tomorrow', value: addDaysJst(1) },
+                  { label: '+1 week', value: addDaysJst(7) },
+                ].map((chip) => (
+                  <Button
+                    key={chip.label}
+                    variant="outline"
+                    size="sm"
+                    className="h-6 rounded-full px-2.5 text-xs"
+                    disabled={updateTicket.isPending}
+                    onClick={() => handleSetFollowUp(chip.value)}
+                  >
+                    {chip.label}
+                  </Button>
+                ))}
+                <input
+                  type="date"
+                  value={ticket.follow_up_at ?? ''}
+                  onChange={(e) => handleSetFollowUp(e.target.value || null)}
+                  className="h-6 rounded-md border bg-background px-1.5 text-xs"
+                  aria-label="Follow-up date"
+                />
+                {ticket.follow_up_at && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs text-muted-foreground"
+                    disabled={updateTicket.isPending}
+                    onClick={() => handleSetFollowUp(null)}
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Actions */}
           {ticket.ticket_status === 'IN_PROGRESS' && (
             <Card>

@@ -14,11 +14,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { X } from 'lucide-react'
 import { createTicketSchema, type CreateTicketFormValues } from '@/validators/ticket'
 import { useTicketTypes, useCreateTicket } from '@/hooks/use-tickets'
 import { useCustomerOrders } from '@/hooks/use-customers'
+import { useAvailableInventorySearch } from '@/hooks/use-items'
+import {
+  composeFollowupSubject,
+  composeProblemSubject,
+  todayJst,
+  addDaysJst,
+} from '@/lib/ticket-followups'
 import { TICKET_PRIORITIES, RETURN_REASONS } from '@/lib/constants'
-import { formatPrice, formatDate } from '@/lib/utils'
+import { formatPrice, formatDate, cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { ReturnData } from '@/services/tickets'
 
@@ -33,9 +41,21 @@ interface CreateTicketDialogProps {
 }
 
 // Types that show the order selector when a customer is present
-const ORDER_TYPES = new Set(['delivery', 'return', 'complaint', 'general', 'technical'])
+const ORDER_TYPES = new Set(['delivery', 'return', 'complaint', 'general', 'technical', 'stock-request'])
 // Types where order is required
 const ORDER_REQUIRED_TYPES = new Set(['delivery', 'return'])
+
+const EMPTY_FORM: CreateTicketFormValues = {
+  description: '',
+  ticket_type_id: '',
+  priority: 'NORMAL',
+  customer_id: '',
+  order_id: '',
+  conversation_id: '',
+  item_label: '',
+  item_code: '',
+  follow_up_at: '',
+}
 
 export function CreateTicketDialog({
   open,
@@ -54,21 +74,17 @@ export function CreateTicketDialog({
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set())
   const [returnReason, setReturnReason] = useState('')
 
+  // Item suggestion dropdown (follow-up types)
+  const [itemQuery, setItemQuery] = useState('')
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false)
+
   const defaultType = defaultTypeSlug
     ? ticketTypes.find((t) => t.slug === defaultTypeSlug)
     : undefined
 
   const form = useForm<CreateTicketFormValues>({
     resolver: zodResolver(createTicketSchema),
-    defaultValues: {
-      subject: '',
-      description: '',
-      ticket_type_id: defaultType?.id ?? '',
-      priority: 'NORMAL',
-      customer_id: customerId ?? '',
-      order_id: orderId ?? '',
-      conversation_id: conversationId ?? '',
-    },
+    defaultValues: { ...EMPTY_FORM },
   })
 
   // Re-seed the form from the CURRENT props every time the dialog opens.
@@ -79,16 +95,16 @@ export function CreateTicketDialog({
   useEffect(() => {
     if (open) {
       form.reset({
-        subject: '',
-        description: '',
+        ...EMPTY_FORM,
         ticket_type_id: defaultType?.id ?? '',
-        priority: 'NORMAL',
         customer_id: customerId ?? '',
         order_id: orderId ?? '',
         conversation_id: conversationId ?? '',
       })
       setSelectedItemIds(new Set())
       setReturnReason('')
+      setItemQuery('')
+      setSuggestionsOpen(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
@@ -98,15 +114,29 @@ export function CreateTicketDialog({
     form.setValue('ticket_type_id', defaultType.id)
   }
 
-  // Derive current type slug
+  // Derive current type
   const selectedTypeId = form.watch('ticket_type_id')
   const selectedType = ticketTypes.find((t) => t.id === selectedTypeId)
   const typeSlug = selectedType?.slug ?? ''
+  const isFollowup = selectedType?.kind === 'followup'
 
   const showOrderSelector = !!customerId && ORDER_TYPES.has(typeSlug)
   const orderRequired = ORDER_REQUIRED_TYPES.has(typeSlug)
   const isReturn = typeSlug === 'return'
   const isDelivery = typeSlug === 'delivery'
+
+  // Debounced inventory suggestions for the Item field
+  const itemLabel = form.watch('item_label') ?? ''
+  useEffect(() => {
+    const handle = setTimeout(() => setItemQuery(itemLabel), 300)
+    return () => clearTimeout(handle)
+  }, [itemLabel])
+  const { data: itemSuggestions = [] } = useAvailableInventorySearch(
+    open && isFollowup && suggestionsOpen ? itemQuery : '',
+  )
+
+  const itemCode = form.watch('item_code') ?? ''
+  const followUpAt = form.watch('follow_up_at') ?? ''
 
   // Get the selected order's items for return checkbox display
   const selectedOrderId = form.watch('order_id')
@@ -154,30 +184,57 @@ export function CreateTicketDialog({
     })
   }
 
+  const followUpChips: { label: string; value: string }[] = [
+    { label: 'Today', value: todayJst() },
+    { label: 'Tomorrow', value: addDaysJst(1) },
+    { label: 'Next week', value: addDaysJst(7) },
+  ]
+
   function onSubmit(data: CreateTicketFormValues) {
-    // Subject required for non-return types
-    if (!isReturn && data.subject.trim().length < 3) {
-      form.setError('subject', { message: 'Subject must be at least 3 characters' })
-      return
-    }
-    // Extra validation for types with requirements
-    if (isDelivery && !data.order_id) {
-      toast.error('Please select an order for delivery issues')
-      return
-    }
-    if (isReturn) {
-      if (!data.order_id) {
-        toast.error('Please select an order for returns')
+    let subject: string
+    let description: string
+
+    if (isFollowup) {
+      const item = (data.item_label ?? '').trim()
+      if (item.length < 2) {
+        form.setError('item_label', { message: 'Enter what this follow-up is about' })
         return
       }
-      if (selectedItemIds.size === 0) {
-        toast.error('Please select at least one item to return')
+      const note = (data.description ?? '').trim()
+      subject = composeFollowupSubject(item, note || undefined)
+      description = note || subject
+    } else {
+      const desc = (data.description ?? '').trim()
+      if (!isReturn && desc.length < 10) {
+        form.setError('description', { message: 'Please describe the issue in at least 10 characters' })
         return
       }
-      if (!returnReason) {
-        toast.error('Please select a return reason')
+      if (isDelivery && !data.order_id) {
+        toast.error('Please select an order for delivery issues')
         return
       }
+      if (isReturn) {
+        if (!data.order_id) {
+          toast.error('Please select an order for returns')
+          return
+        }
+        if (selectedItemIds.size === 0) {
+          toast.error('Please select at least one item to return')
+          return
+        }
+        if (!returnReason) {
+          toast.error('Please select a return reason')
+          return
+        }
+        if (desc.length < 10) {
+          form.setError('description', { message: 'Please describe the reason in at least 10 characters' })
+          return
+        }
+      }
+      subject = isReturn
+        ? `Return: ${RETURN_REASONS.find(r => r.value === returnReason)?.label ?? returnReason}`
+        : composeProblemSubject(desc)
+      description = desc
     }
 
     // Build return_data if return type
@@ -198,21 +255,23 @@ export function CreateTicketDialog({
       }
     }
 
-    // Auto-generate subject for returns if empty
-    const subject = data.subject.trim() || (isReturn
-      ? `Return: ${RETURN_REASONS.find(r => r.value === returnReason)?.label ?? returnReason}`
-      : data.subject)
-
     createTicket.mutate(
       {
         ticket_type_id: data.ticket_type_id,
         customer_id: data.customer_id,
         subject,
-        description: data.description,
+        description,
         priority: data.priority,
         order_id: data.order_id || undefined,
         conversation_id: data.conversation_id || undefined,
         created_by_role: 'staff',
+        ...(isFollowup
+          ? {
+              item_label: (data.item_label ?? '').trim(),
+              item_code: data.item_code || undefined,
+              follow_up_at: data.follow_up_at || undefined,
+            }
+          : {}),
         ...(returnData ? { return_data: returnData } : {}),
       },
       {
@@ -227,7 +286,7 @@ export function CreateTicketDialog({
   }
 
   function resetAndClose() {
-    form.reset()
+    form.reset({ ...EMPTY_FORM })
     setSelectedItemIds(new Set())
     setReturnReason('')
     onOpenChange(false)
@@ -235,7 +294,7 @@ export function CreateTicketDialog({
 
   function handleOpenChange(open: boolean) {
     if (!open) {
-      form.reset()
+      form.reset({ ...EMPTY_FORM })
       setSelectedItemIds(new Set())
       setReturnReason('')
     }
@@ -246,13 +305,17 @@ export function CreateTicketDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>{isReturn ? 'Create Return Ticket' : 'Create Ticket'}</DialogTitle>
+          <DialogTitle>
+            {isReturn ? 'Create Return Ticket' : isFollowup ? 'Create Follow-up' : 'Create Ticket'}
+          </DialogTitle>
           <DialogDescription>
             {isReturn
               ? 'Select items to return and provide a reason.'
-              : customerId
-                ? 'Create a new support ticket for this customer.'
-                : 'Create a new support ticket. It will auto-link when a customer is linked to this conversation.'}
+              : isFollowup
+                ? 'What to follow up, and when. The subject is written for you.'
+                : customerId
+                  ? 'Create a new support ticket for this customer.'
+                  : 'Create a new support ticket. It will auto-link when a customer is linked to this conversation.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -279,6 +342,115 @@ export function CreateTicketDialog({
               <p className="text-sm text-destructive">{form.formState.errors.ticket_type_id.message}</p>
             )}
           </div>
+
+          {/* Follow-up types: Item + date */}
+          {isFollowup && (
+            <>
+              <div className="space-y-2 relative">
+                <label className="text-sm font-medium">
+                  Item / what to follow up <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  value={itemLabel}
+                  placeholder="e.g. Poco X7 — type to search inventory, or free text"
+                  autoComplete="off"
+                  onChange={(e) => {
+                    form.setValue('item_label', e.target.value)
+                    form.setValue('item_code', '')
+                    form.clearErrors('item_label')
+                    setSuggestionsOpen(true)
+                  }}
+                  onFocus={() => setSuggestionsOpen(true)}
+                  onBlur={() => setTimeout(() => setSuggestionsOpen(false), 150)}
+                />
+                {suggestionsOpen && itemSuggestions.length > 0 && (
+                  <div className="absolute z-50 top-full left-0 right-0 mt-1 rounded-md border bg-popover shadow-md max-h-56 overflow-y-auto">
+                    {itemSuggestions.slice(0, 8).map((r) => (
+                      <button
+                        key={`${r.type}-${r.id}`}
+                        type="button"
+                        className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/60"
+                        onMouseDown={(e) => {
+                          e.preventDefault()
+                          form.setValue('item_label', r.description)
+                          form.setValue('item_code', r.code)
+                          form.clearErrors('item_label')
+                          setSuggestionsOpen(false)
+                        }}
+                      >
+                        <span className="font-mono text-xs text-muted-foreground shrink-0">{r.code}</span>
+                        <span className="truncate flex-1">{r.description}</span>
+                        {r.price != null && (
+                          <span className="text-xs font-medium shrink-0">{formatPrice(r.price)}</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {itemCode && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-mono">
+                      {itemCode} linked
+                      <button
+                        type="button"
+                        className="hover:text-destructive"
+                        onClick={() => form.setValue('item_code', '')}
+                        aria-label="Unlink item"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  </div>
+                )}
+                {form.formState.errors.item_label && (
+                  <p className="text-sm text-destructive">{form.formState.errors.item_label.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Follow up on</label>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {followUpChips.map((chip) => (
+                    <button
+                      key={chip.label}
+                      type="button"
+                      onClick={() => form.setValue('follow_up_at', followUpAt === chip.value ? '' : chip.value)}
+                      className={cn(
+                        'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                        followUpAt === chip.value
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-background hover:bg-muted',
+                      )}
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                  <input
+                    type="date"
+                    value={followUpAt}
+                    min={todayJst()}
+                    onChange={(e) => form.setValue('follow_up_at', e.target.value)}
+                    className="h-7 rounded-md border bg-background px-2 text-xs"
+                    aria-label="Custom follow-up date"
+                  />
+                  {followUpAt && (
+                    <button
+                      type="button"
+                      onClick={() => form.setValue('follow_up_at', '')}
+                      className="text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {followUpAt
+                    ? `Will appear in the queue on ${followUpAt}.`
+                    : 'No date — the ticket sits in the "No date" list until one is set.'}
+                </p>
+              </div>
+            </>
+          )}
 
           {/* Order selector */}
           {showOrderSelector && (
@@ -405,24 +577,25 @@ export function CreateTicketDialog({
             </div>
           )}
 
+          {/* Note / Description */}
           <div className="space-y-2">
             <label className="text-sm font-medium">
-              Subject {isReturn && <span className="text-xs text-muted-foreground">(optional, auto-generated if empty)</span>}
-            </label>
-            <Input {...form.register('subject')} placeholder="Brief summary of the issue" />
-            {form.formState.errors.subject && (
-              <p className="text-sm text-destructive">{form.formState.errors.subject.message}</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">
-              Description <span className="text-red-500">*</span>
+              {isFollowup ? (
+                <>Note <span className="text-xs text-muted-foreground">(optional)</span></>
+              ) : (
+                <>Description <span className="text-red-500">*</span></>
+              )}
             </label>
             <Textarea
               {...form.register('description')}
-              placeholder={isReturn ? 'Describe the reason for the return...' : 'Describe the issue in detail...'}
-              rows={isReturn ? 3 : 4}
+              placeholder={
+                isFollowup
+                  ? 'e.g. customer will order end of month'
+                  : isReturn
+                    ? 'Describe the reason for the return...'
+                    : 'Describe the issue in detail... (first line becomes the subject)'
+              }
+              rows={isFollowup ? 2 : isReturn ? 3 : 4}
             />
             {form.formState.errors.description && (
               <p className="text-sm text-destructive">{form.formState.errors.description.message}</p>
@@ -434,7 +607,7 @@ export function CreateTicketDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={createTicket.isPending}>
-              {createTicket.isPending ? 'Creating...' : isReturn ? 'Create Return Ticket' : 'Create Ticket'}
+              {createTicket.isPending ? 'Creating...' : isReturn ? 'Create Return Ticket' : isFollowup ? 'Create Follow-up' : 'Create Ticket'}
             </Button>
           </DialogFooter>
         </form>

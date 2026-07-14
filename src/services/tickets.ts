@@ -9,6 +9,7 @@ export interface TicketType {
   slug: string
   label: string
   icon: string
+  kind: 'problem' | 'followup'
   is_active: boolean
   sort_order: number
   created_at: string
@@ -29,6 +30,9 @@ export interface Ticket {
   resolution_notes: string | null
   created_by_role: 'staff' | 'customer'
   return_data: ReturnData | null
+  follow_up_at: string | null
+  item_label: string | null
+  item_code: string | null
   created_at: string
   updated_at: string
   resolved_at: string | null
@@ -113,7 +117,7 @@ export async function getTickets(filters: TicketFilters = {}) {
     .from('tickets')
     .select(`
       *,
-      ticket_types(id, name, slug, label, icon),
+      ticket_types(id, name, slug, label, icon, kind),
       customers(customer_code, last_name, first_name, email),
       orders(order_code),
       conversations(contact_name)
@@ -229,6 +233,43 @@ export async function getOrderTickets(orderId: string) {
   return data ?? []
 }
 
+// Queue view + sidebar badge: every OPEN/IN_PROGRESS ticket with its type kind.
+// Bucketing (Needs Attention / Due Today / Upcoming / No Date) happens client-side
+// in src/lib/ticket-followups.ts so the page and badge share one small query.
+export interface QueueTicket {
+  id: string
+  ticket_code: string
+  subject: string
+  priority: string
+  ticket_status: string
+  created_at: string
+  follow_up_at: string | null
+  item_label: string | null
+  item_code: string | null
+  ticket_types: { id: string; name: string; slug: string; label: string; icon: string; kind: 'problem' | 'followup' } | null
+  customers: { customer_code: string; last_name: string; first_name: string } | null
+  conversations: { contact_name: string | null } | null
+  orders: { order_code: string } | null
+}
+
+export async function getTicketQueue() {
+  const { data, error } = await supabase
+    .from('tickets')
+    .select(`
+      id, ticket_code, subject, priority, ticket_status, created_at,
+      follow_up_at, item_label, item_code,
+      ticket_types(id, name, slug, label, icon, kind),
+      customers(customer_code, last_name, first_name),
+      conversations(contact_name),
+      orders(order_code)
+    `)
+    .in('ticket_status', ['OPEN', 'IN_PROGRESS'])
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+  return (data ?? []) as unknown as QueueTicket[]
+}
+
 export async function getConversationTickets(conversationId: string) {
   const { data, error } = await supabase
     .from('tickets')
@@ -266,6 +307,9 @@ interface CreateTicketInput {
   assigned_staff_id?: string
   created_by_role?: 'staff' | 'customer'
   return_data?: ReturnData
+  follow_up_at?: string
+  item_label?: string
+  item_code?: string
 }
 
 export async function createTicket(input: CreateTicketInput) {
@@ -289,6 +333,9 @@ export async function createTicket(input: CreateTicketInput) {
       created_by_role: input.created_by_role ?? 'staff',
       created_by_id: user?.id ?? null,
       return_data: input.return_data ? (input.return_data as unknown as Record<string, unknown>) : null,
+      follow_up_at: input.follow_up_at || null,
+      item_label: input.item_label || null,
+      item_code: input.item_code || null,
     })
     .select()
     .single()
@@ -304,6 +351,8 @@ interface UpdateTicketInput {
   assigned_staff_id?: string | null
   order_id?: string | null
   conversation_id?: string | null
+  follow_up_at?: string | null
+  item_label?: string | null
 }
 
 export async function updateTicket(id: string, updates: UpdateTicketInput) {
