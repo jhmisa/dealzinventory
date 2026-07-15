@@ -175,7 +175,7 @@ export function ProductSlidePicker({ open, onOpenChange, onAdd }: ProductSlidePi
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-5 md:grid-cols-[1fr_320px]">
+        <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_320px]">
           <div className="space-y-3">
             {/* Search */}
             <div className="relative">
