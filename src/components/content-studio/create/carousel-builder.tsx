@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Upload, ArrowUp, ArrowDown, X, Loader2 } from 'lucide-react'
+import { Upload, ArrowUp, ArrowDown, X, Loader2, PackageSearch } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useContentCategories } from '@/hooks/use-content-categories'
 import { useCreateContentItem } from '@/hooks/use-content-items'
@@ -22,10 +22,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { ProductSlidePicker } from './product-slide-picker'
 
 interface CarouselBuilderProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+}
+
+interface Slide {
+  url: string
+  /** Product code (P/B/G/A) when the slide was baked from a product photo; null for uploads. */
+  code: string | null
 }
 
 export function CarouselBuilder({ open, onOpenChange }: CarouselBuilderProps) {
@@ -34,7 +41,8 @@ export function CarouselBuilder({ open, onOpenChange }: CarouselBuilderProps) {
 
   const [title, setTitle] = useState('')
   const [categoryId, setCategoryId] = useState<string>('')
-  const [slides, setSlides] = useState<string[]>([])
+  const [slides, setSlides] = useState<Slide[]>([])
+  const [pickerOpen, setPickerOpen] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -52,7 +60,7 @@ export function CarouselBuilder({ open, onOpenChange }: CarouselBuilderProps) {
           continue
         }
         const { data: pub } = supabase.storage.from('social-media').getPublicUrl(path)
-        setSlides((prev) => [...prev, pub.publicUrl])
+        setSlides((prev) => [...prev, { url: pub.publicUrl, code: null }])
       }
     } finally {
       setUploading(false)
@@ -77,10 +85,12 @@ export function CarouselBuilder({ open, onOpenChange }: CarouselBuilderProps) {
     if (slides.length < 2) return toast.error('Add at least 2 slides.')
     setSaving(true)
     try {
+      const codes = [...new Set(slides.map((s) => s.code).filter((c): c is string => !!c))]
       await createItem.mutateAsync({
         kind: 'carousel',
         title: title.trim(),
-        media_urls: slides,
+        media_urls: slides.map((s) => s.url),
+        item_codes: codes.length ? codes : null,
         category_id: categoryId || null,
         orientation: 'square',
         source: 'carousel',
@@ -132,24 +142,34 @@ export function CarouselBuilder({ open, onOpenChange }: CarouselBuilderProps) {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label>Slides ({slides.length})</Label>
-              <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md border border-border px-3 text-xs">
-                {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                Add images
-                <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => addImages(e.target.files)} />
-              </label>
+              <div className="flex items-center gap-1.5">
+                <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setPickerOpen(true)}>
+                  <PackageSearch className="h-3.5 w-3.5" /> Add from products
+                </Button>
+                <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md border border-border px-3 text-xs">
+                  {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                  Add images
+                  <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => addImages(e.target.files)} />
+                </label>
+              </div>
             </div>
             {slides.length === 0 ? (
               <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-                Add images to build the carousel.
+                Add images or pick product photos to build the carousel.
               </div>
             ) : (
               <div className="grid grid-cols-4 gap-2">
-                {slides.map((url, i) => (
-                  <div key={url} className="relative overflow-hidden rounded-md border">
-                    <img src={url} alt="" className="aspect-square w-full object-cover" />
+                {slides.map((slide, i) => (
+                  <div key={slide.url} className="relative overflow-hidden rounded-md border">
+                    <img src={slide.url} alt="" className="aspect-square w-full object-cover" />
                     {i === 0 && (
                       <span className="absolute left-1 top-1 rounded bg-primary px-1 text-[9px] font-semibold text-primary-foreground">
                         COVER
+                      </span>
+                    )}
+                    {slide.code && (
+                      <span className="absolute right-1 top-1 rounded bg-black/60 px-1 font-mono text-[9px] text-white">
+                        {slide.code}
                       </span>
                     )}
                     <div className="absolute inset-x-0 bottom-0 flex justify-between bg-black/50 p-0.5">
@@ -174,6 +194,12 @@ export function CarouselBuilder({ open, onOpenChange }: CarouselBuilderProps) {
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={save} disabled={saving || uploading}>{saving ? 'Saving…' : 'Save carousel'}</Button>
         </DialogFooter>
+
+        <ProductSlidePicker
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          onAdd={(added) => setSlides((prev) => [...prev, ...added])}
+        />
       </DialogContent>
     </Dialog>
   )

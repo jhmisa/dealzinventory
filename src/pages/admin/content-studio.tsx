@@ -47,7 +47,7 @@ const CREATE_MAKERS = [
   {
     key: 'carousel',
     title: 'Build carousel',
-    desc: 'Ordered slides for a multi-image post.',
+    desc: 'Ordered slides for a multi-image post — from uploads or product photos with specs + price baked in.',
     icon: LayoutGrid,
     to: null,
     modal: 'carousel' as MakerModal,
