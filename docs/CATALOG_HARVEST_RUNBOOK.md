@@ -218,6 +218,7 @@ Re-harvest for new Apple models follows the same shape as §2 (add specs → re-
 | Kyocera | Kyocera (京セラ) | `items/smartphone/kyocera` (+ **ymobile** section) | au `KYV\d+ \| KYG\d+` · SoftBank `A\d{3}KC \| \d{3}KC` · SIM-free `KC-S\d+` (Android One = code-less) | `kyocera-specs.ts` / `KYOCERA_COLORS_JA_EN` | `2026-07-01-kyocera-fill-gaps.sql` | `iosys-kyocera-p1.html` | ✅ SMARTPHONES ONLY; no legacy rows (0 COMPUTER) |
 | HTC | HTC | `items/smartphone/htc` | **coarse only** SoftBank `\d{3}HT` · au `HTV3[23]` (=10/U11); J-series codes KEPT in name | `htc-specs.ts` / `HTC_COLORS_JA_EN` | `2026-07-01-htc-fill-gaps.sql` | `iosys-htc-p1.html` | ✅ closed JP lineup; no legacy rows (0 COMPUTER) |
 | Surface | Microsoft | `items/tablet/windows/surface` (+ `items/notepc/mobilenote/microsoft/surface_laptop`) | MS retail SKU `[A-Z0-9]{3}-\d{5}` (STV-00012); config in title bracket | `surface-specs.ts` (screen/year + part#→color) / `SURFACE_COLORS_JA_EN` | `2026-07-20-surface-fill-gaps.sql` | `iosys-surface-p{1,2}.html` | ✅ TABLET (+COMPUTER laptop path, empty); **legacy reconcile OPEN** (13 coarse COMPUTER rows / 95 items) |
+| Android tablets | Samsung/Lenovo/NEC/Huawei/Sharp/Kyocera/Fujitsu/Xiaomi | `items/tablet/android` (ONE multi-brand path) | per-brand: `SM-[TXP]…\|SCT##` · `ZA[6alnum](JP\|TW)` · `PC-T…` · `[A-Z]{3}\d?-(A?L\|W)\d{2}` · `KYT##` · code-in-name (dtab `d-##X`, arrows Tab `F-##K`) · code-less pads | `tablet-specs.ts` (specs + code→color + code→storage) / per-config maps in `android-listing.ts` | `2026-07-20-android-tablet-fill-gaps.sql` | `iosys-tablet-android-p{1..5}.html` | ✅ 8 configs, 41 SKUs, TABLET; imports/niche (ALLDOCUBE/BOOX/Blackview/TCL/IRIS/aiwa/Wacom…) deliberately OUT |
 
 ### Galaxy (Samsung)
 - **Codes:** SIM-free `SM-…Q/C` · au `SCG##`/`SCV##` · docomo `SC-##L`.
@@ -467,6 +468,42 @@ Re-harvest for new Apple models follows the same shape as §2 (add specs → re-
 - **Legacy reconcile OPEN:** 13 coarse COMPUTER rows ("Surface Go" = 56 mixed items, "Surface Pro 5",
   "Surface Go w/ KB", colors "Silver") / 95 items — need per-item config knowledge to repoint; the
   part#-keyed rows coexist safely (matching hits part#/model_number first).
+
+### Android tablets (items/tablet/android — the MULTI-BRAND path)
+- **One page, eight configs.** Unlike the per-brand phone paths, this path mixes every maker;
+  `TABLET_CATEGORY` (harvest.ts) runs each `AndroidBrandConfig` over the same page and
+  concatenates (code shapes/name gates are disjoint, so a title parses under exactly one).
+  Configs: `GALAXYTAB` (SM-T/X/P + au SCT##; long SKUs like SM-X930NZAIXJP kept whole — base
+  identifies the model, suffix = color/storage/region) · `LENOVO` (ZA+6alnum+JP/TW region; MTM =
+  full config lock) · `NEC` (PC-T…; LAVIE casing; designation-form names — NEC reuses marketing
+  names across years, "T12" 2022 ≠ "T12N" 2026) · `HUAWEITAB` (SHT-AL09/JDN2-L09/KOB-L09 —
+  prefix digit = platform GENERATION, and both `L`/`AL` = LTE) · `DTAB` + `ARROWSTAB` (code-in-name
+  via nameConsumeRe — each d-/F-code is a distinct device, HTC-J precedent) · `QUATAB` (KYT##) ·
+  `XIAOMIPAD` (fully code-less).
+- **Engine capability added (opt-in `connectivityAware`):** tablet titles carry "Wi-Fiモデル"/
+  "LTEモデル" at the name end or a bare "LTE"/"Wi-Fi" at the tail head after the code; the engine
+  strips them and appends **" LTE"** to the model name (LTE/Wi-Fi twins are distinct products —
+  Surface " LTE Advanced" precedent, and required by `uq_active_tablet_sku`). "5G" untouched
+  (model distinguisher: "Galaxy Tab A11+ 5G"). Also: `SIM FREE` (latin) now counts as unlocked.
+- **Verified enrichment beyond phones** (all sourced in `tablet-specs.ts`, never guessed):
+  `storage_gb` per single-JP-config model (every dtab code, Qua tab, arrows Tab, MediaPad T3 8,
+  TAB4 8 Plus, Tab B11, Tab M8/M9/K10/P11 Pro/Yoga Tab 11, NEC PC-codes), `TABLET_CODE_COLORS` +
+  `TABLET_CODE_STORAGE` for colorless/storage-less code-carrying cards, ASCII alias fixups
+  ("SpaceGray"→"Space Gray", "IRON GREY"→"Iron Grey"), and **dtab brand := verified maker**
+  (d-41A/d-51C Sharp, d-52C/d-51F Lenovo — the d-code letter is docomo's FISCAL CYCLE, not the
+  maker; pre-d-41A dtabs were Huawei). Maker-unresolved d-codes stay staged (fill-gaps holds them).
+- **Research traps recorded:** Galaxy Tab S6 Lite deliberately NOT in specs (two JP gens share the
+  exact name — SM-P613/720G vs SM-P620/Exynos 1280); Tab S8 base / S7-and-earlier never JP retail;
+  Tab M8 HD JP SKUs are 2/16GB (not 32); Yoga Tab 11 ZA8W0113JP = 4/128 (2021 launch SKU 8/256);
+  LAVIE Tab T10 = Unisoc T610 (not MediaTek); Qua tab QZ8 = SD430 (≠ T3 8's SD425); JDN2-L09 RAM
+  is storage-tied (3GB/32 · 4GB/64 — spec carries base 3).
+- **TB = 1024 fix shipped with this pass:** the three synced storage normalizers (utils.ts /
+  backorder-match.ts / SQL `_backorder_norm_storage_gb`) said 1TB=1000 while adapter+harvest say
+  1024 — every 1TB device failed matching (surfaced by Tab S11 Ultra 1TB). All three now 1024
+  (migration `20260720100000`, applied via CLI — `db push` blocked by unrelated remote history).
+- **Scope decision:** cheap-import/niche brands (ALLDOCUBE, BOOX, Bigme, Blackview, DOOGEE, TCL,
+  IRIS OHYAMA, aiwa, Orbic, Wacom/XPPen drawing tablets, Panasonic TOUGHPAD industrial) are
+  deliberately unconfigured — same locked principle as phones. They fail the dialog gracefully.
 
 ---
 

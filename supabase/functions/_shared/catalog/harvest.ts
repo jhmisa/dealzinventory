@@ -22,6 +22,17 @@ import { airpodsSpec } from "./airpods-specs.ts"
 import { type SurfaceListingSku, parseSurfaceListingPage } from "./surface-listing.ts"
 import { surfacePartColor, surfaceSpec } from "./surface-specs.ts"
 import {
+  ARROWSTAB_CONFIG,
+  DTAB_CONFIG,
+  GALAXYTAB_CONFIG,
+  HUAWEITAB_CONFIG,
+  LENOVO_CONFIG,
+  NEC_CONFIG,
+  QUATAB_CONFIG,
+  XIAOMIPAD_CONFIG,
+} from "./android-listing.ts"
+import { TABLET_ASCII_COLOR_ALIASES, TABLET_CODE_COLORS, TABLET_CODE_STORAGE, tabletSpec } from "./tablet-specs.ts"
+import {
   type AndroidBrandConfig,
   type AndroidListingSku,
   AQUOS_CONFIG,
@@ -414,7 +425,7 @@ type AndroidSpec =
     chipset: string
     screen_size: number | null
     year: number
-    ram_gb: number
+    ram_gb: number | null // null when a model's JP RAM tier is unverified (Redmi Pad SE 8.7)
     os_family: "Android"
   }
   | null
@@ -580,6 +591,62 @@ export const KYOCERA_CATEGORY: HarvestCategory = androidCategory(
 
 // HTC — closed JP lineup (au "HTC J" + SoftBank + HTC NIPPON SIM-free). Default sections cover
 // simfree/au/softbank (docomo/rakuten return 0 and stop immediately).
+// Android tablets — items/tablet/android is ONE multi-brand listing (unlike the per-brand phone
+// paths), so this category runs EVERY tablet brand config over each page and concatenates. Extra
+// verified enrichment beyond the phone flow (all research-backed, never guessed):
+//   - storage-less cards get the model's single-JP-config storage (dtab / Qua tab / arrows Tab /
+//     MediaPad T3 8 / TAB4 8 Plus / Tab B11 / NEC codes);
+//   - colorless code-carrying cards get the code's verified color (Lenovo/NEC lock one color per
+//     code); still-colorless rows stay null and the fill-gaps skips them;
+//   - glued/SHOUTING ASCII colors normalize to the maker's official form (SpaceGray → Space Gray);
+//   - dtab rows get brand := the verified MAKER (d-41A/d-51C Sharp, d-52C/d-51F Lenovo — the
+//     d-code letter is docomo's fiscal cycle, NOT the manufacturer).
+const TABLET_CONFIGS = [
+  GALAXYTAB_CONFIG,
+  LENOVO_CONFIG,
+  NEC_CONFIG,
+  HUAWEITAB_CONFIG,
+  DTAB_CONFIG,
+  ARROWSTAB_CONFIG,
+  QUATAB_CONFIG,
+  XIAOMIPAD_CONFIG,
+]
+
+export const TABLET_CATEGORY: HarvestCategory = {
+  pathPrefix: "items/tablet",
+  sections: [{ path: "android", carrier: null }],
+  pageToRows: (html, section, src) => {
+    const rows: CatalogRow[] = []
+    for (const config of TABLET_CONFIGS) {
+      for (const sku of parseAndroidListingPage(html, config, section.carrier)) {
+        const t = tabletSpec(sku.model_name)
+        if (sku.storage_gb == null && t?.storage_gb != null) sku.storage_gb = t.storage_gb
+        if (sku.storage_gb == null && sku.model_number) {
+          sku.storage_gb = TABLET_CODE_STORAGE[sku.model_number] ?? null
+        }
+        if (sku.color_ja == null && sku.color_en == null && sku.model_number) {
+          sku.color_en = TABLET_CODE_COLORS[sku.model_number] ?? null
+        }
+        if (sku.color_en && TABLET_ASCII_COLOR_ALIASES[sku.color_en]) {
+          sku.color_en = TABLET_ASCII_COLOR_ALIASES[sku.color_en]
+        }
+        if (t?.maker) sku.brand = t.maker
+        const spec: AndroidSpec = t
+          ? {
+            chipset: t.chipset,
+            screen_size: t.screen_size,
+            year: t.year,
+            ram_gb: t.ram_gb,
+            os_family: t.os_family,
+          }
+          : null
+        rows.push(androidRow(sku, spec, "TABLET", section, src))
+      }
+    }
+    return rows
+  },
+}
+
 export const HTC_CATEGORY: HarvestCategory = androidCategory(
   "items/smartphone/htc",
   HTC_CONFIG,

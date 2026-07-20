@@ -28,10 +28,10 @@ Deno.test("storage '128GB' text matches integer 128 after normalization", () => 
   assertEquals(r.ok, true)
 })
 
-Deno.test("storage '1TB' text matches integer 1000 (TB→GB)", () => {
+Deno.test("storage '1TB' text matches integer 1024 (TB→GB, adapter/harvest convention)", () => {
   const r = verifyPCodeMatch(
     { product_id: "p1", storage_gb: "1TB", color: "Pink", condition_grade: "S" },
-    { product_id: "p1", storage_gb: 1000, color: "Pink", condition_grade: "S" },
+    { product_id: "p1", storage_gb: 1024, color: "Pink", condition_grade: "S" },
   )
   assertEquals(r.ok, true)
 })

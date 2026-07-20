@@ -32,6 +32,7 @@ import {
   AIRPODS_CATEGORY,
   SURFACE_CATEGORY,
   SURFACE_LAPTOP_CATEGORY,
+  TABLET_CATEGORY,
 } from "./harvest.ts"
 
 const UA =
@@ -82,6 +83,8 @@ const category = which === "ipad"
   ? SURFACE_CATEGORY
   : which === "surfacelaptop"
   ? SURFACE_LAPTOP_CATEGORY
+  : which === "tablet" || which === "androidtablet"
+  ? TABLET_CATEGORY
   : IPHONE_CATEGORY
 console.error(`=== harvesting category: ${which} ===`)
 

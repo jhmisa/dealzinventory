@@ -17,8 +17,9 @@ export function formatPrice(yen: number | null | undefined): string {
  * in supabase/functions/_shared/backorder-match.ts (keep all three in sync).
  *
  * Rules: extract the leading digit run; if the string matches /tb/i, multiply by
- * 1000 (TB→GB). Numbers pass through (floored). NULL / no digits → null.
- * Examples: '128GB'→128, '1TB'→1000, '256GB SSD'→256, '128'→128, 512→512.
+ * 1024 (TB→GB — matches the supplier adapter + catalog harvest, which parse 1TB as 1024).
+ * Numbers pass through (floored). NULL / no digits → null.
+ * Examples: '128GB'→128, '1TB'→1024, '256GB SSD'→256, '128'→128, 512→512.
  */
 export function normalizeStorageGb(v: unknown): number | null {
   if (v == null) return null
@@ -28,7 +29,7 @@ export function normalizeStorageGb(v: unknown): number | null {
   if (!m) return null
   const gb = parseInt(m[1], 10)
   if (Number.isNaN(gb)) return null
-  return /t\s*b/i.test(v) ? gb * 1000 : gb
+  return /t\s*b/i.test(v) ? gb * 1024 : gb
 }
 
 /**

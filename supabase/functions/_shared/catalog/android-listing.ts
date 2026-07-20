@@ -40,6 +40,13 @@ export interface AndroidBrandConfig {
   // back to this anchored (^) regex to CONSUME the model-name prefix; the match is the name, the
   // remainder is the color/storage tail, and model_number is null. Must be anchored and /g-free.
   nameConsumeRe?: RegExp
+  // OPTIONAL (tablet-path grammars): iosys tablet titles carry connectivity tokens —
+  // "Wi-Fiモデル"/"LTEモデル" at the END of the name segment, or a bare "LTE"/"Wi-Fi" at the
+  // HEAD of the tail right after the code ("ZA2F0141JP LTE Sparkling White"). When set, the
+  // engine strips them and appends " LTE" to the canonical model name for LTE units — LTE and
+  // Wi-Fi twins are different products and must not collapse into one (brand,model,storage,color)
+  // identity (same decision as Surface " LTE Advanced").
+  connectivityAware?: boolean
 }
 
 const LEADING_BRACKET = /^【([^】]*)】\s*/
@@ -178,10 +185,30 @@ export function parseAndroidListingTitle(
     }
   }
 
+  // 4c. Connectivity tokens (tablet grammars, opt-in via config.connectivityAware): strip
+  //     "Wi-Fiモデル"/"LTEモデル"/bare "Wi-Fi"/"LTE" from the END of the name segment and from the
+  //     HEAD of the tail ("ZA2F0141JP LTE Sparkling White"). LTE marks a distinct product →
+  //     appended to the canonical model name below (Wi-Fi is the unnamed default). "5G" is NOT
+  //     touched — it is a model-name distinguisher (Galaxy Tab A11+ 5G), like Pixel's 5G.
+  let isLte = false
+  if (config.connectivityAware) {
+    const nameConn = nameSeg.match(/(?:\s+(?:Wi-?Fi|LTE)(?:モデル)?)+\s*$/i)
+    if (nameConn && nameConn.index != null) {
+      if (/LTE/i.test(nameConn[0])) isLte = true
+      nameSeg = nameSeg.slice(0, nameConn.index).trim()
+    }
+    const tailConn = tail.match(/^(?:(LTE)|Wi-?Fi)(?:モデル)?\b\s*/i)
+    if (tailConn) {
+      if (tailConn[1]) isLte = true
+      tail = tail.slice(tailConn[0].length).trim()
+    }
+  }
+
   // 5. Validate the name segment actually names this brand's device.
   if (!config.modelNameRe.test(nameSeg)) return null
-  const model_name = config.canonicalModelName(nameSeg)
+  let model_name = config.canonicalModelName(nameSeg)
   if (!model_name) return null
+  if (isLte && !/\bLTE\b/i.test(model_name)) model_name += " LTE"
 
   // 6. Trailing 【...】 note (carrier / RAM / ROM / region). First discard any trailing pure-noise
   //    bracket like 【法人モデル】 (corporate-channel marker) that can follow the real note bracket,
@@ -294,7 +321,7 @@ export function parseAndroidListingTitle(
     pathCarrier ??
     null
 
-  const is_unlocked = leadingUnlock || /SIMフリー|SIM解除|SIMロック解除/i.test(region_note ?? "")
+  const is_unlocked = leadingUnlock || /SIMフリー|SIM解除|SIMロック解除|SIM\s?FREE/i.test(region_note ?? "")
     ? true
     : null
   const is_domestic = region_note == null
@@ -1386,4 +1413,216 @@ export const HTC_CONFIG: AndroidBrandConfig = {
     return s.replace(/\s+/g, " ").trim()
   },
   colorJaToEn: htcColorJaToEn,
+}
+
+// ============================================================================
+// TABLET-PATH BRAND CONFIGS (items/tablet/android — one MULTI-BRAND page)
+// ============================================================================
+// Unlike the per-brand smartphone paths, iosys's Android-tablet path mixes every maker on one
+// listing. harvest.ts's TABLET_CATEGORY runs EACH of these configs over the same page and
+// concatenates the results; a title parses under exactly one config (code shapes and name
+// prefixes are disjoint). Import/niche brands (ALLDOCUBE, BOOX, Bigme, Blackview, DOOGEE, TCL,
+// IRIS OHYAMA, aiwa, Orbic, Wacom/XPPen drawing tablets, Panasonic TOUGHPAD industrials) are
+// DELIBERATELY not configured — same locked scope principle as phones (cheap imports out).
+
+// --- Samsung Galaxy Tab ---------------------------------------------------------------------
+// Codes: base SM-T/X/P + an optional glued config/color/region suffix (SM-X930NZAIXJP) — the
+// whole token is kept as the coarse model_number. Colors reuse the Galaxy map + tablet extras.
+export const GALAXYTAB_EXTRA_COLORS_JA_EN: Record<string, string> = {
+  "グレー": "Gray",
+  "ムーンストーングレー": "Moonstone Gray",
+}
+
+export const GALAXYTAB_CONFIG: AndroidBrandConfig = {
+  brand: "Samsung",
+  brandPrefixes: ["Samsung", "SAMSUNG"],
+  modelNameRe: /^galaxy\s*tab/i,
+  modelCodeRe: /\b(?:SM-[TXP][A-Z0-9]+|SCT\d{2})\b/, // SM-T/X/P families + au tablet SCT##
+  canonicalModelName: (seg) => {
+    let s = seg.replace(/\s+/g, " ").trim()
+    s = s.replace(/^galaxy\s*tab/i, "Galaxy Tab")
+    return s.replace(/\s+/g, " ").trim()
+  },
+  colorJaToEn: (ja) =>
+    ja ? GALAXYTAB_EXTRA_COLORS_JA_EN[ja] ?? GALAXY_COLORS_JA_EN[ja] ?? null : null,
+  connectivityAware: true,
+}
+
+// --- Lenovo (Tab / IdeaTab / Legion Tab / Yoga Tab) ------------------------------------------
+// Codes: ZA + 6 alphanumerics + optional region suffix (JP=domestic, TW=Taiwan import).
+// "TAB4" stays glued (official JP styling "Lenovo TAB4 8 Plus"); "TAB"→"Tab" case-normalized.
+export const LENOVO_COLORS_JA_EN: Record<string, string> = {
+  "ルナグレー": "Luna Grey",
+  "アイアングレー": "Iron Grey",
+  "ストームグレー": "Storm Grey",
+  "ストームグレイ": "Storm Grey", // iosys spelling variant (Yoga Tab 11)
+  "スパークリングホワイト": "Sparkling White",
+  "アークティックグレー": "Arctic Grey",
+  "アビスブルー": "Abyss Blue",
+  "スレートグレー": "Slate Grey",
+  "オーロラブラック": "Aurora Black",
+  "エクリプスブラック": "Eclipse Black",
+  "ブラック": "Black",
+  "ホワイト": "White",
+  "グレー": "Grey",
+}
+
+export const LENOVO_CONFIG: AndroidBrandConfig = {
+  brand: "Lenovo",
+  brandPrefixes: ["Lenovo", "LENOVO"],
+  modelNameRe: /^(tab|ideatab|legion\s*tab|yoga\s*tab)/i,
+  modelCodeRe: /\bZA[A-Z0-9]{6}(?:[A-Z]{2})?\b/,
+  canonicalModelName: (seg) => {
+    let s = seg.replace(/\s+/g, " ").trim()
+    // Legion Tab (8.8", 3) — iosys's inline size+gen parenthetical → official "Gen 3" form.
+    s = s.replace(/\(\s*8\.8\s*"?\s*,\s*3\s*\)/, "Gen 3")
+    s = s.replace(/^tab/i, "Tab").replace(/^ideatab/i, "IdeaTab")
+      .replace(/^legion\s*tab/i, "Legion Tab").replace(/^yoga\s*tab/i, "Yoga Tab")
+    return s.replace(/\s+/g, " ").trim()
+  },
+  colorJaToEn: (ja) => (ja ? LENOVO_COLORS_JA_EN[ja] ?? null : null),
+  connectivityAware: true,
+}
+
+// --- NEC LAVIE Tab (Lenovo-built, sold under NEC) --------------------------------------------
+// Codes: PC-T#### / PC-TX### (+ config letters). model_name keys on the designation form iosys
+// prints ("LAVIE Tab T1275/LAS") — NEC's official brand casing is LAVIE.
+export const NEC_COLORS_JA_EN: Record<string, string> = {
+  "クラウドグレー": "Cloud Gray",
+  "プラチナグレー": "Platinum Grey",
+  "シーシェル": "Seashell",
+  "ブラック": "Black",
+  "ホワイト": "White",
+  "シルバー": "Silver",
+}
+
+export const NEC_CONFIG: AndroidBrandConfig = {
+  brand: "NEC",
+  brandPrefixes: ["NEC"],
+  modelNameRe: /^la\s?vie/i,
+  modelCodeRe: /\bPC-T[A-Z0-9]+\b/,
+  canonicalModelName: (seg) => {
+    let s = seg.replace(/\s+/g, " ").trim()
+    s = s.replace(/^la\s?vie/i, "LAVIE")
+    return s.replace(/\s+/g, " ").trim()
+  },
+  colorJaToEn: (ja) => (ja ? NEC_COLORS_JA_EN[ja] ?? null : null),
+  connectivityAware: true,
+}
+
+// --- Huawei tablets (MediaPad / MatePad) -----------------------------------------------------
+// Codes: 3-letter platform + optional GENERATION digit + radio suffix (SHT-AL09, JDN2-L09,
+// KOB-L09, BAH2-W19). W = Wi-Fi, L/AL = LTE (both LTE — a naive "L09" regex must accept AL09).
+// Distinct from the HUAWEI phone config: tablets need the MediaPad/MatePad name gate and the
+// connectivity handling; sole JP color for the MediaPad line is Space Gray.
+export const HUAWEITAB_EXTRA_COLORS_JA_EN: Record<string, string> = {
+  "スペースグレー": "Space Gray",
+  "スペースグレイ": "Space Gray",
+}
+
+export const HUAWEITAB_CONFIG: AndroidBrandConfig = {
+  brand: "Huawei",
+  brandPrefixes: ["HUAWEI", "Huawei"],
+  modelNameRe: /^(mediapad|matepad)/i,
+  modelCodeRe: /\b[A-Z]{3}\d?-(?:A?L|W)\d{2}\b/,
+  canonicalModelName: (seg) => {
+    let s = seg.replace(/\s+/g, " ").trim()
+    s = s.replace(/^mediapad/i, "MediaPad").replace(/^matepad/i, "MatePad")
+    // Drop an inline size parenthetical: "MediaPad M5 lite (10.1インチ)" — the 10.1" model's
+    // official name is just "MediaPad M5 lite" (the 8" one carries the "8").
+    s = s.replace(/\s*\([\d.]+インチ\)/, "")
+    return s.replace(/\s+/g, " ").trim()
+  },
+  colorJaToEn: (ja) =>
+    ja ? HUAWEITAB_EXTRA_COLORS_JA_EN[ja] ?? HUAWEI_COLORS_JA_EN[ja] ?? null : null,
+  connectivityAware: true,
+}
+
+// --- docomo dtab -----------------------------------------------------------------------------
+// docomo's house tablet line; the d-code letter is docomo's FISCAL-CYCLE letter, NOT the maker
+// (research-verified: d-41A/d-51C = Sharp, d-52C/d-51F = Lenovo, pre-d-41A = Huawei). Each
+// d-code is a DISTINCT device (HTC J-series precedent) → the code stays IN the model name via
+// nameConsumeRe; harvest.ts overrides brand to the research-verified maker per model.
+export const DTAB_COLORS_JA_EN: Record<string, string> = {
+  "ホワイト": "White",
+  "ブラック": "Black",
+  "チャコールグレー": "Charcoal Gray",
+  "ミスティブルー": "Misty Blue",
+  "ストームグレー": "Storm Gray",
+  "サンダーグレー": "Thunder Gray",
+  // メタグレープ (d-51F) deliberately unmapped — katakana verified, official EN rendering not.
+}
+
+export const DTAB_CONFIG: AndroidBrandConfig = {
+  brand: "dtab", // placeholder — replaced with the verified maker at harvest row build
+  brandPrefixes: [],
+  modelNameRe: /^dtab/i,
+  modelCodeRe: /(?!)/, // never matches — the d-code is consumed INTO the name
+  nameConsumeRe: /^(?:(?:docomo|au|softbank)\s+)?dtab(?:\s+Compact)?\s+d-\d{2}[A-Z]\b/i,
+  canonicalModelName: (seg) => seg.replace(/\s+/g, " ").trim(),
+  colorJaToEn: (ja) => (ja ? DTAB_COLORS_JA_EN[ja] ?? null : null),
+}
+
+// --- arrows Tab (Fujitsu, docomo) ------------------------------------------------------------
+// "arrows Tab" is generic across generations (F-02K / F-04H / …) → the F-code stays IN the name
+// (HTC J-series precedent). Cards can be bracket-less with a leading 【SIMロック解除済】 marker.
+export const ARROWSTAB_CONFIG: AndroidBrandConfig = {
+  brand: "Fujitsu",
+  brandPrefixes: [],
+  modelNameRe: /^arrows\s+tab/i,
+  modelCodeRe: /(?!)/,
+  nameConsumeRe: /^(?:(?:docomo|au|softbank)\s+)?arrows\s+Tab\s+F-\d{2}[A-Z]\b/i,
+  canonicalModelName: (seg) => seg.replace(/\s+/g, " ").trim(),
+  colorJaToEn: (ja) => (ja ? ARROWS_COLORS_JA_EN[ja] ?? null : null),
+}
+
+// --- Qua tab (Kyocera, au) -------------------------------------------------------------------
+export const QUATAB_COLORS_JA_EN: Record<string, string> = {
+  "モカブラック": "Mocha Black",
+  "オフホワイト": "Off White",
+  // チョコミント deliberately unmapped — katakana verified, EN spacing ("Chocomint"?) not.
+}
+
+export const QUATAB_CONFIG: AndroidBrandConfig = {
+  brand: "Kyocera",
+  brandPrefixes: [],
+  modelNameRe: /^qua\s*tab/i,
+  modelCodeRe: /\bKYT\d{2}\b/,
+  canonicalModelName: (seg) => seg.replace(/\s+/g, " ").trim(),
+  colorJaToEn: (ja) => (ja ? QUATAB_COLORS_JA_EN[ja] ?? KYOCERA_COLORS_JA_EN[ja] ?? null : null),
+}
+
+// --- Xiaomi / Redmi pads (fully code-less, like Nothing) -------------------------------------
+export const XIAOMIPAD_EXTRA_COLORS_JA_EN: Record<string, string> = {
+  "グレー": "Gray",
+  "パープル": "Purple",
+  "ブルー": "Blue",
+  "グリーン": "Green",
+  "シルバー": "Silver",
+  "コズミックグレー": "Cosmic Gray",
+  "パールホワイト": "Pearl White",
+  "グラビティグレー": "Gravity Gray",
+  "ミストブルー": "Mist Blue",
+  "シャンパンゴールド": "Champagne Gold",
+  "グラファイトグレー": "Graphite Gray",
+  "ミントグリーン": "Mint Green",
+  "ムーンライトシルバー": "Moonlight Silver",
+  "ラベンダーパープル": "Lavender Purple",
+  "オーシャンブルー": "Ocean Blue",
+}
+
+export const XIAOMIPAD_CONFIG: AndroidBrandConfig = {
+  brand: "Xiaomi",
+  brandPrefixes: [],
+  modelNameRe: /^(xiaomi|redmi)\s*pad/i,
+  modelCodeRe: /(?!)/,
+  nameConsumeRe: /^(?:Xiaomi|Redmi)\s+Pad\d*(?:\s+(?:mini|Mini|Pro|SE|Plus|\d[A-Za-z0-9.]*))*/,
+  canonicalModelName: (seg) => {
+    let s = seg.replace(/\s+/g, " ").trim()
+    s = s.replace(/^xiaomi/i, "Xiaomi").replace(/^redmi/i, "Redmi")
+    s = s.replace(/\bPad(?=\d)/i, "Pad ").replace(/\bpad\b/i, "Pad")
+    return s.replace(/\s+/g, " ").trim()
+  },
+  colorJaToEn: (ja) =>
+    ja ? XIAOMIPAD_EXTRA_COLORS_JA_EN[ja] ?? XIAOMI_COLORS_JA_EN[ja] ?? null : null,
 }
