@@ -93,3 +93,51 @@ Deno.test("iosys: iPad color strips trailing part# / model code", () => {
   assertEquals(p.storageGb, 128)
   assertEquals(p.conditionGrade, "S")
 })
+
+// --- Title with LEADING 【...】 promo tags — modelText must survive -----------------------
+// This docomo iPhone12 listing's title starts with 【バッテリー80%未満】【SIMロック解除済】.
+// The old `title.split("【")[0]` returned "" (everything before the first 【), which dropped the
+// model text entirely and broke catalog matching ("No matching product model"). All 【...】 blocks
+// must be stripped wherever they appear, leaving the real model text (incl. the part number).
+const battHtml = await Deno.readTextFile(
+  new URL("./__fixtures__/iosys-308737.html", import.meta.url),
+)
+const battUrl =
+  "https://iosys.co.jp/items/smartphone/iphone12/docomo/iphone12_a2402/308737"
+
+Deno.test("iosys: leading 【...】 promo tags don't wipe modelText (part# preserved)", () => {
+  const p = iosysAdapter.parse(battHtml, battUrl)
+  assertEquals(p.modelText, "docomo iPhone12 A2402 (MGHV3J/A) 128GB ホワイト")
+  assertEquals(p.brandText, "Apple")
+  assertEquals(p.color, "White")
+  assertEquals(p.colorJa, "ホワイト")
+  assertEquals(p.storageGb, 128)
+  assertEquals(p.conditionGrade, "A")
+})
+
+// --- Surface (Microsoft) detail page — config-in-bracket title, eMMC spec key -----------------
+// The Surface Go2 B-code repro (2026-07-20): the raw-title color match dragged the config
+// bracket tail in as the color ("eMMC/Win11Home】"), and storage fell back to the title's RAM
+// token because the spec table labels the storage row "eMMC"/"SSD", not "ROM"/"容量".
+const surfaceHtml = await Deno.readTextFile(
+  new URL("./__fixtures__/iosys-413644.html", import.meta.url),
+)
+const surfaceUrl =
+  "https://iosys.co.jp/items/tablet/windows/surface/wifi/surface_go2_stv-00012/413644"
+
+Deno.test("iosys: Surface Go2 — part# as modelNumber, no bracket-garbage color, eMMC storage", () => {
+  const p = iosysAdapter.parse(surfaceHtml, surfaceUrl)
+  assertEquals(p.supplierProductCode, "413644")
+  assertEquals(p.brandText, "MICROSOFT")
+  assertEquals(p.modelText, "Surface Go2 STV-00012")
+  assertEquals(p.modelNumber, "STV-00012") // Microsoft retail SKU — drives catalog matching
+  assertEquals(p.color, null) // colorless listing; must NOT be "eMMC/Win11Home】"
+  assertEquals(p.colorJa, null)
+  assertEquals(p.storageGb, 64) // from the spec table's eMMC row, not the title's 4GB RAM token
+  assertEquals(p.ramGb, 4)
+  assertEquals(p.conditionGrade, "B")
+  assertEquals(p.stock, 1)
+  assertEquals(p.specs.screenSize, 10.5)
+  assertEquals(p.specs.year, 2020)
+  assertEquals(p.specs.cpu, "Pentium Gold 4425Y(1.7GHz)")
+})

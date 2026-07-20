@@ -216,10 +216,11 @@ function parseSpecTable(html: string): Record<string, string> {
   return out
 }
 
-/** Extract a Japanese carrier model code (SO-52C, SC-54D, A301SH, XQ-CT44, SCG14...) from text. */
+/** Extract a Japanese carrier model code (SO-52C, SC-54D, A301SH, XQ-CT44, SCG14...) or a
+ * Microsoft Surface retail SKU (STV-00012, 1S3-00013 — 3 alphanumerics + 5 digits) from text. */
 function extractModelNumber(...candidates: (string | null)[]): string | null {
   const re =
-    /\b(SO-\d{2}[A-Za-z]+|SOG\d+|SOV\d+|XQ-[A-Z]{2}\d{2}|SC-\d{2}[A-Z]|SCG\d+|SCV\d+|SM-[A-Z0-9]+|SH-(?:RM)?\d+[A-Z]?|SHG\d+|SHV\d+|F-\d{2}[A-Z]|FCG\d+|CPH\d+|OPG\d+|XIG\d+|G[A-Z0-9]{4}|A\d{3}(?:SH|SO|OP|XM|MO|FC)|XT\d{4}-\d|HWV\d+|HW-\d{2}[A-Z])\b/
+    /\b(SO-\d{2}[A-Za-z]+|SOG\d+|SOV\d+|XQ-[A-Z]{2}\d{2}|SC-\d{2}[A-Z]|SCG\d+|SCV\d+|SM-[A-Z0-9]+|SH-(?:RM)?\d+[A-Z]?|SHG\d+|SHV\d+|F-\d{2}[A-Z]|FCG\d+|CPH\d+|OPG\d+|XIG\d+|G[A-Z0-9]{4}|A\d{3}(?:SH|SO|OP|XM|MO|FC)|XT\d{4}-\d|HWV\d+|HW-\d{2}[A-Z]|[A-Z0-9]{3}-\d{5})\b/
   for (const c of candidates) {
     if (!c) continue
     const m = c.match(re)
@@ -310,7 +311,14 @@ function parse(html: string, input: string): NormalizedSupplierProduct {
     ldName ??
     pick(html, /<meta property="og:title" content="([^"]+)"/) ??
     pick(html, /<h1[^>]*>([^<]+)<\/h1>/)
-  const modelText = title ? decodeEntities(title.split("|")[0].split("【")[0].trim()) : null
+  // Drop the site suffix ("...|中古スマホ...") then strip every 【...】 tag. iosys puts status/promo
+  // tags both after the model ("... 【中古Aランク】") and, for special listings, BEFORE it
+  // ("【バッテリー80%未満】【SIMロック解除済】docomo iPhone12 ..."). Splitting on the first 【 wiped
+  // the whole model text for the leading-tag case; remove all bracketed blocks instead.
+  const modelText = title
+    ? decodeEntities(title.split("|")[0].replace(/【[^】]*】/g, " ").replace(/\s+/g, " ").trim()) ||
+      null
+    : null
 
   const brandText = ldBrand ? decodeEntities(ldBrand) : null
 
@@ -321,14 +329,18 @@ function parse(html: string, input: string): NormalizedSupplierProduct {
   // ("128GB ホワイト"); for Android titles there is NO storage token, so fall back to the
   // token after the model number (and before any 【...】 bracket). Keep colorJa raw and derive
   // canonical English (now consulting the Android color maps too). Unknown tokens stay raw.
+  // Match against the bracket-stripped title: Surface/Mac titles carry the config INSIDE a
+  // trailing 【CPU/4GB/64GB eMMC/Win11Home】 bracket, and the raw-title match dragged that
+  // bracket tail in as the "color" ("eMMC/Win11Home】"). Colors always sit outside 【...】.
+  const titleForColor = title ? title.split("|")[0].replace(/【[^】]*】/g, " ") : null
   let colorJa: string | null = null
-  if (title) {
-    const storageAnchored = title.match(/\d+\s*(?:GB|TB)\s+([^【|]+)/i)
+  if (titleForColor) {
+    const storageAnchored = titleForColor.match(/\d+\s*(?:GB|TB)\s+([^【|]+)/i)
     if (storageAnchored) {
       colorJa = stripTrailingCodes(decodeEntities(storageAnchored[1].trim())) || null
     } else if (modelNumber) {
       // text after the model number up to the first 【 / | / end
-      const afterCode = title.split(modelNumber)[1] ?? ""
+      const afterCode = titleForColor.split(modelNumber)[1] ?? ""
       const codeAnchored = afterCode.match(/^\s*([^【|]+)/)
       if (codeAnchored) colorJa = stripTrailingCodes(decodeEntities(codeAnchored[1].trim())) || null
     }
@@ -338,7 +350,9 @@ function parse(html: string, input: string): NormalizedSupplierProduct {
   // Spec table (<div id="spec"><table>): authoritative for OS/CPU/RAM/ROM/screen/camera/etc.
   const spec = parseSpecTable(html)
   const specRamGb = parseStorage(spec["RAM"] ?? null)
-  const specStorageGb = parseStorage(spec["ROM"] ?? spec["容量"] ?? null)
+  // Storage row label varies by device shape: phones use ROM/容量, Surface/PC pages label the
+  // row by the drive type (eMMC / SSD) instead.
+  const specStorageGb = parseStorage(spec["ROM"] ?? spec["容量"] ?? spec["eMMC"] ?? spec["SSD"] ?? null)
 
   // Storage: spec table ROM > JSON-LD ストレージ > title token.
   const storageGb =

@@ -17,6 +17,7 @@ import {
   ASUS_COLORS_JA_EN,
   MOTOROLA_COLORS_JA_EN,
 } from "./android-listing.ts"
+import { SURFACE_COLORS_JA_EN } from "./surface-listing.ts"
 
 /** Japanese color token -> canonical English color name. */
 export const JA_TO_EN_COLOR: Record<string, string> = {
@@ -85,9 +86,10 @@ export const JA_TO_EN_COLOR: Record<string, string> = {
   "ソフトピンク": "Soft Pink",
 }
 
-// All Android brand color maps, consulted after the Apple map. Order is arbitrary — keys
-// rarely collide, and where they do (e.g. ミント -> Mint) every map agrees.
+// All other brand color maps (Android + Surface), consulted after the Apple map. Order is
+// arbitrary — keys rarely collide, and where they do (e.g. ミント -> Mint) every map agrees.
 const ANDROID_COLOR_MAPS: Record<string, string>[] = [
+  SURFACE_COLORS_JA_EN,
   GALAXY_COLORS_JA_EN,
   XPERIA_COLORS_JA_EN,
   AQUOS_COLORS_JA_EN,

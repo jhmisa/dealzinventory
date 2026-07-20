@@ -19,6 +19,8 @@ import { type AppleWatchListingSku, parseAppleWatchListingPage } from "./apple-w
 import { appleWatchSpec } from "./apple-watch-specs.ts"
 import { type AirPodsListingSku, parseAirPodsListingPage } from "./airpods-listing.ts"
 import { airpodsSpec } from "./airpods-specs.ts"
+import { type SurfaceListingSku, parseSurfaceListingPage } from "./surface-listing.ts"
+import { surfacePartColor, surfaceSpec } from "./surface-specs.ts"
 import {
   type AndroidBrandConfig,
   type AndroidListingSku,
@@ -325,6 +327,70 @@ export const AIRPODS_CATEGORY: HarvestCategory = {
   sections: [{ path: "airpods", carrier: null }],
   pageToRows: (html, section, src) =>
     parseAirPodsListingPage(html).map((sku) => airpodsRow(sku, section, src)),
+}
+
+// Microsoft Surface — the second config-in-title, part#-keyed shape after Mac. The Microsoft
+// retail SKU (STV-00012) encodes model+config+color, so identity = part_number and the config
+// is read verbatim from the title bracket. Screen/year come from surface-specs; the Go line's
+// colorless cards are colored from the verified part#→color reference (never guessed).
+function surfaceRow(
+  sku: SurfaceListingSku,
+  deviceCategory: string,
+  section: CarrierSection,
+  sourceUrl: string,
+): CatalogRow {
+  const spec = surfaceSpec(sku.model_name)
+  const color_en = sku.color_en ?? (sku.color_ja == null ? surfacePartColor(sku.part_number) : null)
+  return {
+    sku_key: sku.part_number,
+    part_number: sku.part_number,
+    model_number: sku.part_number, // like Mac: the retail SKU IS the identifier
+    brand: "Microsoft",
+    // LTE models are a distinct product in Microsoft's own marketing ("Surface Go 2 LTE
+    // Advanced") AND must not collide with the Wi-Fi twin on the (brand, model_name, color,
+    // storage) TABLET identity index — so the connectivity word lives in the name.
+    model_name: sku.lte ? `${sku.model_name} LTE Advanced` : sku.model_name,
+    storage_gb: sku.storage_gb,
+    color_ja: sku.color_ja,
+    color_en,
+    carrier: null,
+    connectivity: sku.lte ? "LTE Advanced" : "Wi-Fi",
+    device_category: deviceCategory,
+    source_url: sourceUrl,
+    carrier_path: section.path,
+    raw_title: sku.raw_title,
+    listing_count: 1,
+    specs: {
+      chipset: sku.chip,
+      cpu_ghz: sku.cpu_ghz,
+      ram_gb: sku.ram_gb,
+      storage_type: sku.storage_type,
+      os: sku.os,
+      os_family: "Windows",
+      screen_size: spec?.screen_size ?? null,
+      year: spec?.year ?? null,
+      lte: sku.lte,
+      spec_known: spec != null,
+    },
+  }
+}
+
+// Tablet path: Surface Go / Pro / Book (iosys files Book under tablet too).
+export const SURFACE_CATEGORY: HarvestCategory = {
+  pathPrefix: "items/tablet/windows",
+  sections: [{ path: "surface", carrier: null }],
+  pageToRows: (html, section, src) =>
+    parseSurfaceListingPage(html).map((sku) => surfaceRow(sku, "TABLET", section, src)),
+}
+
+// Laptop path: Surface Laptop / Laptop Go / Laptop Studio (same title grammar; currently often
+// empty — the section converges immediately on a 0-card page, like code-less brands' carrier
+// sections, so wiring it is free insurance for when iosys stocks them).
+export const SURFACE_LAPTOP_CATEGORY: HarvestCategory = {
+  pathPrefix: "items/notepc/mobilenote/microsoft",
+  sections: [{ path: "surface_laptop", carrier: null }],
+  pageToRows: (html, section, src) =>
+    parseSurfaceListingPage(html).map((sku) => surfaceRow(sku, "COMPUTER", section, src)),
 }
 
 // Android brands have no part_number → dedupe identity is (brand, model, storage, color, carrier).

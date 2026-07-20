@@ -217,6 +217,7 @@ Re-harvest for new Apple models follows the same shape as §2 (add specs → re-
 | Nothing | Nothing (+ CMF) | `items/smartphone/nothing` | **NONE — fully code-less** (sentinel `/(?!)/`; all SIM-free/Rakuten) → `nameConsumeRe` only | `nothing-specs.ts` / `NOTHING_COLORS_JA_EN` | `2026-07-01-nothing-{fill-gaps,legacy-reconcile}.sql` | `iosys-nothing-p1.html` | ✅ legacy reconciled inline (1 COMPUTER row / 1 item → ANDROID) |
 | Kyocera | Kyocera (京セラ) | `items/smartphone/kyocera` (+ **ymobile** section) | au `KYV\d+ \| KYG\d+` · SoftBank `A\d{3}KC \| \d{3}KC` · SIM-free `KC-S\d+` (Android One = code-less) | `kyocera-specs.ts` / `KYOCERA_COLORS_JA_EN` | `2026-07-01-kyocera-fill-gaps.sql` | `iosys-kyocera-p1.html` | ✅ SMARTPHONES ONLY; no legacy rows (0 COMPUTER) |
 | HTC | HTC | `items/smartphone/htc` | **coarse only** SoftBank `\d{3}HT` · au `HTV3[23]` (=10/U11); J-series codes KEPT in name | `htc-specs.ts` / `HTC_COLORS_JA_EN` | `2026-07-01-htc-fill-gaps.sql` | `iosys-htc-p1.html` | ✅ closed JP lineup; no legacy rows (0 COMPUTER) |
+| Surface | Microsoft | `items/tablet/windows/surface` (+ `items/notepc/mobilenote/microsoft/surface_laptop`) | MS retail SKU `[A-Z0-9]{3}-\d{5}` (STV-00012); config in title bracket | `surface-specs.ts` (screen/year + part#→color) / `SURFACE_COLORS_JA_EN` | `2026-07-20-surface-fill-gaps.sql` | `iosys-surface-p{1,2}.html` | ✅ TABLET (+COMPUTER laptop path, empty); **legacy reconcile OPEN** (13 coarse COMPUTER rows / 95 items) |
 
 ### Galaxy (Samsung)
 - **Codes:** SIM-free `SM-…Q/C` · au `SCG##`/`SCV##` · docomo `SC-##L`.
@@ -442,6 +443,30 @@ Re-harvest for new Apple models follows the same shape as §2 (add specs → re-
   colors = Carbon Gray / Topaz Gold / Camellia Red only. Desire 626 JP = 2GB variant. サルサレッド =
   Salsa Red is a Desire 22 pro JP-exclusive color.
 - **No legacy rows** (0 COMPUTER). Current iosys stock = Desire 22 pro (SIM-free, 3 colors) + U11 601HT.
+
+### Microsoft Surface (Go / Pro / Book + Laptop line)
+- **First non-Apple part#-keyed shape**, second config-in-title shape after Mac (its own parser
+  `surface-listing.ts`, NOT an `AndroidBrandConfig`). Microsoft's retail SKU (`STV-00012` — 3
+  alphanumerics + 5 digits, prefix may start with a digit) encodes model+config+color like an
+  Apple part#; the bracket carries `CPU(GHz)/RAM/storage {eMMC|SSD}/Win11{Home|Pro}` so config is
+  read verbatim (spec_known needs only screen/year from `surface-specs.ts`).
+- **Grammar:** `[【欠品tags】] Surface {Model}[ LTE Advanced] {XXX-#####} [color]【config】`. Go-line
+  cards are COLORLESS → verified `SURFACE_PART_COLORS` (part#→color; Go 2 line is Platinum-only,
+  sourced) fills them; unverified part#s stay null and the fill-gaps skips them.
+- **Identity trap:** `uq_active_tablet_sku` = (brand, model_name, color, storage_gb) — Microsoft
+  channel twins (consumer STV / education STZ / commercial RRX = one hardware config) and RAM-tier
+  siblings COLLAPSE to one row (DISTINCT ON prefers the Win-Home consumer SKU). **LTE models keep
+  " LTE Advanced" in model_name** (set in `surfaceRow`) so cellular/Wi-Fi twins don't collide.
+- **JP-year traps (verified):** Surface Book JP=2016, Pro X JP=2020, Laptop Studio JP=2022 (all later
+  than global). Two-size lines (Book 2/3, Laptop 3–6) have NO single screen → null, per-part#.
+  Bare "Surface Pro" is ambiguous (2013 vs 2017 model) → NOT in specs, flags unknownModels.
+- **Backorder side (shipped together):** supplier-adapter `iosys.ts` now (1) matches colors on the
+  bracket-stripped title (the config bracket was being captured as "color eMMC/Win11Home】"),
+  (2) reads spec-table storage from `eMMC`/`SSD` row labels, (3) extracts the MS SKU as
+  modelNumber; frontend `extractPartNumber`/`cleanModelName` know the MS shape too.
+- **Legacy reconcile OPEN:** 13 coarse COMPUTER rows ("Surface Go" = 56 mixed items, "Surface Pro 5",
+  "Surface Go w/ KB", colors "Silver") / 95 items — need per-item config knowledge to repoint; the
+  part#-keyed rows coexist safely (matching hits part#/model_number first).
 
 ---
 

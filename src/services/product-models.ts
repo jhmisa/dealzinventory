@@ -19,10 +19,11 @@ export interface ProductModelMatchInput {
   colorJa?: string | null
 }
 
-// Extract an Apple part-number like "MYWJ3J/A" from the model text. These are the canonical,
-// SKU-precise identifier stored on product_models.part_number.
+// Extract an Apple part-number like "MYWJ3J/A" or a Microsoft Surface retail SKU like
+// "STV-00012" (3 alphanumerics + 5 digits) from the model text. These are the canonical,
+// SKU-precise identifiers stored on product_models.part_number.
 function extractPartNumber(modelText: string): string | null {
-  const m = modelText.match(/\b([A-Z0-9]{4,7}\/[A-Z]{1,2})\b/)
+  const m = modelText.match(/\b([A-Z0-9]{4,7}\/[A-Z]{1,2}|[A-Z0-9]{3}-\d{5})\b/)
   return m ? m[1] : null
 }
 
@@ -32,16 +33,18 @@ function extractPartNumber(modelText: string): string | null {
 // glued "iPhone16" -> "iPhone 16" form to match our clean product_models.model_name.
 export function cleanModelName(modelText: string): string {
   let name = modelText.trim()
-  // Cut at the first A-number (e.g. " A3295 ...") if present...
-  const aSplit = name.split(/\s+A\d{4,5}/)[0]
-  if (aSplit !== name) {
-    name = aSplit
+  // Cut at the first A-number (e.g. " A3295 ...") or Surface part# (" STV-00012 ...") if present...
+  const codeSplit = name.split(/\s+(?:A\d{4,5}|[A-Z0-9]{3}-\d{5})/)[0]
+  if (codeSplit !== name) {
+    name = codeSplit
   } else {
     // ...otherwise cut at the storage token (e.g. " 256GB").
     name = name.split(/\s+\d+\s*(?:GB|TB)/i)[0]
   }
-  // Normalize "iPhone16" -> "iPhone 16" (catalog stores the spaced form).
-  name = name.replace(/\b(iPhone|iPad)(\d)/i, '$1 $2')
+  // Normalize "iPhone16" -> "iPhone 16" (catalog stores the spaced form). Surface glues the
+  // number the same way ("Go2" / "Pro7+"); the fuzzy search RPC is separator-insensitive so
+  // the glued form still matches, but drop a leading maker word iosys prints in caps.
+  name = name.replace(/\b(iPhone|iPad)(\d)/i, '$1 $2').replace(/^MICROSOFT\s+/i, '')
   return name.trim()
 }
 
