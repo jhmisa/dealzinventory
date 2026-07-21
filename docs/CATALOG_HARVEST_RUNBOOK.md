@@ -158,11 +158,21 @@ because the title grammar differs.
 - **Colors:** `apple-colors.ts` (JA→EN) with model-aware fixes (iPhone 8/X `Black→Space Gray`,
   `White→Silver`; `Red→(PRODUCT)RED`; `Midnight Black→Midnight`).
 - **Mac (`mac-listing.ts`, SHIPPED v1.75.0):** path `items/pc/notepc/macbook`. Grammar `MacBook
-  [Air|Pro] {size}インチ {part#/A} {Early|Mid|Late} {year} {color} 【chip/RAM/SSD[/GPU]】`. **The config
+  [Air|Pro|Neo] {size}インチ {part#/A} {Early|Mid|Late} {year} {color} 【chip/RAM/SSD[/GPU]】`. **The config
   is IN the title bracket → no spec file needed** (spec_known always true). Parses M1–M5 (Pro/Max) +
   Intel, CPU/GPU cores, region suffix, period→year. **Identity collapses on config** (model/size/chip/
   RAM/SSD/color), part# is coarse. fill-gaps formats storage GB/TB, os_family='macOS'. No COMPUTER
   unique index yet (legacy dirty rows). NEXT: iMac/mini/Studio (`items/pc/deskpc/mac` — desktop grammar).
+  - **MacBook Neo (Early 2026, A18 Pro, added v1.112.0):** a DISTINCT `MacLine` — `detectLine` checks
+    `^MacBook Neo` BEFORE the generic `^MacBook` (else it collapses into the old 12″ "MacBook").
+    Colors シトラス/インディゴ/ブラッシュ = Citrus/Indigo/Blush (in `apple-colors.ts`). Its listing-card
+    titles carry NO `インチ` → screen_size null (detail-page spec table has it; honest gap, not guessed).
+  - **⚠️ Mac backorder matching (fixed v1.112.0):** Macs put the part# in `model_number` (NULL
+    `part_number`, config-collapsed to a representative). For the Add-Backorder dialog to match a Mac:
+    (1) `findMatchingProductModel` branch (a) queries `part_number.eq OR model_number.eq`; (2)
+    `cleanModelName` cuts at the Apple `XXXXX/A` part# so the name-fallback resolves "MacBook Neo"/etc;
+    (3) the `iosys.ts` adapter recovers the color from `…(Early|Mid|Late) YYYY {color}` (Mac titles have
+    no storage token to anchor it). Applies to all MacBooks + desktop Macs, not just Neo.
 - **Desktop Macs (iMac/Mac mini/Studio/Pro, SHIPPED v1.76.0):** same `mac-listing.ts` parser, path
   `items/pc/deskpc/mac` (split-on-part#; iMac size+storage-type inside the bracket; colorless desktops → `—`).
 - **Apple Watch (`apple-watch-listing.ts` + `apple-watch-specs.ts`, SHIPPED v1.77.0):** path

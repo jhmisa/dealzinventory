@@ -33,8 +33,9 @@ function extractPartNumber(modelText: string): string | null {
 // glued "iPhone16" -> "iPhone 16" form to match our clean product_models.model_name.
 export function cleanModelName(modelText: string): string {
   let name = modelText.trim()
-  // Cut at the first A-number (e.g. " A3295 ...") or Surface part# (" STV-00012 ...") if present...
-  const codeSplit = name.split(/\s+(?:A\d{4,5}|[A-Z0-9]{3}-\d{5})/)[0]
+  // Cut at the first A-number (" A3295 ..."), Surface part# (" STV-00012 ..."), or Apple SKU part#
+  // (" MHFA4J/A ..." — Macs, whose name segment precedes the part#) if present...
+  const codeSplit = name.split(/\s+(?:A\d{4,5}|[A-Z0-9]{3}-\d{5}|[A-Z0-9]{4,7}\/[A-Z]{1,2})/)[0]
   if (codeSplit !== name) {
     name = codeSplit
   } else {
@@ -80,13 +81,15 @@ export async function findMatchingProductModel(
     } as ProductModelWithHeroImage
   }
 
-  // (a) Exact part-number match — the happy path.
+  // (a) Exact part-number match — the happy path. Macs/desktop Macs store the Apple part# in
+  // `model_number` (not `part_number`, which they leave NULL — the part# is config-collapsed to a
+  // representative there), so when the part_number lookup misses, retry against model_number.
   const partNo = extractPartNumber(modelText)
   if (partNo) {
     const { data, error } = await supabase
       .from('product_models')
       .select(select)
-      .eq('part_number', partNo)
+      .or(`part_number.eq.${partNo},model_number.eq.${partNo}`)
       .eq('status', 'ACTIVE')
       .limit(1)
     if (error) throw error

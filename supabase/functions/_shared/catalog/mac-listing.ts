@@ -18,6 +18,7 @@ import { colorJaToEn } from "./apple-colors.ts"
 export type MacLine =
   | "MacBook Air"
   | "MacBook Pro"
+  | "MacBook Neo"
   | "MacBook"
   | "Mac mini"
   | "iMac"
@@ -75,6 +76,9 @@ function detectLine(head: string): MacLine | null {
   const s = head.trim()
   if (/^MacBook\s+Air/i.test(s)) return "MacBook Air"
   if (/^MacBook\s+Pro/i.test(s)) return "MacBook Pro"
+  // MacBook Neo (Early 2026, A18 Pro, colorful entry line) is a DISTINCT product from the old
+  // 12" "MacBook" — must be caught before the generic /^MacBook/ fallthrough or it collapses.
+  if (/^MacBook\s+Neo/i.test(s)) return "MacBook Neo"
   if (/^MacBook/i.test(s)) return "MacBook"
   if (/^Mac\s*mini/i.test(s)) return "Mac mini"
   if (/^Mac\s*Studio/i.test(s)) return "Mac Studio"

@@ -141,3 +141,20 @@ Deno.test("iosys: Surface Go2 — part# as modelNumber, no bracket-garbage color
   assertEquals(p.specs.year, 2020)
   assertEquals(p.specs.cpu, "Pentium Gold 4425Y(1.7GHz)")
 })
+
+// --- MacBook Neo (Apple part# in model_number, period-anchored color) -------------------------
+// The Mac title puts the color AFTER "Early 2026" with no storage token to anchor it, so the
+// storage/modelNumber color branches both miss — the period-anchored fallback recovers it.
+const mbHtml = await Deno.readTextFile(new URL("./__fixtures__/iosys-400216.html", import.meta.url))
+const mbUrl = "https://iosys.co.jp/items/notepc/macbook/apple/macbook_neo_mhfa4j_a_early_2026/400216"
+
+Deno.test("iosys: MacBook Neo — period-anchored color, spec-table storage/screen", () => {
+  const p = iosysAdapter.parse(mbHtml, mbUrl)
+  assertEquals(p.brandText, "Apple")
+  assertEquals(p.modelText, "MacBook Neo MHFA4J/A Early 2026 シルバー")
+  assertEquals(p.color, "Silver") // recovered from "…Early 2026 シルバー"
+  assertEquals(p.colorJa, "シルバー")
+  assertEquals(p.storageGb, 256)
+  assertEquals(p.specs.screenSize, 13)
+  assertEquals(p.conditionGrade, "S")
+})

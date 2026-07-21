@@ -176,3 +176,28 @@ Deno.test("mac: desktop page extraction", () => {
   assertEquals(skus.some((s) => s.model_name === "iMac"), true)
   assertEquals(skus.every((s) => /\/A$/.test(s.part_number)), true)
 })
+
+// --- MacBook Neo (Early 2026, A18 Pro) — distinct line, new colors ---------------------------
+
+Deno.test("mac: MacBook Neo keeps its line (not collapsed to MacBook), A18 Pro + new color", () => {
+  const s = mac("MacBook Neo MHFD4J/A Early 2026 シトラス【Apple A18 Pro/8GB/256GB SSD】")
+  assertEquals(s?.model_name, "MacBook Neo")
+  assertEquals(s?.part_number, "MHFD4J/A")
+  assertEquals(s?.year, 2026)
+  assertEquals(s?.chip, "Apple A18 Pro")
+  assertEquals(s?.is_intel, false)
+  assertEquals(s?.ram_gb, 8)
+  assertEquals(s?.ssd_gb, 256)
+  assertEquals(s?.color_ja, "シトラス")
+  assertEquals(s?.color_en, "Citrus")
+})
+
+Deno.test("mac: MacBook Neo Indigo / Blush colors resolve", () => {
+  assertEquals(mac("MacBook Neo MHFG4J/A Early 2026 インディゴ【Apple A18 Pro/8GB/512GB SSD】")?.color_en, "Indigo")
+  assertEquals(mac("MacBook Neo MHFH4J/A Early 2026 ブラッシュ【Apple A18 Pro/8GB/256GB SSD】")?.color_en, "Blush")
+})
+
+Deno.test("mac: old 12-inch MacBook still resolves to plain MacBook", () => {
+  const s = mac("MacBook 12インチ MNYF2J/A Early 2016 スペースグレイ【Core m3/8GB/256GB SSD】")
+  assertEquals(s?.model_name, "MacBook")
+})

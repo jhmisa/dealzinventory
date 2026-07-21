@@ -57,6 +57,10 @@ export const JA_TO_EN_COLOR: Record<string, string> = {
   // --- 13-series ---
   "ミッドナイト": "Midnight",
   "スターライト": "Starlight",
+  // MacBook Neo (Early 2026, A18 Pro) — verified official EN names (apple.com/macbook-neo).
+  "シトラス": "Citrus",
+  "インディゴ": "Indigo",
+  "ブラッシュ": "Blush",
   "シエラブルー": "Sierra Blue",
   "アルパイングリーン": "Alpine Green",
 

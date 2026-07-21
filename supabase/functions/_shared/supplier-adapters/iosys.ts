@@ -344,6 +344,13 @@ function parse(html: string, input: string): NormalizedSupplierProduct {
       const codeAnchored = afterCode.match(/^\s*([^【|]+)/)
       if (codeAnchored) colorJa = stripTrailingCodes(decodeEntities(codeAnchored[1].trim())) || null
     }
+    if (!colorJa) {
+      // Mac/Apple titles put the color after the "(Early|Mid|Late) YYYY" period marker with no
+      // storage token to anchor it ("MacBook Neo MHFA4J/A Early 2026 シルバー"). Take the trailing
+      // token. Safe brand-wide — non-Mac titles carry no Early/Mid/Late-YYYY marker.
+      const periodAnchored = titleForColor.match(/(?:Early|Mid|Late)\s*\d{4}\s+([^【|]+?)\s*$/i)
+      if (periodAnchored) colorJa = stripTrailingCodes(decodeEntities(periodAnchored[1].trim())) || null
+    }
   }
   const color = colorJaToEn(colorJa) ?? colorJa
 
