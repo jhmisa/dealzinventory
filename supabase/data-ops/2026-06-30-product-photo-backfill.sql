@@ -61,4 +61,16 @@ ranked AS (
 )
 SELECT product_id, image_url FROM ranked;
 
+-- SECURITY: this script DROPs and recreates the table, which also drops its RLS flag and policy,
+-- and the fresh table re-inherits anon/authenticated grants from the ALTER DEFAULT PRIVILEGES
+-- rule in 20260528000000_explicit_public_grants.sql. That is exactly how this table ended up
+-- world-readable AND world-writable via the anon key (caught by the advisor, 2026-08-06) after it
+-- had already been secured once. Re-apply the lockdown here so re-running this data-op can never
+-- reopen the hole again. Keep in sync with 20260806000000_refix_product_photo_jobs_rls.sql.
+ALTER TABLE public.product_photo_jobs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS product_photo_jobs_auth_all ON public.product_photo_jobs;
+CREATE POLICY product_photo_jobs_auth_all ON public.product_photo_jobs
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+REVOKE ALL ON public.product_photo_jobs FROM anon;
+
 COMMIT;
